@@ -1,6 +1,6 @@
 /**
  * Planning pipeline: YAML configs → daily loads (with pressure surfaces) → carry-over →
- * operating windows / school stress → effective capacity → weighted risk + explainable surfaces.
+ * operating windows / school stress → effective capacity → weighted pressure + explainable surfaces.
  */
 import { PRESSURE_SURFACE_IDS } from '@/domain/pressureSurfaces';
 import { emptySurfaceTotals } from '@/domain/pressureSurfaces';
@@ -17,8 +17,10 @@ import {
 } from './phaseEngine';
 import { withOperationalNoise } from './dataNoise';
 import { computeRisk, type RiskRow } from './riskModel';
+import { storePaydayMonthMultiplier } from '@/engine/paydayMonthShape';
 import { DEFAULT_RISK_TUNING, type RiskModelTuning } from './riskModelTuning';
 import type { MarketConfig } from './types';
+import { TRADING_MONTH_KEYS } from '@/lib/tradingMonthlyDsl';
 import { parseAllYamlDocuments } from './yamlDslParser';
 import {
   blendTowardMultiplier,
@@ -126,7 +128,11 @@ export function runPipeline(
     const agg = dailyByMarket.get(market) || [];
     const dayRow = agg.find((r) => r.date === date && r.market === market);
     const config = configByMarket[market];
-    const store_pressure = getStorePressureForDate(date, config);
+    const rawStore = getStorePressureForDate(date, config);
+    const store_pressure = Math.min(
+      1,
+      Math.max(0, rawStore * storePaydayMonthMultiplier(date, tuning.storePaydayMonthPeakMultiplier))
+    );
     const { campaign_active, campaign_risk } = getCampaignRiskForDate(date, config);
     const public_holiday_flag = isPublicHoliday(market, date);
     const school_holiday_flag = isSchoolHoliday(market, date);
@@ -312,6 +318,13 @@ function getStorePressureForDate(dateStr: string, config: MarketConfig | undefin
   const level = weekly[dayName];
   if (level == null) return 0;
   let p = TRADING_LEVELS[String(level).toLowerCase()] ?? 0.5;
+  const monthKey = TRADING_MONTH_KEYS[d.getMonth()];
+  if (monthKey) {
+    const mm = config.monthlyTradingPattern?.[monthKey];
+    if (mm != null && Number.isFinite(mm)) {
+      p *= Math.min(1, Math.max(0, mm));
+    }
+  }
   const seas = config.seasonalTrading;
   if (seas && seas.amplitude > 0) {
     p *= seasonalTradingFactor(dateStr, seas.peak_month, seas.amplitude);

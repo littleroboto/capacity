@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/Header';
 import { DSLPanel } from '@/components/DSLPanel';
+import { WORKBENCH_SPLIT_HANDLE_PX, WorkbenchSplitHandle } from '@/components/WorkbenchSplitHandle';
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
 import { PlanningWorkbench } from '@/components/PlanningWorkbench';
 import { RunwayGrid, type SlotSelection } from '@/components/RunwayGrid';
@@ -12,6 +13,9 @@ import { fetchRunwayMarketOrder } from '@/lib/runwayManifest';
 import { useAtcStore } from '@/store/useAtcStore';
 
 const DSL_PANEL_COLLAPSED_STORAGE_KEY = 'capacity:dsl-panel-collapsed';
+const DSL_SPLIT_RIGHT_PX_KEY = 'capacity:dsl-split-right-px';
+const MIN_DSL_PANEL_PX = 280;
+const DEFAULT_DSL_PANEL_PX = 520;
 
 export default function App() {
   const [marketIds, setMarketIds] = useState<string[]>([]);
@@ -37,6 +41,58 @@ export default function App() {
   });
   const lgUp = useMediaMinWidth(1024);
   const dslPanelLayoutCollapsed = dslPanelCollapsed && lgUp;
+  const mainGridRef = useRef<HTMLDivElement>(null);
+
+  const [dslRightWidthPx, setDslRightWidthPx] = useState(() => {
+    try {
+      if (typeof localStorage === 'undefined') return DEFAULT_DSL_PANEL_PX;
+      const v = localStorage.getItem(DSL_SPLIT_RIGHT_PX_KEY);
+      const n = v ? Number.parseInt(v, 10) : NaN;
+      if (Number.isFinite(n) && n >= MIN_DSL_PANEL_PX) return Math.min(n, 2400);
+    } catch {
+      /* ignore */
+    }
+    return DEFAULT_DSL_PANEL_PX;
+  });
+
+  const persistDslSplit = useCallback((w: number) => {
+    try {
+      localStorage.setItem(DSL_SPLIT_RIGHT_PX_KEY, String(Math.round(w)));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!lgUp || dslPanelLayoutCollapsed || !mainGridRef.current) return;
+    const el = mainGridRef.current;
+    const fit = () => {
+      const total = el.getBoundingClientRect().width;
+      const rightEl = el.children[2] as HTMLElement | undefined;
+      const measured = Math.round(rightEl?.getBoundingClientRect().width ?? 0);
+      if (total < MIN_DSL_PANEL_PX + WORKBENCH_SPLIT_HANDLE_PX + 120) {
+        if (measured >= MIN_DSL_PANEL_PX) {
+          setDslRightWidthPx(measured);
+        }
+        return;
+      }
+      const maxRight = Math.max(
+        MIN_DSL_PANEL_PX,
+        Math.floor(total * 0.78) - WORKBENCH_SPLIT_HANDLE_PX
+      );
+      setDslRightWidthPx((prev) => {
+        let next = Math.min(prev, maxRight);
+        if (measured >= MIN_DSL_PANEL_PX) {
+          next = Math.min(next, measured);
+        }
+        return Math.max(MIN_DSL_PANEL_PX, next);
+      });
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [lgUp, dslPanelLayoutCollapsed]);
 
   useEffect(() => {
     try {
@@ -80,13 +136,21 @@ export default function App() {
 
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
-      <Header marketIds={marketIds} />
+      <Header />
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent text-foreground">
         <div
+          ref={mainGridRef}
           className={
             dslPanelLayoutCollapsed
               ? 'grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-0 lg:grid-cols-[minmax(0,1fr)_2.75rem]'
-              : 'grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(280px,42%)]'
+              : 'grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-0'
+          }
+          style={
+            lgUp && !dslPanelLayoutCollapsed
+              ? {
+                  gridTemplateColumns: `minmax(0, 1fr) ${WORKBENCH_SPLIT_HANDLE_PX}px minmax(${MIN_DSL_PANEL_PX}px, ${dslRightWidthPx}px)`,
+                }
+              : undefined
           }
         >
           <div className="flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto overflow-x-auto p-4">
@@ -102,7 +166,20 @@ export default function App() {
               </footer>
             </div>
           </div>
-          <DSLPanel collapsed={dslPanelLayoutCollapsed} onCollapsedChange={setDslPanelCollapsed} />
+          {lgUp && !dslPanelLayoutCollapsed ? (
+            <WorkbenchSplitHandle
+              rightWidthPx={dslRightWidthPx}
+              onWidthChange={setDslRightWidthPx}
+              onDragEnd={persistDslSplit}
+              containerRef={mainGridRef}
+              minRightPx={MIN_DSL_PANEL_PX}
+            />
+          ) : null}
+          <DSLPanel
+            marketIds={marketIds}
+            collapsed={dslPanelLayoutCollapsed}
+            onCollapsedChange={setDslPanelCollapsed}
+          />
         </div>
       </main>
     </div>

@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { ChevronDown, RotateCcw, Rows2, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -9,15 +8,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DEFAULT_RISK_TUNING, normalizedRiskWeights, type RiskModelTuning } from '@/engine/riskModelTuning';
+import { normalizedRiskWeights } from '@/engine/riskModelTuning';
 import {
   RISK_HEATMAP_CURVE_OPTIONS,
   applyRiskHeatmapTransfer,
   riskHeatmapCurveUsesGamma,
   type RiskHeatmapCurveId,
 } from '@/lib/riskHeatmapTransfer';
+import { RightPanelSection } from '@/components/RightPanelSection';
+import { TechWeeklyRhythmPanel } from '@/components/TechWeeklyRhythmPanel';
 import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
+
+/** Slider step in γ (0.1 = coarser than the old 0.05 centi-step). */
+const GAMMA_UI_MIN = 0.35;
+const GAMMA_UI_MAX = 3;
+const GAMMA_UI_STEP = 0.1;
+
+function snapGammaUi(gamma: number): number {
+  const s = Math.round(gamma / GAMMA_UI_STEP) * GAMMA_UI_STEP;
+  return Math.min(GAMMA_UI_MAX, Math.max(GAMMA_UI_MIN, Math.round(s * 100) / 100));
+}
+
+function formatPaydayPeakText(n: number): string {
+  const r = Math.min(2, Math.max(1, Math.round(n * 1000) / 1000));
+  const s = r.toFixed(3).replace(/\.?0+$/, '');
+  return s === '' ? '1' : s;
+}
 
 /** Distinct segment colours for the blend bar (collapsed + expanded story). */
 const BLEND_VIS: { key: keyof ReturnType<typeof normalizedRiskWeights>; label: string; className: string }[] = [
@@ -40,7 +57,7 @@ function BlendStackBar({
     <div
       className={cn('w-full', className)}
       role="img"
-      aria-label={`Combined risk mix: ${label}`}
+      aria-label={`Combined pressure mix: ${label}`}
     >
       <div className="flex h-2.5 w-full overflow-hidden rounded-full border border-border/60 bg-muted/60 shadow-inner">
         {segs.map((s) => (
@@ -113,98 +130,15 @@ function CurveTransferSparkline({
   );
 }
 
-const RISK_BLEND_PRESETS: { id: string; label: string; tuning: RiskModelTuning }[] = [
-  {
-    id: 'tech-led',
-    label: 'Tech-led',
-    tuning: {
-      ...DEFAULT_RISK_TUNING,
-      importanceTech: 75,
-      importanceStore: 18,
-      importanceCampaign: 7,
-      importanceHoliday: 0,
-    },
-  },
-  {
-    id: 'store-led',
-    label: 'Restaurant-led',
-    tuning: {
-      ...DEFAULT_RISK_TUNING,
-      importanceTech: 25,
-      importanceStore: 55,
-      importanceCampaign: 15,
-      importanceHoliday: 5,
-    },
-  },
-  {
-    id: 'balanced',
-    label: 'Balanced',
-    tuning: {
-      ...DEFAULT_RISK_TUNING,
-      importanceTech: 30,
-      importanceStore: 30,
-      importanceCampaign: 30,
-      importanceHoliday: 10,
-    },
-  },
-];
-
-function TuningSlider({
-  id,
-  label,
-  value,
-  max,
-  blendShare,
-  onChange,
-  hint,
-}: {
-  id: string;
-  label: string;
-  value: number;
-  max: number;
-  /** Normalized share of Combined risk (0–1). */
-  blendShare: number;
-  onChange: (n: number) => void;
-  hint?: string;
-}) {
-  const pctShare = `${Math.round(blendShare * 100)}%`;
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-start justify-between gap-2">
-        <Label htmlFor={id} className="text-xs font-normal text-foreground">
-          {label}
-        </Label>
-        <div className="shrink-0 text-right leading-tight">
-          <div className="tabular-nums text-xs font-medium text-foreground">{pctShare}</div>
-          <div className="tabular-nums text-[10px] text-muted-foreground">weight {value}</div>
-        </div>
-      </div>
-      <input
-        id={id}
-        type="range"
-        min={0}
-        max={max}
-        step={1}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="h-2 w-full cursor-pointer accent-primary"
-      />
-      {hint ? <p className="text-[10px] leading-snug text-muted-foreground">{hint}</p> : null}
-    </div>
-  );
-}
-
-type SectionShell = 0 | 1 | 2;
-
 export function RiskModelPanel() {
   const [expanded, setExpanded] = useState(false);
-  /** 0 = full chrome, 1 = text-only strip, 2 = icon-only strip. */
-  const [shell, setShell] = useState<SectionShell>(0);
-  const cycleShell = () => setShell((s) => ((s + 1) % 3) as SectionShell);
-  /** Collapse Tech/Restaurant/Marketing/Resources sliders to save vertical space. */
-  const [blendWeightsOpen, setBlendWeightsOpen] = useState(false);
-  const viewMode = useAtcStore((s) => s.viewMode);
   const riskTuning = useAtcStore((s) => s.riskTuning);
+  const paydayPeak = riskTuning.storePaydayMonthPeakMultiplier;
+  const [paydayPeakText, setPaydayPeakText] = useState(() => formatPaydayPeakText(paydayPeak));
+
+  useEffect(() => {
+    setPaydayPeakText(formatPaydayPeakText(paydayPeak));
+  }, [paydayPeak]);
   const riskHeatmapGamma = useAtcStore((s) => s.riskHeatmapGamma);
   const riskHeatmapCurve = useAtcStore((s) => s.riskHeatmapCurve);
   const setRiskTuning = useAtcStore((s) => s.setRiskTuning);
@@ -218,137 +152,27 @@ export function RiskModelPanel() {
 
   const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-  const patch = (p: Partial<RiskModelTuning>) => setRiskTuning(p);
-
   const blendSummary = `Tech ${pct(weights.tech)} · Restaurant ${pct(weights.store)} · Marketing ${pct(weights.campaign)} · Resources ${pct(weights.holiday)}`;
 
-  const shellHint = ['Full header', 'Text strip', 'Icons only'][shell]!;
-
-  const headerRow = (opts: { iconOnly?: boolean }) => {
-    if (opts.iconOnly) {
-      return (
-        <div className="flex items-center justify-end gap-0.5 border-b border-border/50 bg-card/40 px-1 py-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 shrink-0 p-0 text-muted-foreground"
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
-            title={expanded ? 'Hide risk tuning' : 'Show risk tuning'}
-            aria-label={expanded ? 'Hide risk tuning' : 'Show risk tuning'}
-          >
-            <SlidersHorizontal className="h-4 w-4" aria-hidden />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 shrink-0 p-0 text-muted-foreground"
-            onClick={cycleShell}
-            title={`Section layout: ${shellHint}. Click for next.`}
-            aria-label={`Cycle section layout, currently ${shellHint}`}
-          >
-            <Rows2 className="h-4 w-4" aria-hidden />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 shrink-0 p-0 text-muted-foreground"
-            onClick={() => resetRiskTuning()}
-            title="Reset risk model"
-            aria-label="Reset risk model"
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden />
-          </Button>
-        </div>
-      );
-    }
-    if (shell === 1) {
-      return (
-        <div className="flex items-center justify-between gap-2 border-b border-border/50 bg-card/40 px-2 py-2">
-          <button
-            type="button"
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-0.5 text-left outline-none ring-offset-background transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring"
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
-          >
-            <ChevronDown
-              className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200', expanded && 'rotate-180')}
-              aria-hidden
-            />
-            <span className="min-w-0">
-              <span className="text-xs font-semibold text-foreground">Risk model</span>
-              <span className="ml-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                {expanded ? 'Hide tuning' : 'Show tuning'}
-              </span>
-            </span>
-          </button>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-muted-foreground"
-              onClick={cycleShell}
-              title={`Layout: ${shellHint}`}
-              aria-label={`Cycle section layout, ${shellHint}`}
-            >
-              <Rows2 className="h-4 w-4" aria-hidden />
-            </Button>
-            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => resetRiskTuning()}>
-              Reset
-            </Button>
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="flex items-start justify-between gap-3 border-b border-border/50 bg-card/40 p-3">
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none ring-offset-background transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-        >
-          <ChevronDown
-            className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200', expanded && 'rotate-180')}
-            aria-hidden
-          />
-          <span className="flex flex-col gap-0.5">
-            <h3 className="text-sm font-semibold tracking-tight text-foreground">Risk model</h3>
-            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              {expanded ? 'Hide tuning' : 'Show tuning'}
-            </span>
-          </span>
-        </button>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-muted-foreground"
-            onClick={cycleShell}
-            title={`Layout: ${shellHint}. Next: compact.`}
-            aria-label={`Cycle section layout, ${shellHint}`}
-          >
-            <Rows2 className="h-4 w-4" aria-hidden />
-          </Button>
-          <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => resetRiskTuning()}>
-            Reset
-          </Button>
-        </div>
-      </div>
-    );
-  };
+  const tuningHintFull = (
+    <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+      {expanded ? 'Hide tuning' : 'Show tuning'}
+    </span>
+  );
 
   return (
-    <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-muted/20 shadow-sm">
-      {shell === 2 ? headerRow({ iconOnly: true }) : headerRow({})}
-
-      {expanded ? (
-        <div className="flex min-h-0 max-h-[min(52vh,32rem)] flex-col gap-3 overflow-x-hidden overflow-y-auto overscroll-y-contain border-t border-border/60 px-3 pb-3 pt-3">
+    <RightPanelSection
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+      title="Pressure heatmap"
+      belowTitleMeta={tuningHintFull}
+      headerExtras={
+        <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => resetRiskTuning()}>
+          Reset
+        </Button>
+      }
+    >
+      <div className="flex min-h-0 flex-col gap-3 overflow-x-hidden border-t border-border/60 px-3 pb-3 pt-3">
           <div className="flex flex-col gap-2">
             <BlendStackBar weights={weights} />
             <p className="text-[11px] leading-snug text-muted-foreground">
@@ -357,188 +181,186 @@ export function RiskModelPanel() {
             </p>
           </div>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            On <strong className="font-medium text-foreground">public or school</strong> holidays, lab/team capacity is
-            scaled by a fixed <strong className="font-medium text-foreground">50%</strong> in the engine. Use{' '}
-            <strong className="font-medium text-foreground">Blend weights</strong> below to change Tech / Restaurant /
-            Marketing / Resources; collapse it to focus on the combined transfer curve (γ) controls.
+            Combined pressure uses the fixed mix above for <strong className="font-medium text-foreground">Technology</strong>{' '}
+            and <strong className="font-medium text-foreground">Business</strong> heatmaps. On{' '}
+            <strong className="font-medium text-foreground">public or school</strong> holidays, lab/team capacity is scaled
+            by <strong className="font-medium text-foreground">50%</strong> in the engine. Use{' '}
+            <strong className="font-medium text-foreground">Reset</strong> to restore defaults. Heatmap colour tuning (below)
+            sets γ / curve for both lenses after lens-specific scaling.
           </p>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Quick presets</span>
-            <div className="flex flex-wrap gap-1.5">
-              {RISK_BLEND_PRESETS.map((p) => (
-                <Button
-                  key={p.id}
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 text-[11px]"
-                  onClick={() => setRiskTuning(p.tuning)}
-                >
-                  {p.label}
-                </Button>
-              ))}
+
+          <TechWeeklyRhythmPanel />
+
+          <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="payday-month-peak" className="text-xs font-normal">
+                Post-payday / month-start trading lift
+              </Label>
+              <input
+                id="payday-month-peak"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                spellCheck={false}
+                className="h-8 w-full max-w-[8rem] rounded border border-border/70 bg-background px-1.5 font-mono text-[11px] tabular-nums text-foreground shadow-sm"
+                value={paydayPeakText}
+                onChange={(e) => setPaydayPeakText(e.target.value)}
+                onBlur={() => {
+                  const trimmed = paydayPeakText.trim();
+                  if (trimmed === '' || trimmed === '.' || trimmed === '-') {
+                    setPaydayPeakText(formatPaydayPeakText(paydayPeak));
+                    return;
+                  }
+                  const v = parseFloat(trimmed);
+                  if (!Number.isFinite(v)) {
+                    setPaydayPeakText(formatPaydayPeakText(paydayPeak));
+                    return;
+                  }
+                  setRiskTuning({ storePaydayMonthPeakMultiplier: v });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+              />
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                Peak multiplier on YAML-derived restaurant / trading pressure in the{' '}
+                <strong className="font-medium text-foreground">first week</strong> of each calendar month, tapering
+                toward <strong className="font-medium text-foreground">month-end</strong>.{' '}
+                <strong className="font-medium text-foreground">1</strong> = off; default{' '}
+                <strong className="font-medium text-foreground">1.15</strong> (clamped 1–2) before capping{' '}
+                <span className="font-mono text-foreground/80">store_pressure</span> at 1.
+              </p>
             </div>
           </div>
-          <div className="rounded-md border border-border/70 bg-muted/30">
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-xs font-medium text-foreground outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => setBlendWeightsOpen((o) => !o)}
-              aria-expanded={blendWeightsOpen}
-              id="risk-blend-weights-toggle"
-            >
-              <ChevronDown
-                className={cn(
-                  'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
-                  blendWeightsOpen && 'rotate-180'
-                )}
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1 leading-snug">
-                Blend weights <span className="font-normal text-muted-foreground">(Tech · Restaurant · Marketing · Resources)</span>
-              </span>
-              <span className="shrink-0 text-[10px] font-normal text-muted-foreground">
-                {blendWeightsOpen ? 'Hide sliders' : 'Show sliders'}
-              </span>
-            </button>
-            {blendWeightsOpen ? (
-              <div className="space-y-3 border-t border-border/60 px-2.5 pb-3 pt-2">
-                <p className="text-[11px] leading-snug text-muted-foreground">
-                  <strong className="font-medium text-foreground">Only ratios matter</strong> — scaling all four sliders
-                  by the same amount leaves the blend unchanged. The large percentage on each row is that factor’s share
-                  of <strong className="font-medium text-foreground">Combined risk</strong>; “weight” is the raw slider
-                  value.
-                </p>
-                <div className="grid gap-3">
-                  <TuningSlider
-                    id="imp-tech"
-                    label="Tech"
-                    value={riskTuning.importanceTech}
-                    max={100}
-                    blendShare={weights.tech}
-                    onChange={(n) => patch({ importanceTech: n })}
-                  />
-                  <TuningSlider
-                    id="imp-store"
-                    label="Restaurant"
-                    value={riskTuning.importanceStore}
-                    max={100}
-                    blendShare={weights.store}
-                    onChange={(n) => patch({ importanceStore: n })}
-                  />
-                  <TuningSlider
-                    id="imp-campaign"
-                    label="Marketing"
-                    value={riskTuning.importanceCampaign}
-                    max={100}
-                    blendShare={weights.campaign}
-                    hint="Campaign strength while a window is active. Business view uses this too; see cell hover for detail."
-                    onChange={(n) => patch({ importanceCampaign: n })}
-                  />
-                  <TuningSlider
-                    id="imp-holiday"
-                    label="Resources"
-                    value={riskTuning.importanceHoliday}
-                    max={100}
-                    blendShare={weights.holiday}
-                    hint="Adds a risk bump on public or school holidays. Leave at 0 for capacity-only effect (tighter lab/team caps on those days)."
-                    onChange={(n) => patch({ importanceHoliday: n })}
+
+        <div className="min-w-0 flex flex-col gap-2 border-t border-border/60 pt-3">
+          {riskHeatmapCurveUsesGamma(riskHeatmapCurve) ? (
+            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto] sm:items-end sm:gap-x-3">
+              <div className="flex min-w-0 flex-col gap-1">
+                <Label htmlFor="risk-heatmap-curve" className="text-xs font-normal">
+                  Heatmap Colour Tuning
+                </Label>
+                <Select
+                  value={riskHeatmapCurve}
+                  onValueChange={(v) => setRiskHeatmapCurve(v as RiskHeatmapCurveId)}
+                >
+                  <SelectTrigger
+                    id="risk-heatmap-curve"
+                    className="relative h-9 w-full justify-start px-3 pr-9 text-xs [&>svg:last-of-type]:pointer-events-none [&>svg:last-of-type]:absolute [&>svg:last-of-type]:right-2.5 [&>svg:last-of-type]:top-1/2 [&>svg:last-of-type]:-translate-y-1/2 [&>svg:last-of-type]:shrink-0"
+                  >
+                    <span className="flex min-w-0 w-full flex-1 justify-center">
+                      <SelectValue placeholder="Curve" />
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[min(22rem,72vh)]">
+                    {RISK_HEATMAP_CURVE_OPTIONS.map((o) => (
+                      <SelectItem
+                        key={o.id}
+                        value={o.id}
+                        className="cursor-pointer py-2 pl-8 pr-8 text-xs"
+                        itemTextClassName="flex flex-1 justify-center"
+                      >
+                        <span className="flex items-center justify-center gap-2.5">
+                          <CurveTransferSparkline curve={o.id} gamma={riskHeatmapGamma} />
+                          <span className="min-w-0 shrink leading-snug">{o.label}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-w-0 flex-col gap-1">
+                <Label htmlFor="risk-heatmap-gamma" className="text-xs font-normal">
+                  Strength
+                </Label>
+                <div className="flex h-9 items-center">
+                  <input
+                    id="risk-heatmap-gamma"
+                    type="range"
+                    min={GAMMA_UI_MIN}
+                    max={GAMMA_UI_MAX}
+                    step={GAMMA_UI_STEP}
+                    value={snapGammaUi(riskHeatmapGamma)}
+                    onChange={(e) => setRiskHeatmapGamma(Number(e.target.value))}
+                    className="h-3 w-full min-w-[7rem] cursor-pointer accent-primary"
                   />
                 </div>
               </div>
-            ) : null}
-          </div>
-
-      {viewMode === 'combined' ? (
-        <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="risk-heatmap-curve" className="text-xs font-normal">
-              Combined risk transfer curve
-            </Label>
-            <Select
-              value={riskHeatmapCurve}
-              onValueChange={(v) => setRiskHeatmapCurve(v as RiskHeatmapCurveId)}
-            >
-              <SelectTrigger
-                id="risk-heatmap-curve"
-                className="relative h-9 w-full justify-start px-3 pr-9 text-xs [&>svg:last-of-type]:pointer-events-none [&>svg:last-of-type]:absolute [&>svg:last-of-type]:right-2.5 [&>svg:last-of-type]:top-1/2 [&>svg:last-of-type]:-translate-y-1/2 [&>svg:last-of-type]:shrink-0"
-              >
-                <span className="flex min-w-0 w-full flex-1 justify-center">
-                  <SelectValue placeholder="Curve" />
-                </span>
-              </SelectTrigger>
-              <SelectContent className="max-h-[min(22rem,72vh)]">
-                {RISK_HEATMAP_CURVE_OPTIONS.map((o) => (
-                  <SelectItem
-                    key={o.id}
-                    value={o.id}
-                    className="cursor-pointer py-2 pl-8 pr-8 text-xs"
-                    itemTextClassName="flex flex-1 justify-center"
-                  >
-                    <span className="flex items-center justify-center gap-2.5">
-                      <CurveTransferSparkline curve={o.id} gamma={riskHeatmapGamma} />
-                      <span className="min-w-0 shrink leading-snug">{o.label}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {curveHint ? (
-              <p className="text-[10px] leading-snug text-muted-foreground">{curveHint}</p>
-            ) : null}
-          </div>
-          {riskHeatmapCurveUsesGamma(riskHeatmapCurve) ? (
-            <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4">
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="risk-heatmap-gamma" className="text-xs font-normal">
-                  Curve strength (γ)
-                </Label>
-                <input
-                  id="risk-heatmap-gamma"
-                  type="range"
-                  min={35}
-                  max={300}
-                  step={5}
-                  value={Math.round(riskHeatmapGamma * 100)}
-                  onChange={(e) => setRiskHeatmapGamma(Number(e.target.value) / 100)}
-                  className="h-2.5 w-full cursor-pointer accent-primary"
-                />
-                {riskHeatmapCurve === 'power' ? (
-                  <p className="text-[10px] leading-snug text-muted-foreground">
-                    Power: γ &gt; 1 favours greens at low scores; γ &lt; 1 lifts mids toward amber/red.{' '}
-                    <span className="font-mono text-foreground/80">risk_heatmap_gamma</span> is omitted when γ = 1.
-                  </p>
-                ) : (
-                  <p className="text-[10px] leading-snug text-muted-foreground">
-                    γ steers steepness (sigmoid) or compression (log).{' '}
-                    <span className="font-mono text-foreground/80">risk_heatmap_gamma</span> is omitted when γ = 1.
-                  </p>
-                )}
-              </div>
-              <div
-                role="status"
-                aria-live="polite"
-                aria-label={`Curve strength gamma ${riskHeatmapGamma.toFixed(2)}`}
-                className="flex flex-row items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/35 px-3 py-2.5 dark:bg-muted/20 sm:min-w-[5.25rem] sm:flex-col sm:justify-center sm:gap-1 sm:self-stretch sm:px-4 sm:py-3"
-              >
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:text-center">
-                  Gamma
-                </span>
-                <span className="text-3xl font-extrabold tabular-nums leading-none tracking-tight text-foreground sm:text-4xl">
-                  {riskHeatmapGamma.toFixed(2)}
-                </span>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-normal text-muted-foreground">γ</span>
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-label={`Curve strength gamma ${riskHeatmapGamma.toFixed(2)}`}
+                  className="flex h-9 min-w-[4.5rem] items-center justify-center rounded-lg border border-border/60 bg-muted/35 px-3 dark:bg-muted/20"
+                >
+                  <span className="text-2xl font-extrabold tabular-nums leading-none tracking-tight text-foreground sm:text-[1.65rem]">
+                    {riskHeatmapGamma.toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
+          ) : (
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor="risk-heatmap-curve" className="text-xs font-normal">
+                Heatmap Colour Tuning
+              </Label>
+              <Select
+                value={riskHeatmapCurve}
+                onValueChange={(v) => setRiskHeatmapCurve(v as RiskHeatmapCurveId)}
+              >
+                <SelectTrigger
+                  id="risk-heatmap-curve"
+                  className="relative h-9 w-full justify-start px-3 pr-9 text-xs [&>svg:last-of-type]:pointer-events-none [&>svg:last-of-type]:absolute [&>svg:last-of-type]:right-2.5 [&>svg:last-of-type]:top-1/2 [&>svg:last-of-type]:-translate-y-1/2 [&>svg:last-of-type]:shrink-0"
+                >
+                  <span className="flex min-w-0 w-full flex-1 justify-center">
+                    <SelectValue placeholder="Curve" />
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="max-h-[min(22rem,72vh)]">
+                  {RISK_HEATMAP_CURVE_OPTIONS.map((o) => (
+                    <SelectItem
+                      key={o.id}
+                      value={o.id}
+                      className="cursor-pointer py-2 pl-8 pr-8 text-xs"
+                      itemTextClassName="flex flex-1 justify-center"
+                    >
+                      <span className="flex items-center justify-center gap-2.5">
+                        <CurveTransferSparkline curve={o.id} gamma={riskHeatmapGamma} />
+                        <span className="min-w-0 shrink leading-snug">{o.label}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {curveHint ? (
+            <p className="text-[10px] leading-snug text-muted-foreground">{curveHint}</p>
+          ) : null}
+          {riskHeatmapCurveUsesGamma(riskHeatmapCurve) ? (
+            riskHeatmapCurve === 'power' ? (
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                Power: γ &gt; 1 favours greens at low pressure values; γ &lt; 1 lifts mids toward amber/red. In YAML,{' '}
+                <span className="font-mono text-foreground/80">risk_heatmap_gamma</span> is omitted when γ = 1.
+              </p>
+            ) : (
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                γ steers steepness (sigmoid) or compression (log). In YAML,{' '}
+                <span className="font-mono text-foreground/80">risk_heatmap_gamma</span> is omitted when γ = 1.
+              </p>
+            )
           ) : null}
           <p className="text-[10px] leading-snug text-muted-foreground">
-            Updates the editor for the focused country:{' '}
-            <span className="font-mono text-foreground/80">risk_heatmap_curve</span> when not Power (default), plus{' '}
-            <span className="font-mono text-foreground/80">risk_heatmap_gamma</span> when γ ≠ 1.
+            Same mapping for Technology (blended pressure score) and Business (percentile-normalised blend). Updates YAML for
+            the focused country: <span className="font-mono text-foreground/80">risk_heatmap_curve</span> when not Power
+            (default), plus <span className="font-mono text-foreground/80">risk_heatmap_gamma</span> when γ ≠ 1.
           </p>
         </div>
-      ) : null}
         </div>
-      ) : null}
-    </div>
+    </RightPanelSection>
   );
 }

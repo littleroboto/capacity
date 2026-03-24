@@ -2,15 +2,47 @@ import type { ReactNode, Ref, RefObject } from 'react';
 import { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Cpu, Megaphone, Palmtree, Percent, Store, X } from 'lucide-react';
 import type { ViewModeId } from '@/lib/constants';
 import type { RunwayTooltipPayload } from '@/lib/runwayTooltipBreakdown';
+import { cn } from '@/lib/utils';
+
+const BLEND_TERM_ICONS: Record<string, LucideIcon> = {
+  tech: Cpu,
+  store: Store,
+  campaign: Megaphone,
+  holiday: Palmtree,
+};
+
+/** Align with pressure-blend colours in `RiskModelPanel` for a coherent story. */
+const BLEND_TERM_ICON_CLASS: Record<string, string> = {
+  tech: 'text-sky-600 dark:text-sky-400',
+  store: 'text-amber-600 dark:text-amber-400',
+  campaign: 'text-violet-600 dark:text-violet-400',
+  holiday: 'text-teal-600 dark:text-teal-400',
+};
+
+function BlendTermRowIcon({ termKey }: { termKey: string }) {
+  const Icon = BLEND_TERM_ICONS[termKey] ?? Percent;
+  return (
+    <span
+      className={cn(
+        'flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted/60 dark:bg-zinc-800/80',
+        BLEND_TERM_ICON_CLASS[termKey]
+      )}
+      aria-hidden
+    >
+      <Icon className="h-4 w-4" strokeWidth={2.25} />
+    </span>
+  );
+}
 
 const TOOLTIP_POINTER_OFFSET_PX = 14;
 const TOOLTIP_VIEWPORT_MARGIN_PX = 12;
 
 /**
- * Keep a fixed tooltip near the pointer but inside the viewport (flip above / left when needed).
+ * Keep the day-details popover near the click point but inside the viewport (flip above / left when needed).
  */
 function clampTooltipInViewport(
   clientX: number,
@@ -48,12 +80,10 @@ function clampTooltipInViewport(
 
 function blendSectionTitle(viewMode: ViewModeId, riskBand: string): string {
   switch (viewMode) {
-    case 'technology':
-      return 'Tech effort vs combined blend';
     case 'in_store':
       return 'Business activity (components)';
     default:
-      return `What moves combined risk (${riskBand})`;
+      return `What moves Technology view (${riskBand})`;
   }
 }
 
@@ -66,10 +96,6 @@ type RunwayCellTooltipProps = {
   reducedMotion: boolean;
   onDismiss: () => void;
   rootRef: RefObject<HTMLDivElement | null>;
-  /** Cancel delayed hide when pointer moves from heatmap onto the tooltip (fixed overlay). */
-  onTooltipPointerEnter: () => void;
-  /** Restart delayed hide when pointer leaves the tooltip. */
-  onTooltipPointerLeave: () => void;
 };
 
 function SectionTitle({ children }: { children: ReactNode }) {
@@ -137,14 +163,15 @@ function TooltipPayloadBody({ p }: { p: RunwayTooltipPayload }) {
         <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground dark:text-zinc-400">
           Cell shows{' '}
           <span className="font-semibold text-foreground dark:text-zinc-100">{p.fillMetricLabel}</span>
-          <span className="mx-1 font-mono text-[13px] font-semibold tabular-nums text-foreground dark:text-zinc-100">
+          <span className="mx-1 font-mono text-lg font-extrabold tabular-nums tracking-tight text-foreground dark:text-zinc-100">
             {p.fillMetricValue.toFixed(2)}
           </span>
         </p>
         {p.viewMode === 'in_store' ? (
           <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground dark:text-zinc-400">
             Business view uses max(restaurant trading, marketing impact) plus a small lift on public/school holidays.
-            Public vs school called out below.
+            The heatmap uses a continuous colour ramp so busy stretches still show a little variation. Public vs school
+            called out below.
           </p>
         ) : null}
       </header>
@@ -173,9 +200,12 @@ function TooltipPayloadBody({ p }: { p: RunwayTooltipPayload }) {
         {sortedBlend.map((t) => (
           <div
             key={t.key}
-            className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-0.5 text-[13px] leading-snug"
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 text-[13px] leading-snug sm:gap-x-4"
           >
-            <span className="font-medium text-foreground/90 dark:text-zinc-200">{t.label}</span>
+            <span className="flex min-w-0 items-center gap-2.5">
+              <BlendTermRowIcon termKey={t.key} />
+              <span className="font-medium text-foreground/90 dark:text-zinc-200">{t.label}</span>
+            </span>
             <span className="shrink-0 text-right font-mono text-[12px] tabular-nums tracking-tight text-muted-foreground dark:text-zinc-500 sm:text-[13px]">
               <span className="text-foreground/80 dark:text-zinc-300">{t.factor.toFixed(2)}</span>
               <span className="mx-1 text-muted-foreground/70 dark:text-zinc-500">×</span>
@@ -185,9 +215,13 @@ function TooltipPayloadBody({ p }: { p: RunwayTooltipPayload }) {
             </span>
           </div>
         ))}
-        <div className="mt-2 flex items-baseline justify-between border-t border-border/50 pt-3 text-sm font-bold tabular-nums text-foreground dark:border-zinc-600/35 dark:text-zinc-100">
-          <span>Combined</span>
-          <span className="font-mono text-base">{p.row.risk_score.toFixed(2)}</span>
+        <div className="mt-3 flex items-end justify-between gap-3 border-t border-border/50 pt-3.5 dark:border-zinc-600/35">
+          <span className="pb-0.5 text-sm font-bold uppercase tracking-wide text-muted-foreground dark:text-zinc-500">
+            {p.viewMode === 'combined' ? 'Technology score' : 'Blended pressure score'}
+          </span>
+          <span className="font-mono text-3xl font-extrabold leading-none tracking-tight text-foreground tabular-nums dark:text-zinc-50 sm:text-4xl">
+            {p.row.risk_score.toFixed(2)}
+          </span>
         </div>
       </div>
 
@@ -240,8 +274,6 @@ export function RunwayCellTooltip({
   reducedMotion,
   onDismiss,
   rootRef,
-  onTooltipPointerEnter,
-  onTooltipPointerLeave,
 }: RunwayCellTooltipProps) {
   const spring = reducedMotion
     ? { duration: 0 }
@@ -297,8 +329,6 @@ export function RunwayCellTooltip({
           key={presenceKey}
           ref={rootRef as Ref<HTMLDivElement>}
           layout={false}
-          onPointerEnter={onTooltipPointerEnter}
-          onPointerLeave={onTooltipPointerLeave}
           initial={reducedMotion ? false : { opacity: 0, scale: 0.98, y: 6 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={reducedMotion ? undefined : { opacity: 0, scale: 0.99, y: 4 }}

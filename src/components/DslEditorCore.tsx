@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAtcStore } from '@/store/useAtcStore';
-import { saveScenario } from '@/lib/storage';
+import { saveNamedWorkspaceInteractive } from '@/lib/workspaceSnapshot';
 import { cn } from '@/lib/utils';
 
 /** Long-form YAML reference (also used in the syntax dialog). */
@@ -27,13 +27,16 @@ export function DslSyntaxHelpBody({ className }: { className?: string }) {
       )}
     >
       Multiple documents in one file define the multi-country runway. In{' '}
-      <span className="font-mono text-foreground/80">trading.weekly_pattern</span> and{' '}
-      <span className="font-mono text-foreground/80">tech.weekly_pattern</span>, use{' '}
+      <span className="font-mono text-foreground/80">trading.weekly_pattern</span> (string levels) and{' '}
+      <span className="font-mono text-foreground/80">tech.weekly_pattern</span> (prefer <strong>0–1</strong> numbers;
+      named levels still work), use{' '}
       <span className="font-mono text-foreground/80">default</span> (or{' '}
       <span className="font-mono text-foreground/80">weekdays</span> /{' '}
       <span className="font-mono text-foreground/80">weekend</span>) plus per-day overrides instead of listing all seven
       days. Other optional keys: <span className="font-mono text-foreground/80">tech.labs_scale</span> /{' '}
       <span className="font-mono text-foreground/80">teams_scale</span>,{' '}
+      <span className="font-mono text-foreground/80">trading.monthly_pattern</span> (optional Jan–Dec{' '}
+      <strong>0–1</strong> multipliers on weekly store level),{' '}
       <span className="font-mono text-foreground/80">trading.seasonal</span> (annual store wave),{' '}
       <span className="font-mono text-foreground/80">prep_before_live_days</span> +{' '}
       <span className="font-mono text-foreground/80">live_support_load</span> /{' '}
@@ -53,7 +56,7 @@ type DslEditorCoreProps = {
   /** Fixed CSS height for the editor (e.g. modal); omit for flex fill. */
   editorFixedHeight?: string;
   description?: 'full' | 'none';
-  /** Extra actions after Save scenario (e.g. modal Done). */
+  /** Extra actions after Save snapshot (e.g. modal Done). */
   trailingActions?: ReactNode;
   className?: string;
 };
@@ -90,19 +93,14 @@ export function DslEditorCore({
 
   const dslText = useAtcStore((s) => s.dslText);
   const parseError = useAtcStore((s) => s.parseError);
-  const country = useAtcStore((s) => s.country);
-  const viewMode = useAtcStore((s) => s.viewMode);
   const theme = useAtcStore((s) => s.theme);
-  const riskTuning = useAtcStore((s) => s.riskTuning);
   const setDslText = useAtcStore((s) => s.setDslText);
   const applyDsl = useAtcStore((s) => s.applyDsl);
   const resetDsl = useAtcStore((s) => s.resetDsl);
 
   const handleSaveScenario = () => {
-    const name = window.prompt('Scenario name');
-    if (!name?.trim()) return;
-    saveScenario(name.trim(), { dsl: dslText, picker: country, layer: viewMode, riskTuning });
-    window.alert('Scenario saved to this browser.');
+    const id = saveNamedWorkspaceInteractive();
+    if (id) window.alert('Saved to history in this browser. Open Local data to load or export.');
   };
 
   return (
@@ -118,51 +116,54 @@ export function DslEditorCore({
         style={editorFixedHeight ? ({ height: editorFixedHeight } as CSSProperties) : undefined}
       >
         <div
-          className="flex shrink-0 flex-wrap items-center justify-end gap-0.5 border-b border-border/80 bg-muted/25 px-1 py-0.5"
+          className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 border-b border-border/80 bg-muted/25 px-1 py-0.5"
           role="toolbar"
           aria-label="Editor appearance"
         >
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 shrink-0 gap-0 p-0 text-muted-foreground hover:text-foreground"
-            disabled={fontSize <= DSL_EDITOR_FONT_MIN}
-            onClick={() => setFontSize((n) => Math.max(DSL_EDITOR_FONT_MIN, n - 1))}
-            aria-label="Smaller text"
-            title="Smaller text"
-          >
-            <ZoomOut className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 shrink-0 gap-0 p-0 text-muted-foreground hover:text-foreground"
-            disabled={fontSize >= DSL_EDITOR_FONT_MAX}
-            onClick={() => setFontSize((n) => Math.min(DSL_EDITOR_FONT_MAX, n + 1))}
-            aria-label="Larger text"
-            title="Larger text"
-          >
-            <ZoomIn className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 shrink-0 gap-0 p-0 text-muted-foreground hover:text-foreground"
-            onClick={() => setFontSize(DSL_EDITOR_FONT_DEFAULT)}
-            aria-label="Reset text size"
-            title="Reset text size"
-          >
-            <ALargeSmall className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-          </Button>
-          <span
-            className="mr-0.5 select-none tabular-nums text-[10px] text-muted-foreground"
-            aria-live="polite"
-          >
-            {fontSize}px
-          </span>
+          <div className="flex flex-wrap items-center gap-0.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 shrink-0 gap-0 p-0 text-muted-foreground hover:text-foreground"
+              disabled={fontSize <= DSL_EDITOR_FONT_MIN}
+              onClick={() => setFontSize((n) => Math.max(DSL_EDITOR_FONT_MIN, n - 1))}
+              aria-label="Smaller text"
+              title="Smaller text"
+            >
+              <ZoomOut className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 shrink-0 gap-0 p-0 text-muted-foreground hover:text-foreground"
+              disabled={fontSize >= DSL_EDITOR_FONT_MAX}
+              onClick={() => setFontSize((n) => Math.min(DSL_EDITOR_FONT_MAX, n + 1))}
+              aria-label="Larger text"
+              title="Larger text"
+            >
+              <ZoomIn className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 shrink-0 gap-0 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setFontSize(DSL_EDITOR_FONT_DEFAULT)}
+              aria-label="Reset text size"
+              title="Reset text size"
+            >
+              <ALargeSmall className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+            </Button>
+            <span
+              className="select-none tabular-nums text-[10px] text-muted-foreground"
+              aria-live="polite"
+            >
+              {fontSize}px
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-0.5">
           <Button
             type="button"
             size="sm"
@@ -209,6 +210,7 @@ export function DslEditorCore({
           >
             <Map className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
           </Button>
+          </div>
         </div>
         <div className="min-h-0 min-w-0 flex-1">
           <Editor
@@ -257,8 +259,8 @@ export function DslEditorCore({
           variant="outline"
           className="h-7 w-7 shrink-0 gap-0 p-0"
           onClick={handleSaveScenario}
-          aria-label="Save scenario to this browser"
-          title="Save scenario"
+          aria-label="Save workspace snapshot to this browser"
+          title="Save workspace snapshot"
         >
           <Save className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
         </Button>

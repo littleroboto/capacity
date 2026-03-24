@@ -46,10 +46,11 @@ export type SeasonalTradingConfig = {
 
 /**
  * Tech-side weekly shape (menu pipeline, weekend catch-up, Fri-before-Sat prep).
- * Levels use the same strings as `trading.weekly_pattern`; scaled into lab/team readiness load.
+ * `weekly_pattern` values are **0–1** (after YAML parse); legacy named levels are normalised in the parser.
+ * Scaled into lab/team readiness load with `labs_scale` / `teams_scale` / `backend_scale`.
  */
 export type TechRhythmConfig = {
-  weekly_pattern?: Record<string, string>;
+  weekly_pattern?: Record<string, number>;
   labs_scale?: number;
   teams_scale?: number;
   backend_scale?: number;
@@ -64,6 +65,11 @@ export type MarketConfig = {
   campaigns: CampaignConfig[];
   releases: ReleaseConfig[];
   trading?: Record<string, unknown>;
+  /**
+   * Optional `trading.monthly_pattern` (Jan–Dec, 0–1). Multiplies weekly store level for that calendar month;
+   * omitted months behave as 1 in the UI patcher; absent block → no effect in the engine.
+   */
+  monthlyTradingPattern?: Record<string, number>;
   /** Parsed from `trading.seasonal` for store_pressure only. */
   seasonalTrading?: SeasonalTradingConfig;
   holidays?: Record<string, unknown>;

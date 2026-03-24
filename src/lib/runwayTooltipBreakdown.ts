@@ -206,7 +206,7 @@ export function buildRiskBlendTerms(row: RiskRow, tuning: RiskModelTuning): Risk
   if (w.holiday > 0) {
     terms.push({
       key: 'holiday',
-      label: 'Holiday (risk dial)',
+      label: 'Holiday (pressure dial)',
       factor: holidayN,
       weight: w.holiday,
       contribution: w.holiday * holidayN,
@@ -270,7 +270,7 @@ export function buildRunwayTooltipPayload(input: {
     pressureSurfaceLines: pressureSurfaceLines(row),
     headroomLine:
       row.headroom != null
-        ? `Headroom (1 − combined risk): ${(row.headroom * 100).toFixed(0)}%`
+        ? `Headroom (1 − combined pressure): ${(row.headroom * 100).toFixed(0)}%`
         : null,
   };
 }

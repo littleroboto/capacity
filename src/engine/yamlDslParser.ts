@@ -11,6 +11,7 @@ import type {
   StressCorrelations,
   TechRhythmConfig,
 } from './types';
+import { expandTechWeeklyPattern } from './techWeeklyPattern';
 import type { EnvelopeKind } from './weighting';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -60,7 +61,8 @@ const WEEKLY_PATTERN_DAY_SET = new Set<string>(WEEKLY_PATTERN_DAYS);
 const WEEKLY_PATTERN_META = new Set(['default', '_default', 'weekdays', 'weekend']);
 
 /**
- * Expand compact `trading.weekly_pattern` / `tech.weekly_pattern`:
+ * Expand compact `trading.weekly_pattern` (string levels only). For `tech.weekly_pattern`, use
+ * {@link expandTechWeeklyPattern} (numeric [0,1] and named levels).
  * - `default` or `_default`: baseline for all seven days
  * - `weekdays`: Mon–Fri (after default)
  * - `weekend`: Sat–Sun (after default)
@@ -269,6 +271,7 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     campaigns,
     releases: [],
     trading: expandTradingWeeklyPattern(parsed.trading as Record<string, unknown> | undefined),
+    monthlyTradingPattern: mapMonthlyTradingPattern(parsed.trading as Record<string, unknown> | undefined),
     seasonalTrading: mapSeasonalTrading(parsed.trading),
     holidays: parsed.holidays,
     holidayCapacityTaperDays,
@@ -325,6 +328,38 @@ function mapOperatingWindows(raw: unknown[]): OperatingWindow[] | undefined {
   return out.length ? out : undefined;
 }
 
+const TRADING_MONTH_KEY_SET = new Set([
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]);
+
+function mapMonthlyTradingPattern(
+  trading: Record<string, unknown> | undefined
+): Record<string, number> | undefined {
+  if (!trading || typeof trading !== 'object') return undefined;
+  const raw = (trading.monthly_pattern ?? trading.monthlyPattern) as Record<string, unknown> | undefined;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const key = String(k).trim();
+    if (!TRADING_MONTH_KEY_SET.has(key)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    out[key] = Math.min(1, Math.max(0, n));
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 function mapSeasonalTrading(trading: Record<string, unknown> | undefined): SeasonalTradingConfig | undefined {
   if (!trading || typeof trading !== 'object') return undefined;
   const s = trading.seasonal as Record<string, unknown> | undefined;
@@ -343,7 +378,7 @@ function mapSeasonalTrading(trading: Record<string, unknown> | undefined): Seaso
 function mapTechRhythm(tech: Record<string, unknown> | undefined): TechRhythmConfig | undefined {
   if (!tech || typeof tech !== 'object') return undefined;
   const wpRaw = (tech.weekly_pattern ?? tech.weeklyPattern) as Record<string, unknown> | undefined;
-  const expanded = expandWeeklyPattern(wpRaw);
+  const expanded = expandTechWeeklyPattern(wpRaw);
   if (!expanded || Object.keys(expanded).length === 0) return undefined;
   const weekly_pattern = expanded;
   const ls = Number(tech.labs_scale ?? tech.labsScale);

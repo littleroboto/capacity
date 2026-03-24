@@ -1,5 +1,5 @@
 /**
- * Transfer functions map combined risk score in [0, 1] → palette index input in [0, 1]
+ * Transfer functions map combined pressure score in [0, 1] → palette index input in [0, 1]
  * before discrete colour bands (see `riskHeatmapColors.ts`).
  */
 
@@ -17,7 +17,7 @@ export const RISK_HEATMAP_CURVE_IDS = [
 export type RiskHeatmapCurveId = (typeof RISK_HEATMAP_CURVE_IDS)[number];
 
 export const RISK_HEATMAP_CURVE_OPTIONS: { id: RiskHeatmapCurveId; label: string; hint: string }[] = [
-  { id: 'power', label: 'Power (γ)', hint: 'score^γ — same as legacy; use γ slider' },
+  { id: 'power', label: 'Power (γ)', hint: 'pressure^γ — same as legacy; use γ slider' },
   { id: 'linear', label: 'Linear', hint: 'Identity; ignores γ' },
   { id: 'smoothstep', label: 'Smoothstep', hint: '3t² − 2t³; soft ends' },
   { id: 'sigmoid', label: 'Sigmoid (S)', hint: 'Logistic around mid; steepness from γ' },

@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { ViewModeId } from '@/lib/constants';
 import { parseDate } from '@/engine/calendar';
 import type { RiskRow } from '@/engine/riskModel';
+import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import {
   heatmapColorForViewMode,
   HEATMAP_RUNWAY_PAD_FILL,
@@ -50,20 +51,21 @@ import { SlotOverlay } from '@/components/SlotOverlay';
 import type { MarketConfig } from '@/engine/types';
 import { downloadRunwayHeatmapPng } from '@/lib/runwayPngExport';
 import { percentileNormRange } from '@/lib/heatmapNormRange';
-import { inStoreHeatmapMetric, techHeatmapMetric } from '@/lib/runwayViewMetrics';
+import { inStoreHeatmapMetric } from '@/lib/runwayViewMetrics';
 import { Download, Loader2 } from 'lucide-react';
 
-/** Default cell size (px) for single-market runway. */
+/** Default cell size (px) for runway heatmaps (single-market and LIOM compare). */
 export const CELL_PX = 20;
-/** Slightly smaller cells when showing every market side-by-side. */
-const COMPARE_CELL_PX = 14;
+
+/** Pointer anchor for the day-details popover (click or keyboard). */
+type RunwayTipAnchor = { clientX: number; clientY: number };
 
 export { RUNWAY_CELL_GAP_PX };
 
 const COUNTRY_SWITCH_MIN_MS = 260;
 
 /** Heatmap colour “swoosh”: grey underlay, then staggered reveal + optional post-reveal shimmer. */
-/** Extra delay per market column so the wave travels left→right across “All markets”. */
+/** Extra delay per market column so the wave travels left→right across LIOM compare columns. */
 const SWOOSH_MARKET_COLUMN_GAP_SEC = 0.1;
 const SWOOSH_MAX_STAGGER_SEC = 1.38;
 const SWOOSH_DURATION_SEC = 0.42;
@@ -72,12 +74,12 @@ const SWOOSH_EASE = [0.2, 0.88, 0.22, 1] as const;
 
 const RUNWAY_DIM_PAST_DAYS_STORAGE_KEY = 'capacity:runway-dim-past-days';
 
-/** Compare-all column header: oval country code (nationality-sticker style). */
+/** Compare-all column header: market code. */
 function RunwayMarketCodeSticker({ code }: { code: string }) {
   return (
     <span
       title={`Market ${code}`}
-      className="inline-flex min-h-[28px] min-w-[2.85rem] shrink-0 items-center justify-center rounded-full border-[3px] border-black bg-white px-3 py-1 text-[11px] font-black uppercase leading-none tracking-tight text-black"
+      className="shrink-0 text-sm font-bold tabular-nums tracking-tight text-foreground"
     >
       {code}
     </span>
@@ -144,9 +146,10 @@ function RunwaySkeleton({
       >
         <div
           className={cn(
-            'flex items-start px-1',
-            compareAll ? 'flex-row justify-start gap-1' : 'flex-row justify-center gap-5'
+            'flex items-start px-0.5',
+            compareAll ? 'flex-row justify-start' : 'flex-row justify-center gap-5'
           )}
+          style={compareAll ? { gap: CALENDAR_QUARTER_GRID_COL_GAP_PX } : undefined}
         >
           {Array.from({ length: columns }, (_, i) => (
             <motion.div
@@ -156,9 +159,9 @@ function RunwaySkeleton({
               animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
               transition={{ duration: 0.22, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
             >
-              <div className="h-[28px] w-11 shrink-0 rounded-full border-[3px] border-black/20 bg-white/90" />
+              <div className="h-5 w-8 shrink-0 rounded-sm bg-muted/60" aria-hidden />
               <motion.div
-                className="min-h-[min(52vh,420px)] w-[168px] rounded-lg bg-muted/55 sm:w-[188px]"
+                className="min-h-[min(52vh,420px)] w-[182px] rounded-lg bg-muted/55 sm:w-[194px]"
                 animate={
                   reduceMotion
                     ? {}
@@ -185,25 +188,21 @@ const WEEKDAY_GRID_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
 function fillMetricLabelForView(mode: ViewModeId): string {
   switch (mode) {
     case 'combined':
-      return 'Combined risk';
-    case 'technology':
-      return 'Tech utilisation vs effective cap (heatmap to 2.5× for colour spread)';
+      return 'Technology (blended pressure score)';
     case 'in_store':
-      return 'Business activity (trading · marketing · holidays)';
+      return 'Business blend (trading · marketing · holidays — weights from pressure model)';
     default:
       return 'Metric';
   }
 }
 
-function cellMetric(row: RiskRow | undefined, mode: ViewModeId): number {
+function cellMetric(row: RiskRow | undefined, mode: ViewModeId, tuning: RiskModelTuning): number {
   if (!row) return 0;
   switch (mode) {
     case 'combined':
       return row.risk_score;
-    case 'technology':
-      return techHeatmapMetric(row);
     case 'in_store':
-      return inStoreHeatmapMetric(row);
+      return inStoreHeatmapMetric(row, tuning);
     default:
       return row.risk_score;
   }
@@ -269,8 +268,35 @@ type HeatCellProps = {
   /** When false during color sweep, only the grey→colour reveal runs. */
   postSweep: boolean;
   sweepDelaySec: number;
-  showTipFromCell: (e: React.MouseEvent, dateStr: string | null, weekdayCol: number) => void;
+  /** Remounts the colour layer so the grey→fill sweep replays when the view mode changes. */
+  viewMode: ViewModeId;
+  openDayDetailsFromCell: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
 };
+
+function heatCellTipHandlers(
+  openDayDetailsFromCell: HeatCellProps['openDayDetailsFromCell'],
+  dateStr: string | null,
+  weekdayCol: number
+) {
+  return {
+    onClick: (e: React.MouseEvent) => {
+      e.stopPropagation();
+      openDayDetailsFromCell({ clientX: e.clientX, clientY: e.clientY }, dateStr, weekdayCol);
+    },
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      e.stopPropagation();
+      const el = e.currentTarget as HTMLElement;
+      const r = el.getBoundingClientRect();
+      openDayDetailsFromCell(
+        { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 },
+        dateStr,
+        weekdayCol
+      );
+    },
+  };
+}
 
 function HeatCellDimWrap({ pastDimmed, children }: { pastDimmed: boolean; children: ReactNode }) {
   return <div className={cn('shrink-0', pastDimmed && 'opacity-25')}>{children}</div>;
@@ -288,23 +314,27 @@ const HeatCell = memo(function HeatCell({
   enableColorSweep,
   postSweep,
   sweepDelaySec,
-  showTipFromCell,
+  viewMode,
+  openDayDetailsFromCell,
 }: HeatCellProps) {
   const tw = heatmapTwinkleParams(discoMode, shimmerBase, weekdayCol);
   const pulseOn = (shimmer || discoMode) && (!enableColorSweep || postSweep);
 
-  const handlers = {
-    onMouseEnter: (e: React.MouseEvent) => {
-      showTipFromCell(e, dateStr, weekdayCol);
-    },
-  };
+  const handlers = heatCellTipHandlers(openDayDetailsFromCell, dateStr, weekdayCol);
 
-  const boxClass = cn('relative shrink-0 cursor-default rounded-[3px]', isToday && 'z-[1]');
+  const boxClass = cn(
+    'relative shrink-0 cursor-pointer rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+    isToday && 'z-[1]'
+  );
 
   if (!enableColorSweep && !shimmer && !discoMode) {
     return (
       <HeatCellDimWrap pastDimmed={pastDimmed}>
         <div
+          role="button"
+          tabIndex={0}
+          title="Click for day details"
+          aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
           className={boxClass}
           style={{ width: CELL_PX, height: CELL_PX, backgroundColor: fill }}
           {...handlers}
@@ -319,6 +349,10 @@ const HeatCell = memo(function HeatCell({
     return (
       <HeatCellDimWrap pastDimmed={pastDimmed}>
         <motion.div
+          role="button"
+          tabIndex={0}
+          title="Click for day details"
+          aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
           className={cn(boxClass, 'will-change-[opacity,filter]')}
           style={{ width: CELL_PX, height: CELL_PX, backgroundColor: fill }}
           initial={false}
@@ -345,13 +379,18 @@ const HeatCell = memo(function HeatCell({
     <div className="relative shrink-0" style={{ width: CELL_PX, height: CELL_PX }}>
       <div className="pointer-events-none absolute inset-0 rounded-[3px] bg-muted" aria-hidden />
       <motion.div
+        key={viewMode}
         className={cn(
-          'absolute inset-0 cursor-default rounded-[3px]',
+          'absolute inset-0 cursor-pointer rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
           isToday && 'z-[1]',
           'will-change-[opacity,filter]'
         )}
+        role="button"
+        tabIndex={0}
+        title="Click for day details"
+        aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
         style={{ backgroundColor: fill }}
-        initial={{ opacity: 0, filter: 'brightness(1)' }}
+        initial={{ opacity: 0, filter: 'brightness(0.92) saturate(0.85)' }}
         animate={
           pulseOn
             ? {
@@ -378,6 +417,7 @@ const HeatCell = memo(function HeatCell({
               }
             : {
                 opacity: { delay: sweepDelaySec, duration: SWOOSH_DURATION_SEC, ease: SWOOSH_EASE },
+                filter: { delay: sweepDelaySec, duration: SWOOSH_DURATION_SEC * 0.92, ease: SWOOSH_EASE },
               }
         }
         {...handlers}
@@ -404,23 +444,27 @@ const HeatCellSized = memo(function HeatCellSized({
   enableColorSweep,
   postSweep,
   sweepDelaySec,
-  showTipFromCell,
+  viewMode,
+  openDayDetailsFromCell,
 }: HeatCellSizedProps) {
   const tw = heatmapTwinkleParams(discoMode, shimmerBase, weekdayCol);
   const pulseOn = (shimmer || discoMode) && (!enableColorSweep || postSweep);
 
-  const handlers = {
-    onMouseEnter: (e: React.MouseEvent) => {
-      showTipFromCell(e, dateStr, weekdayCol);
-    },
-  };
+  const handlers = heatCellTipHandlers(openDayDetailsFromCell, dateStr, weekdayCol);
 
-  const boxClass = cn('relative shrink-0 cursor-default rounded-[2px]', isToday && 'z-[1]');
+  const boxClass = cn(
+    'relative shrink-0 cursor-pointer rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+    isToday && 'z-[1]'
+  );
 
   if (!enableColorSweep && !shimmer && !discoMode) {
     return (
       <HeatCellDimWrap pastDimmed={pastDimmed}>
         <div
+          role="button"
+          tabIndex={0}
+          title="Click for day details"
+          aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
           className={boxClass}
           style={{ width: cellPx, height: cellPx, backgroundColor: fill }}
           {...handlers}
@@ -435,6 +479,10 @@ const HeatCellSized = memo(function HeatCellSized({
     return (
       <HeatCellDimWrap pastDimmed={pastDimmed}>
         <motion.div
+          role="button"
+          tabIndex={0}
+          title="Click for day details"
+          aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
           className={cn(boxClass, 'will-change-[opacity,filter]')}
           style={{ width: cellPx, height: cellPx, backgroundColor: fill }}
           initial={false}
@@ -461,13 +509,18 @@ const HeatCellSized = memo(function HeatCellSized({
     <div className="relative shrink-0" style={{ width: cellPx, height: cellPx }}>
       <div className="pointer-events-none absolute inset-0 rounded-[2px] bg-muted" aria-hidden />
       <motion.div
+        key={viewMode}
         className={cn(
-          'absolute inset-0 cursor-default rounded-[2px]',
+          'absolute inset-0 cursor-pointer rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
           isToday && 'z-[1]',
           'will-change-[opacity,filter]'
         )}
+        role="button"
+        tabIndex={0}
+        title="Click for day details"
+        aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
         style={{ backgroundColor: fill }}
-        initial={{ opacity: 0, filter: 'brightness(1)' }}
+        initial={{ opacity: 0, filter: 'brightness(0.92) saturate(0.85)' }}
         animate={
           pulseOn
             ? {
@@ -494,6 +547,7 @@ const HeatCellSized = memo(function HeatCellSized({
               }
             : {
                 opacity: { delay: sweepDelaySec, duration: SWOOSH_DURATION_SEC, ease: SWOOSH_EASE },
+                filter: { delay: sweepDelaySec, duration: SWOOSH_DURATION_SEC * 0.92, ease: SWOOSH_EASE },
               }
         }
         {...handlers}
@@ -514,7 +568,8 @@ type RunwayVerticalHeatmapBodyProps = {
   monthStripW: number;
   riskByDate: Map<string, RiskRow>;
   norm: RunwayNormRange | undefined;
-  heatmapOpts: HeatmapColorOpts | undefined;
+  heatmapOpts: HeatmapColorOpts;
+  riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
   todayYmd: string;
   dimPastDays: boolean;
@@ -524,13 +579,12 @@ type RunwayVerticalHeatmapBodyProps = {
   postSweep: boolean;
   /** Extra delay (seconds) so multi-market columns swoosh in sequence left→right. */
   sweepMarketOffsetSec: number;
-  showTipFromCell: (e: React.MouseEvent, dateStr: string | null, weekdayCol: number) => void;
+  openDayDetailsFromCell: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
   layout: RunwayHeatmapLayout;
   /** When `vertical_strip`, hide left quarter gutter (compare-all uses a shared gutter column). */
   showQuarterGutter?: boolean;
-  /** Compare-all: month names only in leftmost market column; weekdays only on first month row. */
+  /** Compare-all: month abbrev beside each mini-grid; one shared Mo–Su row (first model month only). */
   compareStripLabels?: boolean;
-  isLeftmostMarketColumn?: boolean;
   firstCalendarMonthKey?: string | null;
 };
 
@@ -658,6 +712,7 @@ function RunwayMonthMiniGrid({
   riskByDate,
   norm,
   heatmapOpts,
+  riskTuning,
   viewMode,
   todayYmd,
   shimmer,
@@ -665,7 +720,7 @@ function RunwayMonthMiniGrid({
   enableColorSweep,
   postSweep,
   sweepMarketOffsetSec,
-  showTipFromCell,
+  openDayDetailsFromCell,
   dimPastDays,
   showMonthLabel = true,
   showWeekdayRow = true,
@@ -680,7 +735,8 @@ function RunwayMonthMiniGrid({
   monthStripW: number;
   riskByDate: Map<string, RiskRow>;
   norm: RunwayNormRange | undefined;
-  heatmapOpts: HeatmapColorOpts | undefined;
+  heatmapOpts: HeatmapColorOpts;
+  riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
   todayYmd: string;
   shimmer: boolean;
@@ -688,7 +744,7 @@ function RunwayMonthMiniGrid({
   enableColorSweep: boolean;
   postSweep: boolean;
   sweepMarketOffsetSec: number;
-  showTipFromCell: (e: React.MouseEvent, dateStr: string | null, weekdayCol: number) => void;
+  openDayDetailsFromCell: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
   /** When true, calendar days strictly before today render at 25% opacity. */
   dimPastDays: boolean;
   showMonthLabel?: boolean;
@@ -717,7 +773,7 @@ function RunwayMonthMiniGrid({
   );
 
   const weeksGrid = (
-    <div data-runway-weeks-grid className="flex flex-col" style={{ gap }}>
+    <div data-runway-weeks-grid data-no-drag className="flex flex-col" style={{ gap }}>
       {mo.weeks.map((week, wi) => (
         <div key={wi} className="flex shrink-0" style={{ gap }}>
           {week.map((cell, di) => {
@@ -737,7 +793,7 @@ function RunwayMonthMiniGrid({
               ? HEATMAP_RUNWAY_PAD_FILL
               : heatmapColorForViewMode(
                   viewMode,
-                  row ? cellMetric(row, viewMode) : undefined,
+                  row ? cellMetric(row, viewMode, riskTuning) : undefined,
                   norm,
                   heatmapOpts
                 );
@@ -758,7 +814,8 @@ function RunwayMonthMiniGrid({
                 enableColorSweep={enableColorSweep}
                 postSweep={postSweep}
                 sweepDelaySec={sweepDelaySec}
-                showTipFromCell={showTipFromCell}
+                viewMode={viewMode}
+                openDayDetailsFromCell={openDayDetailsFromCell}
               />
             ) : (
               <HeatCellSized
@@ -775,7 +832,8 @@ function RunwayMonthMiniGrid({
                 enableColorSweep={enableColorSweep}
                 postSweep={postSweep}
                 sweepDelaySec={sweepDelaySec}
-                showTipFromCell={showTipFromCell}
+                viewMode={viewMode}
+                openDayDetailsFromCell={openDayDetailsFromCell}
               />
             );
           })}
@@ -835,6 +893,7 @@ function RunwayVerticalHeatmapBody({
   riskByDate,
   norm,
   heatmapOpts,
+  riskTuning,
   viewMode,
   todayYmd,
   dimPastDays,
@@ -843,15 +902,13 @@ function RunwayVerticalHeatmapBody({
   enableColorSweep,
   postSweep,
   sweepMarketOffsetSec,
-  showTipFromCell,
+  openDayDetailsFromCell,
   layout,
   showQuarterGutter = true,
   compareStripLabels = false,
-  isLeftmostMarketColumn = true,
   firstCalendarMonthKey = null,
 }: RunwayVerticalHeatmapBodyProps) {
   const compactStripLabels = compareStripLabels;
-  const showMonthLabelInColumn = !compactStripLabels || isLeftmostMarketColumn;
   const showWeekdayRowForMonth = (mo: CalendarMonthBlock) =>
     !compactStripLabels || mo.key === firstCalendarMonthKey;
 
@@ -924,6 +981,7 @@ function RunwayVerticalHeatmapBody({
                         riskByDate={riskByDate}
                         norm={norm}
                         heatmapOpts={heatmapOpts}
+                        riskTuning={riskTuning}
                         viewMode={viewMode}
                         todayYmd={todayYmd}
                         shimmer={shimmer}
@@ -931,7 +989,7 @@ function RunwayVerticalHeatmapBody({
                         enableColorSweep={enableColorSweep}
                         postSweep={postSweep}
                         sweepMarketOffsetSec={sweepMarketOffsetSec}
-                        showTipFromCell={showTipFromCell}
+                        openDayDetailsFromCell={openDayDetailsFromCell}
                         dimPastDays={dimPastDays}
                       />
                     );
@@ -1033,6 +1091,7 @@ function RunwayVerticalHeatmapBody({
                           riskByDate={riskByDate}
                           norm={norm}
                           heatmapOpts={heatmapOpts}
+                          riskTuning={riskTuning}
                           viewMode={viewMode}
                           todayYmd={todayYmd}
                           shimmer={shimmer}
@@ -1040,9 +1099,8 @@ function RunwayVerticalHeatmapBody({
                           enableColorSweep={enableColorSweep}
                           postSweep={postSweep}
                           sweepMarketOffsetSec={sweepMarketOffsetSec}
-                          showTipFromCell={showTipFromCell}
+                          openDayDetailsFromCell={openDayDetailsFromCell}
                           dimPastDays={dimPastDays}
-                          showMonthLabel={showMonthLabelInColumn}
                           showWeekdayRow={showWeekdayRowForMonth(mo)}
                           monthLabelPlacement={compareStripLabels ? 'side' : 'above'}
                         />
@@ -1063,8 +1121,8 @@ export type SlotSelection = {
   dateStart: string;
   dateEnd: string;
   markets: string[];
-  avgRisk: number;
-  maxRisk: number;
+  avgPressure: number;
+  maxPressure: number;
 };
 
 type RunwayGridProps = {
@@ -1091,7 +1149,8 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
 
   const scrollTopRef = useRef(0);
   const [tip, setTip] = useState<RunwayTipState | null>(null);
-  const hideTipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tipRef = useRef<RunwayTipState | null>(null);
+  tipRef.current = tip;
   const heatmapInteractionRef = useRef<HTMLDivElement>(null);
   const tooltipRootRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
@@ -1108,7 +1167,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     }
   });
 
-  const cellPx = compareAllMarkets ? COMPARE_CELL_PX : CELL_PX;
+  const cellPx = CELL_PX;
 
   const marketsOrdered = useMemo(() => {
     const fromCfg = configs.map((c) => c.market);
@@ -1163,25 +1222,9 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     }
   }, [dimPastDays]);
 
-  const cancelTipHide = useCallback(() => {
-    if (hideTipTimerRef.current != null) {
-      clearTimeout(hideTipTimerRef.current);
-      hideTipTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleTipHide = useCallback(() => {
-    cancelTipHide();
-    hideTipTimerRef.current = setTimeout(() => {
-      setTip(null);
-      hideTipTimerRef.current = null;
-    }, 200);
-  }, [cancelTipHide]);
-
   const dismissTip = useCallback(() => {
-    cancelTipHide();
     setTip(null);
-  }, [cancelTipHide]);
+  }, []);
 
   useEffect(() => {
     if (!tip) return;
@@ -1203,58 +1246,55 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     };
   }, [tip, dismissTip]);
 
-  useEffect(() => () => cancelTipHide(), [cancelTipHide]);
-
   const allDatesSorted = useMemo(() => [...new Set(riskSurface.map((r) => r.date))].sort(), [riskSurface]);
 
-  const { calendarLayout, normTech, normInStore } = useMemo(() => {
+  const { calendarLayout, normInStore } = useMemo(() => {
     const calendarLayout = compareAllMarkets
       ? buildVerticalMonthsRunwayLayout(allDatesSorted, cellPx)
       : buildQuarterGridRunwayLayout(allDatesSorted, cellPx);
-    let normTech: RunwayNormRange | undefined;
     let normInStore: RunwayNormRange | undefined;
     if (riskSurface.length) {
-      const tech = riskSurface.map((r) => techHeatmapMetric(r));
-      const inStore = riskSurface.map((r) => inStoreHeatmapMetric(r));
-      normTech = percentileNormRange(tech, { minSpan: 0.2, clamp01: false });
+      const inStore = riskSurface.map((r) => inStoreHeatmapMetric(r, riskTuning));
       normInStore = percentileNormRange(inStore, { minSpan: 0.14, clamp01: true });
     }
     return {
       calendarLayout,
-      normTech,
       normInStore,
     };
-  }, [allDatesSorted, cellPx, riskSurface, compareAllMarkets]);
+  }, [allDatesSorted, cellPx, riskSurface, compareAllMarkets, riskTuning]);
 
-  const heatmapOpts: HeatmapColorOpts | undefined =
-    viewMode === 'combined'
-      ? { riskHeatmapGamma, riskHeatmapCurve }
-      : viewMode === 'technology' || viewMode === 'in_store'
-        ? {}
-        : undefined;
+  const heatmapOpts: HeatmapColorOpts = { riskHeatmapGamma, riskHeatmapCurve };
 
-  const norm = viewMode === 'technology' ? normTech : viewMode === 'in_store' ? normInStore : undefined;
+  const norm = viewMode === 'in_store' ? normInStore : undefined;
 
   const makeShowTip = useCallback(
     (market: string, riskByDate: Map<string, RiskRow>, config: MarketConfig | undefined) =>
-      (e: React.MouseEvent, dateStr: string | null, weekdayCol: number) => {
-        cancelTipHide();
+      (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => {
         const wd = dateStr ? weekdayShortFromYmd(dateStr) : WEEKDAY_HEADERS[weekdayCol];
+        const prev = tipRef.current;
+        const { clientX, clientY } = anchor;
+
         if (!dateStr) {
-          setTip({
-            x: e.clientX,
-            y: e.clientY,
-            simple: `${wd} — outside model range`,
-          });
+          const simple = `${wd} — outside model range`;
+          if (prev && 'simple' in prev && prev.simple === simple) {
+            setTip(null);
+            return;
+          }
+          setTip({ x: clientX, y: clientY, simple });
           return;
         }
         const row = riskByDate.get(dateStr);
         if (!row) {
-          setTip({
-            x: e.clientX,
-            y: e.clientY,
-            simple: `${dateStr} · ${market} — no data`,
-          });
+          const simple = `${dateStr} · ${market} — no data`;
+          if (prev && 'simple' in prev && prev.simple === simple) {
+            setTip(null);
+            return;
+          }
+          setTip({ x: clientX, y: clientY, simple });
+          return;
+        }
+        if (prev && 'payload' in prev && prev.payload.dateStr === dateStr && prev.payload.market === market) {
+          setTip(null);
           return;
         }
         const payload = buildRunwayTooltipPayload({
@@ -1266,11 +1306,11 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
           config,
           tuning: riskTuning,
           fillMetricLabel: fillMetricLabelForView(viewMode),
-          fillMetricValue: cellMetric(row, viewMode),
+          fillMetricValue: cellMetric(row, viewMode, riskTuning),
         });
-        setTip({ x: e.clientX, y: e.clientY, payload });
+        setTip({ x: clientX, y: clientY, payload });
       },
-    [cancelTipHide, viewMode, riskTuning]
+    [viewMode, riskTuning]
   );
 
   const todayYmd = formatDateYmd(new Date());
@@ -1364,7 +1404,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
               </motion.div>
             ) : calendarLayout ? (
               <motion.div
-                key={`grid-${country}-${viewMode}-${compareAllMarkets ? 'compare' : 'single'}`}
+                key={`grid-${country}-${compareAllMarkets ? 'compare' : 'single'}`}
                 className="w-full pt-8"
                 initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1384,6 +1424,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
                   monthStripW={monthStripW}
                   norm={norm}
                   heatmapOpts={heatmapOpts}
+                  riskTuning={riskTuning}
                   viewMode={viewMode}
                   todayYmd={todayYmd}
                   dimPastDays={dimPastDays}
@@ -1392,8 +1433,6 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
                   country={country}
                   marketConfig={marketConfig}
                   makeShowTip={makeShowTip}
-                  cancelTipHide={cancelTipHide}
-                  scheduleTipHide={scheduleTipHide}
                   heatmapInteractionRef={heatmapInteractionRef}
                   outerRef={outerRef}
                   heatmapCaptureRef={heatmapCaptureRef}
@@ -1413,8 +1452,6 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
         reducedMotion={!!reduceMotion}
         onDismiss={dismissTip}
         rootRef={tooltipRootRef}
-        onTooltipPointerEnter={cancelTipHide}
-        onTooltipPointerLeave={scheduleTipHide}
       />
     </div>
   );
@@ -1432,7 +1469,8 @@ type RunwayGridBodyProps = {
   gap: number;
   monthStripW: number;
   norm: RunwayNormRange | undefined;
-  heatmapOpts: HeatmapColorOpts | undefined;
+  heatmapOpts: HeatmapColorOpts;
+  riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
   todayYmd: string;
   dimPastDays: boolean;
@@ -1444,9 +1482,7 @@ type RunwayGridBodyProps = {
     market: string,
     riskByDate: Map<string, RiskRow>,
     config: MarketConfig | undefined
-  ) => (e: React.MouseEvent, dateStr: string | null, weekdayCol: number) => void;
-  cancelTipHide: () => void;
-  scheduleTipHide: () => void;
+  ) => (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
   heatmapInteractionRef: React.RefObject<HTMLDivElement | null>;
   outerRef: React.MutableRefObject<HTMLDivElement | null>;
   heatmapCaptureRef: React.MutableRefObject<HTMLDivElement | null>;
@@ -1468,6 +1504,7 @@ function RunwayGridBody({
   monthStripW,
   norm,
   heatmapOpts,
+  riskTuning,
   viewMode,
   todayYmd,
   dimPastDays,
@@ -1476,8 +1513,6 @@ function RunwayGridBody({
   country,
   marketConfig,
   makeShowTip,
-  cancelTipHide,
-  scheduleTipHide,
   heatmapInteractionRef,
   outerRef,
   heatmapCaptureRef,
@@ -1496,7 +1531,7 @@ function RunwayGridBody({
     setPostSweep(false);
     const t = window.setTimeout(() => setPostSweep(true), SWOOSH_POST_MS);
     return () => clearTimeout(t);
-  }, [reduceMotion]);
+  }, [reduceMotion, viewMode]);
 
   const firstCompareCalendarMonthKey = useMemo(
     () => firstCalendarMonthKeyFromSections(sections),
@@ -1527,12 +1562,14 @@ function RunwayGridBody({
       <div
         ref={heatmapInteractionRef as Ref<HTMLDivElement>}
         className="flex min-w-0 flex-1 flex-col justify-center bg-transparent p-0 shadow-none"
-        onMouseEnter={cancelTipHide}
-        onMouseLeave={scheduleTipHide}
       >
         {compareAllMarkets ? (
           <div className="w-full overflow-x-auto overflow-y-visible pb-1">
-            <div ref={heatmapCaptureRef} className="flex w-max flex-row items-start justify-start gap-1 px-1">
+            <div
+              ref={heatmapCaptureRef}
+              className="flex w-max max-w-none flex-row items-start justify-start px-0.5"
+              style={{ gap: CALENDAR_QUARTER_GRID_COL_GAP_PX }}
+            >
               <div className="flex shrink-0 flex-col items-end">
                 <div className="invisible mb-1.5 flex h-[32px] items-center justify-center" aria-hidden>
                   <RunwayMarketCodeSticker code="UK" />
@@ -1566,6 +1603,7 @@ function RunwayGridBody({
                         riskByDate={map}
                         norm={norm}
                         heatmapOpts={heatmapOpts}
+                        riskTuning={riskTuning}
                         viewMode={viewMode}
                         todayYmd={todayYmd}
                         dimPastDays={dimPastDays}
@@ -1574,11 +1612,10 @@ function RunwayGridBody({
                         enableColorSweep={enableColorSweep}
                         postSweep={postSweep}
                         sweepMarketOffsetSec={colIdx * SWOOSH_MARKET_COLUMN_GAP_SEC}
-                        showTipFromCell={makeShowTip(m, map, cfg)}
+                        openDayDetailsFromCell={makeShowTip(m, map, cfg)}
                         layout="vertical_strip"
                         showQuarterGutter={false}
                         compareStripLabels
-                        isLeftmostMarketColumn={colIdx === 0}
                         firstCalendarMonthKey={firstCompareCalendarMonthKey}
                       />
                     </div>
@@ -1614,6 +1651,7 @@ function RunwayGridBody({
                 riskByDate={riskByDateForMarket(riskSurface, country)}
                 norm={norm}
                 heatmapOpts={heatmapOpts}
+                riskTuning={riskTuning}
                 viewMode={viewMode}
                 todayYmd={todayYmd}
                 dimPastDays={dimPastDays}
@@ -1622,7 +1660,7 @@ function RunwayGridBody({
                 enableColorSweep={enableColorSweep}
                 postSweep={postSweep}
                 sweepMarketOffsetSec={0}
-                showTipFromCell={makeShowTip(country, riskByDateForMarket(riskSurface, country), marketConfig)}
+                openDayDetailsFromCell={makeShowTip(country, riskByDateForMarket(riskSurface, country), marketConfig)}
                 layout="quarter_grid"
               />
             </div>

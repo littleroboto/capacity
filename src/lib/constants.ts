@@ -16,35 +16,31 @@ export const RISK_BANDS = {
 export const VIEW_MODES = [
   {
     id: 'combined',
-    label: 'Combined',
-    title: 'One score from the weighted blend of tech, restaurant, marketing, and holiday factors.',
-  },
-  {
-    id: 'technology',
-    label: 'Tech effort',
+    label: 'Technology',
     title:
-      'Labs, teams, and backend under change and live load. Tech typically leads timelines and overlaps business peaks to support delivery.',
+      'Deployment pressure score — tech-led blend with restaurant, marketing, and holidays. Transfer curve and γ apply in this lens.',
   },
   {
     id: 'in_store',
     label: 'Business',
-    title: 'Restaurant trading, marketing windows, and holiday rhythm — demand and activity in the business.',
+    title:
+      'Restaurant trading, marketing windows, and holiday rhythm. Uses a smoother colour ramp so busy periods still show a bit of nuance when values cluster high.',
   },
 ] as const;
 
 export type ViewModeId = (typeof VIEW_MODES)[number]['id'];
 
-/** Map persisted / legacy layer ids to the three runway lenses. */
+/** Map persisted / legacy layer ids to runway view modes (`combined` = Technology lens in the UI). */
 export function normalizeViewModeId(raw: string | null): ViewModeId {
   if (!raw) return 'combined';
   const legacy: Record<string, ViewModeId> = {
     combined: 'combined',
-    technology: 'technology',
+    technology: 'combined',
     in_store: 'in_store',
     risk_score: 'combined',
-    tech_pressure: 'technology',
-    tech_readiness_pressure: 'technology',
-    tech_sustain_pressure: 'technology',
+    tech_pressure: 'combined',
+    tech_readiness_pressure: 'combined',
+    tech_sustain_pressure: 'combined',
     store_pressure: 'in_store',
     campaign_presence: 'in_store',
     campaign_risk: 'in_store',
@@ -60,6 +56,8 @@ export const STORAGE_KEYS = {
   theme: 'owm_theme',
   atc_dsl: 'atc_dsl',
   atc_scenarios: 'atc_scenarios',
-  /** Zustand persist blob for country, view mode, theme, risk tuning. */
+  /** Zustand persist blob for country, view mode, theme, pressure tuning (stored as `riskTuning`). */
   capacity_atc: 'capacity-atc',
+  /** Header UI: compact bar (`1` / absent). */
+  header_compact: 'capacity_header_compact',
 } as const;

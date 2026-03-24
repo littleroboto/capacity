@@ -1,18 +1,68 @@
 import { normalizeViewModeId } from '@/lib/constants';
+import { looksLikeYamlDsl } from '@/lib/dslGuards';
 import { clampRiskTuning, DEFAULT_RISK_TUNING } from '@/engine/riskModelTuning';
+import { runPipelineFromDsl } from '@/engine/pipeline';
+import { syncRiskHeatmapVisualFromConfigs } from '@/lib/heatmapVisualFromConfigs';
+import {
+  extractMarketDocument,
+  splitToDslByMarket,
+} from '@/lib/multiDocMarketYaml';
+import { FALLBACK_RUNWAY_MARKET_IDS, isRunwayAllMarkets } from '@/lib/markets';
 import type { ScenarioState } from '@/lib/storage';
-import { setStored } from '@/lib/storage';
+import { setAtcDsl, setStored } from '@/lib/storage';
 import { useAtcStore } from '@/store/useAtcStore';
 
-/** Load a saved scenario: country, DSL, view mode, optional risk tuning, then run pipeline + persist `atc_dsl`. */
+/** Load a saved workspace: full DSL, per-market map, runway order, tuning, view, theme, disco, then pipeline + persist. */
 export function applyScenarioToStore(s: ScenarioState): void {
-  setStored('picker', s.picker);
-  if (s.riskTuning && typeof s.riskTuning === 'object') {
-    useAtcStore.setState({
-      riskTuning: clampRiskTuning({ ...DEFAULT_RISK_TUNING, ...s.riskTuning }),
-    });
+  const full = (s.fullDsl ?? s.dsl ?? '').trim();
+  if (!full || !looksLikeYamlDsl(full)) return;
+
+  const split = splitToDslByMarket(full);
+  const currentOrder = useAtcStore.getState().runwayMarketOrder;
+  const order =
+    s.runwayMarketOrder?.length ? [...s.runwayMarketOrder] : [...currentOrder];
+  if (!order.length) {
+    order.push(...FALLBACK_RUNWAY_MARKET_IDS);
   }
-  useAtcStore.setState({ country: s.picker, dslText: s.dsl });
-  useAtcStore.getState().setViewMode(normalizeViewModeId(s.layer));
-  useAtcStore.getState().applyDsl(s.dsl);
+  const dslByMarket = { ...(s.dslByMarket ?? {}), ...split };
+
+  const country = s.picker;
+  let dslText = full;
+  if (!isRunwayAllMarkets(country)) {
+    dslText =
+      extractMarketDocument(full, country) ??
+      dslByMarket[country] ??
+      full;
+    if (!looksLikeYamlDsl(dslText)) dslText = full;
+  }
+
+  const riskTuning = s.riskTuning
+    ? clampRiskTuning({ ...DEFAULT_RISK_TUNING, ...s.riskTuning })
+    : DEFAULT_RISK_TUNING;
+
+  setStored('picker', country);
+  setStored('layer', normalizeViewModeId(s.layer));
+
+  useAtcStore.setState({
+    country,
+    runwayMarketOrder: order,
+    dslByMarket,
+    dslText,
+    riskTuning,
+    viewMode: normalizeViewModeId(s.layer),
+    discoMode: s.discoMode ?? false,
+  });
+
+  if (s.theme === 'light' || s.theme === 'dark') {
+    useAtcStore.getState().setTheme(s.theme);
+  }
+
+  setAtcDsl(full);
+  const r = runPipelineFromDsl(full, riskTuning);
+  useAtcStore.setState({
+    riskSurface: r.riskSurface,
+    configs: r.configs,
+    parseError: r.parseError ?? null,
+    ...syncRiskHeatmapVisualFromConfigs(r.configs, country, order),
+  });
 }

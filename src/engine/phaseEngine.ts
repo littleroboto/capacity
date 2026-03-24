@@ -3,7 +3,6 @@ import { emptySurfaceSlice, emptySurfaceTotals, type SurfaceLoadSlice } from '@/
 import { parseDate, type CalendarRow } from './calendar';
 import type { CampaignConfig, MarketConfig, PhaseLoad } from './types';
 
-const RHYTHM_LEVELS: Record<string, number> = { low: 0.25, medium: 0.5, high: 0.75, very_high: 1 };
 const DEFAULT_LIVE_SUPPORT_SCALE = 0.45;
 
 function scalePhaseLoad(load: PhaseLoad, factor: number): PhaseLoad {
@@ -188,9 +187,9 @@ export function expandPhases(calendar: CalendarRow[], config: MarketConfig): Exp
     const tr = config.techRhythm;
     if (tr?.weekly_pattern) {
       const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][weekday];
-      const levelKey = tr.weekly_pattern[dayName];
-      if (levelKey != null) {
-        const base = RHYTHM_LEVELS[String(levelKey).toLowerCase()] ?? 0.5;
+      const baseRaw = tr.weekly_pattern[dayName];
+      if (baseRaw != null && Number.isFinite(baseRaw)) {
+        const base = Math.min(1, Math.max(0, baseRaw));
         const labs = (tr.labs_scale ?? 2) * base;
         const teams = (tr.teams_scale ?? 1) * base;
         const backend = (tr.backend_scale ?? 0) * base;

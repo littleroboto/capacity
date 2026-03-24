@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from './constants';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
+import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
 
 /** Same-tab refresh for scenario list (localStorage has no event in-tab). */
 export const SCENARIOS_CHANGED = 'atc-scenarios-changed';
@@ -47,11 +48,21 @@ export function setAtcDsl(text: string | null): void {
 export type ScenarioState = {
   id: string;
   name: string;
-  dsl: string;
+  /** When this snapshot was saved (ISO). Omitted in very old exports. */
+  savedAt?: string;
+  /** Canonical merged multi-doc YAML. Prefer over `dsl`. */
+  fullDsl?: string;
+  /** Legacy field; same as `fullDsl` when `fullDsl` absent. */
+  dsl?: string;
   picker: string;
   layer: string;
-  /** Saved when present (risk model sliders). */
   riskTuning?: RiskModelTuning;
+  runwayMarketOrder?: string[];
+  dslByMarket?: Record<string, string>;
+  riskHeatmapGamma?: number;
+  riskHeatmapCurve?: RiskHeatmapCurveId;
+  discoMode?: boolean;
+  theme?: 'light' | 'dark';
 };
 
 export function getScenarios(): ScenarioState[] {
@@ -65,14 +76,9 @@ export function getScenarios(): ScenarioState[] {
   }
 }
 
-export function saveScenario(
-  name: string,
-  state: { dsl: string; picker: string; layer: string; riskTuning?: RiskModelTuning }
-): string {
+/** Append a fully-built snapshot (see `buildWorkspaceSnapshot` / import). */
+export function appendScenario(row: ScenarioState): void {
   const list = getScenarios();
-  const id = `scenario-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-  const row: ScenarioState = { id, name, dsl: state.dsl, picker: state.picker, layer: state.layer };
-  if (state.riskTuning) row.riskTuning = state.riskTuning;
   list.push(row);
   try {
     localStorage.setItem(STORAGE_KEYS.atc_scenarios, JSON.stringify(list));
@@ -80,6 +86,27 @@ export function saveScenario(
     /* ignore */
   }
   notifyScenariosChanged();
+}
+
+/**
+ * @deprecated Use `saveNamedWorkspace` / `saveNamedWorkspaceInteractive` from `@/lib/workspaceSnapshot`.
+ */
+export function saveScenario(
+  name: string,
+  state: { dsl: string; picker: string; layer: string; riskTuning?: RiskModelTuning }
+): string {
+  const id = `scenario-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const row: ScenarioState = {
+    id,
+    name,
+    savedAt: new Date().toISOString(),
+    fullDsl: state.dsl,
+    dsl: state.dsl,
+    picker: state.picker,
+    layer: state.layer,
+    riskTuning: state.riskTuning,
+  };
+  appendScenario(row);
   return id;
 }
 

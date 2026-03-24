@@ -5,8 +5,8 @@ import {
 } from '@/lib/riskHeatmapTransfer';
 
 /**
- * 10-step diverging heatmap: saturated green (low risk) → amber (mid) → red (high).
- * index = Math.floor(risk_score * 9) with risk_score clamped to [0, 1].
+ * Anchor stops for the heatmap ramp (green → amber → red). Cells use {@link heatmapColorContinuous}
+ * so Technology and Business lenses share the same granular scale; patterns differ by metric per day.
  */
 export const RISK_HEATMAP_COLORS = [
   '#14532d', // green-900
@@ -29,6 +29,7 @@ export const HEATMAP_RUNWAY_PAD_FILL = '#cbd5e1';
 /** Cells with data but below the stress cutoff (distinct from empty / out-of-range). */
 export const STRESS_BELOW_CUTOFF_FILL = '#d1d9e6';
 
+/** Legacy 10-bucket mapping; runway uses {@link heatmapColorContinuous} for both view modes. */
 export function riskScoreToHeatmapColor(riskScore: number | undefined): string {
   if (riskScore == null || Number.isNaN(riskScore)) return EMPTY_CELL_FILL;
   const r = Math.min(1, Math.max(0, riskScore));
@@ -36,13 +37,41 @@ export function riskScoreToHeatmapColor(riskScore: number | undefined): string {
   return RISK_HEATMAP_COLORS[index] ?? RISK_HEATMAP_COLORS[RISK_HEATMAP_COLORS.length - 1]!;
 }
 
+function parseRgbHex(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function lerpHex(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = parseRgbHex(a);
+  const [br, bg, bb] = parseRgbHex(b);
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bl = Math.round(ab + (bb - ab) * t);
+  return `#${[r, g, bl].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Smooth ramp along {@link RISK_HEATMAP_COLORS} — used for both runway lenses after transfer. */
+export function heatmapColorContinuous(
+  metric01: number,
+  palette: readonly string[] = RISK_HEATMAP_COLORS
+): string {
+  const r = Math.min(1, Math.max(0, metric01));
+  if (palette.length < 2) return palette[0] ?? EMPTY_CELL_FILL;
+  const x = r * (palette.length - 1);
+  const i = Math.floor(x);
+  const t = x - i;
+  const j = Math.min(i + 1, palette.length - 1);
+  return lerpHex(palette[i]!, palette[j]!, t);
+}
+
 /** Min–max of a metric over the visible runway; stretches tech/store colours when absolute values sit in a narrow band. */
 export type RunwayNormRange = { min: number; max: number };
 
 export type HeatmapColorOpts = {
-  /** Combined risk only: transfer curve id (`power` = legacy score^γ). */
+  /** Transfer curve id (`power` = score^γ); applied after normalising the lens metric. */
   riskHeatmapCurve?: RiskHeatmapCurveId;
-  /** Combined risk only: γ for power/sigmoid/log; stored as `risk_heatmap_gamma`. */
+  /** γ for power/sigmoid/log; stored as `risk_heatmap_gamma`. */
   riskHeatmapGamma?: number;
   /**
    * 0 = off. Otherwise only values **at or above** this level (0–1 scale after norm / γ) use the stress palette;
@@ -59,15 +88,16 @@ export function heatmapColorForViewMode(
 ): string {
   if (metric == null || Number.isNaN(metric)) return EMPTY_CELL_FILL;
   let v = metric;
-  if (norm && norm.max > norm.min && (mode === 'technology' || mode === 'in_store')) {
+  if (norm && norm.max > norm.min && mode === 'in_store') {
     v = (metric - norm.min) / (norm.max - norm.min);
     v = Math.min(1, Math.max(0, v));
-  } else if (mode === 'combined') {
-    const curve = opts?.riskHeatmapCurve ?? 'power';
-    const gamma = opts?.riskHeatmapGamma ?? 1;
-    const c = Math.min(1, Math.max(0, v));
-    v = applyRiskHeatmapTransfer(c, curve, gamma);
+  } else {
+    v = Math.min(1, Math.max(0, v));
   }
+
+  const curve = opts?.riskHeatmapCurve ?? 'power';
+  const gamma = opts?.riskHeatmapGamma ?? 1;
+  v = applyRiskHeatmapTransfer(v, curve, gamma);
 
   const cut = opts?.stressCutoff;
   if (cut != null && cut > 1e-6 && cut < 1 - 1e-6) {
@@ -77,5 +107,5 @@ export function heatmapColorForViewMode(
     v = Math.min(1, Math.max(0, v));
   }
 
-  return riskScoreToHeatmapColor(v);
+  return heatmapColorContinuous(v);
 }

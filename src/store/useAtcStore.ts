@@ -20,11 +20,23 @@ import {
   RUNWAY_ALL_MARKETS_VALUE,
 } from '@/lib/markets';
 import { patchDslRiskHeatmapVisual } from '@/lib/dslRiskHeatmapPatch';
+import {
+  patchDslTradingMonthlyPattern,
+  type TradingMonthlyPatternPatch,
+} from '@/lib/dslTradingMonthlyPatch';
+import { patchDslTechWeeklyPattern, type TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
+import { syncRiskHeatmapVisualFromConfigs } from '@/lib/heatmapVisualFromConfigs';
 import { getAtcDsl, setAtcDsl, setStored, getStored } from '@/lib/storage';
 
 /** Debounce writes to `atc_dsl` while dragging the heatmap γ slider. */
 let atcDslGammaPersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce writes to `atc_dsl` while painting `tech.weekly_pattern`. */
+let atcDslTechRhythmPersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce writes to `atc_dsl` while editing `trading.monthly_pattern`. */
+let atcDslTradingMonthlyPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
 function countParsedMarkets(dsl: string): number {
   try {
@@ -32,22 +44,6 @@ function countParsedMarkets(dsl: string): number {
   } catch {
     return 0;
   }
-}
-
-function syncRiskHeatmapVisualFromConfigs(
-  configs: MarketConfig[],
-  country: string,
-  runwayOrder: readonly string[]
-): { riskHeatmapGamma: number; riskHeatmapCurve: RiskHeatmapCurveId } {
-  const focus = gammaFocusMarket(country, configs, runwayOrder);
-  const c = configs.find((x) => x.market === focus);
-  const g = c?.riskHeatmapGamma;
-  let riskHeatmapGamma = 1;
-  if (g != null && Number.isFinite(g) && g > 0) {
-    riskHeatmapGamma = Math.min(3, Math.max(0.35, g));
-  }
-  const riskHeatmapCurve = c?.riskHeatmapCurve ?? 'power';
-  return { riskHeatmapGamma, riskHeatmapCurve };
 }
 
 type AtcState = {
@@ -60,14 +56,14 @@ type AtcState = {
   dslText: string;
   dslByMarket: Record<string, string>;
   riskTuning: RiskModelTuning;
-  /** Combined-risk heatmap: γ for power/sigmoid/log (see `risk_heatmap_gamma` in YAML). */
+  /** Pressure heatmap: γ for power/sigmoid/log (see `risk_heatmap_gamma` in YAML). */
   riskHeatmapGamma: number;
-  /** Combined-risk heatmap transfer (`risk_heatmap_curve` in YAML; `power` = default / legacy). */
+  /** Pressure heatmap transfer (`risk_heatmap_curve` in YAML; `power` = default / legacy). */
   riskHeatmapCurve: RiskHeatmapCurveId;
   riskSurface: RiskRow[];
   configs: MarketConfig[];
   parseError: string | null;
-  /** Runway heatmap: sparkle / twinkle on every cell (honour reduced-motion in UI). */
+  /** Runway heatmap: optional sparkle / twinkle on every cell when on (dark theme, honour reduced-motion). */
   discoMode: boolean;
   setCountry: (c: string) => void;
   setViewMode: (v: ViewModeId) => void;
@@ -80,6 +76,10 @@ type AtcState = {
   resetRiskTuning: () => void;
   setRiskHeatmapGamma: (gamma: number) => void;
   setRiskHeatmapCurve: (curve: RiskHeatmapCurveId) => void;
+  /** Writes explicit Mon–Sun `tech.weekly_pattern` for the focused market and re-runs the pipeline. */
+  setTechWeeklyPattern: (pattern: TechWeeklyPatternPatch) => void;
+  /** Writes explicit Jan–Dec `trading.monthly_pattern` (0–1) for the focused market and re-runs the pipeline. */
+  setTradingMonthlyPattern: (pattern: TradingMonthlyPatternPatch) => void;
   applyDsl: (text?: string) => void;
   resetDsl: () => void;
   /** `multiDocFallback`: bundled all-markets YAML when `atc_dsl` is empty (first visit). */
@@ -248,6 +248,50 @@ export const useAtcStore = create<AtcState>()(
         }, 450);
       },
 
+      setTechWeeklyPattern: (pattern) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslTechWeeklyPattern(full, market, pattern);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTechRhythmPersistTimer != null) clearTimeout(atcDslTechRhythmPersistTimer);
+        atcDslTechRhythmPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTechRhythmPersistTimer = null;
+        }, 450);
+      },
+
+      setTradingMonthlyPattern: (pattern: TradingMonthlyPatternPatch) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslTradingMonthlyPattern(full, market, pattern);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTradingMonthlyPersistTimer != null) clearTimeout(atcDslTradingMonthlyPersistTimer);
+        atcDslTradingMonthlyPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTradingMonthlyPersistTimer = null;
+        }, 450);
+      },
+
       applyDsl: (text) => {
         const dsl = (text ?? get().dslText).trim();
         if (!looksLikeYamlDsl(dsl)) {
@@ -369,6 +413,24 @@ export const useAtcStore = create<AtcState>()(
     }),
     {
       name: STORAGE_KEYS.capacity_atc,
+      /** One-time: blend-weight UI removed — snap persisted importances to fixed balanced mix. */
+      version: 1,
+      migrate: (persistedState, fromVersion) => {
+        const ps = (persistedState ?? {}) as Partial<{
+          country: string;
+          viewMode: ViewModeId;
+          theme: 'light' | 'dark';
+          riskTuning: RiskModelTuning;
+          discoMode: boolean;
+        }>;
+        if (fromVersion < 1) {
+          return {
+            ...ps,
+            riskTuning: clampRiskTuning(DEFAULT_RISK_TUNING),
+          };
+        }
+        return ps;
+      },
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AtcState> & { runwayCompareAllMarkets?: boolean };
         const { stressCutoff: _legacyStressCutoff, ...pWithoutStress } = p as Partial<AtcState> & {
@@ -386,6 +448,7 @@ export const useAtcStore = create<AtcState>()(
         return {
           ...rest,
           country,
+          viewMode: normalizeViewModeId(typeof base.viewMode === 'string' ? base.viewMode : 'combined'),
           riskTuning: clampRiskTuning({ ...DEFAULT_RISK_TUNING, ...base.riskTuning }),
         };
       },

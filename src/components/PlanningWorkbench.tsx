@@ -3,7 +3,11 @@ import { useAtcStore } from '@/store/useAtcStore';
 import { simulationSummaryFromRiskRows } from '@/planning/metrics';
 import { scenarioFromMarketConfig } from '@/planning/scenarioFromMarketConfig';
 import { buildPlanningExportBundle } from '@/planning/exportBundle';
-import { isRunwayAllMarkets, RUNWAY_ALL_MARKETS_VALUE } from '@/lib/markets';
+import {
+  isRunwayAllMarkets,
+  RUNWAY_ALL_MARKETS_LABEL,
+  RUNWAY_ALL_MARKETS_VALUE,
+} from '@/lib/markets';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -155,7 +159,7 @@ export function PlanningWorkbench({
             </div>
             {country === RUNWAY_ALL_MARKETS_VALUE ? (
               <p className="truncate text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground/90">All markets</span>
+                <span className="font-semibold text-foreground/90">{RUNWAY_ALL_MARKETS_LABEL}</span>
                 {' — '}
                 aggregate stats; pick one market to export.
               </p>
@@ -171,7 +175,7 @@ export function PlanningWorkbench({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <FooterKpi label="High-band days" value={String(summary.highBandDayCount)} />
-            <FooterKpi label="Σ risk (area)" value={summary.overloadArea.toFixed(0)} />
+            <FooterKpi label="Σ pressure (area)" value={summary.overloadArea.toFixed(0)} />
             <FooterKpi label="Cap strain days" value={String(summary.nominalBreachDayCount)} />
             {scenario ? (
               <Button
@@ -230,8 +234,9 @@ export function PlanningWorkbench({
       <div className="px-3 py-3 sm:px-4 sm:py-4">
         {country === RUNWAY_ALL_MARKETS_VALUE ? (
           <p className="mb-4 rounded-md border border-dashed border-border/80 bg-muted/25 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-            <span className="font-medium text-foreground/90">All markets</span> — aggregate stats across the
-            bundle. Choose one market in the header to see its profile, event list, and export.
+            <span className="font-medium text-foreground/90">{RUNWAY_ALL_MARKETS_LABEL}</span> — aggregate stats across the
+            bundle. Choose one market under <strong className="font-medium text-foreground">Runway focus</strong> in
+            Controls to see its profile, event list, and export.
           </p>
         ) : scenario ? (
           <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
@@ -250,7 +255,7 @@ export function PlanningWorkbench({
           )}
         >
           <StatTile variant={variant} label="High-band days" value={String(summary.highBandDayCount)} />
-          <StatTile variant={variant} label="Σ risk (area)" value={summary.overloadArea.toFixed(0)} />
+          <StatTile variant={variant} label="Σ pressure (area)" value={summary.overloadArea.toFixed(0)} />
           <StatTile variant={variant} label="Cap strain days" value={String(summary.nominalBreachDayCount)} />
         </div>
 

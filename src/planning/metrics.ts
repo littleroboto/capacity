@@ -2,7 +2,7 @@ import { RISK_BANDS } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { SimulationSummary } from '@/domain/types';
 
-/** Derive planning-oriented summary stats from the runway risk surface. */
+/** Derive planning-oriented summary stats from the runway pressure surface (`risk_score` per row). */
 export function simulationSummaryFromRiskRows(rows: RiskRow[]): SimulationSummary {
   if (rows.length === 0) {
     return {

@@ -13,11 +13,14 @@ export const RUNWAY_MARKET_IDS = FALLBACK_RUNWAY_MARKET_IDS;
  */
 export const RUNWAY_ALL_MARKETS_VALUE = '__ALL__' as const;
 
+/** Label for the country picker and workbench when `RUNWAY_ALL_MARKETS_VALUE` is selected (e.g. LIOM = all columns). */
+export const RUNWAY_ALL_MARKETS_LABEL = 'LIOM' as const;
+
 export function isRunwayAllMarkets(country: string): boolean {
   return country === RUNWAY_ALL_MARKETS_VALUE;
 }
 
-/** For γ slider / YAML patch when “All markets” is selected — first document in pipeline order. */
+/** For γ slider / YAML patch when LIOM (`RUNWAY_ALL_MARKETS_VALUE`) is selected — first document in pipeline order. */
 export function gammaFocusMarket(
   country: string,
   configs: { market: string }[],

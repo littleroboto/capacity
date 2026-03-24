@@ -85,8 +85,8 @@ export function SlotOverlay({
         dateStart,
         dateEnd,
         markets: [market],
-        avgRisk: n ? sum / n : 0,
-        maxRisk: maxR,
+        avgPressure: n ? sum / n : 0,
+        maxPressure: maxR,
       });
     },
     [cellSize, market, onSlotSelection, outerRef, placedCells, riskByDate, scrollTopRef]

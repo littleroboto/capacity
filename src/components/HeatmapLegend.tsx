@@ -1,5 +1,5 @@
 import type { ViewModeId } from '@/lib/constants';
-import { RISK_HEATMAP_COLORS, STRESS_BELOW_CUTOFF_FILL } from '@/lib/riskHeatmapColors';
+import { heatmapColorContinuous, STRESS_BELOW_CUTOFF_FILL } from '@/lib/riskHeatmapColors';
 
 /** Match `HeatCell` non-motion box rounding. */
 const LEGEND_CELL_ROUNDED = 'rounded-[3px]';
@@ -60,8 +60,11 @@ export function HeatmapLegend({
 }: HeatmapLegendProps) {
   const stackStyle = { gap: cellGapPx } as const;
 
-  /** Top of stack = high end of palette (red); bottom = low (green). Matches runway cells. */
-  const gradientTopToBottom = [...RISK_HEATMAP_COLORS].reverse();
+  /** Top = high (red); bottom = low (green). Same stepped preview as the continuous cell ramp for both lenses. */
+  const legendSteps = 22;
+  const gradientTopToBottom = Array.from({ length: legendSteps }, (_, i) =>
+    heatmapColorContinuous(1 - i / (legendSteps - 1))
+  );
 
   return (
     <div className={className} data-view-mode={viewMode}>
