@@ -1,0 +1,265 @@
+# France — Zone B vacation dates (Ministère de l'Éducation nationale / académie calendars; stub `holidayCalc.ts`).
+country: FR
+
+resources:
+  labs:
+    capacity: 4
+  teams:
+    pos_team:
+      size: 3
+      sme_depth: 2
+
+bau:
+  weekly_promo_cycle:
+    day: Mon
+    labs: 1
+    support_days: 3
+  integration_tests:
+    frequency: weekly
+    day: Wed
+    labs: 1
+
+campaigns:
+  - name: spring_easter_vacances_2026
+    start: 2026-04-11
+    duration: 16
+    prep_before_live_days: 56
+    impact: very_high
+    load:
+      labs: 3.7
+      teams: 2.85
+      backend: 1.45
+      ops: 1.12
+      commercial: 0.75
+    live_support_load:
+      labs: 1
+      teams: 1.08
+      backend: 0.44
+      ops: 2.5
+      commercial: 0.9
+  - name: summer_grandes_vacances_2026
+    start: 2026-07-04
+    duration: 52
+    prep_before_live_days: 60
+    impact: very_high
+    load:
+      labs: 4.1
+      teams: 3.1
+      backend: 1.65
+      ops: 1.28
+      commercial: 0.82
+    live_support_load:
+      labs: 0.98
+      teams: 1.15
+      backend: 0.44
+      ops: 2.7
+      commercial: 0.93
+  - name: autumn_toussaint_peak_2026
+    start: 2026-10-17
+    duration: 17
+    prep_before_live_days: 42
+    impact: high
+    load:
+      labs: 3.25
+      teams: 2.55
+      backend: 1.22
+      ops: 1
+      commercial: 0.69
+    live_support_load:
+      labs: 0.9
+      teams: 0.98
+      backend: 0.36
+      ops: 2.15
+      commercial: 0.85
+  - name: spring_easter_vacances_2027
+    start: 2027-04-16
+    duration: 16
+    prep_before_live_days: 56
+    impact: very_high
+    load:
+      labs: 3.7
+      teams: 2.85
+      backend: 1.45
+      ops: 1.12
+      commercial: 0.75
+    live_support_load:
+      labs: 1
+      teams: 1.08
+      backend: 0.44
+      ops: 2.5
+      commercial: 0.9
+  - name: summer_grandes_vacances_2027
+    start: 2027-07-10
+    duration: 52
+    prep_before_live_days: 60
+    impact: very_high
+    load:
+      labs: 4.1
+      teams: 3.1
+      backend: 1.65
+      ops: 1.28
+      commercial: 0.82
+    live_support_load:
+      labs: 0.98
+      teams: 1.15
+      backend: 0.44
+      ops: 2.7
+      commercial: 0.93
+  - name: autumn_toussaint_peak_2027
+    start: 2027-10-23
+    duration: 16
+    prep_before_live_days: 42
+    impact: high
+    load:
+      labs: 3.25
+      teams: 2.55
+      backend: 1.22
+      ops: 1
+      commercial: 0.69
+    live_support_load:
+      labs: 0.9
+      teams: 0.98
+      backend: 0.36
+      ops: 2.15
+      commercial: 0.85
+  - name: spring_easter_vacances_2028
+    start: 2028-04-08
+    duration: 16
+    prep_before_live_days: 56
+    impact: very_high
+    load:
+      labs: 3.7
+      teams: 2.85
+      backend: 1.45
+      ops: 1.12
+      commercial: 0.75
+    live_support_load:
+      labs: 1
+      teams: 1.08
+      backend: 0.44
+      ops: 2.5
+      commercial: 0.9
+  - name: summer_grandes_vacances_2028
+    start: 2028-07-08
+    duration: 52
+    prep_before_live_days: 60
+    impact: very_high
+    load:
+      labs: 4.1
+      teams: 3.1
+      backend: 1.65
+      ops: 1.28
+      commercial: 0.82
+    live_support_load:
+      labs: 0.98
+      teams: 1.15
+      backend: 0.44
+      ops: 2.7
+      commercial: 0.93
+  - name: autumn_toussaint_peak_2028
+    start: 2028-10-21
+    duration: 16
+    prep_before_live_days: 42
+    impact: high
+    load:
+      labs: 3.25
+      teams: 2.55
+      backend: 1.22
+      ops: 1
+      commercial: 0.69
+    live_support_load:
+      labs: 0.9
+      teams: 0.98
+      backend: 0.36
+      ops: 2.15
+      commercial: 0.85
+
+  # Mega advent: ~2-month prep then full December.
+  - name: advent_mega_campaign_2026
+    start: 2026-12-01
+    duration: 31
+    prep_before_live_days: 61
+    impact: very_high
+    load:
+      labs: 4.7
+      teams: 3.55
+      backend: 1.88
+      ops: 1.45
+      commercial: 0.88
+    live_support_load:
+      labs: 1.12
+      teams: 1.22
+      backend: 0.52
+      ops: 2.95
+      commercial: 0.97
+  - name: advent_mega_campaign_2027
+    start: 2027-12-01
+    duration: 31
+    prep_before_live_days: 61
+    impact: very_high
+    load:
+      labs: 4.7
+      teams: 3.55
+      backend: 1.88
+      ops: 1.45
+      commercial: 0.88
+    live_support_load:
+      labs: 1.12
+      teams: 1.22
+      backend: 0.52
+      ops: 2.95
+      commercial: 0.97
+  - name: advent_mega_campaign_2028
+    start: 2028-12-01
+    duration: 31
+    prep_before_live_days: 61
+    impact: very_high
+    load:
+      labs: 4.7
+      teams: 3.55
+      backend: 1.88
+      ops: 1.45
+      commercial: 0.88
+    live_support_load:
+      labs: 1.12
+      teams: 1.22
+      backend: 0.52
+      ops: 2.95
+      commercial: 0.97
+
+holidays:
+  auto_public: true
+  auto_school: true
+  capacity_taper_days: 3
+
+stress_correlations:
+  school_holidays:
+    store_pressure_mult: 1.1
+    lab_load_mult: 1.06
+    team_load_mult: 1.09
+    backend_load_mult: 1.04
+    ops_activity_mult: 1.06
+    commercial_activity_mult: 1.1
+    lab_team_capacity_mult: 0.93
+
+trading:
+  weekly_pattern:
+    default: medium
+    Fri: high
+    Sat: very_high
+    Sun: high
+  seasonal:
+    peak_month: 7
+    amplitude: 0.09
+
+tech:
+  weekly_pattern:
+    default: medium
+    Mon: high
+    Tue: very_high
+    Thu: high
+    Fri: very_high
+    Sat: high
+    Sun: low
+  labs_scale: 1.15
+  teams_scale: 0.72

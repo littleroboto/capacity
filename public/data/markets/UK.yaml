@@ -1,0 +1,304 @@
+# United Kingdom — England-style school terms (DfE / local authority patterns; stub `holidayCalc.ts`).
+# Easter Sundays: 2026-04-05, 2027-03-28, 2028-04-16 (movable feast; see timeanddate.com / Church calendar).
+country: UK
+
+resources:
+  labs:
+    capacity: 6
+  teams:
+    pos_team:
+      size: 5
+      sme_depth: 2
+
+bau:
+  weekly_promo_cycle:
+    day: Wed
+    labs: 2
+    support_days: 2
+  integration_tests:
+    frequency: weekly
+    day: Tue
+    labs: 1
+
+# England-style school breaks: Easter / summer / Oct half-term (`holidayCalc.ts`). Easter dates from movable calendar (e.g. timeanddate.com).
+campaigns:
+  - name: spring_easter_peak_2026
+    start: 2026-03-28
+    duration: 14
+    prep_before_live_days: 56
+    impact: very_high
+    load:
+      labs: 4.1
+      teams: 3.1
+      backend: 1.65
+      ops: 1.25
+      commercial: 0.78
+    live_support_load:
+      labs: 1.05
+      teams: 1.15
+      backend: 0.48
+      ops: 2.65
+      commercial: 0.93
+  - name: summer_school_hol_peak_2026
+    start: 2026-07-23
+    duration: 38
+    prep_before_live_days: 63
+    impact: very_high
+    load:
+      labs: 4.4
+      teams: 3.35
+      backend: 1.8
+      ops: 1.35
+      commercial: 0.84
+    live_support_load:
+      labs: 1
+      teams: 1.2
+      backend: 0.46
+      ops: 2.8
+      commercial: 0.95
+  - name: autumn_half_term_peak_2026
+    start: 2026-10-17
+    duration: 18
+    prep_before_live_days: 45
+    impact: high
+    load:
+      labs: 3.5
+      teams: 2.75
+      backend: 1.35
+      ops: 1.08
+      commercial: 0.72
+    live_support_load:
+      labs: 0.95
+      teams: 1.05
+      backend: 0.4
+      ops: 2.3
+      commercial: 0.88
+  - name: spring_easter_peak_2027
+    start: 2027-03-27
+    duration: 14
+    prep_before_live_days: 56
+    impact: very_high
+    load:
+      labs: 4.1
+      teams: 3.1
+      backend: 1.65
+      ops: 1.25
+      commercial: 0.78
+    live_support_load:
+      labs: 1.05
+      teams: 1.15
+      backend: 0.48
+      ops: 2.65
+      commercial: 0.93
+  - name: summer_school_hol_peak_2027
+    start: 2027-07-21
+    duration: 40
+    prep_before_live_days: 63
+    impact: very_high
+    load:
+      labs: 4.4
+      teams: 3.35
+      backend: 1.8
+      ops: 1.35
+      commercial: 0.84
+    live_support_load:
+      labs: 1
+      teams: 1.2
+      backend: 0.46
+      ops: 2.8
+      commercial: 0.95
+  - name: autumn_half_term_peak_2027
+    start: 2027-10-16
+    duration: 18
+    prep_before_live_days: 45
+    impact: high
+    load:
+      labs: 3.5
+      teams: 2.75
+      backend: 1.35
+      ops: 1.08
+      commercial: 0.72
+    live_support_load:
+      labs: 0.95
+      teams: 1.05
+      backend: 0.4
+      ops: 2.3
+      commercial: 0.88
+  - name: spring_easter_peak_2028
+    start: 2028-03-28
+    duration: 14
+    prep_before_live_days: 56
+    impact: very_high
+    load:
+      labs: 4.1
+      teams: 3.1
+      backend: 1.65
+      ops: 1.25
+      commercial: 0.78
+    live_support_load:
+      labs: 1.05
+      teams: 1.15
+      backend: 0.48
+      ops: 2.65
+      commercial: 0.93
+  - name: summer_school_hol_peak_2028
+    start: 2028-07-24
+    duration: 38
+    prep_before_live_days: 63
+    impact: very_high
+    load:
+      labs: 4.4
+      teams: 3.35
+      backend: 1.8
+      ops: 1.35
+      commercial: 0.84
+    live_support_load:
+      labs: 1
+      teams: 1.2
+      backend: 0.46
+      ops: 2.8
+      commercial: 0.95
+  - name: autumn_half_term_peak_2028
+    start: 2028-10-14
+    duration: 18
+    prep_before_live_days: 45
+    impact: high
+    load:
+      labs: 3.5
+      teams: 2.75
+      backend: 1.35
+      ops: 1.08
+      commercial: 0.72
+    live_support_load:
+      labs: 0.95
+      teams: 1.05
+      backend: 0.4
+      ops: 2.3
+      commercial: 0.88
+  - name: black_friday_uk_2026
+    start: 2026-11-27
+    duration: 7
+    impact: very_high
+    readiness_duration: 3
+    load:
+      labs: 3
+      teams: 2
+    live_support_load:
+      labs: 1
+      teams: 1
+  - name: black_friday_uk_2027
+    start: 2027-11-26
+    duration: 7
+    impact: very_high
+    readiness_duration: 3
+    load:
+      labs: 3
+      teams: 2
+    live_support_load:
+      labs: 1
+      teams: 1
+  - name: black_friday_uk_2028
+    start: 2028-11-24
+    duration: 7
+    impact: very_high
+    readiness_duration: 3
+    load:
+      labs: 3
+      teams: 2
+    live_support_load:
+      labs: 1
+      teams: 1
+
+  # Mega advent: ~2-month prep then full December (digital + in-store promo peak).
+  - name: advent_mega_campaign_2026
+    start: 2026-12-01
+    duration: 31
+    prep_before_live_days: 61
+    impact: very_high
+    load:
+      labs: 4.7
+      teams: 3.55
+      backend: 1.88
+      ops: 1.45
+      commercial: 0.88
+    live_support_load:
+      labs: 1.12
+      teams: 1.22
+      backend: 0.52
+      ops: 2.95
+      commercial: 0.97
+  - name: advent_mega_campaign_2027
+    start: 2027-12-01
+    duration: 31
+    prep_before_live_days: 61
+    impact: very_high
+    load:
+      labs: 4.7
+      teams: 3.55
+      backend: 1.88
+      ops: 1.45
+      commercial: 0.88
+    live_support_load:
+      labs: 1.12
+      teams: 1.22
+      backend: 0.52
+      ops: 2.95
+      commercial: 0.97
+  - name: advent_mega_campaign_2028
+    start: 2028-12-01
+    duration: 31
+    prep_before_live_days: 61
+    impact: very_high
+    load:
+      labs: 4.7
+      teams: 3.55
+      backend: 1.88
+      ops: 1.45
+      commercial: 0.88
+    live_support_load:
+      labs: 1.12
+      teams: 1.22
+      backend: 0.52
+      ops: 2.95
+      commercial: 0.97
+
+holidays:
+  auto_public: true
+  auto_school: true
+  # Soften lab/team holiday capacity pinch in the days before/after stub holiday dates (0 = off).
+  capacity_taper_days: 3
+
+stress_correlations:
+  school_holidays:
+    store_pressure_mult: 1.13
+    lab_load_mult: 1.06
+    team_load_mult: 1.1
+    backend_load_mult: 1.04
+    ops_activity_mult: 1.06
+    commercial_activity_mult: 1.12
+    lab_team_capacity_mult: 0.92
+
+# Store / marketing ops rhythm (trading pressure). Optional seasonal wave: busier in northern summer, quieter mid-winter.
+trading:
+  weekly_pattern:
+    default: medium
+    Wed: high
+    Thu: high
+    Fri: very_high
+    Sat: very_high
+  seasonal:
+    peak_month: 7
+    amplitude: 0.1
+
+# Technology rhythm (lab/team readiness load) — independent weekly shape, e.g. menu cutover and weekend catch-up.
+tech:
+  weekly_pattern:
+    default: medium
+    Mon: high
+    Tue: very_high
+    Thu: high
+    Fri: very_high
+    Sat: low
+    Sun: low
+  labs_scale: 1.25
+  teams_scale: 0.65

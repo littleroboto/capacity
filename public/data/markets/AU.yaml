@@ -1,0 +1,254 @@
+# Australia — NSW Eastern school terms (stub in `holidayCalc.ts`).
+#
+# Calendar is shifted vs Northern markets: southern summer = Dec–Jan (school summer holidays over
+# Christmas/Jan). Expect Advent-style retail build through November–mid-December, then peak trading
+# and promos across the long summer break. July is a shorter winter school break (not “summer peak”).
+# Pipeline adds AU-only store lift for late Dec–Jan on top of global December retail seasoning.
+country: AU
+
+resources:
+  labs:
+    capacity: 5
+  teams:
+    pos_team:
+      size: 4
+      sme_depth: 2
+
+bau:
+  weekly_promo_cycle:
+    day: Tue
+    labs: 2
+    support_days: 2
+  integration_tests:
+    frequency: weekly
+    day: Thu
+    labs: 1
+
+# Easter ≈ southern autumn term break; Sep–Oct ≈ southern spring holidays; summer_dec_jan = long
+# summer programme (prep from ~late Oct through festive build into Jan live + promos).
+campaigns:
+  - name: easter_autumn_term_peak_2026
+    start: 2026-04-07
+    duration: 14
+    prep_before_live_days: 49
+    impact: very_high
+    load:
+      labs: 3.9
+      teams: 3
+      backend: 1.55
+      ops: 1.15
+      commercial: 0.76
+    live_support_load:
+      labs: 1.05
+      teams: 1.1
+      backend: 0.46
+      ops: 2.55
+      commercial: 0.91
+  - name: spring_sep_oct_term_peak_2026
+    start: 2026-09-28
+    duration: 12
+    prep_before_live_days: 42
+    impact: high
+    load:
+      labs: 3.4
+      teams: 2.65
+      backend: 1.3
+      ops: 1.05
+      commercial: 0.7
+    live_support_load:
+      labs: 0.95
+      teams: 1
+      backend: 0.38
+      ops: 2.2
+      commercial: 0.86
+  - name: summer_dec_jan_peak_2026
+    start: 2026-12-18
+    duration: 42
+    prep_before_live_days: 56
+    impact: very_high
+    load:
+      labs: 4.35
+      teams: 3.3
+      backend: 1.75
+      ops: 1.4
+      commercial: 0.88
+    live_support_load:
+      labs: 1.05
+      teams: 1.25
+      backend: 0.48
+      ops: 2.95
+      commercial: 0.97
+  - name: easter_autumn_term_peak_2027
+    start: 2027-04-06
+    duration: 12
+    prep_before_live_days: 49
+    impact: very_high
+    load:
+      labs: 3.9
+      teams: 3
+      backend: 1.55
+      ops: 1.15
+      commercial: 0.76
+    live_support_load:
+      labs: 1.05
+      teams: 1.1
+      backend: 0.46
+      ops: 2.55
+      commercial: 0.91
+  - name: spring_sep_oct_term_peak_2027
+    start: 2027-09-27
+    duration: 12
+    prep_before_live_days: 42
+    impact: high
+    load:
+      labs: 3.4
+      teams: 2.65
+      backend: 1.3
+      ops: 1.05
+      commercial: 0.7
+    live_support_load:
+      labs: 0.95
+      teams: 1
+      backend: 0.38
+      ops: 2.2
+      commercial: 0.86
+  - name: summer_dec_jan_peak_2027
+    start: 2027-12-17
+    duration: 42
+    prep_before_live_days: 56
+    impact: very_high
+    load:
+      labs: 4.35
+      teams: 3.3
+      backend: 1.75
+      ops: 1.4
+      commercial: 0.88
+    live_support_load:
+      labs: 1.05
+      teams: 1.25
+      backend: 0.48
+      ops: 2.95
+      commercial: 0.97
+  - name: easter_autumn_term_peak_2028
+    start: 2028-04-04
+    duration: 12
+    prep_before_live_days: 49
+    impact: very_high
+    load:
+      labs: 3.9
+      teams: 3
+      backend: 1.55
+      ops: 1.15
+      commercial: 0.76
+    live_support_load:
+      labs: 1.05
+      teams: 1.1
+      backend: 0.46
+      ops: 2.55
+      commercial: 0.91
+  - name: spring_sep_oct_term_peak_2028
+    start: 2028-10-02
+    duration: 12
+    prep_before_live_days: 42
+    impact: high
+    load:
+      labs: 3.4
+      teams: 2.65
+      backend: 1.3
+      ops: 1.05
+      commercial: 0.7
+    live_support_load:
+      labs: 0.95
+      teams: 1
+      backend: 0.38
+      ops: 2.2
+      commercial: 0.86
+  - name: summer_dec_jan_peak_2028
+    start: 2028-12-15
+    duration: 42
+    prep_before_live_days: 56
+    impact: very_high
+    load:
+      labs: 4.35
+      teams: 3.3
+      backend: 1.75
+      ops: 1.4
+      commercial: 0.88
+    live_support_load:
+      labs: 1.05
+      teams: 1.25
+      backend: 0.48
+      ops: 2.95
+      commercial: 0.97
+
+# Advent-style retail / marketing build (commercial-led); ramps into December campaign prep overlap.
+operating_windows:
+  - name: au_festive_countdown_2026
+    start: '2026-11-01'
+    end: '2026-12-23'
+    ramp_in_days: 14
+    ramp_out_days: 8
+    envelope: smoothstep
+    store_pressure_mult: 1.07
+    commercial_activity_mult: 1.14
+    lab_load_mult: 1.04
+    team_load_mult: 1.04
+  - name: au_festive_countdown_2027
+    start: '2027-11-01'
+    end: '2027-12-23'
+    ramp_in_days: 14
+    ramp_out_days: 8
+    envelope: smoothstep
+    store_pressure_mult: 1.07
+    commercial_activity_mult: 1.14
+    lab_load_mult: 1.04
+    team_load_mult: 1.04
+  - name: au_festive_countdown_2028
+    start: '2028-11-01'
+    end: '2028-12-23'
+    ramp_in_days: 14
+    ramp_out_days: 8
+    envelope: smoothstep
+    store_pressure_mult: 1.07
+    commercial_activity_mult: 1.14
+    lab_load_mult: 1.04
+    team_load_mult: 1.04
+
+holidays:
+  auto_public: true
+  auto_school: true
+  capacity_taper_days: 3
+
+stress_correlations:
+  school_holidays:
+    store_pressure_mult: 1.12
+    lab_load_mult: 1.06
+    team_load_mult: 1.09
+    backend_load_mult: 1.04
+    ops_activity_mult: 1.07
+    commercial_activity_mult: 1.12
+    lab_team_capacity_mult: 0.93
+
+trading:
+  weekly_pattern:
+    default: medium
+    Thu: high
+    Fri: high
+    Sat: very_high
+    Sun: high
+  seasonal:
+    # January = southern midsummer; July = cooler / winter-school-hol stretch (lower cosine peak).
+    peak_month: 1
+    amplitude: 0.2
+
+tech:
+  weekly_pattern:
+    default: medium
+    Mon: high
+    Tue: very_high
+    Thu: high
+    Fri: very_high
+    Sat: high
+    Sun: low
+  labs_scale: 1.3
+  teams_scale: 0.8
