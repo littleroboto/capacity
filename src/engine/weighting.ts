@@ -58,8 +58,11 @@ export function isGregorianChristmasDay(isoDate: string): boolean {
 /**
  * December retail season on **in-store trading pressure** (all markets): ramp from 1 Dec through Christmas Eve,
  * then **closed** on 25 Dec. Late December after the 25th returns to the YAML weekly level only.
+ * Peak extra lift ≈ {@link DECEMBER_RETAIL_STORE_BUMP} (was higher; tuned for a subtler holiday bump).
  * Applied after `weekly_pattern` and optional `trading.seasonal`.
  */
+export const DECEMBER_RETAIL_STORE_BUMP = 0.15;
+
 export function applyDecemberRestaurantSeasoning(isoDate: string, storePressure01: number): number {
   const p = Math.min(1, Math.max(0, storePressure01));
   const parts = isoDate.split('-').map(Number);
@@ -70,15 +73,15 @@ export function applyDecemberRestaurantSeasoning(isoDate: string, storePressure0
   if (day === 25) return 0;
   if (day >= 1 && day <= 24) {
     const t = clamp01((day - 1) / 23);
-    const mult = 1 + 0.45 * smoothstep01(t);
+    const mult = 1 + DECEMBER_RETAIL_STORE_BUMP * smoothstep01(t);
     return Math.min(1, p * mult);
   }
   return p;
 }
 
 /**
- * Australia: southern summer + long school holidays make **late Dec–Jan** a sustained high-trading window
- * (promos, drive-through, travel) on top of global Dec 1–24 retail seasoning. Stacks after `applyDecemberRestaurantSeasoning`.
+ * Australia: southern summer + long school holidays add a modest extra lift **late Dec–Jan** on top of global
+ * December seasoning. Kept smaller than historical tuning so the overall holiday bump stays moderate.
  */
 export function applyAustraliaPostChristmasSummerLift(isoDate: string, storePressure01: number): number {
   const p = Math.min(1, Math.max(0, storePressure01));
@@ -88,12 +91,12 @@ export function applyAustraliaPostChristmasSummerLift(isoDate: string, storePres
   if (!Number.isFinite(m) || !Number.isFinite(day)) return p;
   if (m === 12 && day >= 26) {
     const t = clamp01((day - 26) / 5);
-    const mult = 1 + 0.14 * smoothstep01(t);
+    const mult = 1 + 0.06 * smoothstep01(t);
     return Math.min(1, p * mult);
   }
   if (m === 1 && day <= 28) {
     const t = clamp01((28 - day) / 28);
-    const mult = 1 + 0.2 * smoothstep01(t);
+    const mult = 1 + 0.1 * smoothstep01(t);
     return Math.min(1, p * mult);
   }
   return p;

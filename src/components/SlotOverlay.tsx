@@ -1,6 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDrag } from '@use-gesture/react';
 import type { RiskRow } from '@/engine/riskModel';
+import type { RiskModelTuning } from '@/engine/riskModelTuning';
+import type { ViewModeId } from '@/lib/constants';
+import { heatmapCellMetric } from '@/lib/runwayViewMetrics';
 import type { PlacedRunwayCell } from '@/lib/calendarQuarterLayout';
 import type { SlotSelection } from '@/components/RunwayGrid';
 
@@ -9,11 +12,20 @@ type Box = { x0: number; y0: number; x1: number; y1: number };
 type SlotOverlayProps = {
   outerRef: React.RefObject<HTMLDivElement | null>;
   cellSize: number;
+  /** Hit-test height per cell; defaults to `cellSize` (3D runway uses `cellSize + rowTowerPx`). */
+  cellHitHeightPx?: number;
   placedCells: PlacedRunwayCell[];
   scrollTopRef: React.MutableRefObject<number>;
   market: string;
   riskByDate: Map<string, RiskRow>;
+  viewMode: ViewModeId;
+  riskTuning: RiskModelTuning;
   onSlotSelection: (s: SlotSelection | null) => void;
+  /**
+   * When true, drag-to-select is disabled (e.g. 3D runway uses a screen-space rotate; rect hit-test
+   * would not match layout coordinates until we add inverse transforms).
+   */
+  disabled?: boolean;
 };
 
 function pickDatesInRect(
@@ -22,7 +34,8 @@ function pickDatesInRect(
   hiX: number,
   hiY: number,
   cellSize: number,
-  placedCells: PlacedRunwayCell[]
+  placedCells: PlacedRunwayCell[],
+  cellHitHeightPx: number
 ): string[] {
   const a = Math.min(loX, hiX);
   const b = Math.max(loX, hiX);
@@ -32,7 +45,7 @@ function pickDatesInRect(
   for (const p of placedCells) {
     if (typeof p.dateStr !== 'string') continue;
     const x2 = p.x + cellSize;
-    const y2 = p.y + cellSize;
+    const y2 = p.y + cellHitHeightPx;
     if (p.x < b && x2 > a && p.y < d && y2 > c) picked.push(p.dateStr);
   }
   picked.sort();
@@ -42,14 +55,26 @@ function pickDatesInRect(
 export function SlotOverlay({
   outerRef,
   cellSize,
+  cellHitHeightPx,
   placedCells,
   scrollTopRef,
   market,
   riskByDate,
+  viewMode,
+  riskTuning,
   onSlotSelection,
+  disabled = false,
 }: SlotOverlayProps) {
   const [box, setBox] = useState<Box | null>(null);
   const activeRef = useRef(false);
+  const hitH = cellHitHeightPx ?? cellSize;
+
+  useEffect(() => {
+    if (disabled) {
+      setBox(null);
+      activeRef.current = false;
+    }
+  }, [disabled]);
 
   const finalize = useCallback(
     (b: Box | null) => {
@@ -64,7 +89,7 @@ export function SlotOverlay({
       const st = scrollTopRef.current;
       const y0 = Math.min(b.y0, b.y1) - r.top + st;
       const y1 = Math.max(b.y0, b.y1) - r.top + st;
-      const picked = pickDatesInRect(x0, y0, x1, y1, cellSize, placedCells);
+      const picked = pickDatesInRect(x0, y0, x1, y1, cellSize, placedCells, hitH);
       if (!picked.length) {
         onSlotSelection(null);
         return;
@@ -76,7 +101,7 @@ export function SlotOverlay({
       let maxR = 0;
       for (const d of picked) {
         const row = riskByDate.get(d);
-        const rv = row?.risk_score ?? 0;
+        const rv = row ? heatmapCellMetric(row, viewMode, riskTuning) : 0;
         sum += rv;
         n += 1;
         maxR = Math.max(maxR, rv);
@@ -89,11 +114,12 @@ export function SlotOverlay({
         maxPressure: maxR,
       });
     },
-    [cellSize, market, onSlotSelection, outerRef, placedCells, riskByDate, scrollTopRef]
+    [cellSize, hitH, market, onSlotSelection, outerRef, placedCells, riskByDate, riskTuning, scrollTopRef, viewMode]
   );
 
   useDrag(
     ({ first, last, xy: [x, y], initial: [ix, iy], event }) => {
+      if (disabled) return;
       if (event.target instanceof HTMLElement) {
         const tag = event.target.closest('[data-no-drag]');
         if (tag) return;
@@ -120,10 +146,10 @@ export function SlotOverlay({
         setBox(null);
       }
     },
-    { target: outerRef, pointer: { capture: true } }
+    { target: outerRef, pointer: { capture: true }, enabled: !disabled }
   );
 
-  if (!box) return null;
+  if (disabled || !box) return null;
   const l = Math.min(box.x0, box.x1);
   const t = Math.min(box.y0, box.y1);
   const w = Math.abs(box.x1 - box.x0);

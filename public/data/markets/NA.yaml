@@ -1,306 +1,117 @@
-# Narnia (NA) — fictional western-hemisphere market (below Canada, above Mexico in the atlas joke).
-# Stub public + school calendars match the CA spine in `holidayCalc.ts` / `holidayPublicCatalog.ts` with Narnia-themed labels.
-# Campaigns are synthetic: lantern-winter promos, spring menu thaw, midsummer caravan, autumn wild hunt, year-end feast.
-country: NA
+# Narnia (NA) — fictional demo market; stubs follow CA spine in `holidayCalc.ts`.
+market: NA
+title: Narnia
+risk_heatmap_gamma_tech: 1.06
+risk_heatmap_gamma_business: 1.22
 
 resources:
   labs:
     capacity: 5
-  teams:
-    wardrobe_ops:
-      size: 4
-      sme_depth: 2
+  staff:
+    capacity: 4
+  testing_capacity: 5
 
 bau:
-  weekly_promo_cycle:
-    day: Tue
-    labs: 2
+  days_in_use: [mo, tu, we, th, fr]
+  weekly_cycle:
+    labs_required: 2
+    staff_required: 0
     support_days: 2
   integration_tests:
-    frequency: weekly
     day: Thu
     labs: 1
 
 campaigns:
   - name: deep_winter_lantern_promo_2026
-    start: '2026-02-09'
+    start_date: '2026-02-09'
     duration: 10
-    prep_before_live_days: 42
+    testing_prep_duration: 30
     impact: medium
-    load:
-      labs: 2.8
-      teams: 2.2
-      backend: 1.1
-      ops: 0.85
-      commercial: 0.65
-    live_support_load:
-      labs: 0.95
-      teams: 1
-      backend: 0.42
-      ops: 2.1
-      commercial: 0.88
+    business_uplift: 0.85
+    campaign_support:
+      labs_required: 2.8
+      tech_staff: 2.2
+    live_campaign_support:
+      labs_required: 0.95
+      tech_staff: 1
   - name: great_thaw_menu_refresh_2026
-    start: '2026-04-07'
+    start_date: '2026-04-07'
     duration: 21
-    prep_before_live_days: 56
+    testing_prep_duration: 30
     impact: very_high
+    business_uplift: 1.0
     stagger_functional_loads: true
     tech_finish_before_live_days: 14
     marketing_prep_days_before_live: 30
     supply_prep_days_before_live: 21
-    load:
-      labs: 3.9
-      teams: 3.05
-      backend: 1.55
-      ops: 1.15
-      commercial: 0.78
-    live_support_load:
-      labs: 1.05
-      teams: 1.12
-      backend: 0.46
-      ops: 2.45
-      commercial: 0.9
+    campaign_support:
+      labs_required: 3.9
+      tech_staff: 3.05
+    live_campaign_support:
+      labs_required: 1.05
+      tech_staff: 1.12
   - name: midsummer_caravan_digital_2026
-    start: '2026-07-06'
+    start_date: '2026-07-06'
     duration: 35
-    prep_before_live_days: 49
+    testing_prep_duration: 30
     impact: high
-    load:
-      labs: 3.5
-      teams: 2.85
-      backend: 1.45
-      ops: 1.25
-      commercial: 0.82
-    live_support_load:
-      labs: 1
-      teams: 1.15
-      backend: 0.44
-      ops: 2.65
-      commercial: 0.93
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 3.5
+      tech_staff: 2.85
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1.15
   - name: wild_hunt_autumn_promo_2026
-    start: '2026-10-05'
+    start_date: '2026-10-05'
     duration: 14
-    prep_before_live_days: 42
+    testing_prep_duration: 30
     impact: high
-    load:
-      labs: 3.35
-      teams: 2.65
-      backend: 1.28
-      ops: 1.05
-      commercial: 0.72
-    live_support_load:
-      labs: 0.95
-      teams: 1.02
-      backend: 0.4
-      ops: 2.3
-      commercial: 0.87
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 3.35
+      tech_staff: 2.65
+    live_campaign_support:
+      labs_required: 0.95
+      tech_staff: 1.02
   - name: feast_of_tumnus_holiday_2026
-    start: '2026-12-01'
+    start_date: '2026-12-01'
     duration: 31
-    prep_before_live_days: 63
+    testing_prep_duration: 30
     impact: very_high
+    business_uplift: 1.0
     stagger_functional_loads: true
     tech_finish_before_live_days: 14
     marketing_prep_days_before_live: 30
     supply_prep_days_before_live: 21
-    load:
-      labs: 4.2
-      teams: 3.2
-      backend: 1.65
-      ops: 1.35
-      commercial: 0.9
-    live_support_load:
-      labs: 1.1
-      teams: 1.2
-      backend: 0.48
-      ops: 2.85
-      commercial: 0.98
-  - name: deep_winter_lantern_promo_2027
-    start: '2027-02-08'
-    duration: 10
-    prep_before_live_days: 42
-    impact: medium
-    load:
-      labs: 2.8
-      teams: 2.2
-      backend: 1.1
-      ops: 0.85
-      commercial: 0.65
-    live_support_load:
-      labs: 0.95
-      teams: 1
-      backend: 0.42
-      ops: 2.1
-      commercial: 0.88
-  - name: great_thaw_menu_refresh_2027
-    start: '2027-04-06'
-    duration: 21
-    prep_before_live_days: 56
-    impact: very_high
-    stagger_functional_loads: true
-    tech_finish_before_live_days: 14
-    marketing_prep_days_before_live: 30
-    supply_prep_days_before_live: 21
-    load:
-      labs: 3.9
-      teams: 3.05
-      backend: 1.55
-      ops: 1.15
-      commercial: 0.78
-    live_support_load:
-      labs: 1.05
-      teams: 1.12
-      backend: 0.46
-      ops: 2.45
-      commercial: 0.9
-  - name: midsummer_caravan_digital_2027
-    start: '2027-07-05'
-    duration: 35
-    prep_before_live_days: 49
-    impact: high
-    load:
-      labs: 3.5
-      teams: 2.85
-      backend: 1.45
-      ops: 1.25
-      commercial: 0.82
-    live_support_load:
-      labs: 1
-      teams: 1.15
-      backend: 0.44
-      ops: 2.65
-      commercial: 0.93
-  - name: wild_hunt_autumn_promo_2027
-    start: '2027-10-04'
-    duration: 14
-    prep_before_live_days: 42
-    impact: high
-    load:
-      labs: 3.35
-      teams: 2.65
-      backend: 1.28
-      ops: 1.05
-      commercial: 0.72
-    live_support_load:
-      labs: 0.95
-      teams: 1.02
-      backend: 0.4
-      ops: 2.3
-      commercial: 0.87
-  - name: feast_of_tumnus_holiday_2027
-    start: '2027-11-30'
-    duration: 31
-    prep_before_live_days: 63
-    impact: very_high
-    stagger_functional_loads: true
-    tech_finish_before_live_days: 14
-    marketing_prep_days_before_live: 30
-    supply_prep_days_before_live: 21
-    load:
-      labs: 4.2
-      teams: 3.2
-      backend: 1.65
-      ops: 1.35
-      commercial: 0.9
-    live_support_load:
-      labs: 1.1
-      teams: 1.2
-      backend: 0.48
-      ops: 2.85
-      commercial: 0.98
-  - name: deep_winter_lantern_promo_2028
-    start: '2028-02-14'
-    duration: 10
-    prep_before_live_days: 42
-    impact: medium
-    load:
-      labs: 2.8
-      teams: 2.2
-      backend: 1.1
-      ops: 0.85
-      commercial: 0.65
-    live_support_load:
-      labs: 0.95
-      teams: 1
-      backend: 0.42
-      ops: 2.1
-      commercial: 0.88
-  - name: great_thaw_menu_refresh_2028
-    start: '2028-04-04'
-    duration: 21
-    prep_before_live_days: 56
-    impact: very_high
-    stagger_functional_loads: true
-    tech_finish_before_live_days: 14
-    marketing_prep_days_before_live: 30
-    supply_prep_days_before_live: 21
-    load:
-      labs: 3.9
-      teams: 3.05
-      backend: 1.55
-      ops: 1.15
-      commercial: 0.78
-    live_support_load:
-      labs: 1.05
-      teams: 1.12
-      backend: 0.46
-      ops: 2.45
-      commercial: 0.9
-  - name: midsummer_caravan_digital_2028
-    start: '2028-07-03'
-    duration: 35
-    prep_before_live_days: 49
-    impact: high
-    load:
-      labs: 3.5
-      teams: 2.85
-      backend: 1.45
-      ops: 1.25
-      commercial: 0.82
-    live_support_load:
-      labs: 1
-      teams: 1.15
-      backend: 0.44
-      ops: 2.65
-      commercial: 0.93
-  - name: wild_hunt_autumn_promo_2028
-    start: '2028-10-02'
-    duration: 14
-    prep_before_live_days: 42
-    impact: high
-    load:
-      labs: 3.35
-      teams: 2.65
-      backend: 1.28
-      ops: 1.05
-      commercial: 0.72
-    live_support_load:
-      labs: 0.95
-      teams: 1.02
-      backend: 0.4
-      ops: 2.3
-      commercial: 0.87
-  - name: feast_of_tumnus_holiday_2028
-    start: '2028-11-28'
-    duration: 31
-    prep_before_live_days: 63
-    impact: very_high
-    stagger_functional_loads: true
-    tech_finish_before_live_days: 14
-    marketing_prep_days_before_live: 30
-    supply_prep_days_before_live: 21
-    load:
-      labs: 4.2
-      teams: 3.2
-      backend: 1.65
-      ops: 1.35
-      commercial: 0.9
-    live_support_load:
-      labs: 1.1
-      teams: 1.2
-      backend: 0.48
-      ops: 2.85
-      commercial: 0.98
+    campaign_support:
+      labs_required: 4.2
+      tech_staff: 3.2
+    live_campaign_support:
+      labs_required: 1.1
+      tech_staff: 1.2
+
+public_holidays:
+  auto: true
+  dates: []
+  staffing_multiplier: 0.5
+  trading_multiplier: 1.04
+
+school_holidays:
+  auto: true
+  dates: []
+  staffing_multiplier: 0.88
+  trading_multiplier: 1.11
+  load_effects:
+    lab_load_mult: 1.05
+    team_load_mult: 1.08
+    backend_load_mult: 1.04
+    ops_activity_mult: 1.08
+    commercial_activity_mult: 1.1
+
+holidays:
+  capacity_taper_days: 3
+  lab_capacity_scale: 0.5
 
 operating_windows:
   - name: lantern_season_ramp_2026
@@ -331,84 +142,19 @@ operating_windows:
     commercial_activity_mult: 1.16
     lab_load_mult: 1.05
     team_load_mult: 1.04
-  - name: lantern_season_ramp_2027
-    start: '2027-01-04'
-    end: '2027-02-26'
-    ramp_in_days: 10
-    ramp_out_days: 7
-    envelope: smoothstep
-    store_pressure_mult: 1.05
-    commercial_activity_mult: 1.1
-    lab_load_mult: 1.03
-  - name: union_day_midsummer_surge_2027
-    start: '2027-06-14'
-    end: '2027-07-19'
-    ramp_in_days: 10
-    ramp_out_days: 10
-    envelope: smoothstep
-    store_pressure_mult: 1.08
-    ops_activity_mult: 1.09
-    commercial_activity_mult: 1.06
-  - name: narnia_festive_lantern_road_2027
-    start: '2027-11-01'
-    end: '2027-12-23'
-    ramp_in_days: 14
-    ramp_out_days: 8
-    envelope: smoothstep
-    store_pressure_mult: 1.1
-    commercial_activity_mult: 1.16
-    lab_load_mult: 1.05
-    team_load_mult: 1.04
-  - name: lantern_season_ramp_2028
-    start: '2028-01-03'
-    end: '2028-02-27'
-    ramp_in_days: 10
-    ramp_out_days: 7
-    envelope: smoothstep
-    store_pressure_mult: 1.05
-    commercial_activity_mult: 1.1
-    lab_load_mult: 1.03
-  - name: union_day_midsummer_surge_2028
-    start: '2028-06-12'
-    end: '2028-07-18'
-    ramp_in_days: 10
-    ramp_out_days: 10
-    envelope: smoothstep
-    store_pressure_mult: 1.08
-    ops_activity_mult: 1.09
-    commercial_activity_mult: 1.06
-  - name: narnia_festive_lantern_road_2028
-    start: '2028-11-01'
-    end: '2028-12-22'
-    ramp_in_days: 14
-    ramp_out_days: 8
-    envelope: smoothstep
-    store_pressure_mult: 1.1
-    commercial_activity_mult: 1.16
-    lab_load_mult: 1.05
-    team_load_mult: 1.04
-
-holidays:
-  auto_public: true
-  auto_school: true
-  capacity_taper_days: 3
-
-stress_correlations:
-  school_holidays:
-    store_pressure_mult: 1.11
-    lab_load_mult: 1.05
-    team_load_mult: 1.08
-    backend_load_mult: 1.04
-    ops_activity_mult: 1.08
-    commercial_activity_mult: 1.1
-    lab_team_capacity_mult: 0.94
 
 trading:
+  campaign_store_boost_prep: 0
+  campaign_store_boost_live: 0.28
+  payday_month_peak_multiplier: 1.12
   weekly_pattern:
-    default: medium
-    Thu: high
-    Fri: high
-    Sat: very_high
+    Mon: 0.7
+    Tue: 0.72
+    Wed: 0.74
+    Thu: 0.85
+    Fri: 0.92
+    Sat: 1.0
+    Sun: 0.58
   seasonal:
     peak_month: 12
     amplitude: 0.22

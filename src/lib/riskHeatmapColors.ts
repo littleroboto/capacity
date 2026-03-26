@@ -5,36 +5,51 @@ import {
 } from '@/lib/riskHeatmapTransfer';
 
 /**
- * Anchor stops for the heatmap ramp (green → amber → red). Cells use {@link heatmapColorContinuous}
- * so Technology and Business lenses share the same granular scale; patterns differ by metric per day.
+ * **9 discrete bands** (low → high): classic **temperature / weather-radar** order — calm ice → blues →
+ * cyan → green → yellow → orange → red — as flat swatches tuned for modern UI (readable on grid cells).
+ * Runway cells pick one colour per band after clamp 0–1 and γ ({@link heatmapColorDiscrete}).
+ * {@link heatmapColorContinuous} lerps these anchors for smooth ramps.
  */
 export const RISK_HEATMAP_COLORS = [
-  '#14532d', // green-900
-  '#166534', // green-800
-  '#15803d', // green-700
-  '#16a34a', // green-600
-  '#4ade80', // green-400 — still clearly “good”
-  '#facc15', // amber-400 — pivot
-  '#f59e0b', // amber-500
-  '#ea580c', // orange-600
-  '#dc2626', // red-600
-  '#991b1b', // red-800
+  '#f0f9ff',
+  '#bae6fd',
+  '#0ea5e9',
+  '#06b6d4',
+  '#34d399',
+  '#facc15',
+  '#fb923c',
+  '#ef4444',
+  '#ff1f1f',
 ] as const;
+
+/** One label per {@link RISK_HEATMAP_COLORS} entry, index 0 = coldest / lowest KPI (temperature-scale wording). */
+export const HEATMAP_TEMPERATURE_BAND_LABELS = [
+  'Calm · lowest',
+  'Cool',
+  'Cold',
+  'Chill',
+  'Mild',
+  'Warm',
+  'Hot',
+  'Very hot',
+  'Extreme · highest',
+] as const;
+
+export const HEATMAP_TEMPERATURE_STEP_COUNT = RISK_HEATMAP_COLORS.length;
 
 const EMPTY_CELL_FILL = '#94a3b8';
 
 /** In-month calendar cells with no runway row (outside model window or missing day); adjacent-month grid slots are not drawn. */
 export const HEATMAP_RUNWAY_PAD_FILL = '#cbd5e1';
 
-/** Cells with data but below the stress cutoff (distinct from empty / out-of-range). */
-export const STRESS_BELOW_CUTOFF_FILL = '#d1d9e6';
+/** Opacity for runway cells whose transformed score is below {@link HeatmapColorOpts.stressCutoff}. */
+export const HEATMAP_BELOW_CUTOFF_DIM_OPACITY = 0.26;
 
-/** Legacy 10-bucket mapping; runway uses {@link heatmapColorContinuous} for both view modes. */
+/** Legacy mapping: same discrete temperature bands as the runway. */
 export function riskScoreToHeatmapColor(riskScore: number | undefined): string {
   if (riskScore == null || Number.isNaN(riskScore)) return EMPTY_CELL_FILL;
   const r = Math.min(1, Math.max(0, riskScore));
-  const index = Math.floor(r * 9);
-  return RISK_HEATMAP_COLORS[index] ?? RISK_HEATMAP_COLORS[RISK_HEATMAP_COLORS.length - 1]!;
+  return heatmapColorDiscrete(r, RISK_HEATMAP_COLORS);
 }
 
 function parseRgbHex(hex: string): [number, number, number] {
@@ -51,7 +66,20 @@ function lerpHex(a: string, b: string, t: number): string {
   return `#${[r, g, bl].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** Smooth ramp along {@link RISK_HEATMAP_COLORS} — used for both runway lenses after transfer. */
+/** Equal-width solid bins — runway uses this for the temperature-style scale. */
+export function heatmapColorDiscrete(
+  metric01: number,
+  palette: readonly string[] = RISK_HEATMAP_COLORS
+): string {
+  const r = Math.min(1, Math.max(0, metric01));
+  const n = palette.length;
+  if (n === 0) return EMPTY_CELL_FILL;
+  if (n === 1) return palette[0]!;
+  const idx = Math.min(n - 1, Math.floor(r * n));
+  return palette[idx]!;
+}
+
+/** Smooth RGB lerp between consecutive anchors (classic heatmap). */
 export function heatmapColorContinuous(
   metric01: number,
   palette: readonly string[] = RISK_HEATMAP_COLORS
@@ -65,8 +93,8 @@ export function heatmapColorContinuous(
   return lerpHex(palette[i]!, palette[j]!, t);
 }
 
-/** Min–max of a metric over the visible runway; stretches tech/store colours when absolute values sit in a narrow band. */
-export type RunwayNormRange = { min: number; max: number };
+/** `spectrum` = temperature-style multi-band ramp; `mono` = one hue, alpha scales with transformed score. */
+export type HeatmapRenderStyle = 'spectrum' | 'mono';
 
 export type HeatmapColorOpts = {
   /** Transfer curve id (`power` = score^γ); applied after normalising the lens metric. */
@@ -74,38 +102,108 @@ export type HeatmapColorOpts = {
   /** γ for power/sigmoid/log; stored as `risk_heatmap_gamma`. */
   riskHeatmapGamma?: number;
   /**
-   * 0 = off. Otherwise only values **at or above** this level (0–1 scale after norm / γ) use the stress palette;
-   * values below render as `STRESS_BELOW_CUTOFF_FILL`. Above the cutoff, the palette spans the remaining band.
+   * 0 = off. Compared on the **transformed** scale (after curve + γ, same as colour mapping). Cells strictly below
+   * this level keep their band colour but render at {@link HEATMAP_BELOW_CUTOFF_DIM_OPACITY}.
    */
   stressCutoff?: number;
+  /** Default spectrum bands; mono uses {@link monoColor} with alpha from transformed 0–1. */
+  renderStyle?: HeatmapRenderStyle;
+  /** `#rrggbb` for mono mode (invalid values fall back to sky). */
+  monoColor?: string;
 };
 
-export function heatmapColorForViewMode(
-  mode: ViewModeId,
-  metric: number | undefined,
-  norm?: RunwayNormRange,
-  opts?: HeatmapColorOpts
-): string {
-  if (metric == null || Number.isNaN(metric)) return EMPTY_CELL_FILL;
-  let v = metric;
-  if (norm && norm.max > norm.min && mode === 'in_store') {
-    v = (metric - norm.min) / (norm.max - norm.min);
-    v = Math.min(1, Math.max(0, v));
-  } else {
-    v = Math.min(1, Math.max(0, v));
-  }
+/** Preset hues for the mono heatmap (Controls panel). */
+export const HEATMAP_MONO_COLOR_PRESETS: readonly { label: string; hex: string }[] = [
+  { label: 'Sky', hex: '#0ea5e9' },
+  { label: 'Amber', hex: '#f59e0b' },
+  { label: 'Rose', hex: '#f43f5e' },
+  { label: 'Violet', hex: '#8b5cf6' },
+  { label: 'Emerald', hex: '#10b981' },
+  { label: 'Slate', hex: '#64748b' },
+] as const;
 
+export const DEFAULT_HEATMAP_MONO_COLOR = HEATMAP_MONO_COLOR_PRESETS[0]!.hex;
+
+export function normalizeHeatmapMonoHex(raw: string): string {
+  let h = raw.trim();
+  if (!h.startsWith('#')) h = `#${h}`;
+  return parseRgbFromHex6(h) ? h : DEFAULT_HEATMAP_MONO_COLOR;
+}
+
+const MONO_ALPHA_MIN = 0.12;
+
+function parseRgbFromHex6(hex: string): [number, number, number] | null {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** CSS `rgba(...)` from `#rrggbb` and 0–1 alpha. */
+export function hexToRgba(hex: string, alpha: number): string {
+  const rgb = parseRgbFromHex6(hex);
+  const a = Math.min(1, Math.max(0, alpha));
+  if (!rgb) return `rgba(14, 165, 233, ${a})`;
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
+}
+
+/** Transformed 0–1 after curve + γ; `null` if metric missing. */
+export function heatmapTransformedMetric01(metric: number | undefined, opts?: HeatmapColorOpts): number | null {
+  if (metric == null || Number.isNaN(metric)) return null;
+  let v = Math.min(1, Math.max(0, metric));
   const curve = opts?.riskHeatmapCurve ?? 'power';
   const gamma = opts?.riskHeatmapGamma ?? 1;
   v = applyRiskHeatmapTransfer(v, curve, gamma);
+  return Math.min(1, Math.max(0, v));
+}
 
-  const cut = opts?.stressCutoff;
-  if (cut != null && cut > 1e-6 && cut < 1 - 1e-6) {
-    if (v < cut) return STRESS_BELOW_CUTOFF_FILL;
-    const span = 1 - cut;
-    v = span > 1e-9 ? (v - cut) / span : 1;
-    v = Math.min(1, Math.max(0, v));
+/**
+ * Maps a view’s heatmap metric (already 0–1, Technology or Business) through optional γ into discrete
+ * temperature-band colours — **same absolute scale for every view** (no per-runway min–max stretch).
+ */
+export function heatmapColorForViewMode(
+  _mode: ViewModeId,
+  metric: number | undefined,
+  opts?: HeatmapColorOpts
+): string {
+  const t = heatmapTransformedMetric01(metric, opts);
+  if (t == null) return EMPTY_CELL_FILL;
+
+  if (opts?.renderStyle === 'mono') {
+    const hex = normalizeHeatmapMonoHex(opts.monoColor ?? '');
+    const alpha = MONO_ALPHA_MIN + t * (1 - MONO_ALPHA_MIN);
+    return hexToRgba(hex, alpha);
   }
 
-  return heatmapColorContinuous(v);
+  return heatmapColorDiscrete(t);
+}
+
+/**
+ * Same normalisation and transfer as {@link heatmapColorForViewMode}, but returns the continuous 0–1 value
+ * (for extrusion height, sparklines, etc.) instead of a discrete band colour.
+ */
+export function transformedHeatmapMetric(
+  _mode: ViewModeId,
+  metric: number | undefined,
+  opts?: HeatmapColorOpts
+): number {
+  return heatmapTransformedMetric01(metric, opts) ?? 0;
+}
+
+/**
+ * Cell opacity for dimming low scores when {@link HeatmapColorOpts.stressCutoff} is set (after the same curve + γ
+ * as {@link heatmapColorForViewMode}).
+ */
+export function heatmapOpacityForStressCutoff(
+  _mode: ViewModeId,
+  metric: number | undefined,
+  opts?: HeatmapColorOpts
+): number {
+  const v = heatmapTransformedMetric01(metric, opts);
+  if (v == null) return 1;
+  const cut = opts?.stressCutoff;
+  if (cut != null && cut > 1e-6 && cut < 1 - 1e-6 && v < cut) {
+    return HEATMAP_BELOW_CUTOFF_DIM_OPACITY;
+  }
+  return 1;
 }

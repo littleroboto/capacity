@@ -5,6 +5,7 @@ import {
   formatDateYmd,
   runwayDayStripWidth,
 } from '@/lib/weekRunway';
+import { skylineMonthBodyHeightPx } from '@/lib/runwayIsoSkylineLayout';
 
 export const QUARTER_LETTERS = ['JFM', 'AMJ', 'JAS', 'OND'] as const;
 export type QuarterLetters = (typeof QUARTER_LETTERS)[number];
@@ -181,27 +182,121 @@ function buildVerticalYearSectionsFromDates(sortedDatesYmd: string[]): VerticalY
   return sections;
 }
 
+/** All week rows in calendar order (for one continuous isometric skyline). */
+export function flattenRunwayWeeksFromSections(sections: VerticalYearSection[]): RunwayCalendarCellValue[][] {
+  const out: RunwayCalendarCellValue[][] = [];
+  for (const sec of sections) {
+    for (const mo of sec.months) {
+      for (const w of mo.weeks) {
+        out.push(w);
+      }
+    }
+  }
+  return out;
+}
+
+/** One label stack at the first week of a calendar month (isometric skyline). */
+export type SkylineChronologyGroup = {
+  weekIndex: number;
+  /** First week of a year section (model year strip). */
+  yearLabel?: string;
+  /** Present when month starts a calendar quarter (Jan, Apr, Jul, Oct). */
+  quarterLabel?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  monthLabel: string;
+};
+
+function quarterLabelFromMonthIndex(monthIndex: number): 'Q1' | 'Q2' | 'Q3' | 'Q4' {
+  return [`Q1`, `Q2`, `Q3`, `Q4`][Math.floor(monthIndex / 3)]! as 'Q1' | 'Q2' | 'Q3' | 'Q4';
+}
+
+/**
+ * Labels for the continuous isometric skyline: year (section start), quarter (quarter months),
+ * and every month — aligned to flattened week indices.
+ */
+export function skylineChronologyGroups(sections: VerticalYearSection[]): SkylineChronologyGroup[] {
+  const out: SkylineChronologyGroup[] = [];
+  let weekIndex = 0;
+  for (const sec of sections) {
+    for (let mi = 0; mi < sec.months.length; mi++) {
+      const mo = sec.months[mi]!;
+      const yearLabel = mi === 0 ? String(sec.year) : undefined;
+      const quarterLabel = mo.monthIndex % 3 === 0 ? quarterLabelFromMonthIndex(mo.monthIndex) : undefined;
+      out.push({
+        weekIndex,
+        yearLabel,
+        quarterLabel,
+        monthLabel: mo.labelShort,
+      });
+      weekIndex += mo.weeks.length;
+    }
+  }
+  return out;
+}
+
+/** Optional vertical runway layout (single-column months). */
+export type VerticalMonthsRunwayLayoutOpts = {
+  /**
+   * Extra px for 3D isometric skyline columns (tower height in local cell space).
+   * When set, month block height follows the isometric lattice SVG instead of flat week rows.
+   */
+  rowTowerPx?: number;
+};
+
 /**
  * Runway layout: each month is one Monday-start mini-grid; months stack vertically in one column.
  * Left gutter shows Q1–Q4 once per calendar quarter, vertically centered on that quarter’s stacked months.
  * Compare-all view uses one shared gutter column; per-market columns omit the gutter.
+ *
+ * When `rowTowerPx` is set (3D skyline), layout is a **single** strip: no gutter, height = one skyline
+ * for all weeks concatenated in order (matches the continuous isometric block UI).
  */
 export function buildVerticalMonthsRunwayLayout(
   sortedDatesYmd: string[],
-  cellPx: number
+  cellPx: number,
+  opts?: VerticalMonthsRunwayLayoutOpts
 ): RunwayVerticalCalendarLayout | null {
   const sections = buildVerticalYearSectionsFromDates(sortedDatesYmd);
   if (!sections) return null;
 
   const gap = RUNWAY_CELL_GAP_PX;
   const stripW = runwayDayStripWidth(cellPx, gap, RUNWAY_DAY_COLUMNS);
-  const stride = cellPx + gap;
+  const strideX = cellPx + gap;
+  const rowTower = Math.max(0, Math.round(opts?.rowTowerPx ?? 0));
+  const strideY = cellPx + gap + rowTower;
+
+  const placedCells: PlacedRunwayCell[] = [];
+  let flatIndex = 0;
+
+  /** One isometric block: no year/month/weekday headers or quarter gutter in layout coordinates. */
+  if (rowTower > 0) {
+    const flatWeeks = flattenRunwayWeeksFromSections(sections);
+    const totalWeeks = flatWeeks.length;
+    const bodyH = skylineMonthBodyHeightPx(totalWeeks, cellPx, gap, rowTower);
+    const strideYPlaced = bodyH / Math.max(1, totalWeeks);
+    const x0 = 0;
+    const cellY = 0;
+    for (let wi = 0; wi < totalWeeks; wi++) {
+      const week = flatWeeks[wi]!;
+      for (let di = 0; di < RUNWAY_DAY_COLUMNS; di++) {
+        placedCells.push({
+          dateStr: week[di]!,
+          x: x0 + di * strideX,
+          y: cellY + wi * strideYPlaced,
+          flatIndex: flatIndex++,
+        });
+      }
+    }
+    return {
+      sections,
+      contentWidth: stripW,
+      contentHeight: bodyH,
+      placedCells,
+    };
+  }
 
   const contentWidth = CALENDAR_QUARTER_GUTTER_W + stripW;
 
-  const placedCells: PlacedRunwayCell[] = [];
   let yPos = 0;
-  let flatIndex = 0;
 
   for (const sec of sections) {
     yPos += CALENDAR_YEAR_HEADER_H;
@@ -209,18 +304,19 @@ export function buildVerticalMonthsRunwayLayout(
       const rowTop = yPos;
       const cellY = rowTop + CALENDAR_MONTH_HEADER_H + CALENDAR_WEEKDAY_HEADER_H;
       const x0 = CALENDAR_QUARTER_GUTTER_W;
-      for (let wi = 0; wi < mo.weeks.length; wi++) {
+      const wLen = mo.weeks.length;
+      for (let wi = 0; wi < wLen; wi++) {
         const week = mo.weeks[wi]!;
         for (let di = 0; di < RUNWAY_DAY_COLUMNS; di++) {
           placedCells.push({
             dateStr: week[di]!,
-            x: x0 + di * stride,
-            y: cellY + wi * stride,
+            x: x0 + di * strideX,
+            y: cellY + wi * strideY,
             flatIndex: flatIndex++,
           });
         }
       }
-      const blockH = monthBlockHeight(mo.weeks.length, stride, gap);
+      const blockH = monthBlockHeight(wLen, strideY, gap);
       yPos = rowTop + blockH + CALENDAR_MONTH_STACK_GAP_PX;
     }
     yPos += CALENDAR_QUARTER_BLOCK_GAP_PX;

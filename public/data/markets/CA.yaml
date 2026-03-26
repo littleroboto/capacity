@@ -1,255 +1,110 @@
-# Canada — Ontario school-year pattern (Ontario.ca school year calendars; stub `holidayCalc.ts`).
-# Spring spans Easter + March break; summer Jul–Aug; autumn around early October (Thanksgiving corridor).
-country: CA
+# Canada — Ontario school-year pattern (stub `holidayCalc.ts`).
+market: CA
+title: Canada
+risk_heatmap_gamma_tech: 1.06
+risk_heatmap_gamma_business: 1.22
 
 resources:
   labs:
     capacity: 5
-  teams:
-    pos_team:
-      size: 4
-      sme_depth: 2
+  staff:
+    capacity: 4
+  testing_capacity: 5
 
 bau:
-  weekly_promo_cycle:
-    day: Tue
-    labs: 2
+  days_in_use: [mo, tu, we, th, fr]
+  weekly_cycle:
+    labs_required: 2
+    staff_required: 0
     support_days: 2
   integration_tests:
-    frequency: weekly
     day: Thu
     labs: 1
 
 campaigns:
   - name: spring_easter_march_peak_2026
-    start: 2026-04-02
+    start_date: '2026-04-02'
     duration: 16
-    prep_before_live_days: 56
+    testing_prep_duration: 30
     impact: very_high
-    load:
-      labs: 4
-      teams: 3.05
-      backend: 1.6
-      ops: 1.2
-      commercial: 0.77
-    live_support_load:
-      labs: 1.05
-      teams: 1.12
-      backend: 0.47
-      ops: 2.6
-      commercial: 0.92
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 4
+      tech_staff: 3.05
+    live_campaign_support:
+      labs_required: 1.05
+      tech_staff: 1.12
   - name: summer_school_hol_peak_2026
-    start: 2026-07-05
+    start_date: '2026-07-05'
     duration: 48
-    prep_before_live_days: 58
+    testing_prep_duration: 58
     impact: very_high
-    load:
-      labs: 4.35
-      teams: 3.25
-      backend: 1.75
-      ops: 1.32
-      commercial: 0.83
-    live_support_load:
-      labs: 1
-      teams: 1.18
-      backend: 0.45
-      ops: 2.75
-      commercial: 0.94
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 4.35
+      tech_staff: 3.25
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1.18
   - name: autumn_thanksgiving_peak_2026
-    start: 2026-10-03
+    start_date: '2026-10-03'
     duration: 14
-    prep_before_live_days: 42
+    testing_prep_duration: 30
     impact: high
-    load:
-      labs: 3.45
-      teams: 2.7
-      backend: 1.32
-      ops: 1.05
-      commercial: 0.71
-    live_support_load:
-      labs: 0.95
-      teams: 1.02
-      backend: 0.4
-      ops: 2.25
-      commercial: 0.87
-  - name: spring_easter_march_peak_2027
-    start: 2027-03-24
-    duration: 16
-    prep_before_live_days: 56
-    impact: very_high
-    load:
-      labs: 4
-      teams: 3.05
-      backend: 1.6
-      ops: 1.2
-      commercial: 0.77
-    live_support_load:
-      labs: 1.05
-      teams: 1.12
-      backend: 0.47
-      ops: 2.6
-      commercial: 0.92
-  - name: summer_school_hol_peak_2027
-    start: 2027-07-04
-    duration: 48
-    prep_before_live_days: 58
-    impact: very_high
-    load:
-      labs: 4.35
-      teams: 3.25
-      backend: 1.75
-      ops: 1.32
-      commercial: 0.83
-    live_support_load:
-      labs: 1
-      teams: 1.18
-      backend: 0.45
-      ops: 2.75
-      commercial: 0.94
-  - name: autumn_thanksgiving_peak_2027
-    start: 2027-10-02
-    duration: 14
-    prep_before_live_days: 42
-    impact: high
-    load:
-      labs: 3.45
-      teams: 2.7
-      backend: 1.32
-      ops: 1.05
-      commercial: 0.71
-    live_support_load:
-      labs: 0.95
-      teams: 1.02
-      backend: 0.4
-      ops: 2.25
-      commercial: 0.87
-  - name: spring_easter_march_peak_2028
-    start: 2028-04-06
-    duration: 16
-    prep_before_live_days: 56
-    impact: very_high
-    load:
-      labs: 4
-      teams: 3.05
-      backend: 1.6
-      ops: 1.2
-      commercial: 0.77
-    live_support_load:
-      labs: 1.05
-      teams: 1.12
-      backend: 0.47
-      ops: 2.6
-      commercial: 0.92
-  - name: summer_school_hol_peak_2028
-    start: 2028-07-03
-    duration: 48
-    prep_before_live_days: 58
-    impact: very_high
-    load:
-      labs: 4.35
-      teams: 3.25
-      backend: 1.75
-      ops: 1.32
-      commercial: 0.83
-    live_support_load:
-      labs: 1
-      teams: 1.18
-      backend: 0.45
-      ops: 2.75
-      commercial: 0.94
-  - name: autumn_thanksgiving_peak_2028
-    start: 2028-10-07
-    duration: 14
-    prep_before_live_days: 42
-    impact: high
-    load:
-      labs: 3.45
-      teams: 2.7
-      backend: 1.32
-      ops: 1.05
-      commercial: 0.71
-    live_support_load:
-      labs: 0.95
-      teams: 1.02
-      backend: 0.4
-      ops: 2.25
-      commercial: 0.87
-
-  # Mega advent: ~2-month prep then full December (holiday retail + digital).
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 3.45
+      tech_staff: 2.7
+    live_campaign_support:
+      labs_required: 0.95
+      tech_staff: 1.02
   - name: advent_mega_campaign_2026
-    start: 2026-12-01
+    start_date: '2026-12-01'
     duration: 31
-    prep_before_live_days: 61
+    testing_prep_duration: 30
     impact: very_high
-    load:
-      labs: 4.7
-      teams: 3.55
-      backend: 1.88
-      ops: 1.45
-      commercial: 0.88
-    live_support_load:
-      labs: 1.12
-      teams: 1.22
-      backend: 0.52
-      ops: 2.95
-      commercial: 0.97
-  - name: advent_mega_campaign_2027
-    start: 2027-12-01
-    duration: 31
-    prep_before_live_days: 61
-    impact: very_high
-    load:
-      labs: 4.7
-      teams: 3.55
-      backend: 1.88
-      ops: 1.45
-      commercial: 0.88
-    live_support_load:
-      labs: 1.12
-      teams: 1.22
-      backend: 0.52
-      ops: 2.95
-      commercial: 0.97
-  - name: advent_mega_campaign_2028
-    start: 2028-12-01
-    duration: 31
-    prep_before_live_days: 61
-    impact: very_high
-    load:
-      labs: 4.7
-      teams: 3.55
-      backend: 1.88
-      ops: 1.45
-      commercial: 0.88
-    live_support_load:
-      labs: 1.12
-      teams: 1.22
-      backend: 0.52
-      ops: 2.95
-      commercial: 0.97
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 4.7
+      tech_staff: 3.55
+    live_campaign_support:
+      labs_required: 1.12
+      tech_staff: 1.22
 
-holidays:
-  auto_public: true
-  auto_school: true
-  capacity_taper_days: 3
+public_holidays:
+  auto: true
+  dates: []
+  staffing_multiplier: 0.5
+  trading_multiplier: 1.04
 
-stress_correlations:
-  school_holidays:
-    store_pressure_mult: 1.14
+school_holidays:
+  auto: true
+  dates: []
+  staffing_multiplier: 0.88
+  trading_multiplier: 1.14
+  load_effects:
     lab_load_mult: 1.07
     team_load_mult: 1.1
     backend_load_mult: 1.05
     ops_activity_mult: 1.07
     commercial_activity_mult: 1.14
-    lab_team_capacity_mult: 0.91
+
+holidays:
+  capacity_taper_days: 3
+  lab_capacity_scale: 0.5
 
 trading:
+  campaign_store_boost_prep: 0
+  campaign_store_boost_live: 0.28
+  payday_month_peak_multiplier: 1.12
   weekly_pattern:
-    default: medium
-    Thu: high
-    Fri: high
-    Sat: very_high
-    Sun: high
+    Mon: 0.68
+    Tue: 0.72
+    Wed: 0.74
+    Thu: 0.84
+    Fri: 0.94
+    Sat: 1.0
+    Sun: 0.72
   seasonal:
     peak_month: 7
     amplitude: 0.1

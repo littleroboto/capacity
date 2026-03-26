@@ -1,4 +1,5 @@
 import { normalizeViewModeId } from '@/lib/constants';
+import { normalizeHeatmapMonoHex, type HeatmapRenderStyle } from '@/lib/riskHeatmapColors';
 import { looksLikeYamlDsl } from '@/lib/dslGuards';
 import { clampRiskTuning, DEFAULT_RISK_TUNING } from '@/engine/riskModelTuning';
 import { runPipelineFromDsl } from '@/engine/pipeline';
@@ -43,6 +44,14 @@ export function applyScenarioToStore(s: ScenarioState): void {
   setStored('picker', country);
   setStored('layer', normalizeViewModeId(s.layer));
 
+  const stressCut =
+    s.riskHeatmapStressCutoff != null && Number.isFinite(s.riskHeatmapStressCutoff)
+      ? Math.min(0.95, Math.max(0, Math.round(Math.round(s.riskHeatmapStressCutoff / 0.05) * 0.05 * 100) / 100))
+      : undefined;
+
+  const heatmapRenderStyle: HeatmapRenderStyle | undefined =
+    s.heatmapRenderStyle === 'mono' || s.heatmapRenderStyle === 'spectrum' ? s.heatmapRenderStyle : undefined;
+
   useAtcStore.setState({
     country,
     runwayMarketOrder: order,
@@ -51,6 +60,11 @@ export function applyScenarioToStore(s: ScenarioState): void {
     riskTuning,
     viewMode: normalizeViewModeId(s.layer),
     discoMode: s.discoMode ?? false,
+    ...(stressCut !== undefined ? { riskHeatmapStressCutoff: stressCut } : {}),
+    ...(heatmapRenderStyle ? { heatmapRenderStyle } : {}),
+    ...(typeof s.heatmapMonoColor === 'string'
+      ? { heatmapMonoColor: normalizeHeatmapMonoHex(s.heatmapMonoColor) }
+      : {}),
   });
 
   if (s.theme === 'light' || s.theme === 'dark') {

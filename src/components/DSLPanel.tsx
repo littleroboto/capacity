@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { DslEditorCore, DslSyntaxHelpBody } from '@/components/DslEditorCore';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
 import { RiskModelPanel } from '@/components/RiskModelPanel';
 import { WorkbenchRunwayControls } from '@/components/WorkbenchRunwayControls';
@@ -22,12 +21,11 @@ type DSLPanelProps = {
   onCollapsedChange: (collapsed: boolean) => void;
 };
 
-/** Sits in a split layout: runway/heatmap left, controls + inline DSL editor right. */
+/** Sits in a split layout: runway/heatmap left, controls + workbench right. */
 export function DSLPanel({ marketIds, collapsed, onCollapsedChange }: DSLPanelProps) {
   const [localDataOpen, setLocalDataOpen] = useState(false);
-  const [syntaxRefOpen, setSyntaxRefOpen] = useState(false);
-  const [yamlModalOpen, setYamlModalOpen] = useState(false);
   const parseError = useAtcStore((s) => s.parseError);
+  const setViewMode = useAtcStore((s) => s.setViewMode);
 
   const localDataDialog = (
     <Dialog open={localDataOpen} onOpenChange={setLocalDataOpen}>
@@ -36,9 +34,9 @@ export function DSLPanel({ marketIds, collapsed, onCollapsedChange }: DSLPanelPr
           <DialogTitle>Local data</DialogTitle>
           <DialogDescription className="text-pretty">
             Everything stays in this browser. Use <strong className="font-medium text-foreground">Save snapshot</strong>{' '}
-            (disk icon in the YAML toolbar or below) to store DSL, runway order, pressure tuning, view, theme, and related
-            state. The <strong className="font-medium text-foreground">history</strong> table is newest first — click a
-            row or <strong className="font-medium text-foreground">Load</strong> to restore.{' '}
+            (disk icon below) to store DSL, runway order, pressure tuning, view, theme, and related state. The{' '}
+            <strong className="font-medium text-foreground">history</strong> table is newest first — click a row or{' '}
+            <strong className="font-medium text-foreground">Load</strong> to restore.{' '}
             <strong className="font-medium text-foreground">Export</strong> / <strong className="font-medium text-foreground">import</strong>{' '}
             JSON backs up or moves the full list.
           </DialogDescription>
@@ -53,70 +51,6 @@ export function DSLPanel({ marketIds, collapsed, onCollapsedChange }: DSLPanelPr
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-
-  const yamlEditorDialog = (
-    <>
-      <Dialog open={yamlModalOpen} onOpenChange={setYamlModalOpen}>
-        <DialogContent className="h-[min(94dvh,920px)] max-h-[95dvh] w-[min(98vw,90rem)] gap-0 overflow-hidden sm:max-w-[min(98vw,90rem)]">
-          <DialogHeader className="shrink-0 space-y-1 border-b border-border/60 px-6 pb-4 pt-5 pr-14">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <DialogTitle>Market Configuration (YAML)</DialogTitle>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 shrink-0 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
-                onClick={() => setSyntaxRefOpen(true)}
-              >
-                Syntax reference
-              </Button>
-            </div>
-            <DialogDescription className="text-pretty text-xs leading-snug">
-              Multi-market documents for the runway. Use <strong className="font-medium text-foreground">Apply</strong>{' '}
-              in the editor toolbar to re-run the model. Close when finished — your edits stay in the workbench.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-2 pt-3">
-            <DslEditorCore
-              className="min-h-0 flex-1 gap-2"
-              trailingActions={
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs"
-                  onClick={() => setYamlModalOpen(false)}
-                >
-                  Done
-                </Button>
-              }
-            />
-          </div>
-          <DialogFooter className="shrink-0 border-t border-border/60 px-6 py-3">
-            <Button type="button" variant="secondary" onClick={() => setYamlModalOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={syntaxRefOpen} onOpenChange={setSyntaxRefOpen}>
-        <DialogContent className="max-h-[min(85dvh,720px)] gap-0 overflow-hidden sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>DSL syntax reference</DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[55vh] overflow-y-auto py-2">
-            <DslSyntaxHelpBody />
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="secondary" onClick={() => setSyntaxRefOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 
   if (collapsed) {
@@ -142,9 +76,9 @@ export function DSLPanel({ marketIds, collapsed, onCollapsedChange }: DSLPanelPr
             variant="ghost"
             size="sm"
             className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
-            onClick={() => setYamlModalOpen(true)}
-            title="Market YAML — open large editor"
-            aria-label="Open YAML editor"
+            onClick={() => setViewMode('code')}
+            title="Code — YAML editor in the main area"
+            aria-label="Open Code view — YAML editor"
           >
             <FileCode2 className="h-4 w-4" aria-hidden />
           </Button>
@@ -163,12 +97,11 @@ export function DSLPanel({ marketIds, collapsed, onCollapsedChange }: DSLPanelPr
             <span
               className="h-2 w-2 shrink-0 rounded-full bg-red-500 dark:bg-red-400"
               title={parseError}
-              aria-label="DSL parse error — open YAML editor to review"
+              aria-label="DSL parse error — switch to Code view to review"
             />
           ) : null}
         </aside>
         {localDataDialog}
-        {yamlEditorDialog}
       </>
     );
   }
@@ -179,95 +112,100 @@ export function DSLPanel({ marketIds, collapsed, onCollapsedChange }: DSLPanelPr
         id="dsl-controls-panel"
         className="flex h-full min-h-0 min-w-0 shrink-0 flex-col gap-3 overflow-hidden border-l border-border bg-card p-4"
       >
-      <div className="flex shrink-0 items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">Controls</h2>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="hidden h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground lg:flex"
-          onClick={() => onCollapsedChange(true)}
-          aria-expanded={true}
-          aria-controls="dsl-controls-panel"
-          aria-label="Collapse controls panel"
-          title="Collapse controls"
-        >
-          <ChevronRight className="h-5 w-5" aria-hidden />
-        </Button>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5">
-        <WorkbenchRunwayControls marketIds={marketIds} />
-        <RiskModelPanel />
-        <div className="flex shrink-0 flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold tracking-tight text-foreground">Market Configuration (YAML)</p>
-              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-                Multi-market runway DSL — opens in a wide modal for easier reading and editing.
-              </p>
-            </div>
-            {parseError ? (
-              <span
-                className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-500 dark:bg-red-400"
-                title={parseError}
-                aria-label="Parse error"
-              />
-            ) : null}
-          </div>
+        <div className="flex shrink-0 items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold tracking-tight">Controls</h2>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-9 w-full justify-center gap-2 text-xs font-medium"
-            onClick={() => setYamlModalOpen(true)}
+            className="hidden h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground lg:flex"
+            onClick={() => onCollapsedChange(true)}
+            aria-expanded={true}
+            aria-controls="dsl-controls-panel"
+            aria-label="Collapse controls panel"
+            title="Collapse controls"
           >
-            <FileCode2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-            Open YAML editor
+            <ChevronRight className="h-5 w-5" aria-hidden />
           </Button>
         </div>
-      </div>
 
-      <div className="shrink-0 border-t border-border/60 bg-card/40 px-0 pt-2">
-        <div className="flex flex-col items-start gap-1">
-          <div className="flex flex-wrap gap-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5">
+          <WorkbenchRunwayControls marketIds={marketIds} />
+          <RiskModelPanel />
+          <div className="flex shrink-0 flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold tracking-tight text-foreground">DSL authoring</p>
+                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                  Use <span className="font-medium text-foreground/85">Code</span> in{' '}
+                  <span className="font-medium text-foreground/85">View mode</span> for the full YAML editor. Switch to{' '}
+                  <span className="font-medium text-foreground/85">Technology</span> or{' '}
+                  <span className="font-medium text-foreground/85">Business</span> to apply and refresh the runway. This
+                  panel is reserved for a future BYOK assistant that reuses the same authoring prompt you use in
+                  Cursor—not wired yet while the DSL evolves.
+                </p>
+              </div>
+              {parseError ? (
+                <span
+                  className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-500 dark:bg-red-400"
+                  title={parseError}
+                  aria-label="Parse error"
+                />
+              ) : null}
+            </div>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 gap-2 px-2.5 text-xs font-normal"
-              onClick={() => setLocalDataOpen(true)}
-              title="History table, export & import JSON"
-              aria-label="Open local data — workspace history"
+              className="h-9 w-full justify-center gap-2 text-xs font-medium"
+              disabled
+              title="Use View mode in the header to open Code"
             >
-              <Database className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-              Local data
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 gap-2 px-2.5 text-xs font-normal"
-              onClick={() => {
-                saveNamedWorkspaceInteractive();
-              }}
-              title="Save workspace snapshot (DSL + config) to browser history"
-              aria-label="Save workspace snapshot"
-            >
-              <Save className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-              Save snapshot
+              <FileCode2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+              Open Code view
             </Button>
           </div>
-          <p className="max-w-[20rem] text-[10px] leading-snug text-muted-foreground">
-            Snapshots capture multi-market YAML, country, view, pressure mix controls, heatmap UI, theme, and runway order. Open{' '}
-            <span className="font-medium text-foreground/80">Local data</span> to reload from the table or export JSON.
-          </p>
         </div>
-      </div>
 
+        <div className="shrink-0 border-t border-border/60 bg-card/40 px-0 pt-2">
+          <div className="flex w-full flex-col items-end gap-1 text-right">
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 px-2.5 text-xs font-normal"
+                onClick={() => setLocalDataOpen(true)}
+                title="History table, export & import JSON"
+                aria-label="Open local data — workspace history"
+              >
+                <Database className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                Local data
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 px-2.5 text-xs font-normal"
+                onClick={() => {
+                  saveNamedWorkspaceInteractive();
+                }}
+                title="Save workspace snapshot (DSL + config) to browser history"
+                aria-label="Save workspace snapshot"
+              >
+                <Save className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                Save snapshot
+              </Button>
+            </div>
+            <p className="max-w-[20rem] text-[10px] leading-snug text-muted-foreground">
+              Snapshots capture multi-market YAML, country, view, pressure mix controls, heatmap UI, theme, and runway
+              order. Open <span className="font-medium text-foreground/80">Local data</span> to reload from the table or
+              export JSON.
+            </p>
+          </div>
+        </div>
       </aside>
       {localDataDialog}
-      {yamlEditorDialog}
     </>
   );
 }

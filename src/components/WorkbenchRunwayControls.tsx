@@ -2,6 +2,7 @@ import {
   FALLBACK_RUNWAY_MARKET_IDS,
   RUNWAY_ALL_MARKETS_LABEL,
   RUNWAY_ALL_MARKETS_VALUE,
+  isRunwayAllMarkets,
 } from '@/lib/markets';
 import { Label } from '@/components/ui/label';
 import {
@@ -22,12 +23,21 @@ type WorkbenchRunwayControlsProps = {
 /** Runway focus (market / LIOM) and heatmap lens — lives in the right workbench panel. */
 export function WorkbenchRunwayControls({ marketIds }: WorkbenchRunwayControlsProps) {
   const country = useAtcStore((s) => s.country);
+  const configs = useAtcStore((s) => s.configs);
   const viewMode = useAtcStore((s) => s.viewMode);
   const setCountry = useAtcStore((s) => s.setCountry);
   const setViewMode = useAtcStore((s) => s.setViewMode);
   const reduceMotion = useReducedMotion();
 
   const ids = marketIds.length ? marketIds : [...FALLBACK_RUNWAY_MARKET_IDS];
+
+  const labelForMarket = (id: string) => {
+    if (id === RUNWAY_ALL_MARKETS_VALUE) return RUNWAY_ALL_MARKETS_LABEL;
+    const cfg = configs.find((c) => c.market === id);
+    const t = cfg?.title?.trim();
+    if (t && t !== id) return `${id} — ${t}`;
+    return id;
+  };
 
   return (
     <div className="flex shrink-0 flex-col gap-3 rounded-lg border border-border/60 bg-muted/15 p-3">
@@ -46,13 +56,21 @@ export function WorkbenchRunwayControls({ marketIds }: WorkbenchRunwayControlsPr
             <SelectItem value={RUNWAY_ALL_MARKETS_VALUE}>{RUNWAY_ALL_MARKETS_LABEL}</SelectItem>
             {ids.map((id) => (
               <SelectItem key={id} value={id}>
-                {id}
+                {labelForMarket(id)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <p className="text-[10px] leading-snug text-muted-foreground">
           Single market edits YAML for that country; LIOM shows every market column on the runway.
+          {!isRunwayAllMarkets(country) ? (
+            <>
+              {' '}
+              Optional YAML <span className="font-mono text-foreground/80">title</span> /{' '}
+              <span className="font-mono text-foreground/80">description</span> label the market in the picker and
+              column tooltips.
+            </>
+          ) : null}
         </p>
       </div>
 

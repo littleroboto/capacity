@@ -1,271 +1,117 @@
-# Italy — Lombardy school calendar (Regione Lombardia / MIUR-style terms; stub `holidayCalc.ts`).
-country: IT
+# Italy — Lombardy-style school stubs (`holidayCalc.ts`).
+market: IT
+title: Italy
+risk_heatmap_gamma_tech: 1.06
+risk_heatmap_gamma_business: 1.22
 
 resources:
   labs:
     capacity: 5
-  teams:
-    pos_team:
-      size: 4
-      sme_depth: 2
+  staff:
+    capacity: 4
+  testing_capacity: 5
 
 bau:
-  weekly_promo_cycle:
-    day: Thu
-    labs: 2
+  days_in_use: [mo, tu, we, th, fr]
+  weekly_cycle:
+    labs_required: 2
+    staff_required: 0
     support_days: 2
   integration_tests:
-    frequency: weekly
     day: Tue
     labs: 1
 
 campaigns:
   - name: spring_pasqua_peak_2026
-    start: 2026-04-02
+    start_date: '2026-04-02'
     duration: 12
-    prep_before_live_days: 54
+    testing_prep_duration: 54
     impact: very_high
-    load:
-      labs: 3.85
-      teams: 2.95
-      backend: 1.52
-      ops: 1.15
-      commercial: 0.77
-    live_support_load:
-      labs: 1.02
-      teams: 1.08
-      backend: 0.44
-      ops: 2.52
-      commercial: 0.91
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 3.85
+      tech_staff: 2.95
+    live_campaign_support:
+      labs_required: 1.02
+      tech_staff: 1.08
   - name: summer_ferragosto_band_2026
-    start: 2026-06-12
+    start_date: '2026-06-12'
     duration: 78
-    prep_before_live_days: 56
+    testing_prep_duration: 30
     impact: very_high
-    load:
-      labs: 4.2
-      teams: 3.2
-      backend: 1.72
-      ops: 1.32
-      commercial: 0.84
-    live_support_load:
-      labs: 1
-      teams: 1.18
-      backend: 0.46
-      ops: 2.78
-      commercial: 0.94
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 4.2
+      tech_staff: 3.2
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1.18
   - name: autumn_ottobre_peak_2026
-    start: 2026-10-24
+    start_date: '2026-10-24'
     duration: 14
-    prep_before_live_days: 42
+    testing_prep_duration: 30
     impact: high
-    load:
-      labs: 3.3
-      teams: 2.58
-      backend: 1.25
-      ops: 1.02
-      commercial: 0.7
-    live_support_load:
-      labs: 0.92
-      teams: 1
-      backend: 0.37
-      ops: 2.18
-      commercial: 0.86
-  - name: spring_pasqua_peak_2027
-    start: 2027-04-13
-    duration: 12
-    prep_before_live_days: 54
-    impact: very_high
-    load:
-      labs: 3.85
-      teams: 2.95
-      backend: 1.52
-      ops: 1.15
-      commercial: 0.77
-    live_support_load:
-      labs: 1.02
-      teams: 1.08
-      backend: 0.44
-      ops: 2.52
-      commercial: 0.91
-  - name: summer_ferragosto_band_2027
-    start: 2027-06-11
-    duration: 78
-    prep_before_live_days: 56
-    impact: very_high
-    load:
-      labs: 4.2
-      teams: 3.2
-      backend: 1.72
-      ops: 1.32
-      commercial: 0.84
-    live_support_load:
-      labs: 1
-      teams: 1.18
-      backend: 0.46
-      ops: 2.78
-      commercial: 0.94
-  - name: autumn_ottobre_peak_2027
-    start: 2027-10-23
-    duration: 14
-    prep_before_live_days: 42
-    impact: high
-    load:
-      labs: 3.3
-      teams: 2.58
-      backend: 1.25
-      ops: 1.02
-      commercial: 0.7
-    live_support_load:
-      labs: 0.92
-      teams: 1
-      backend: 0.37
-      ops: 2.18
-      commercial: 0.86
-  - name: spring_pasqua_peak_2028
-    start: 2028-04-04
-    duration: 12
-    prep_before_live_days: 54
-    impact: very_high
-    load:
-      labs: 3.85
-      teams: 2.95
-      backend: 1.52
-      ops: 1.15
-      commercial: 0.77
-    live_support_load:
-      labs: 1.02
-      teams: 1.08
-      backend: 0.44
-      ops: 2.52
-      commercial: 0.91
-  - name: summer_ferragosto_band_2028
-    start: 2028-06-14
-    duration: 78
-    prep_before_live_days: 56
-    impact: very_high
-    load:
-      labs: 4.2
-      teams: 3.2
-      backend: 1.72
-      ops: 1.32
-      commercial: 0.84
-    live_support_load:
-      labs: 1
-      teams: 1.18
-      backend: 0.46
-      ops: 2.78
-      commercial: 0.94
-  - name: autumn_ottobre_peak_2028
-    start: 2028-10-21
-    duration: 14
-    prep_before_live_days: 42
-    impact: high
-    load:
-      labs: 3.3
-      teams: 2.58
-      backend: 1.25
-      ops: 1.02
-      commercial: 0.7
-    live_support_load:
-      labs: 0.92
-      teams: 1
-      backend: 0.37
-      ops: 2.18
-      commercial: 0.86
-
-  # Mega advent: ~2-month prep then full December.
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 3.3
+      tech_staff: 2.58
+    live_campaign_support:
+      labs_required: 0.92
+      tech_staff: 1
   - name: advent_mega_campaign_2026
-    start: 2026-12-01
+    start_date: '2026-12-01'
     duration: 31
-    prep_before_live_days: 61
+    testing_prep_duration: 30
     impact: very_high
-    load:
-      labs: 4.7
-      teams: 3.55
-      backend: 1.88
-      ops: 1.45
-      commercial: 0.88
-    live_support_load:
-      labs: 1.12
-      teams: 1.22
-      backend: 0.52
-      ops: 2.95
-      commercial: 0.97
-  - name: advent_mega_campaign_2027
-    start: 2027-12-01
-    duration: 31
-    prep_before_live_days: 61
-    impact: very_high
-    load:
-      labs: 4.7
-      teams: 3.55
-      backend: 1.88
-      ops: 1.45
-      commercial: 0.88
-    live_support_load:
-      labs: 1.12
-      teams: 1.22
-      backend: 0.52
-      ops: 2.95
-      commercial: 0.97
-  - name: advent_mega_campaign_2028
-    start: 2028-12-01
-    duration: 31
-    prep_before_live_days: 61
-    impact: very_high
-    load:
-      labs: 4.7
-      teams: 3.55
-      backend: 1.88
-      ops: 1.45
-      commercial: 0.88
-    live_support_load:
-      labs: 1.12
-      teams: 1.22
-      backend: 0.52
-      ops: 2.95
-      commercial: 0.97
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 4.7
+      tech_staff: 3.55
+    live_campaign_support:
+      labs_required: 1.12
+      tech_staff: 1.22
 
-holidays:
-  auto_public: true
-  auto_school: true
-  capacity_taper_days: 3
+public_holidays:
+  auto: true
+  dates: []
+  staffing_multiplier: 0.5
+  trading_multiplier: 1.04
 
-operating_windows:
-  - name: ferragosto_ops_pinch_2026
-    start: 2026-08-12
-    end: 2026-08-17
-    store_pressure_mult: 1.22
-    lab_team_capacity_mult: 0.88
-  - name: ferragosto_ops_pinch_2027
-    start: 2027-08-11
-    end: 2027-08-16
-    store_pressure_mult: 1.22
-    lab_team_capacity_mult: 0.88
-  - name: ferragosto_ops_pinch_2028
-    start: 2028-08-13
-    end: 2028-08-18
-    store_pressure_mult: 1.22
-    lab_team_capacity_mult: 0.88
-
-stress_correlations:
-  school_holidays:
-    store_pressure_mult: 1.11
+school_holidays:
+  auto: true
+  dates: []
+  staffing_multiplier: 0.88
+  trading_multiplier: 1.11
+  load_effects:
     lab_load_mult: 1.06
     team_load_mult: 1.09
     backend_load_mult: 1.04
     ops_activity_mult: 1.06
     commercial_activity_mult: 1.1
-    lab_team_capacity_mult: 0.93
+
+holidays:
+  capacity_taper_days: 3
+  lab_capacity_scale: 0.5
+
+operating_windows:
+  - name: ferragosto_ops_pinch_2026
+    start: '2026-08-12'
+    end: '2026-08-17'
+    store_pressure_mult: 1.22
+    lab_team_capacity_mult: 0.88
 
 trading:
+  campaign_store_boost_prep: 0
+  campaign_store_boost_live: 0.28
+  payday_month_peak_multiplier: 1.12
   weekly_pattern:
-    default: medium
-    Thu: high
-    Fri: very_high
-    Sat: very_high
-    Sun: high
+    Mon: 0.68
+    Tue: 0.72
+    Wed: 0.74
+    Thu: 0.85
+    Fri: 0.95
+    Sat: 1.0
+    Sun: 0.76
   seasonal:
     peak_month: 8
     amplitude: 0.12

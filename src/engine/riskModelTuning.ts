@@ -18,6 +18,11 @@ export type RiskModelTuning = {
    * toward month-end. 1 = off. Typical ~1.15; capped at 2 in the UI/engine.
    */
   storePaydayMonthPeakMultiplier: number;
+  /**
+   * UI multiplier on each market’s effective `campaign_effect_scale` (YAML value or 1). Scales campaign risk and
+   * store boosts during campaigns. 1 = match DSL; 0 = no campaign pressure from those channels.
+   */
+  campaignEffectUiMultiplier: number;
 };
 
 /** Legacy UI used 0–100 scaled by this delta to the old peak multiplier (for persisted state). */
@@ -31,6 +36,7 @@ export const DEFAULT_RISK_TUNING: RiskModelTuning = {
   importanceHoliday: 10,
   holidayCapacityScale: HOLIDAY_CAPACITY_SCALE,
   storePaydayMonthPeakMultiplier: 1.15,
+  campaignEffectUiMultiplier: 1,
 };
 
 function resolvePaydayPeakMultiplier(
@@ -59,6 +65,12 @@ function clampPaydayPeakMultiplier(n: number): number {
   return Math.min(2, Math.max(1, Math.round(n * 1000) / 1000));
 }
 
+function clampCampaignEffectUiMultiplier(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_RISK_TUNING.campaignEffectUiMultiplier;
+  const s = Math.round(n / 0.05) * 0.05;
+  return Math.min(2.5, Math.max(0, Math.round(s * 100) / 100));
+}
+
 export function clampRiskTuning(
   partial: Partial<RiskModelTuning> & { storePaydayMonthRamp?: number }
 ): RiskModelTuning {
@@ -71,6 +83,7 @@ export function clampRiskTuning(
     importanceHoliday: clampI(m.importanceHoliday),
     holidayCapacityScale: HOLIDAY_CAPACITY_SCALE,
     storePaydayMonthPeakMultiplier: clampPaydayPeakMultiplier(resolvePaydayPeakMultiplier(partial)),
+    campaignEffectUiMultiplier: clampCampaignEffectUiMultiplier(m.campaignEffectUiMultiplier),
   };
 }
 

@@ -23,9 +23,9 @@ Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL**
 4. **Aggregate** — Sum loads per `(date, market)`.
 5. **Store & campaign meta** — `trading.weekly_pattern` → **store_pressure**; campaigns → **campaign_risk** / **campaign_presence**; separate **public** vs **school** auto lists → **public_holiday_flag** / **school_holiday_flag**; **holiday_flag** = either (used for capacity scaling & optional combined-risk holiday term).
 6. **Capacity** — Convert loads to utilisations using **labs / teams / backend** capacity; holidays scale lab & team capacity by a fixed **0.5** (50%).
-7. **Risk** — Combine **tech_pressure**, **store_pressure**, **campaign_risk** into **risk_score** (0–1) and **risk_band**.
-8. **Display noise** — Deterministic jitter on **risk_score** only (heatmap texture); **risk_band** updated to match.
-9. **UI** — Filter surface by **header country** (or **all markets** side-by-side); build **vertical month stacks** (each month = Mon–Sun weeks); colour cells by the selected view mode (10-step palette where applicable).
+7. **Risk** — Combine **tech_pressure**, **store_pressure**, **campaign_risk** into **risk_score** (0–1) and **risk_band** (used for tooltips, band labels, and planning helpers — not the default heatmap cell value).
+8. **Display noise** — Deterministic jitter on **`risk_score`** and **`tech_pressure`** (`src/engine/dataNoise.ts`); **`risk_band`** is recomputed from the noised **`risk_score`**. The **Business** lens is driven mostly by **`store_pressure`** and is **not** given the same jitter.
+9. **UI** — Filter surface by **header country** (or **all markets** side-by-side); build **vertical month stacks** (each month = Mon–Sun weeks); colour cells from **`heatmapCellMetric`** (`src/lib/runwayViewMetrics.ts`) for the active lens (10-step palette after γ + transfer curve).
 
 ---
 
@@ -39,9 +39,9 @@ Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL**
 | **Parser** | `src/engine/yamlDslParser.ts` → `src/engine/types.ts` (`MarketConfig`) |
 | **Pipeline** | `src/engine/pipeline.ts` orchestrates calendar → phases → capacity → risk → noise |
 | **Runway** | **7 days wide** (Mon–Sun) per month; **months stacked vertically** in one column (Q1–Q4 labels on Jan / Apr / Jul / Oct). **All markets**: one column per market, horizontal scroll, shared colour scale |
-| **Heatmap colour** | 10-step green→red scale from **`risk_score`** only (`src/lib/riskHeatmapColors.ts`) |
-| **View modes** | Heatmap lenses: **Combined**, **Technology** (`tech_pressure`), **In store** (trading · campaign · holidays); details on cell hover |
-| **Slot selection** | Drag rectangle on runway (aggregates **risk_score**); no footer readout while status bar is absent |
+| **Heatmap colour** | 10-step green→red from the **active lens metric** after γ and transfer curve (`heatmapCellMetric` → `src/lib/riskHeatmapColors.ts`). **Technology** (view id `combined`): **`tech_pressure`**. **Business** (`in_store`): **`inStoreHeatmapMetric`** (store + prep campaign term + holidays). Not raw **`risk_score`**. |
+| **View modes** | **Technology** and **Business** only in the header; legacy id **`combined`** maps to Technology. |
+| **Slot selection** | Drag rectangle aggregates the **same lens metric** as the heatmap (`heatmapCellMetric`); no footer readout while status bar is absent |
 | **Scenarios** | Save/load named scenarios in `localStorage` (`atc_scenarios`) |
 | **Guards** | Reject HTML/page source in editor/storage; sane `public/` URLs (`src/lib/dslGuards.ts`, `src/lib/publicUrl.ts`) |
 | **Market templates** | `public/data/markets/*.yaml` only (fetched at runtime; bundled `?raw` seeds as fallback) |
@@ -53,7 +53,7 @@ Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL**
 | Item | Status |
 |------|--------|
 | **AI assistant** | Copy-only placeholder in `DSLPanel`; no API, no streaming (old `?llm=1` flow removed) |
-| **Releases in YAML** | `releases` exists in `MarketConfig` / `expandPhases`, but **`yamlToPipelineConfig` always sets `releases: []`** — no YAML mapping yet |
+| **Releases** | Optional top-level **`releases:`** → `MarketConfig.releases` (see [Releases](#releases-yaml)); omit or `[]` if none |
 | **Pilot / Slot Finder** | Not present in current React shell (removed with legacy app) |
 | **Legacy line-based `.dsl`** | Not supported; only YAML |
 | **Holidays** | **`auto_public` / `auto_school`** use **multi-year stubs (2026–2028+)** in `holidayCalc.ts` so a full **15-month / five-quarter** runway from any quarter start still hits holiday/school flags. **AU, UK, DE, FR, CA** lists differ by market. Not a real holiday API. Optional JSON under `data/holidays/` is **not** wired into the pipeline |
@@ -61,7 +61,7 @@ Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL**
 | **`teams.*.sme_depth`** | Ignored for capacity (only **`size`** summed) |
 | **Backend capacity** | Fixed **1000** in config; not read from YAML |
 | **Segments** | `public/data/segments.json` still expands the **country dropdown** market list only |
-| **Display noise** | **Not** part of the “true” model; cosmetic jitter on **`risk_score`** after calculation (`src/engine/dataNoise.ts`) |
+| **Display noise** | **Not** part of the “true” model; cosmetic jitter on **`risk_score`** and **`tech_pressure`** after calculation (`src/engine/dataNoise.ts`) |
 
 ---
 
@@ -170,10 +170,11 @@ If **both** `weekly_promo` and `weekly_promo_cycle` are present, **both** BAU en
 | `readiness_duration` | Optional positive integer. If set, the first **N** days of the campaign interval use **`load`** for **readiness** (change) work; remaining days use **`live_support_load`** for **live / hypercare / on-call** style scheduling. If omitted, the whole interval is tagged **readiness** (same as before). |
 | `live_support_load` | Optional partial load object (same keys as `load`). Used only after `readiness_duration` days; omitted keys count as **0** for that segment. |
 | `presence_only` | If **true**, does not add phase loads; still counts for **campaign_presence** / **campaign_risk** (use with `operating_windows` to avoid double-counting). |
+| `replaces_bau_tech` | If **true** (alias `replacesBauTech`), on prep days where this campaign adds **labs / teams / backend**, **`tech.weekly_pattern`** is skipped and **BAU** loads have those three buckets zeroed (ops/commercial unchanged) so campaign prep **replaces** the recurring tech pipe instead of **adding** to it. Default **false**. |
 
 **Phase engine** adds **commercial_load** (and any **labs** / **teams** / etc. from `load` or `live_support_load`) on each active day. BAU and releases are always tagged **readiness**; campaign days use **readiness** vs **sustain** per the rules above.
 
-**Risk model**: **tech_pressure** still uses **total** scheduled load vs capacity (unchanged for the **Combined** lens). **tech_readiness_pressure** and **tech_sustain_pressure** are not separate header views; they remain on each row for **Technology** tooltips (readiness vs live/support breakdown) and do **not** sum to **tech_pressure**.
+**Risk model**: **tech_pressure** still uses **total** scheduled load vs capacity (unchanged for the **Technology** heatmap lens). **tech_readiness_pressure** and **tech_sustain_pressure** are not separate header views; they remain on each row for **Technology** tooltips (readiness vs live/support breakdown) and do **not** sum to **tech_pressure**.
 
 **Pipeline** also computes **campaign_risk** for risk formula: same interval; **campaign_risk** = max of mapped impact across overlapping campaigns. **campaign_presence** = **1** if any campaign active, else **0**.
 
@@ -205,6 +206,24 @@ Under `school_holidays`, all keys are optional numbers (defaults = no change whe
 
 Array of named **inclusive** date ranges (`start` / `end` as `YYYY-MM-DD`) with the same optional multiplier keys as `school_holidays`, including **`lab_team_capacity_mult`** on **labsCap** / **teamsCap** (multiplies together with the school-holiday cap mult when both apply). Applied to loads / **store_pressure** **before** school-holiday stress; cap mults are read again in `computeCapacity`. Multiple windows on the same day **stack**. **`store_pressure`** can exceed 1.0 here; `computeRisk` still clamps **store_pressure** to 1 for the risk blend.
 
+#### `releases` (optional)
+
+Array of deploy-shaped **change** loads (same expansion as engine `ReleaseConfig`). Omitted or `[]` means no release rows.
+
+| Field | Rule |
+|-------|------|
+| `deploy_date` / `deployDate` | Optional ISO date; if omitted, engine infers from calendar (see `phaseEngine` `inferDeployDate`). |
+| `systems` | Non-empty string array (e.g. `POS`, `Mobile`) — each names a **system** column in expanded rows. |
+| `phases` | Non-empty array of `{ name, offset_days \| offsetDays }` — integer day offset from deploy date. |
+| `load` | Object of numeric buckets (`labs`, `teams`, `backend`, `ops`, `commercial`, …) applied on each phase date. |
+
+Each phase date adds **readiness** / **change** surface load for `(system × phase)`.
+
+#### `title` / `description` (optional)
+
+- **`title`** — Shown in runway focus picker and compare-column tooltips when different from `country`; defaults to **`country`**.
+- **`description`** — Parsed into `MarketConfig` for future UI; optional narrative for authors.
+
 #### `trading.weekly_pattern`
 
 - Keys **`Mon` … `Sun`** (must match exactly as shown; lookup uses `Date.getDay()` → name).
@@ -231,9 +250,9 @@ Loads are **additive** per expanded row, then **summed** per day.
 | BAU anchor day | `lab_load += labs` (and `teams` if ever set in load; YAML BAU only sets `labs`) |
 | BAU support | `lab_load += 0.5 * labs` on support weekdays |
 | Campaign | `commercial_load += impact_factor` |
-| Release phases | If `releases` non-empty in config, per-phase loads on given dates (**not available from YAML today**) |
+| Release phases | If `releases` non-empty in config (from YAML or tests), per-phase loads on given dates |
 
-Default **`releases: []`** from YAML path.
+If YAML omits **`releases`**, the list is empty.
 
 ### Capacity (`computeCapacity`)
 
@@ -254,12 +273,14 @@ Default **`releases: []`** from YAML path.
 
 ### Display noise (`withOperationalNoise`)
 
-- Adds deterministic **±`RISK_SCORE_NOISE_AMPLITUDE`** (default **0.028** half-range) to **risk_score**, clamps **0–1**, rounds 2 dp, recomputes **risk_band**.
-- **Does not** change `tech_pressure`, `store_pressure`, or `campaign_risk` in the row (tooltips still show underlying model pressures).
+- Adds deterministic **±`RISK_SCORE_NOISE_AMPLITUDE`** (default **0.028** half-range) to **`risk_score`** and the same delta to **`tech_pressure`**, clamps **0–1**, rounds 2 dp, recomputes **`risk_band`** from **`risk_score`**.
+- **`store_pressure`** and **`campaign_risk`** are unchanged in the row.
 
-### Heatmap colour
+### Heatmap colour (runway cells)
 
-- **index** = `floor(clamp(risk_score,0,1) * 9)` into a fixed **10-colour** array (green → red).
+- **Input** = **`heatmapCellMetric(row, viewMode, riskTuning)`** — Technology lens uses **`tech_pressure`** (after noise); Business lens uses **`inStoreHeatmapMetric`** (mostly **`store_pressure`**, noised only indirectly if that metric ever incorporated a noised field).
+- **index** = `floor(clamp(transformedMetric,0,1) * 9)` into a fixed **10-colour** array (green → red), after per-lens γ and optional **stress cutoff** dimming (UI-only; see `MARKET_DSL_AND_PIPELINE.md`).
+- **`risk_score`** remains the weighted **tech / store / campaign** blend for banding and explanations where the UI shows “combined risk,” not for default cell fill.
 
 ---
 
@@ -301,6 +322,7 @@ Default **`releases: []`** from YAML path.
 | `src/engine/yamlDslParser.ts` | YAML → configs |
 | `src/engine/calendar.ts` | Timeline |
 | `src/engine/phaseEngine.ts` | BAU / campaign / release expansion |
+| `src/engine/campaignPrepLive.ts` | Shared campaign prep vs live segment (pipeline meta + phase expansion) |
 | `src/engine/capacityModel.ts` | Utilisation |
 | `src/engine/riskModel.ts` | Risk |
 | `src/engine/dataNoise.ts` | Display jitter |

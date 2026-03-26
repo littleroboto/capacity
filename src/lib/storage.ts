@@ -1,6 +1,7 @@
 import { STORAGE_KEYS } from './constants';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
+import type { HeatmapRenderStyle } from '@/lib/riskHeatmapColors';
 
 /** Same-tab refresh for scenario list (localStorage has no event in-tab). */
 export const SCENARIOS_CHANGED = 'atc-scenarios-changed';
@@ -61,8 +62,12 @@ export type ScenarioState = {
   dslByMarket?: Record<string, string>;
   riskHeatmapGamma?: number;
   riskHeatmapCurve?: RiskHeatmapCurveId;
+  /** Optional; 0–0.95 colour floor after curve + γ (UI only). */
+  riskHeatmapStressCutoff?: number;
   discoMode?: boolean;
   theme?: 'light' | 'dark';
+  heatmapRenderStyle?: HeatmapRenderStyle;
+  heatmapMonoColor?: string;
 };
 
 export function getScenarios(): ScenarioState[] {

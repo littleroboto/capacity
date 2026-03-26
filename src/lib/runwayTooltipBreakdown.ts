@@ -4,14 +4,10 @@ import type { RiskRow } from '@/engine/riskModel';
 import { normalizedRiskWeights, type RiskModelTuning } from '@/engine/riskModelTuning';
 import type { BauEntry, MarketConfig } from '@/engine/types';
 import type { ViewModeId } from '@/lib/constants';
+import { isGregorianChristmasDay } from '@/engine/weighting';
+import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-const TRADING_LEVELS: Record<string, number> = {
-  low: 0.25,
-  medium: 0.5,
-  high: 0.75,
-  very_high: 1,
-};
 
 function dateInInclusiveWindow(date: string, start: string, end: string): boolean {
   return date >= start && date <= end;
@@ -103,14 +99,15 @@ export function bauActivityLabels(config: MarketConfig | undefined, dateStr: str
 }
 
 export function storeTradingLine(config: MarketConfig | undefined, dateStr: string): string | null {
-  const weekly = config?.trading?.weekly_pattern as Record<string, string> | undefined;
+  const weekly = config?.trading?.weekly_pattern as Record<string, unknown> | undefined;
   if (!weekly) return null;
   const d = parseDate(dateStr);
   const dayName = DAY_NAMES[d.getDay()];
   const level = weekly[dayName];
   if (level == null) return null;
-  const v = TRADING_LEVELS[String(level).toLowerCase()] ?? 0.5;
-  const pretty = String(level).replace(/_/g, ' ');
+  const v = parseTechRhythmScalar(level) ?? 0.5;
+  const pretty =
+    typeof level === 'number' ? level.toFixed(2) : String(level).replace(/_/g, ' ');
   return `${dayName} store pattern: ${pretty} → base pressure ${v.toFixed(2)}`;
 }
 
@@ -130,7 +127,7 @@ export function pressureSurfaceLines(row: RiskRow): string[] {
   const sorted = entries.filter(([, v]) => v >= 0.02).sort((a, b) => b[1] - a[1]);
   return sorted.map(([k, v]) => {
     const label = SURFACE_LABEL[k] ?? k;
-    return `${label}: ${(v * 100).toFixed(0)}% of tech caps (max of lab/team/backend blend)`;
+    return `${label}: ${(v * 100).toFixed(0)}% of effective capacity (max of lab/team/backend blend)`;
   });
 }
 
@@ -164,7 +161,7 @@ export function techReadinessSustainExplanation(row: RiskRow): string | null {
   if (s >= 0.02) {
     parts.push(`live / support segment ${(s * 100).toFixed(0)}%`);
   }
-  return `Tech split: ${parts.join(' · ')}. Combined tech pressure uses total scheduled load vs the same caps.`;
+  return `Tech split: ${parts.join(' · ')}. Headline score is total scheduled load vs the same capacity caps.`;
 }
 
 export type RiskBlendTerm = {
@@ -177,6 +174,73 @@ export type RiskBlendTerm = {
   contribution: number;
 };
 
+/** Tooltip “blend” rows match the active runway lens (Technology = tech utilisation only). */
+export function buildLensRiskBlendTerms(
+  viewMode: ViewModeId,
+  row: RiskRow,
+  tuning: RiskModelTuning
+): RiskBlendTerm[] {
+  if (viewMode === 'combined') {
+    return [
+      {
+        key: 'tech',
+        label: 'Tech utilisation (heatmap)',
+        factor: row.tech_pressure,
+        weight: 1,
+        contribution: row.tech_pressure,
+      },
+    ];
+  }
+  const store = Math.min(1, Math.max(0, row.store_pressure ?? 0));
+  const inPrepOnly = Boolean(row.campaign_in_prep) && !row.campaign_in_live;
+  const camp = inPrepOnly ? Math.min(1, Math.max(0, row.campaign_risk ?? 0)) : 0;
+  const holidayTerm = row.holiday_flag && !isGregorianChristmasDay(row.date) ? 1 : 0;
+  const w = normalizedRiskWeights(tuning);
+  let wCamp = w.campaign;
+  if (row.campaign_in_live) wCamp = 0;
+  const denom = w.store + wCamp + w.holiday;
+  if (denom < 1e-9) {
+    return [
+      {
+        key: 'store',
+        label: 'Store trading',
+        factor: store,
+        weight: 1,
+        contribution: store,
+      },
+    ];
+  }
+  const terms: RiskBlendTerm[] = [
+    {
+      key: 'store',
+      label: 'Store trading (live campaigns amplify base rhythm)',
+      factor: store,
+      weight: w.store / denom,
+      contribution: (w.store / denom) * store,
+    },
+  ];
+  if (wCamp > 0) {
+    terms.push({
+      key: 'campaign',
+      label: 'Campaign (prep window)',
+      factor: camp,
+      weight: wCamp / denom,
+      contribution: (wCamp / denom) * camp,
+    });
+  }
+  if (w.holiday > 0) {
+    terms.push({
+      key: 'holiday',
+      label: 'Holiday (pressure dial)',
+      factor: holidayTerm,
+      weight: w.holiday / denom,
+      contribution: (w.holiday / denom) * holidayTerm,
+    });
+  }
+  return terms;
+}
+
+/** Full combined-risk blend (planning / diagnostics). */
 export function buildRiskBlendTerms(row: RiskRow, tuning: RiskModelTuning): RiskBlendTerm[] {
   const w = normalizedRiskWeights(tuning);
   const holidayN = row.holiday_flag ? 1 : 0;
@@ -229,8 +293,12 @@ export type RunwayTooltipPayload = {
   techReadinessSustainLine: string | null;
   riskTerms: RiskBlendTerm[];
   riskBand: string;
+  /** Short card title (e.g. Technology capacity / Business pressure). */
+  fillMetricHeadline: string;
   fillMetricLabel: string;
   fillMetricValue: number;
+  /** Heatmap cell fill (hex) for KPI pill background. */
+  cellFillHex: string;
   /** When `public_holiday_flag`, stub catalog name(s) for tooltips. */
   publicHolidayName: string | null;
   pressureSurfaceLines: string[];
@@ -245,11 +313,24 @@ export function buildRunwayTooltipPayload(input: {
   row: RiskRow;
   config: MarketConfig | undefined;
   tuning: RiskModelTuning;
+  fillMetricHeadline: string;
   fillMetricLabel: string;
   fillMetricValue: number;
+  cellFillHex: string;
 }): RunwayTooltipPayload {
-  const { dateStr, weekdayShort, market, viewMode, row, config, tuning, fillMetricLabel, fillMetricValue } =
-    input;
+  const {
+    dateStr,
+    weekdayShort,
+    market,
+    viewMode,
+    row,
+    config,
+    tuning,
+    fillMetricHeadline,
+    fillMetricLabel,
+    fillMetricValue,
+    cellFillHex,
+  } = input;
   return {
     dateStr,
     weekdayShort,
@@ -262,10 +343,12 @@ export function buildRunwayTooltipPayload(input: {
     storeTradingLine: storeTradingLine(config, dateStr),
     techExplanation: techPressureExplanation(row),
     techReadinessSustainLine: techReadinessSustainExplanation(row),
-    riskTerms: buildRiskBlendTerms(row, tuning),
+    riskTerms: buildLensRiskBlendTerms(viewMode, row, tuning),
     riskBand: row.risk_band,
+    fillMetricHeadline,
     fillMetricLabel,
     fillMetricValue,
+    cellFillHex,
     publicHolidayName: row.public_holiday_flag ? getStubPublicHolidayName(market, dateStr) : null,
     pressureSurfaceLines: pressureSurfaceLines(row),
     headroomLine:

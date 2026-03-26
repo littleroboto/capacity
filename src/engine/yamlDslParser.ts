@@ -6,15 +6,47 @@ import type {
   MarketConfig,
   OperatingWindow,
   PhaseLoad,
+  ReleaseConfig,
   SchoolHolidayStress,
   SeasonalTradingConfig,
   StressCorrelations,
   TechRhythmConfig,
+  TradingPressureKnobs,
 } from './types';
 import { expandTechWeeklyPattern } from './techWeeklyPattern';
 import type { EnvelopeKind } from './weighting';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Lowercase tokens → JS weekday (Sun = 0). */
+const DAY_TOKEN_TO_WEEKDAY: Record<string, number> = {
+  su: 0,
+  sun: 0,
+  sunday: 0,
+  mo: 1,
+  mon: 1,
+  monday: 1,
+  tu: 2,
+  tue: 2,
+  tues: 2,
+  tuesday: 2,
+  we: 3,
+  wed: 3,
+  weds: 3,
+  wednesday: 3,
+  th: 4,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  thursday: 4,
+  fr: 5,
+  fri: 5,
+  friday: 5,
+  sa: 6,
+  sat: 6,
+  saturday: 6,
+};
+
 const IMPACT_TO_LOAD: Record<string, number> = { low: 0.25, medium: 0.5, high: 0.8, very_high: 1 };
 
 function pickPhaseLoad(raw: unknown): PhaseLoad {
@@ -55,86 +87,118 @@ function coerceYamlDateString(v: unknown): string {
   return String(v).trim();
 }
 
-const WEEKLY_PATTERN_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
-const WEEKLY_PATTERN_DAY_SET = new Set<string>(WEEKLY_PATTERN_DAYS);
-/** Meta keys for compact `weekly_pattern` (not day names). */
-const WEEKLY_PATTERN_META = new Set(['default', '_default', 'weekdays', 'weekend']);
-
-/**
- * Expand compact `trading.weekly_pattern` (string levels only). For `tech.weekly_pattern`, use
- * {@link expandTechWeeklyPattern} (numeric [0,1] and named levels).
- * - `default` or `_default`: baseline for all seven days
- * - `weekdays`: Mon–Fri (after default)
- * - `weekend`: Sat–Sun (after default)
- * - explicit `Mon` … `Sun`: final overrides (same as legacy full maps)
- */
-function expandWeeklyPattern(raw: Record<string, unknown> | undefined): Record<string, string> | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
-
-  const asLevel = (v: unknown): string | undefined => {
-    if (v == null || v === '') return undefined;
-    const s = String(v).trim();
-    return s.length ? s : undefined;
-  };
-
-  const out: Record<string, string> = {};
-
-  const dft = asLevel(raw.default ?? raw._default);
-  if (dft) {
-    for (const day of WEEKLY_PATTERN_DAYS) out[day] = dft;
-  }
-
-  const wkd = asLevel(raw.weekdays);
-  if (wkd) {
-    for (const day of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const) {
-      out[day] = wkd;
-    }
-  }
-
-  const wend = asLevel(raw.weekend);
-  if (wend) {
-    out.Sat = wend;
-    out.Sun = wend;
-  }
-
-  for (const [k, v] of Object.entries(raw)) {
-    if (WEEKLY_PATTERN_META.has(k)) continue;
-    if (!WEEKLY_PATTERN_DAY_SET.has(k)) continue;
-    const s = asLevel(v);
-    if (s) out[k] = s;
-  }
-
-  return Object.keys(out).length ? out : undefined;
+function weekDayFromToken(tok: string): number | undefined {
+  const s = String(tok).trim();
+  if (WEEKDAYS.includes(s)) return WEEKDAYS.indexOf(s);
+  const k = s.toLowerCase();
+  return DAY_TOKEN_TO_WEEKDAY[k];
 }
 
+/** `campaigns` as list or map keyed by campaign id. */
+function normalizeCampaignsInput(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') {
+    const out: unknown[] = [];
+    for (const [defaultName, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (v == null) continue;
+      if (typeof v !== 'object' || Array.isArray(v)) continue;
+      const row = { ...(v as Record<string, unknown>) };
+      if (row.name == null || String(row.name).trim() === '') row.name = defaultName;
+      out.push(row);
+    }
+    return out;
+  }
+  return [];
+}
+
+function parseDaysInUse(raw: unknown): number[] | undefined {
+  if (raw == null) return undefined;
+  const list = Array.isArray(raw)
+    ? raw
+    : typeof raw === 'string'
+      ? String(raw)
+          .split(/[\s,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+  const days: number[] = [];
+  for (const item of list) {
+    const w = weekDayFromToken(String(item));
+    if (w !== undefined && !days.includes(w)) days.push(w);
+  }
+  return days.length ? days : undefined;
+}
+
+function mapCampaignSupportToPhaseLoad(raw: unknown): PhaseLoad {
+  if (!raw || typeof raw !== 'object') return {};
+  const o = raw as Record<string, unknown>;
+  const num = (x: unknown): number | undefined => {
+    if (x == null || x === '') return undefined;
+    const n = Number(x);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const out: PhaseLoad = {};
+  const labs = num(o.labs_required ?? o.labsRequired ?? o.labs);
+  const teams = num(o.tech_staff ?? o.techStaff ?? o.staff ?? o.teams);
+  const backend = num(o.backend);
+  const ops = num(o.ops ?? o.supply);
+  const commercial = num(o.commercial ?? o.marketing);
+  if (labs != null) out.labs = labs;
+  if (teams != null) out.teams = teams;
+  if (backend != null) out.backend = backend;
+  if (ops != null) out.ops = ops;
+  if (commercial != null) out.commercial = commercial;
+  return out;
+}
+
+/**
+ * Expand `trading.weekly_pattern` the same way as `tech.weekly_pattern`: per-day **0–1** numbers after parse,
+ * or named levels (`low` / `medium` / `high` / `very_high`). Supports `default`, `weekdays`, `weekend`, and `Mon`…`Sun`.
+ */
 function expandTradingWeeklyPattern(trading: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!trading || typeof trading !== 'object') return trading ?? {};
   const wp = trading.weekly_pattern;
   if (!wp || typeof wp !== 'object') return trading;
-  const expanded = expandWeeklyPattern(wp as Record<string, unknown>);
+  const expanded = expandTechWeeklyPattern(wp as Record<string, unknown>);
   if (!expanded) return trading;
   return { ...trading, weekly_pattern: expanded };
 }
 
 export type ParsedYaml = {
+  /** Market id (`market:` or legacy `country:` in YAML). */
   country: string;
-  resources: { labs: Record<string, unknown>; teams: Record<string, unknown> };
+  /** Display title; pipeline defaults to market id when omitted. */
+  title?: string;
+  description?: string;
+  resources: {
+    labs: Record<string, unknown>;
+    teams: Record<string, unknown>;
+    staff?: Record<string, unknown>;
+    testing_capacity?: unknown;
+  };
   bau: Record<string, unknown>;
   campaigns: unknown[];
   holidays: Record<string, unknown>;
+  /** New schema: `public_holidays` block (dates, auto, multipliers). */
+  public_holidays?: Record<string, unknown>;
+  /** New schema: `school_holidays` block. */
+  school_holidays?: Record<string, unknown>;
   trading: Record<string, unknown>;
   tech: Record<string, unknown>;
   stress_correlations: Record<string, unknown>;
   operating_windows: unknown[];
-  /** Combined-risk heatmap: index uses score ** gamma (optional). */
+  releases: unknown[];
+  /** Legacy / fallback heatmap γ. */
   risk_heatmap_gamma?: number;
+  risk_heatmap_gamma_tech?: number;
+  risk_heatmap_gamma_business?: number;
   /** Transfer curve id for combined heatmap (optional; default power). */
   risk_heatmap_curve?: string;
 };
 
 const EMPTY: ParsedYaml = {
   country: '',
-  resources: { labs: {}, teams: {} },
+  resources: { labs: {}, teams: {}, testing_capacity: undefined },
   bau: {},
   campaigns: [],
   holidays: {},
@@ -142,7 +206,10 @@ const EMPTY: ParsedYaml = {
   tech: {},
   stress_correlations: {},
   operating_windows: [],
+  releases: [],
   risk_heatmap_gamma: undefined,
+  risk_heatmap_gamma_tech: undefined,
+  risk_heatmap_gamma_business: undefined,
   risk_heatmap_curve: undefined,
 };
 
@@ -151,22 +218,53 @@ function normalizeYamlObject(raw: unknown): ParsedYaml {
     return { ...EMPTY };
   }
   const o = raw as Record<string, unknown>;
+  const titleRaw = o.title;
+  const title =
+    titleRaw != null && String(titleRaw).trim() ? String(titleRaw).trim() : undefined;
+  const descRaw = o.description;
+  const description =
+    descRaw != null && String(descRaw).trim() ? String(descRaw).trim() : undefined;
   const rawGamma = o.risk_heatmap_gamma;
   const g = rawGamma == null || rawGamma === '' ? NaN : Number(rawGamma);
+  const gt = o.risk_heatmap_gamma_tech ?? o.riskHeatmapGammaTech;
+  const gb = o.risk_heatmap_gamma_business ?? o.riskHeatmapGammaBusiness;
+  const gTech = gt == null || gt === '' ? NaN : Number(gt);
+  const gBus = gb == null || gb === '' ? NaN : Number(gb);
+  const baseHolidays = { ...((o.holidays as Record<string, unknown>) ?? {}) };
+  const pubBlock = (o.public_holidays as Record<string, unknown>) ?? (o.publicHolidays as Record<string, unknown>);
+  const schBlock = (o.school_holidays as Record<string, unknown>) ?? (o.schoolHolidays as Record<string, unknown>);
+  if (pubBlock && typeof pubBlock === 'object' && pubBlock.auto !== undefined) {
+    baseHolidays.auto_public = pubBlock.auto;
+  }
+  if (schBlock && typeof schBlock === 'object' && schBlock.auto !== undefined) {
+    baseHolidays.auto_school = schBlock.auto;
+  }
+
   return {
-    country: String(o.country ?? ''),
+    country: String(o.market ?? o.country ?? ''),
+    title,
+    description,
     resources: {
       labs: (o.resources as { labs?: Record<string, unknown> })?.labs ?? {},
       teams: (o.resources as { teams?: Record<string, unknown> })?.teams ?? {},
+      staff: (o.resources as { staff?: Record<string, unknown> })?.staff,
+      testing_capacity:
+        (o.resources as { testing_capacity?: unknown })?.testing_capacity ??
+        (o.resources as { testingCapacity?: unknown })?.testingCapacity,
     },
     bau: (o.bau as Record<string, unknown>) ?? {},
-    campaigns: Array.isArray(o.campaigns) ? o.campaigns : [],
-    holidays: (o.holidays as Record<string, unknown>) ?? {},
+    campaigns: normalizeCampaignsInput(o.campaigns),
+    holidays: baseHolidays,
+    public_holidays: pubBlock && typeof pubBlock === 'object' ? pubBlock : undefined,
+    school_holidays: schBlock && typeof schBlock === 'object' ? schBlock : undefined,
     trading: (o.trading as Record<string, unknown>) ?? {},
     tech: (o.tech as Record<string, unknown>) ?? {},
     stress_correlations: (o.stress_correlations as Record<string, unknown>) ?? {},
     operating_windows: Array.isArray(o.operating_windows) ? o.operating_windows : [],
+    releases: Array.isArray(o.releases) ? o.releases : [],
     risk_heatmap_gamma: Number.isFinite(g) ? g : undefined,
+    risk_heatmap_gamma_tech: Number.isFinite(gTech) ? gTech : undefined,
+    risk_heatmap_gamma_business: Number.isFinite(gBus) ? gBus : undefined,
     risk_heatmap_curve:
       o.risk_heatmap_curve == null || o.risk_heatmap_curve === ''
         ? undefined
@@ -188,21 +286,181 @@ export function parseYamlDSL(dslText: string): ParsedYaml {
   return normalizeYamlObject(raw);
 }
 
+function clampHeatmapGamma(n: number): number {
+  return Math.min(3, Math.max(0.35, n));
+}
+
+function mapTradingPressureKnobs(
+  trading: Record<string, unknown> | undefined
+): TradingPressureKnobs | undefined {
+  if (!trading || typeof trading !== 'object') return undefined;
+  const pick = (snake: string, camel: string): number | undefined => {
+    const raw = (trading as Record<string, unknown>)[snake] ?? (trading as Record<string, unknown>)[camel];
+    const n = Number(raw);
+    if (raw == null || raw === '' || !Number.isFinite(n) || n < 0) return undefined;
+    return n;
+  };
+  const prep = pick('campaign_store_boost_prep', 'campaignStoreBoostPrep');
+  const live = pick('campaign_store_boost_live', 'campaignStoreBoostLive');
+  const payday = pick('payday_month_peak_multiplier', 'paydayMonthPeakMultiplier');
+  const effect = pick('campaign_effect_scale', 'campaignEffectScale');
+  if (prep == null && live == null && payday == null && effect == null) return undefined;
+  const out: TradingPressureKnobs = {};
+  if (effect != null) out.campaign_effect_scale = Math.min(2.5, Math.max(0, effect));
+  if (prep != null) out.campaign_store_boost_prep = Math.min(0.9, prep);
+  if (live != null) out.campaign_store_boost_live = Math.min(1.5, live);
+  if (payday != null) out.payday_month_peak_multiplier = Math.min(2, Math.max(1, payday));
+  return Object.keys(out).length ? out : undefined;
+}
+
+function mapReleases(raw: unknown[] | undefined): ReleaseConfig[] {
+  if (!raw?.length) return [];
+  const out: ReleaseConfig[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const deployDateRaw = row.deploy_date ?? row.deployDate;
+    const deployDateStr =
+      deployDateRaw != null && String(deployDateRaw).trim()
+        ? coerceYamlDateString(deployDateRaw)
+        : '';
+    const systemsRaw = row.systems;
+    const systems = Array.isArray(systemsRaw)
+      ? systemsRaw.map((s) => String(s).trim()).filter((s) => s.length > 0)
+      : [];
+    const phasesRaw = row.phases;
+    const phases: { name: string; offsetDays: number }[] = [];
+    if (Array.isArray(phasesRaw)) {
+      for (const p of phasesRaw) {
+        if (!p || typeof p !== 'object') continue;
+        const pr = p as Record<string, unknown>;
+        const name = String(pr.name ?? 'phase');
+        const off = Number(pr.offset_days ?? pr.offsetDays);
+        phases.push({ name, offsetDays: Number.isFinite(off) ? Math.floor(off) : 0 });
+      }
+    }
+    const loadObj = row.load;
+    const load: Record<string, number> = {};
+    if (loadObj && typeof loadObj === 'object') {
+      for (const [k, v] of Object.entries(loadObj as Record<string, unknown>)) {
+        const n = Number(v);
+        if (Number.isFinite(n)) load[k] = n;
+      }
+    }
+    if (!systems.length || !phases.length) continue;
+    out.push({
+      ...(deployDateStr ? { deployDate: deployDateStr } : {}),
+      systems,
+      phases,
+      load,
+    });
+  }
+  return out;
+}
+
+function normalizeDateList(raw: unknown): string[] | undefined {
+  if (raw == null) return undefined;
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  for (const item of raw) {
+    const s = coerceYamlDateString(item);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) out.push(s);
+  }
+  return out.length ? out : undefined;
+}
+
+/** Readable BAU: `days_in_use` + `weekly_cycle.labs_required` / `staff_required`. */
+function mapBauModern(bauSection: Record<string, unknown> | undefined): BauEntry | BauEntry[] | undefined {
+  if (!bauSection || typeof bauSection !== 'object') return undefined;
+  const days = parseDaysInUse(bauSection.days_in_use ?? bauSection.daysInUse);
+  const cycle = bauSection.weekly_cycle ?? bauSection.weeklyCycle;
+  if (!days?.length || !cycle || typeof cycle !== 'object') return undefined;
+  const c = cycle as Record<string, unknown>;
+  const labs = Number(c.labs_required ?? c.labsRequired ?? c.labs) || 0;
+  const staff = Number(c.staff_required ?? c.staffRequired ?? c.tech_staff ?? c.teams) || 0;
+  const supportDays = Number(c.support_days ?? c.supportDays) || 0;
+  const load: PhaseLoad = { labs, teams: staff };
+  const entries: BauEntry[] = [];
+  for (const w of days) {
+    const end = supportDays > 0 ? Math.min(6, w + supportDays - 1) : w;
+    entries.push({
+      name: `bau_${WEEKDAYS[w] ?? 'day'}`,
+      weekday: w,
+      supportStart: w,
+      supportEnd: end,
+      load,
+    });
+  }
+  if (entries.length === 0) return undefined;
+  return entries.length === 1 ? entries[0]! : entries;
+}
+
+function mergeStressCorrelations(
+  a: StressCorrelations | undefined,
+  b: StressCorrelations | undefined
+): StressCorrelations | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const sa = a.school_holidays ?? {};
+  const sb = b.school_holidays ?? {};
+  const merged: SchoolHolidayStress = { ...sa, ...sb };
+  return { school_holidays: merged };
+}
+
+function stressFromSchoolHolidayBlock(block: Record<string, unknown>): StressCorrelations | undefined {
+  const school_holidays: SchoolHolidayStress = {};
+  const le = (block.load_effects ?? block.loadEffects) as Record<string, unknown> | undefined;
+  if (le && typeof le === 'object') {
+    const keys: (keyof SchoolHolidayStress)[] = [
+      'store_pressure_mult',
+      'lab_load_mult',
+      'team_load_mult',
+      'backend_load_mult',
+      'ops_activity_mult',
+      'commercial_activity_mult',
+      'lab_team_capacity_mult',
+    ];
+    for (const k of keys) {
+      const n = Number(le[k]);
+      if (Number.isFinite(n)) school_holidays[k] = n;
+    }
+  }
+  const tm = Number(block.trading_multiplier ?? block.tradingMultiplier);
+  if (Number.isFinite(tm) && tm > 0) school_holidays.store_pressure_mult = tm;
+  return Object.keys(school_holidays).length ? { school_holidays } : undefined;
+}
+
 export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
   const market = parsed.country || 'DE';
+  const staffRaw = (parsed.resources?.staff as { capacity?: unknown } | undefined)?.capacity;
+  const staffNum = Number(staffRaw);
+  const fromStaff =
+    staffRaw != null && staffRaw !== '' && Number.isFinite(staffNum) && staffNum > 0 ? staffNum : undefined;
   const capacity = {
     labs: Number((parsed.resources?.labs as { capacity?: number })?.capacity) || 5,
-    teams: sumTeamSizes(parsed.resources?.teams as Record<string, { size?: number }> | undefined),
+    teams: fromStaff ?? sumTeamSizes(parsed.resources?.teams as Record<string, { size?: number }> | undefined),
     backend: 1000,
   };
-  const bau = mapBau(parsed.bau);
+  const tcRaw = parsed.resources?.testing_capacity;
+  const tcNum = Number(tcRaw);
+  const testingCapacity =
+    tcRaw != null && tcRaw !== '' && Number.isFinite(tcNum) && tcNum > 0 ? Math.min(50, tcNum) : undefined;
+  const bau = combineBau(parsed.bau);
   const campaigns: CampaignConfig[] = (parsed.campaigns || []).map((c) => {
     const row = c as Record<string, unknown>;
     const impactKey = String(row.impact ?? '').toLowerCase();
     const fromImpact = IMPACT_TO_LOAD[impactKey];
+    const cs = mapCampaignSupportToPhaseLoad(row.campaign_support ?? row.campaignSupport);
     const yamlLoad = pickPhaseLoad(row.load);
-    const commercial = yamlLoad.commercial ?? (fromImpact !== undefined ? fromImpact : 0.5);
-    const prepRaw = row.prep_before_live_days ?? row.prepBeforeLiveDays;
+    const mergedPrep: PhaseLoad =
+      Object.keys(cs).length > 0 ? { ...yamlLoad, ...cs } : yamlLoad;
+    const commercial =
+      mergedPrep.commercial ?? yamlLoad.commercial ?? (fromImpact !== undefined ? fromImpact : 0.5);
+    const prepRaw =
+      row.testing_prep_duration ??
+      row.testingPrepDuration ??
+      row.prep_before_live_days ??
+      row.prepBeforeLiveDays;
     const pbd = Number(prepRaw);
     const prepBeforeLiveDays =
       prepRaw != null && prepRaw !== '' && Number.isFinite(pbd) && pbd > 0 ? Math.floor(pbd) : undefined;
@@ -214,13 +472,25 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
         : readinessDurRaw != null && readinessDurRaw !== '' && Number.isFinite(rd) && rd > 0
           ? Math.floor(rd)
           : undefined;
-    const live_support_load = pickPhaseLoad(row.live_support_load ?? row.liveSupportLoad);
+    const liveCs = mapCampaignSupportToPhaseLoad(
+      row.live_campaign_support ?? row.liveCampaignSupport ?? row.live_support ?? row.liveSupport
+    );
+    const liveExplicit = pickPhaseLoad(row.live_support_load ?? row.liveSupportLoad);
+    const liveMerged: PhaseLoad =
+      Object.keys(liveCs).length > 0 ? { ...liveExplicit, ...liveCs } : liveExplicit;
+    const live_support_load = liveMerged;
     const hasLiveKeys = Object.keys(live_support_load).length > 0;
     const lssRaw = row.live_support_scale ?? row.liveSupportScale;
     const lssNum = Number(lssRaw);
     const liveSupportScale =
       lssRaw != null && lssRaw !== '' && Number.isFinite(lssNum) && lssNum > 0 && lssNum <= 1
         ? lssNum
+        : undefined;
+    const ltRaw = row.live_tech_load_scale ?? row.liveTechLoadScale;
+    const ltNum = Number(ltRaw);
+    const liveTechLoadScale =
+      ltRaw != null && ltRaw !== '' && Number.isFinite(ltNum) && ltNum >= 0
+        ? Math.min(2.5, ltNum)
         : undefined;
     const stagger =
       row.stagger_functional_loads === true ||
@@ -232,17 +502,29 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
       if (raw == null || raw === '' || !Number.isFinite(n) || n < 0) return def;
       return Math.floor(n);
     };
+    const buRaw = row.business_uplift ?? row.businessUplift;
+    const buNum = Number(buRaw);
+    const businessUplift =
+      buRaw != null && buRaw !== '' && Number.isFinite(buNum) && buNum >= 0
+        ? Math.min(2.5, buNum)
+        : undefined;
     return {
       name: String(row.name ?? 'campaign'),
-      start: coerceYamlDateString(row.start),
+      start: coerceYamlDateString(row.start_date ?? row.startDate ?? row.start),
       durationDays: Number(row.duration) || 0,
+      businessUplift,
       prepBeforeLiveDays,
       readinessDurationDays,
       live_support_load: hasLiveKeys ? live_support_load : undefined,
       liveSupportScale,
-      load: { ...yamlLoad, commercial },
+      liveTechLoadScale,
+      load: { ...mergedPrep, commercial },
       impact: row.impact != null ? String(row.impact) : undefined,
       presenceOnly: row.presence_only === true || row.presenceOnly === true,
+      replacesBauTech:
+        row.replaces_bau_tech === true ||
+        row.replacesBauTech === true ||
+        row.replace_bau_tech === true,
       staggerFunctionalLoads: stagger,
       techPrepDaysBeforeLive: pickU('tech_prep_days_before_live', 'techPrepDaysBeforeLive'),
       techFinishBeforeLiveDays: pickU('tech_finish_before_live_days', 'techFinishBeforeLiveDays'),
@@ -253,7 +535,23 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
   let riskHeatmapGamma: number | undefined;
   const pg = parsed.risk_heatmap_gamma;
   if (pg != null && Number.isFinite(pg) && pg > 0) {
-    riskHeatmapGamma = Math.min(3, Math.max(0.35, pg));
+    riskHeatmapGamma = clampHeatmapGamma(pg);
+  }
+  let riskHeatmapGammaTech: number | undefined;
+  const pgt = parsed.risk_heatmap_gamma_tech;
+  if (pgt != null && Number.isFinite(pgt) && pgt > 0) {
+    riskHeatmapGammaTech = clampHeatmapGamma(pgt);
+  }
+  let riskHeatmapGammaBusiness: number | undefined;
+  const pgb = parsed.risk_heatmap_gamma_business;
+  if (pgb != null && Number.isFinite(pgb) && pgb > 0) {
+    riskHeatmapGammaBusiness = clampHeatmapGamma(pgb);
+  }
+  if (riskHeatmapGammaTech == null && riskHeatmapGamma != null) {
+    riskHeatmapGammaTech = riskHeatmapGamma;
+  }
+  if (riskHeatmapGammaBusiness == null && riskHeatmapGamma != null) {
+    riskHeatmapGammaBusiness = riskHeatmapGamma;
   }
   const riskHeatmapCurve = parseRiskHeatmapCurve(parsed.risk_heatmap_curve);
   const hol = parsed.holidays || {};
@@ -263,22 +561,73 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     capTaperRaw != null && capTaperRaw !== '' && Number.isFinite(capTaper) && capTaper > 0
       ? Math.min(14, Math.floor(capTaper))
       : undefined;
+  const holScaleRaw = hol.lab_capacity_scale ?? hol.labCapacityScale;
+  const holScaleN = Number(holScaleRaw);
+  const holidayLabCapacityScale =
+    holScaleRaw != null && holScaleRaw !== '' && Number.isFinite(holScaleN) && holScaleN > 0
+      ? Math.min(1, Math.max(0.12, holScaleN))
+      : undefined;
+  const tradingPressure = mapTradingPressureKnobs(parsed.trading as Record<string, unknown> | undefined);
+
+  const pubBlock = parsed.public_holidays;
+  let publicHolidayStaffingMultiplier: number | undefined;
+  let publicHolidayTradingMultiplier: number | undefined;
+  let publicHolidayExtraDates: string[] | undefined;
+  if (pubBlock && typeof pubBlock === 'object') {
+    const smRaw = pubBlock.staffing_multiplier ?? pubBlock.staffingMultiplier;
+    if (smRaw != null && smRaw !== '') {
+      const ps = Number(smRaw);
+      if (Number.isFinite(ps)) publicHolidayStaffingMultiplier = Math.min(1, Math.max(0, ps));
+    }
+    const pt = Number(pubBlock.trading_multiplier ?? pubBlock.tradingMultiplier);
+    if (Number.isFinite(pt) && pt > 0) publicHolidayTradingMultiplier = pt;
+    publicHolidayExtraDates = normalizeDateList(pubBlock.dates);
+  }
+
+  const schBlock = parsed.school_holidays;
+  let schoolHolidayStaffingMultiplier: number | undefined;
+  let schoolHolidayExtraDates: string[] | undefined;
+  if (schBlock && typeof schBlock === 'object') {
+    const smRaw = schBlock.staffing_multiplier ?? schBlock.staffingMultiplier;
+    if (smRaw != null && smRaw !== '') {
+      const ss = Number(smRaw);
+      if (Number.isFinite(ss)) schoolHolidayStaffingMultiplier = Math.min(1, Math.max(0, ss));
+    }
+    schoolHolidayExtraDates = normalizeDateList(schBlock.dates);
+  }
+
+  const stressCorrelations = mergeStressCorrelations(
+    mapStressCorrelations(parsed.stress_correlations),
+    schBlock && typeof schBlock === 'object' ? stressFromSchoolHolidayBlock(schBlock as Record<string, unknown>) : undefined
+  );
+
   return {
     market,
-    title: market,
+    title: parsed.title ?? market,
+    description: parsed.description,
     capacity,
+    testingCapacity,
+    holidayLabCapacityScale,
+    publicHolidayStaffingMultiplier,
+    publicHolidayTradingMultiplier,
+    publicHolidayExtraDates,
+    schoolHolidayStaffingMultiplier,
+    schoolHolidayExtraDates,
+    tradingPressure,
     bau,
     campaigns,
-    releases: [],
+    releases: mapReleases(parsed.releases),
     trading: expandTradingWeeklyPattern(parsed.trading as Record<string, unknown> | undefined),
     monthlyTradingPattern: mapMonthlyTradingPattern(parsed.trading as Record<string, unknown> | undefined),
     seasonalTrading: mapSeasonalTrading(parsed.trading),
     holidays: parsed.holidays,
     holidayCapacityTaperDays,
-    stressCorrelations: mapStressCorrelations(parsed.stress_correlations),
+    stressCorrelations,
     operatingWindows: mapOperatingWindows(parsed.operating_windows),
     techRhythm: mapTechRhythm(parsed.tech),
     riskHeatmapGamma,
+    riskHeatmapGammaTech,
+    riskHeatmapGammaBusiness,
     riskHeatmapCurve,
   };
 }
@@ -467,6 +816,42 @@ function mapBau(bauSection: Record<string, unknown> | undefined): BauEntry | Bau
 
   if (entries.length === 0) return undefined;
   if (entries.length === 1) return entries[0];
+  return entries;
+}
+
+/** Modern `days_in_use` BAU plus optional legacy weekly promo / integration_tests. */
+function combineBau(bauSection: Record<string, unknown> | undefined): BauEntry | BauEntry[] | undefined {
+  if (!bauSection || typeof bauSection !== 'object') return mapBau(bauSection);
+  const entries: BauEntry[] = [];
+  const modern = mapBauModern(bauSection);
+  if (modern) {
+    const arr = Array.isArray(modern) ? modern : [modern];
+    entries.push(...arr);
+  }
+  const hasModernWeekly = parseDaysInUse(bauSection.days_in_use ?? bauSection.daysInUse) != null;
+  if (!hasModernWeekly) {
+    const legacy = mapBau(bauSection);
+    if (legacy) {
+      const arr = Array.isArray(legacy) ? legacy : [legacy];
+      entries.push(...arr);
+    }
+  } else {
+    const it = bauSection.integration_tests as Record<string, unknown> | undefined;
+    if (it) {
+      const dayStr = String(it.day ?? 'Thu');
+      const weekday = WEEKDAYS.indexOf(dayStr);
+      const w = weekday >= 0 ? weekday : 4;
+      entries.push({
+        name: 'integration_tests',
+        weekday: w,
+        supportStart: w,
+        supportEnd: w,
+        load: { labs: Number(it.labs) || 0, teams: 0 },
+      });
+    }
+  }
+  if (entries.length === 0) return undefined;
+  if (entries.length === 1) return entries[0]!;
   return entries;
 }
 

@@ -17,22 +17,39 @@ export const VIEW_MODES = [
   {
     id: 'combined',
     label: 'Technology',
+    /** Short heading above the main runway heatmap. */
+    runwayHeatmapTitle: 'Tech Capacity Utilisation',
     title:
-      'Deployment pressure score — tech-led blend with restaurant, marketing, and holidays. Transfer curve and γ apply in this lens.',
+      'Tech utilisation (labs / teams / backend vs effective capacity). Prep-heavy periods read hotter than live campaign support. γ_tech and transfer curve apply.',
   },
   {
     id: 'in_store',
     label: 'Business',
+    runwayHeatmapTitle: 'Restaurant Trading',
     title:
-      'Restaurant trading, marketing windows, and holiday rhythm. Uses a smoother colour ramp so busy periods still show a bit of nuance when values cluster high.',
+      'Store-trading rhythm with live-campaign amplification on top of BAU; prep shows marketing weight without inflating stores. Same absolute heatmap scale as Technology (0–1 blend); γ_business and transfer curve apply.',
+  },
+  {
+    id: 'code',
+    label: 'Code',
+    runwayHeatmapTitle: 'Market configuration',
+    title:
+      'Full multi-market YAML in the main area. Edits stay local until you switch back to Technology or Business — then the model re-runs and the runway updates.',
   },
 ] as const;
 
 export type ViewModeId = (typeof VIEW_MODES)[number]['id'];
 
+/** Heading shown above the runway grid for the active lens. */
+export function runwayHeatmapTitleForViewMode(id: ViewModeId): string {
+  const m = VIEW_MODES.find((v) => v.id === id);
+  return m?.runwayHeatmapTitle ?? VIEW_MODES[0].runwayHeatmapTitle;
+}
+
 /** Map persisted / legacy layer ids to runway view modes (`combined` = Technology lens in the UI). */
 export function normalizeViewModeId(raw: string | null): ViewModeId {
   if (!raw) return 'combined';
+  if (raw === 'code') return 'code';
   const legacy: Record<string, ViewModeId> = {
     combined: 'combined',
     technology: 'combined',

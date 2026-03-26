@@ -1,3 +1,4 @@
+import { parseDslMarketId } from '@/lib/dslMarketLine';
 import { MULTI_DOC_SPLIT } from '@/lib/multiDocMarketYaml';
 import { roundMonthlyUnit, TRADING_MONTH_KEYS, type TradingMonthKey } from '@/lib/tradingMonthlyDsl';
 
@@ -58,8 +59,8 @@ function findMonthlyPatternInTrading(
 }
 
 function patchSegment(segment: string, market: string, pattern: TradingMonthlyPatternPatch): string {
-  const m = segment.match(/^country:\s*(\S+)/m);
-  if (!m || m[1] !== market) return segment;
+  const id = parseDslMarketId(segment);
+  if (!id || id !== market) return segment;
 
   const lines = segment.split('\n');
   const blockLines = buildMonthlyPatternLines(pattern);

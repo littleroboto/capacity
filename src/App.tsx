@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
 import { DSLPanel } from '@/components/DSLPanel';
 import { WORKBENCH_SPLIT_HANDLE_PX, WorkbenchSplitHandle } from '@/components/WorkbenchSplitHandle';
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
-import { PlanningWorkbench } from '@/components/PlanningWorkbench';
+import { MainDslWorkspace } from '@/components/MainDslWorkspace';
 import { RunwayGrid, type SlotSelection } from '@/components/RunwayGrid';
 import { looksLikeYamlDsl } from '@/lib/dslGuards';
 import { defaultDslForMarket } from '@/lib/marketDslSeeds';
@@ -153,18 +154,30 @@ export default function App() {
               : undefined
           }
         >
-          <div className="flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto overflow-x-auto p-4">
-            {parseError ? (
-              <p className="shrink-0 text-sm text-red-600 dark:text-red-400">{parseError}</p>
-            ) : null}
-            <div className="flex min-h-0 w-full min-w-0 flex-col gap-3">
-              <div className="min-w-0 overflow-x-auto overflow-y-visible">
-                <RunwayGrid riskSurface={riskSurface} viewMode={viewMode} onSlotSelection={onSlotSelection} />
+          <div
+            className={cn(
+              'flex min-h-0 min-w-0 flex-col gap-2 p-4',
+              viewMode === 'code'
+                ? 'flex-1 overflow-hidden'
+                : 'overflow-y-auto overflow-x-auto'
+            )}
+          >
+            {viewMode === 'code' ? (
+              <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+                <MainDslWorkspace />
               </div>
-              <footer className="shrink-0 border-t border-border/60 pt-3">
-                <PlanningWorkbench variant="footer" />
-              </footer>
-            </div>
+            ) : (
+              <>
+                {parseError ? (
+                  <p className="shrink-0 text-sm text-red-600 dark:text-red-400">{parseError}</p>
+                ) : null}
+                <div className="flex min-h-0 w-full min-w-0 flex-col">
+                  <div className="min-w-0 overflow-visible">
+                    <RunwayGrid riskSurface={riskSurface} viewMode={viewMode} onSlotSelection={onSlotSelection} />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           {lgUp && !dslPanelLayoutCollapsed ? (
             <WorkbenchSplitHandle

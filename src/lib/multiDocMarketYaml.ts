@@ -1,3 +1,4 @@
+import { parseDslMarketId } from '@/lib/dslMarketLine';
 import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
 import { isRunwayAllMarkets } from '@/lib/markets';
 
@@ -6,7 +7,7 @@ export const MULTI_DOC_SPLIT = /\r?\n---\s*\r?\n/;
 
 /**
  * Split a multi-document YAML string into `country` code → document text.
- * Single-document strings yield one entry when `country:` is present.
+ * Single-document strings yield one entry when `market:` or `country:` is present.
  */
 export function splitToDslByMarket(multiDocYaml: string): Record<string, string> {
   const trimmed = multiDocYaml.trim();
@@ -14,8 +15,8 @@ export function splitToDslByMarket(multiDocYaml: string): Record<string, string>
   const parts = MULTI_DOC_SPLIT.test(trimmed) ? trimmed.split(MULTI_DOC_SPLIT) : [trimmed];
   const out: Record<string, string> = {};
   for (const seg of parts) {
-    const m = seg.match(/^country:\s*(\S+)/m);
-    if (m) out[m[1]] = seg.trim();
+    const id = parseDslMarketId(seg);
+    if (id) out[id] = seg.trim();
   }
   return out;
 }
@@ -26,14 +27,14 @@ export function extractMarketDocument(multiDocYaml: string, marketId: string): s
   if (!trimmed) return null;
   const parts = MULTI_DOC_SPLIT.test(trimmed) ? trimmed.split(MULTI_DOC_SPLIT) : [trimmed];
   for (const seg of parts) {
-    const m = seg.match(/^country:\s*(\S+)/m);
-    if (m && m[1] === marketId) return seg.trim();
+    const id = parseDslMarketId(seg);
+    if (id === marketId) return seg.trim();
   }
   return null;
 }
 
 /**
- * Replace the document whose `country:` is `marketId` (or matches new doc's `country:`).
+ * Replace the document whose `market:` / `country:` is `marketId` (or matches new doc’s id).
  * If none match, appends `newDocYaml` as a new document.
  */
 export function replaceMarketDocument(
@@ -42,15 +43,14 @@ export function replaceMarketDocument(
   newDocYaml: string
 ): string {
   const newTrim = newDocYaml.trim();
-  const newM = newTrim.match(/^country:\s*(\S+)/m);
-  const newCountry = newM ? newM[1] : marketId;
+  const newCountry = parseDslMarketId(newTrim) ?? marketId;
   const trimmed = multiDocYaml.trim();
   if (!trimmed) return newTrim;
   const parts = MULTI_DOC_SPLIT.test(trimmed) ? trimmed.split(MULTI_DOC_SPLIT) : [trimmed];
   let replaced = false;
   const out = parts.map((seg) => {
-    const m = seg.match(/^country:\s*(\S+)/m);
-    if (m && (m[1] === marketId || m[1] === newCountry)) {
+    const id = parseDslMarketId(seg);
+    if (id && (id === marketId || id === newCountry)) {
       replaced = true;
       return newTrim;
     }

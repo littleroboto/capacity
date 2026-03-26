@@ -1,3 +1,4 @@
+import { parseDslMarketId } from '@/lib/dslMarketLine';
 import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
 
 const DOC_SPLIT = /\r?\n---\s*\r?\n/;
@@ -26,10 +27,12 @@ function patchHeatmapInDocSegment(
   gamma: number,
   curve: RiskHeatmapCurveId
 ): string {
-  const m = segment.match(/^country:\s*(\S+)/m);
-  if (!m || m[1] !== market) return segment;
+  const id = parseDslMarketId(segment);
+  if (!id || id !== market) return segment;
 
   let s = segment.replace(/\r?\n?^risk_heatmap_gamma:\s*[\d.]+\s*$/m, '');
+  s = s.replace(/\r?\n?^risk_heatmap_gamma_tech:\s*[\d.]+\s*$/m, '');
+  s = s.replace(/\r?\n?^risk_heatmap_gamma_business:\s*[\d.]+\s*$/m, '');
   s = s.replace(/\r?\n?^risk_heatmap_curve:\s*\S+\s*$/m, '');
 
   const wantGamma = Math.abs(gamma - 1) >= 0.001;
@@ -37,14 +40,18 @@ function patchHeatmapInDocSegment(
   if (!wantGamma && !wantCurve) return s;
 
   const lines: string[] = [];
-  if (wantGamma) lines.push(`risk_heatmap_gamma: ${gamma}`);
+  if (wantGamma) {
+    lines.push(`risk_heatmap_gamma: ${gamma}`);
+    lines.push(`risk_heatmap_gamma_tech: ${gamma}`);
+    lines.push(`risk_heatmap_gamma_business: ${gamma}`);
+  }
   if (wantCurve) lines.push(`risk_heatmap_curve: ${curve}`);
   const block = `\n${lines.join('\n')}`;
 
-  const countryOnly = s.replace(/^(country:\s*\S+)\s*$/m, `$1${block}`);
+  const countryOnly = s.replace(/^((?:market|country):\s*\S+)\s*$/m, `$1${block}`);
   if (countryOnly !== s) return countryOnly;
 
-  const afterCountry = s.replace(/^(country:\s*\S+)/m, `$1${block}`);
+  const afterCountry = s.replace(/^((?:market|country):\s*\S+)/m, `$1${block}`);
   if (afterCountry !== s) return afterCountry;
 
   return s;

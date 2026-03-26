@@ -19,28 +19,56 @@ export function computeCapacity(
    * Use a step function or tapered proximity from `holidayProximityStrength`.
    */
   holidayCapacityStress: (market: string, date: string) => number = () => 0,
-  /** Lab/team capacity multiplier when stress = 1 (e.g. 0.7). */
-  holidayCapacityScale: number = 0.5,
+  /** Default lab/team capacity multiplier when stress = 1 (per-market YAML may override). */
+  defaultHolidayCapacityScale: number = 0.5,
   /** Extra multiplier on lab/team caps (e.g. school-holiday staffing pinch from YAML). */
-  schoolLabTeamCapMult: (market: string, date: string) => number = () => 1
+  schoolLabTeamCapMult: (market: string, date: string) => number = () => 1,
+  /**
+   * Target lab+team cap scale when holiday stress = 1 (clamped 0.12–1). Tapered days still blend
+   * toward this. Defaults to per-market `holidayLabCapacityScale` or `defaultHolidayCapacityScale`.
+   */
+  holidayCapScaleAtFullStress?: (market: string, date: string) => number
 ): CapacityRow[] {
-  const capByMarket: Record<string, { labs: number; teams: number; backend: number }> = {};
+  const capByMarket: Record<
+    string,
+    { labs: number; testingCapacity?: number; teams: number; backend: number; holidayLabCapacityScale?: number }
+  > = {};
   for (const c of configs) {
     capByMarket[c.market] = {
       labs: c.capacity.labs ?? 5,
+      testingCapacity: c.testingCapacity,
       teams: c.capacity.teams ?? 6,
       backend: c.capacity.backend ?? 1000,
+      holidayLabCapacityScale: c.holidayLabCapacityScale,
     };
   }
 
-  const scaleOnHoliday = Math.min(1, Math.max(0.25, holidayCapacityScale));
-
   return dailyRows.map((r) => {
-    const cap = capByMarket[r.market] || { labs: 5, teams: 6, backend: 1000 };
+    const cap = capByMarket[r.market] || {
+      labs: 5,
+      teams: 6,
+      backend: 1000,
+    };
     const stress = Math.min(1, Math.max(0, holidayCapacityStress(r.market, r.date)));
+    const perMarketHol = cap.holidayLabCapacityScale;
+    const baseHol =
+      perMarketHol != null && Number.isFinite(perMarketHol)
+        ? Math.min(1, Math.max(0.12, perMarketHol))
+        : defaultHolidayCapacityScale;
+    const fromCallback = holidayCapScaleAtFullStress?.(r.market, r.date);
+    const scaleOnHoliday = Math.min(
+      1,
+      Math.max(
+        0.12,
+        fromCallback != null && Number.isFinite(fromCallback)
+          ? Math.min(1, Math.max(0.12, fromCallback))
+          : Math.min(1, Math.max(0.25, baseHol))
+      )
+    );
     const scale = 1 + (scaleOnHoliday - 1) * stress;
     const schoolM = Math.min(1.05, Math.max(0.65, schoolLabTeamCapMult(r.market, r.date)));
-    const labsCap = (cap.labs || 5) * scale * schoolM;
+    const labDenom = cap.testingCapacity ?? cap.labs ?? 5;
+    const labsCap = (labDenom || 5) * scale * schoolM;
     const teamsCap = (cap.teams || 6) * scale * schoolM;
     const backendCap = cap.backend || 1000;
 

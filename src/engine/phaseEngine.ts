@@ -1,9 +1,29 @@
 import type { PressureSurfaceId } from '@/domain/pressureSurfaces';
 import { emptySurfaceSlice, emptySurfaceTotals, type SurfaceLoadSlice } from '@/domain/pressureSurfaces';
+import { campaignLoadBearingPrepLiveForDate } from './campaignPrepLive';
 import { parseDate, type CalendarRow } from './calendar';
 import type { CampaignConfig, MarketConfig, PhaseLoad } from './types';
 
 const DEFAULT_LIVE_SUPPORT_SCALE = 0.45;
+
+/**
+ * Applied to labs/teams/backend on campaign **live** (sustain) only — keeps stores/marketing ops realistic
+ * while tech heat drops after go-live (e.g. Monopoly December). Ops/commercial untouched.
+ * Per-campaign {@link CampaignConfig.liveTechLoadScale} overrides; use `1` to disable dampening.
+ */
+const DEFAULT_CAMPAIGN_LIVE_TECH_LOAD_SCALE = 0.55;
+
+function scaleCampaignLiveTechBuckets(load: PhaseLoad, explicitScale?: number): PhaseLoad {
+  const factor =
+    explicitScale != null && Number.isFinite(explicitScale) && explicitScale >= 0
+      ? Math.min(2.5, explicitScale)
+      : DEFAULT_CAMPAIGN_LIVE_TECH_LOAD_SCALE;
+  const out: PhaseLoad = { ...load };
+  if (out.labs != null && Number.isFinite(out.labs)) out.labs *= factor;
+  if (out.teams != null && Number.isFinite(out.teams)) out.teams *= factor;
+  if (out.backend != null && Number.isFinite(out.backend)) out.backend *= factor;
+  return out;
+}
 
 function scalePhaseLoad(load: PhaseLoad, factor: number): PhaseLoad {
   const out: PhaseLoad = {};
@@ -122,6 +142,47 @@ function phaseLoadHasMass(pl: PhaseLoad): boolean {
   );
 }
 
+function phaseLoadTechMass(pl: PhaseLoad): boolean {
+  return (pl.labs ?? 0) + (pl.teams ?? 0) + (pl.backend ?? 0) > 0;
+}
+
+/**
+ * Campaign **prep** (readiness) load attributed to `date`, or **null** if this campaign adds no prep row that day.
+ * Used for `replacesBauTech` (same delivery pipe as recurring tech / BAU lab work).
+ */
+function campaignPrepPhaseLoadForDate(camp: CampaignConfig, date: string): PhaseLoad | null {
+  if (!camp.start || camp.presenceOnly) return null;
+  const t = parseDate(date);
+  const campStart = parseDate(camp.start);
+  const prepDays = camp.prepBeforeLiveDays;
+
+  if (prepDays != null && prepDays > 0) {
+    const seg = campaignLoadBearingPrepLiveForDate(camp, date);
+    if (!seg.inPrepLoaded) return null;
+    if (camp.staggerFunctionalLoads) {
+      const dbl = wholeCalendarDaysBefore(t, campStart);
+      const piece = staggeredPrepSlice(camp, prepDays, dbl);
+      if (!phaseLoadHasMass(piece)) return null;
+      return piece;
+    }
+    return camp.load;
+  }
+
+  if (!camp.durationDays) return null;
+  const segInterval = campaignLoadBearingPrepLiveForDate(camp, date);
+  if (!segInterval.inCampaignWindow || !segInterval.inPrepLoaded) return null;
+  return camp.load;
+}
+
+function anyReplacingCampaignPrepTechMass(config: MarketConfig, date: string): boolean {
+  for (const camp of config.campaigns || []) {
+    if (!camp.replacesBauTech) continue;
+    const pl = campaignPrepPhaseLoadForDate(camp, date);
+    if (pl && phaseLoadTechMass(pl)) return true;
+  }
+  return false;
+}
+
 /**
  * QSR-style prep: tech front-loaded with buffer before live; commercial in the pre-live month;
  * ops (supply) from a few weeks before go-live through prep only here — live ops come from `live_support_load`.
@@ -173,19 +234,28 @@ export function expandPhases(calendar: CalendarRow[], config: MarketConfig): Exp
   for (const { date, market } of marketRows) {
     const d = parseDate(date);
     const weekday = d.getDay();
+    const stripBauTechBuckets = anyReplacingCampaignPrepTechMass(config, date);
 
     for (const bau of bauList) {
       if (!bau) continue;
+      const rawBau = bau.load || {};
+      const bauLoad: PhaseLoad = stripBauTechBuckets
+        ? { ...rawBau, labs: 0, teams: 0, backend: 0 }
+        : rawBau;
       if (weekday === bau.weekday) {
-        addLoad(rows, date, market, 'BAU', bau.name || 'bau', bau.load || {}, 1, 'readiness', 'bau');
+        if (phaseLoadHasMass(bauLoad)) {
+          addLoad(rows, date, market, 'BAU', bau.name || 'bau', bauLoad, 1, 'readiness', 'bau');
+        }
       }
       if (bau.supportStart != null && weekday >= bau.supportStart && weekday <= bau.supportEnd) {
-        addLoad(rows, date, market, 'BAU', 'support', bau.load || {}, 0.5, 'readiness', 'bau');
+        if (phaseLoadHasMass(bauLoad)) {
+          addLoad(rows, date, market, 'BAU', 'support', bauLoad, 0.5, 'readiness', 'bau');
+        }
       }
     }
 
     const tr = config.techRhythm;
-    if (tr?.weekly_pattern) {
+    if (tr?.weekly_pattern && !stripBauTechBuckets) {
       const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][weekday];
       const baseRaw = tr.weekly_pattern[dayName];
       if (baseRaw != null && Number.isFinite(baseRaw)) {
@@ -215,11 +285,8 @@ export function expandPhases(calendar: CalendarRow[], config: MarketConfig): Exp
 
       if (prepDays != null && prepDays > 0) {
         if (camp.presenceOnly) continue;
-        const prepStart = new Date(campStart);
-        prepStart.setDate(prepStart.getDate() - prepDays);
-        const liveEnd = new Date(campStart);
-        liveEnd.setDate(liveEnd.getDate() + camp.durationDays);
-        if (t >= prepStart && t < campStart) {
+        const seg = campaignLoadBearingPrepLiveForDate(camp, date);
+        if (seg.inPrepLoaded) {
           if (camp.staggerFunctionalLoads) {
             const dbl = wholeCalendarDaysBefore(t, campStart);
             const piece = staggeredPrepSlice(camp, prepDays, dbl);
@@ -229,35 +296,33 @@ export function expandPhases(calendar: CalendarRow[], config: MarketConfig): Exp
           } else {
             addLoad(rows, date, market, 'Campaign', `${camp.name}__prep`, camp.load, 1, 'readiness', 'change');
           }
-        } else if (camp.durationDays > 0 && t >= campStart && t < liveEnd) {
-          const liveLoad = resolveLivePhaseLoad(camp);
+        } else if (seg.inLiveLoaded) {
+          const liveLoad = scaleCampaignLiveTechBuckets(resolveLivePhaseLoad(camp), camp.liveTechLoadScale);
           addLoad(rows, date, market, 'Campaign', camp.name, liveLoad, 1, 'sustain', 'campaign');
         }
         continue;
       }
 
       if (!camp.durationDays) continue;
-      const end = new Date(campStart);
-      end.setDate(end.getDate() + camp.durationDays);
-      if (t >= campStart && t < end) {
-        if (!camp.presenceOnly) {
-          const dayIndex = Math.floor((t.getTime() - campStart.getTime()) / 86_400_000);
-          const rd = camp.readinessDurationDays;
-          const inReadiness = rd == null || dayIndex < rd;
-          const phaseLoad: PhaseLoad = inReadiness ? camp.load : (camp.live_support_load ?? {});
-          addLoad(
-            rows,
-            date,
-            market,
-            'Campaign',
-            camp.name,
-            phaseLoad,
-            1,
-            inReadiness ? 'readiness' : 'sustain',
-            inReadiness ? 'change' : 'campaign'
-          );
-        }
-      }
+      const segInterval = campaignLoadBearingPrepLiveForDate(camp, date);
+      if (!segInterval.inCampaignWindow || camp.presenceOnly) continue;
+      const inReadiness = segInterval.inPrepLoaded;
+      const phaseLoad: PhaseLoad = inReadiness ? camp.load : (camp.live_support_load ?? {});
+      const sustainLoad =
+        inReadiness || !liveSupportHasValues(camp.live_support_load)
+          ? phaseLoad
+          : scaleCampaignLiveTechBuckets(phaseLoad, camp.liveTechLoadScale);
+      addLoad(
+        rows,
+        date,
+        market,
+        'Campaign',
+        camp.name,
+        inReadiness ? phaseLoad : sustainLoad,
+        1,
+        inReadiness ? 'readiness' : 'sustain',
+        inReadiness ? 'change' : 'campaign'
+      );
     }
 
     for (const rel of config.releases || []) {

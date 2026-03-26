@@ -26,6 +26,11 @@ import {
 } from '@/lib/dslTradingMonthlyPatch';
 import { patchDslTechWeeklyPattern, type TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
+import {
+  DEFAULT_HEATMAP_MONO_COLOR,
+  normalizeHeatmapMonoHex,
+  type HeatmapRenderStyle,
+} from '@/lib/riskHeatmapColors';
 import { syncRiskHeatmapVisualFromConfigs } from '@/lib/heatmapVisualFromConfigs';
 import { getAtcDsl, setAtcDsl, setStored, getStored } from '@/lib/storage';
 
@@ -56,19 +61,44 @@ type AtcState = {
   dslText: string;
   dslByMarket: Record<string, string>;
   riskTuning: RiskModelTuning;
-  /** Pressure heatmap: γ for power/sigmoid/log (see `risk_heatmap_gamma` in YAML). */
+  /** Panel slider + legacy YAML: Technology lens γ. */
   riskHeatmapGamma: number;
+  riskHeatmapGammaTech: number;
+  riskHeatmapGammaBusiness: number;
   /** Pressure heatmap transfer (`risk_heatmap_curve` in YAML; `power` = default / legacy). */
   riskHeatmapCurve: RiskHeatmapCurveId;
+  /**
+   * 0 = off. After curve + γ, cells strictly below this level (0–1) use reduced opacity; band colours are unchanged.
+   * Not written to YAML.
+   */
+  riskHeatmapStressCutoff: number;
   riskSurface: RiskRow[];
   configs: MarketConfig[];
   parseError: string | null;
   /** Runway heatmap: optional sparkle / twinkle on every cell when on (dark theme, honour reduced-motion). */
   discoMode: boolean;
+  /**
+   * Single-market runway only: isometric lattice + extruded pressure columns (skyline).
+   * Ignored when comparing all markets.
+   */
+  runway3dHeatmap: boolean;
+  /**
+   * Flat heatmaps (quarter grid + compare-all columns): SVG by default. Ignored when single-market 3D runway is on.
+   * Turn off for HTML cells + colour swoosh / disco twinkle.
+   */
+  runwaySvgHeatmap: boolean;
+  /** Runway cell fill: multi-band temperature ramp vs one hue with alpha by intensity. */
+  heatmapRenderStyle: HeatmapRenderStyle;
+  /** `#rrggbb` when {@link heatmapRenderStyle} is `mono`. */
+  heatmapMonoColor: string;
   setCountry: (c: string) => void;
   setViewMode: (v: ViewModeId) => void;
   setTheme: (t: 'light' | 'dark') => void;
   setDiscoMode: (v: boolean) => void;
+  setRunway3dHeatmap: (v: boolean) => void;
+  setRunwaySvgHeatmap: (v: boolean) => void;
+  setHeatmapRenderStyle: (v: HeatmapRenderStyle) => void;
+  setHeatmapMonoColor: (hex: string) => void;
   setDslText: (t: string) => void;
   setRunwayMarketOrder: (ids: string[]) => void;
   setDslByMarket: (m: Record<string, string>) => void;
@@ -76,6 +106,7 @@ type AtcState = {
   resetRiskTuning: () => void;
   setRiskHeatmapGamma: (gamma: number) => void;
   setRiskHeatmapCurve: (curve: RiskHeatmapCurveId) => void;
+  setRiskHeatmapStressCutoff: (cutoff: number) => void;
   /** Writes explicit Mon–Sun `tech.weekly_pattern` for the focused market and re-runs the pipeline. */
   setTechWeeklyPattern: (pattern: TechWeeklyPatternPatch) => void;
   /** Writes explicit Jan–Dec `trading.monthly_pattern` (0–1) for the focused market and re-runs the pipeline. */
@@ -114,7 +145,14 @@ export const useAtcStore = create<AtcState>()(
       dslByMarket: {},
       riskTuning: DEFAULT_RISK_TUNING,
       riskHeatmapGamma: 1,
+      riskHeatmapGammaTech: 1,
+      riskHeatmapGammaBusiness: 1,
       riskHeatmapCurve: 'power',
+      riskHeatmapStressCutoff: 0,
+      runway3dHeatmap: false,
+      runwaySvgHeatmap: true,
+      heatmapRenderStyle: 'spectrum',
+      heatmapMonoColor: DEFAULT_HEATMAP_MONO_COLOR,
       riskSurface: [],
       configs: [],
       parseError: null,
@@ -145,6 +183,7 @@ export const useAtcStore = create<AtcState>()(
             set({ dslByMarket: { ...get().dslByMarket, ...split } });
           }
           set({ dslText: full });
+          if (get().viewMode === 'code') return;
           const r = runPipelineFromDsl(full, riskTuning);
           set({
             riskSurface: r.riskSurface,
@@ -164,6 +203,7 @@ export const useAtcStore = create<AtcState>()(
           singleFromMerged ?? get().dslByMarket[c] ?? defaultDslForMarket(fallbackMarket);
         if (!looksLikeYamlDsl(nextSingle)) nextSingle = defaultDslForMarket(fallbackMarket);
         set({ dslText: nextSingle });
+        if (get().viewMode === 'code') return;
         const full = mergeStateToFullMultiDoc(get());
         const r = runPipelineFromDsl(full, riskTuning);
         set({
@@ -175,6 +215,10 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setViewMode: (v) => {
+        const prev = get().viewMode;
+        if (prev === 'code' && v !== 'code') {
+          get().applyDsl();
+        }
         setStored('layer', v);
         set({ viewMode: v });
       },
@@ -186,6 +230,12 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setDiscoMode: (v) => set({ discoMode: v }),
+
+      setRunway3dHeatmap: (v) => set({ runway3dHeatmap: v }),
+      setRunwaySvgHeatmap: (v) => set({ runwaySvgHeatmap: v }),
+
+      setHeatmapRenderStyle: (v) => set({ heatmapRenderStyle: v }),
+      setHeatmapMonoColor: (hex) => set({ heatmapMonoColor: normalizeHeatmapMonoHex(hex) }),
 
       setDslText: (t) => set({ dslText: t }),
 
@@ -217,12 +267,18 @@ export const useAtcStore = create<AtcState>()(
         if (!isRunwayAllMarkets(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
-        set({ riskHeatmapGamma: g, dslText, dslByMarket });
+        set({ riskHeatmapGamma: g, riskHeatmapGammaTech: g, riskHeatmapGammaBusiness: g, dslText, dslByMarket });
         if (atcDslGammaPersistTimer != null) clearTimeout(atcDslGammaPersistTimer);
         atcDslGammaPersistTimer = setTimeout(() => {
           setAtcDsl(mergeStateToFullMultiDoc(get()));
           atcDslGammaPersistTimer = null;
         }, 450);
+      },
+
+      setRiskHeatmapStressCutoff: (cutoff) => {
+        const s = Math.round(cutoff / 0.05) * 0.05;
+        const c = Math.min(0.95, Math.max(0, Math.round(s * 100) / 100));
+        set({ riskHeatmapStressCutoff: c });
       },
 
       setRiskHeatmapCurve: (curve) => {
@@ -432,9 +488,20 @@ export const useAtcStore = create<AtcState>()(
         return ps;
       },
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<AtcState> & { runwayCompareAllMarkets?: boolean };
-        const { stressCutoff: _legacyStressCutoff, ...pWithoutStress } = p as Partial<AtcState> & {
+        const p = (persisted ?? {}) as Partial<AtcState> & {
+          runwayCompareAllMarkets?: boolean;
+          runwayCompareSvgHeatmap?: boolean;
+          runwaySvgHeatmap?: boolean;
+        };
+        const {
+          stressCutoff: _legacyStressCutoff,
+          runwayCompareSvgHeatmap: legacyCompareSvg,
+          runwaySvgHeatmap: persistedSvg,
+          ...pWithoutStress
+        } = p as Partial<AtcState> & {
           stressCutoff?: number;
+          runwayCompareSvgHeatmap?: boolean;
+          runwaySvgHeatmap?: boolean;
         };
         const base = { ...current, ...pWithoutStress };
         let country = base.country;
@@ -445,11 +512,33 @@ export const useAtcStore = create<AtcState>()(
         const { runwayCompareAllMarkets: _drop, ...rest } = base as typeof base & {
           runwayCompareAllMarkets?: boolean;
         };
+        const rawCut = base.riskHeatmapStressCutoff;
+        const stressCut =
+          typeof rawCut === 'number' && Number.isFinite(rawCut)
+            ? Math.min(0.95, Math.max(0, Math.round(Math.round(rawCut / 0.05) * 0.05 * 100) / 100))
+            : 0;
+        const runwaySvgHeatmap =
+          typeof persistedSvg === 'boolean'
+            ? persistedSvg
+            : typeof legacyCompareSvg === 'boolean'
+              ? legacyCompareSvg
+              : current.runwaySvgHeatmap;
+        const heatmapRenderStyle: HeatmapRenderStyle =
+          base.heatmapRenderStyle === 'mono' || base.heatmapRenderStyle === 'spectrum'
+            ? base.heatmapRenderStyle
+            : current.heatmapRenderStyle;
+        const heatmapMonoColor = normalizeHeatmapMonoHex(
+          typeof base.heatmapMonoColor === 'string' ? base.heatmapMonoColor : current.heatmapMonoColor
+        );
         return {
           ...rest,
           country,
           viewMode: normalizeViewModeId(typeof base.viewMode === 'string' ? base.viewMode : 'combined'),
           riskTuning: clampRiskTuning({ ...DEFAULT_RISK_TUNING, ...base.riskTuning }),
+          riskHeatmapStressCutoff: stressCut,
+          runwaySvgHeatmap,
+          heatmapRenderStyle,
+          heatmapMonoColor,
         };
       },
       partialize: (s) => ({
@@ -458,6 +547,11 @@ export const useAtcStore = create<AtcState>()(
         theme: s.theme,
         riskTuning: s.riskTuning,
         discoMode: s.discoMode,
+        runway3dHeatmap: s.runway3dHeatmap,
+        runwaySvgHeatmap: s.runwaySvgHeatmap,
+        riskHeatmapStressCutoff: s.riskHeatmapStressCutoff,
+        heatmapRenderStyle: s.heatmapRenderStyle,
+        heatmapMonoColor: s.heatmapMonoColor,
       }),
     }
   )

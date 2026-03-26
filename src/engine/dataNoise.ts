@@ -31,9 +31,12 @@ export function withOperationalNoise(rows: RiskRow[], amplitude = RISK_SCORE_NOI
     const delta = (u - 0.5) * 2 * amplitude;
     let risk_score = Math.min(1, Math.max(0, r.risk_score + delta));
     risk_score = Math.round(risk_score * 100) / 100;
+    let tech_pressure = Math.min(1, Math.max(0, r.tech_pressure + delta));
+    tech_pressure = Math.round(tech_pressure * 100) / 100;
     return {
       ...r,
       risk_score,
+      tech_pressure,
       risk_band: bandForRisk(risk_score),
     };
   });

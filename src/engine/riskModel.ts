@@ -4,7 +4,24 @@ import { RISK_BANDS } from '@/lib/constants';
 import type { CapacityRow } from './capacityModel';
 import { DEFAULT_RISK_TUNING, normalizedRiskWeights, type RiskModelTuning } from './riskModelTuning';
 
+/**
+ * Scales tech utilisation before the Technology heatmap and combined-risk tech term so peaks sit
+ * slightly below full saturation (0.85 = stronger pull toward green; 1 = off).
+ */
+const TECH_PRESSURE_DISPLAY_COMPRESSION = 0.9;
+
+function compressTechUtilisation01(u: number): number {
+  if (!Number.isFinite(u) || u <= 0) return 0;
+  return Math.min(1, u * TECH_PRESSURE_DISPLAY_COMPRESSION);
+}
+
 export type RiskRow = CapacityRow & {
+  /** Base store-trading rhythm before campaign live amplification (0–1). */
+  store_trading_base: number;
+  /** Load-bearing campaign in prep window (for business-lens marketing term). */
+  campaign_in_prep: boolean;
+  /** Load-bearing campaign in live window. */
+  campaign_in_live: boolean;
   tech_pressure: number;
   /**
    * Utilisation-style pressure from readiness-tagged loads only (change/BAU work).
@@ -63,10 +80,13 @@ function techPressureFromSurfaceSlice(
 }
 
 type PreRiskRow = CapacityRow & {
+  store_trading_base: number;
   store_pressure: number;
   campaign_active: boolean;
   campaign_risk: number;
   campaign_presence: number;
+  campaign_in_prep: boolean;
+  campaign_in_live: boolean;
   holiday_flag: boolean;
   public_holiday_flag: boolean;
   school_holiday_flag: boolean;
@@ -78,29 +98,37 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
     const lab = r.lab_utilisation ?? 0;
     const team = r.team_utilisation ?? 0;
     const backend = r.backend_pressure ?? 0;
-    const tech_pressure = Math.min(1, Math.max(lab, team, backend * 0.5));
+    const rawTechPressure = Math.min(1, Math.max(lab, team, backend * 0.5));
+    const tech_pressure = compressTechUtilisation01(rawTechPressure);
     const labsCap = r.labs_effective_cap ?? 0;
     const teamsCap = r.teams_effective_cap ?? 0;
     const backCap = r.backend_effective_cap ?? 0;
-    const tech_readiness_pressure = componentTechPressure({
-      labL: r.lab_load_readiness ?? 0,
-      teamL: r.team_load_readiness ?? 0,
-      backL: r.backend_load_readiness ?? 0,
-      labsCap,
-      teamsCap,
-      backCap,
-    });
-    const tech_sustain_pressure = componentTechPressure({
-      labL: r.lab_load_sustain ?? 0,
-      teamL: r.team_load_sustain ?? 0,
-      backL: r.backend_load_sustain ?? 0,
-      labsCap,
-      teamsCap,
-      backCap,
-    });
+    const tech_readiness_pressure = compressTechUtilisation01(
+      componentTechPressure({
+        labL: r.lab_load_readiness ?? 0,
+        teamL: r.team_load_readiness ?? 0,
+        backL: r.backend_load_readiness ?? 0,
+        labsCap,
+        teamsCap,
+        backCap,
+      })
+    );
+    const tech_sustain_pressure = compressTechUtilisation01(
+      componentTechPressure({
+        labL: r.lab_load_sustain ?? 0,
+        teamL: r.team_load_sustain ?? 0,
+        backL: r.backend_load_sustain ?? 0,
+        labsCap,
+        teamsCap,
+        backCap,
+      })
+    );
+    const store_trading_base = Math.min(1, r.store_trading_base ?? r.store_pressure ?? 0);
     const store_pressure = Math.min(1, r.store_pressure ?? 0);
     const campaign_risk = Math.min(1, r.campaign_risk ?? 0);
     const campaign_presence = r.campaign_presence ?? (r.campaign_active ? 1 : 0);
+    const campaign_in_prep = Boolean(r.campaign_in_prep);
+    const campaign_in_live = Boolean(r.campaign_in_live);
     const public_holiday_flag = Boolean(r.public_holiday_flag);
     const school_holiday_flag = Boolean(r.school_holiday_flag);
     const holiday_flag = Boolean(r.holiday_flag);
@@ -116,7 +144,9 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
     for (const sid of PRESSURE_SURFACE_IDS) {
       const sl = r.surfaceTotals?.[sid];
       pressure_surfaces[sid] = sl
-        ? Math.round(techPressureFromSurfaceSlice(sl, labsCap, teamsCap, backCap) * 100) / 100
+        ? Math.round(
+            compressTechUtilisation01(techPressureFromSurfaceSlice(sl, labsCap, teamsCap, backCap)) * 100
+          ) / 100
         : 0;
     }
     const headroom = Math.round((1 - risk_score) * 100) / 100;
@@ -127,6 +157,9 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
 
     return {
       ...r,
+      store_trading_base: Math.round(store_trading_base * 100) / 100,
+      campaign_in_prep,
+      campaign_in_live,
       tech_pressure: Math.round(tech_pressure * 100) / 100,
       tech_readiness_pressure: Math.round(tech_readiness_pressure * 100) / 100,
       tech_sustain_pressure: Math.round(tech_sustain_pressure * 100) / 100,

@@ -3,8 +3,9 @@ import { APP_VERSION, GIT_COMMIT_SHORT } from '@/lib/buildMeta';
 import { cn } from '@/lib/utils';
 import { useCallback, useState } from 'react';
 import { useAtcStore } from '@/store/useAtcStore';
+import { isRunwayAllMarkets } from '@/lib/markets';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, GitBranch, Moon, Sparkles, Sun } from 'lucide-react';
+import { Atom, Box, ChevronDown, ChevronUp, GitBranch, Grid2x2, Moon, Sparkles, Sun } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 
 export function Header() {
@@ -12,7 +13,22 @@ export function Header() {
   const setTheme = useAtcStore((s) => s.setTheme);
   const discoModePref = useAtcStore((s) => s.discoMode);
   const setDiscoMode = useAtcStore((s) => s.setDiscoMode);
+  const country = useAtcStore((s) => s.country);
+  const runway3dHeatmap = useAtcStore((s) => s.runway3dHeatmap);
+  const setRunway3dHeatmap = useAtcStore((s) => s.setRunway3dHeatmap);
+  const runwaySvgHeatmap = useAtcStore((s) => s.runwaySvgHeatmap);
+  const setRunwaySvgHeatmap = useAtcStore((s) => s.setRunwaySvgHeatmap);
   const reduceMotion = useReducedMotion();
+  const singleMarketRunway = !isRunwayAllMarkets(country);
+  const compareAllMarkets = isRunwayAllMarkets(country);
+  const isDark = theme === 'dark';
+  const showSvgHeatmapControl = singleMarketRunway || compareAllMarkets;
+  const showToybox = singleMarketRunway || isDark;
+
+  const sw3d = toyboxSwitchClasses(runway3dHeatmap);
+  const swSvg = toyboxSwitchClasses(runwaySvgHeatmap, 'md');
+  const swSvgCompact = toyboxSwitchClasses(runwaySvgHeatmap, 'sm');
+  const swDisco = toyboxSwitchClasses(discoModePref);
 
   const [compact, setCompact] = useState(readHeaderCompact);
 
@@ -28,8 +44,6 @@ export function Header() {
     });
   }, []);
 
-  const isDark = theme === 'dark';
-
   return (
     <header className="border-b border-border bg-card shadow-sm">
       <div
@@ -40,9 +54,9 @@ export function Header() {
       >
         {compact ? (
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-1.5">
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <h1 className="text-sm font-bold leading-tight tracking-tight text-foreground sm:text-[0.9375rem]">
-                Deployment Pressure Surface
+                {`Experiment: "Market Pressure Surface"`}
               </h1>
               <span
                 className="text-[10px] tabular-nums leading-none text-muted-foreground"
@@ -55,10 +69,17 @@ export function Header() {
             </div>
 
             <div
-              id="header-main-controls"
+              id="header-compact-controls"
               className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:justify-end"
             >
-              <div className="flex items-center gap-1">
+              <div
+                className="flex shrink-0 items-center gap-1.5"
+                title={
+                  showSvgHeatmapControl && runway3dHeatmap && singleMarketRunway
+                    ? '3D runway uses HTML blocks. Turn 3D off for SVG quarter grid.'
+                    : undefined
+                }
+              >
                 {isDark ? (
                   <Moon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                 ) : (
@@ -82,34 +103,36 @@ export function Header() {
                     )}
                   />
                 </button>
-              </div>
-
-              {isDark ? (
-                <div
-                  className="flex items-center gap-1 border-l border-border/60 pl-2 text-muted-foreground"
-                  title="Twinkle every runway cell. Off while reduced motion is preferred."
-                >
-                  <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={discoModePref}
-                    aria-label={discoModePref ? 'Turn off disco twinkle' : 'Turn on disco twinkle'}
-                    onClick={() => setDiscoMode(!discoModePref)}
-                    className={cn(
-                      'relative h-5 w-9 shrink-0 rounded-full border border-border bg-muted/80 p-px transition-colors',
-                      'hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 focus-visible:ring-offset-1 focus-visible:ring-offset-card'
-                    )}
-                  >
-                    <span
+                {showSvgHeatmapControl ? (
+                  <>
+                    <Grid2x2
                       className={cn(
-                        'block h-4 w-4 rounded-full bg-card shadow-sm ring-1 ring-border/80 transition-transform duration-200 ease-out',
-                        discoModePref ? 'translate-x-4' : 'translate-x-0'
+                        'h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-90',
+                        runwaySvgHeatmap && 'text-primary'
                       )}
+                      aria-hidden
                     />
-                  </button>
-                </div>
-              ) : null}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={runwaySvgHeatmap}
+                      data-state={runwaySvgHeatmap ? 'on' : 'off'}
+                      aria-label={
+                        runwaySvgHeatmap ? 'Turn off SVG runway heatmap' : 'Turn on SVG runway heatmap'
+                      }
+                      title={
+                        runway3dHeatmap && singleMarketRunway
+                          ? '3D runway uses HTML blocks. Turn 3D off for SVG quarter grid.'
+                          : 'SVG runway cells (default). Off for HTML, swoosh, disco.'
+                      }
+                      onClick={() => setRunwaySvgHeatmap(!runwaySvgHeatmap)}
+                      className={swSvgCompact.track}
+                    >
+                      <span className={swSvgCompact.thumb} />
+                    </button>
+                  </>
+                ) : null}
+              </div>
 
               <Button
                 type="button"
@@ -118,9 +141,9 @@ export function Header() {
                 className="ml-1 h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-foreground"
                 onClick={toggleCompact}
                 aria-expanded={false}
-                aria-controls="header-main-controls"
+                aria-controls="header-expanded-panel"
                 aria-label="Expand header details"
-                title="Show full header"
+                title="Show full header (theme + toybox)"
               >
                 <ChevronDown className="h-4 w-4" aria-hidden />
               </Button>
@@ -134,7 +157,7 @@ export function Header() {
                   <div className="min-w-0">
                     <h1 className="text-foreground">
                       <span className="text-lg font-bold tracking-tight md:text-xl">
-                        Deployment Pressure Surface
+                        {`Experiment: "Market Pressure Surface"`}
                       </span>
                     </h1>
                   </div>
@@ -145,7 +168,7 @@ export function Header() {
                     className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
                     onClick={toggleCompact}
                     aria-expanded
-                    aria-controls="header-main-controls"
+                    aria-controls="header-expanded-panel"
                     aria-label="Collapse header to compact bar"
                     title="Compact header"
                   >
@@ -163,76 +186,159 @@ export function Header() {
                 </p>
                 <p className="mt-1 max-w-md text-[11px] leading-snug text-muted-foreground md:text-xs">
                   Runway focus and heatmap lens live in the <strong className="font-medium text-foreground">Controls</strong>{' '}
-                  panel on the right. Use the header for theme and version only.
+                  panel on the right. <strong className="font-medium text-foreground">Theme and runway</strong> includes SVG heatmap
+                  (on by default for flat views). Expand the header for the <strong className="font-medium text-foreground">Toybox</strong>{' '}
+                  (3D runway, disco twinkle in dark mode).
                 </p>
               </div>
             </div>
 
             <div
-              id="header-main-controls"
-              className="flex flex-wrap items-end gap-x-5 gap-y-3 lg:shrink-0"
+              id="header-expanded-panel"
+              className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start lg:shrink-0 lg:flex-nowrap"
             >
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Theme</span>
-                <div className="flex h-9 flex-wrap items-center gap-x-3 gap-y-1">
-                  <div className="flex items-center gap-2">
-                    {isDark ? (
-                      <Moon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    ) : (
-                      <Sun className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    )}
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={isDark}
-                      aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-                      onClick={() => setTheme(isDark ? 'light' : 'dark')}
-                      className={cn(
-                        'relative h-7 w-12 shrink-0 rounded-full border border-border bg-muted/80 p-0.5 transition-colors',
-                        'hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 focus-visible:ring-offset-2 focus-visible:ring-offset-card'
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'block h-6 w-6 rounded-full bg-card shadow-sm ring-1 ring-border/80 transition-transform duration-200 ease-out',
-                          isDark ? 'translate-x-5' : 'translate-x-0'
-                        )}
-                      />
-                    </button>
-                  </div>
+              <div id="header-main-controls" className="flex flex-col gap-1">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Theme and runway
+                </span>
+                <div className="flex h-9 items-center gap-2">
                   {isDark ? (
-                    <div
-                      className="flex items-center gap-2 border-l border-border/60 pl-3 text-muted-foreground"
-                      title="Twinkle every runway cell. Off while reduced motion is preferred."
-                    >
-                      <Sparkles className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                    <Moon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  ) : (
+                    <Sun className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  )}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isDark}
+                    aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+                    onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                    className={cn(
+                      'relative h-7 w-12 shrink-0 rounded-full border border-border bg-muted/80 p-0.5 transition-colors',
+                      'hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 focus-visible:ring-offset-2 focus-visible:ring-offset-card'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'block h-6 w-6 rounded-full bg-card shadow-sm ring-1 ring-border/80 transition-transform duration-200 ease-out',
+                        isDark ? 'translate-x-5' : 'translate-x-0'
+                      )}
+                    />
+                  </button>
+                  {showSvgHeatmapControl ? (
+                    <>
+                      <Grid2x2
+                        className={cn(
+                          'h-4 w-4 shrink-0 opacity-90',
+                          runwaySvgHeatmap && 'text-primary'
+                        )}
+                        aria-hidden
+                      />
                       <button
                         type="button"
                         role="switch"
-                        aria-checked={discoModePref}
-                        aria-label={discoModePref ? 'Turn off disco twinkle' : 'Turn on disco twinkle'}
-                        onClick={() => setDiscoMode(!discoModePref)}
-                        className={cn(
-                          'relative h-7 w-12 shrink-0 rounded-full border border-border bg-muted/80 p-0.5 transition-colors',
-                          'hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 focus-visible:ring-offset-2 focus-visible:ring-offset-card'
-                        )}
+                        aria-checked={runwaySvgHeatmap}
+                        data-state={runwaySvgHeatmap ? 'on' : 'off'}
+                        aria-label={
+                          runwaySvgHeatmap ? 'Turn off SVG runway heatmap' : 'Turn on SVG runway heatmap'
+                        }
+                        title={
+                          runway3dHeatmap && singleMarketRunway
+                            ? '3D runway uses HTML blocks. Turn 3D off to use SVG quarter grid. Compare-all always uses this when flat.'
+                            : 'Default on: SVG cells for flat quarter grid and compare-all. Turn off for HTML, colour swoosh, and disco twinkle.'
+                        }
+                        onClick={() => setRunwaySvgHeatmap(!runwaySvgHeatmap)}
+                        className={swSvg.track}
                       >
-                        <span
-                          className={cn(
-                            'block h-6 w-6 rounded-full bg-card shadow-sm ring-1 ring-border/80 transition-transform duration-200 ease-out',
-                            discoModePref ? 'translate-x-5' : 'translate-x-0'
-                          )}
-                        />
+                        <span className={swSvg.thumb} />
                       </button>
-                    </div>
+                    </>
                   ) : null}
                 </div>
-                {isDark && reduceMotion && discoModePref ? (
-                  <p className="max-w-[14rem] text-[10px] font-normal leading-tight text-muted-foreground">
-                    Disco twinkle is off while reduced motion is on.
-                  </p>
-                ) : null}
               </div>
+
+              {showToybox ? (
+                <div
+                  className="rounded-lg border border-border/80 bg-muted/25 px-3 py-2.5 sm:min-w-[min(100%,18rem)]"
+                  aria-labelledby="header-toybox-heading"
+                >
+                  <div
+                    id="header-toybox-heading"
+                    className="mb-2 flex items-center gap-2 text-muted-foreground"
+                  >
+                    <Atom className="h-4 w-4 shrink-0 text-foreground/80" aria-hidden />
+                    <span className="text-[11px] font-semibold tracking-wide text-foreground/85">Toybox</span>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+                    {singleMarketRunway ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          3D runway
+                        </span>
+                        <div
+                          className="flex h-9 flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground"
+                          title="Isometric 3D pressure blocks in one vertical column (single market). Compare-all stays flat."
+                        >
+                          <Box
+                            className={cn(
+                              'h-4 w-4 shrink-0 opacity-90',
+                              runway3dHeatmap && 'text-primary'
+                            )}
+                            aria-hidden
+                          />
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={runway3dHeatmap}
+                            data-state={runway3dHeatmap ? 'on' : 'off'}
+                            aria-label={runway3dHeatmap ? 'Turn off 3D runway heatmap' : 'Turn on 3D runway heatmap'}
+                            onClick={() => setRunway3dHeatmap(!runway3dHeatmap)}
+                            title="GitHub-style 3D blocks in a single vertical runway column (one market only)."
+                            className={sw3d.track}
+                          >
+                            <span className={sw3d.thumb} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                    {isDark ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Disco twinkle
+                        </span>
+                        <div
+                          className="flex h-9 flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground"
+                          title="Twinkle every runway cell. Off while reduced motion is preferred."
+                        >
+                          <Sparkles
+                            className={cn(
+                              'h-4 w-4 shrink-0 opacity-90',
+                              discoModePref && 'text-primary'
+                            )}
+                            aria-hidden
+                          />
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={discoModePref}
+                            data-state={discoModePref ? 'on' : 'off'}
+                            aria-label={discoModePref ? 'Turn off disco twinkle' : 'Turn on disco twinkle'}
+                            onClick={() => setDiscoMode(!discoModePref)}
+                            className={swDisco.track}
+                          >
+                            <span className={swDisco.thumb} />
+                          </button>
+                        </div>
+                        {reduceMotion && discoModePref ? (
+                          <p className="max-w-[14rem] text-[10px] font-normal leading-tight text-muted-foreground">
+                            Disco twinkle is off while reduced motion is on.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         )}
@@ -247,4 +353,27 @@ function readHeaderCompact(): boolean {
   } catch {
     return false;
   }
+}
+
+function toyboxSwitchClasses(on: boolean, size: 'md' | 'sm' = 'md') {
+  const isSm = size === 'sm';
+  return {
+    track: cn(
+      'relative shrink-0 rounded-full border transition-colors',
+      isSm ? 'h-5 w-9 p-px' : 'h-7 w-12 p-0.5',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25 focus-visible:ring-offset-2 focus-visible:ring-offset-card',
+      on
+        ? 'border-primary/50 bg-primary/20 hover:bg-primary/[0.26]'
+        : 'border-border bg-muted/80 hover:bg-muted'
+    ),
+    thumb: cn(
+      'block rounded-full shadow-sm transition-transform duration-200 ease-out',
+      isSm ? 'h-4 w-4' : 'h-6 w-6',
+      on
+        ? isSm
+          ? 'translate-x-4 bg-primary ring-1 ring-primary/35'
+          : 'translate-x-5 bg-primary ring-1 ring-primary/35'
+        : 'translate-x-0 bg-card ring-1 ring-border/80'
+    ),
+  } as const;
 }

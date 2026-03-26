@@ -23,27 +23,49 @@ const BUNDLED_BY_MARKET: Record<string, string> = {
 };
 
 function minimalDsl(country: string): string {
-  return `country: ${country || 'DE'}
+  return `market: ${country || 'DE'}
 
 resources:
   labs:
     capacity: 5
-  teams: {}
+  staff:
+    capacity: 6
 
 bau:
-  weekly_promo_cycle:
-    day: Tue
-    labs: 2
+  days_in_use: [mo, tu, we, th, fr]
+  weekly_cycle:
+    labs_required: 2
+    staff_required: 0
     support_days: 2
 
 campaigns: []
-holidays: {}
+
+public_holidays:
+  auto: false
+  dates: []
+  staffing_multiplier: 0.5
+
+school_holidays:
+  auto: false
+  dates: []
+  staffing_multiplier: 0.85
+
 trading:
   weekly_pattern:
-    default: medium
-    Thu: high
-    Fri: high
-    Sat: very_high
+    Mon: 0.7
+    Tue: 0.72
+    Wed: 0.74
+    Thu: 0.8
+    Fri: 0.95
+    Sat: 1.0
+    Sun: 0.6
+
+tech:
+  weekly_pattern:
+    weekdays: medium
+    weekend: low
+  labs_scale: 2
+  teams_scale: 1
 `;
 }
 

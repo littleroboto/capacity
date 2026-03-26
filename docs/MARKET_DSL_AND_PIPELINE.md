@@ -16,8 +16,8 @@ For planning-domain layering, pressure surfaces, and export shapes, see [PLANNIN
 6. **Carry-over** — `applyLoadCarryover` adds backlog-style spill from **intrinsic** overload (not from carry-in alone), applied **before** operating-window scaling.
 7. **Operating windows** — Date-bounded multipliers (and optional ramps) adjust loads and sometimes **effective lab+team capacity**.
 8. **School stress** — On school-holiday days, `stress_correlations.school_holidays` multipliers apply (loads up, optional capacity down).
-9. **Store pressure** — Trading weekly pattern + optional **seasonal** cosine + pipeline extras (e.g. December retail seasoning; Australia post-Christmas summer lift) feed **store_pressure** and risk blending.
-10. **Capacity & risk** — Nominal caps come from `resources`; holidays can taper capacity. **Risk** combines utilisation, headroom, store/campaign signals, then optional **heatmap gamma** and **transfer curve** for colour mapping.
+9. **Store pressure** — Trading weekly pattern + optional **monthly_pattern** and **seasonal** cosine, then **code-only** regional seasoning (see §9a), then payday shape, windows, campaigns, holidays.
+10. **Capacity & risk** — Nominal caps come from `resources`; holidays can taper capacity. **Risk** combines utilisation, headroom, store/campaign signals into **`risk_score`**. **Runway cell colour** uses **lens metrics** (`tech_pressure` for Technology, **`inStoreHeatmapMetric`** for Business) after γ + curve — not raw **`risk_score`** (see [CAPACITY-RUNWAY.md](./CAPACITY-RUNWAY.md)).
 
 The result is a per-day **`RiskRow`** series rendered as the runway grid and tooltips.
 
@@ -27,21 +27,26 @@ The result is a per-day **`RiskRow`** series rendered as the runway grid and too
 
 | Section | Purpose |
 | --- | --- |
-| `country` | Market id (e.g. `DE`, `AU`). Becomes `MarketConfig.market`. |
-| `resources` | Nominal **capacity**: lab slots and summed team sizes. |
-| `bau` | Repeating weekly spikes (promo cycle, integration tests). |
-| `campaigns` | Named programmes with prep and live (or presence-only) loads. |
+| `market` | Preferred market id (`DE`, `AU`, …). Legacy **`country`** still parses; both become `MarketConfig.market`. |
+| `title` / `description` | Optional display strings; `title` defaults to market id. |
+| `releases` | Optional phased deploy loads (`systems` × `phases` × `load`); see [CAPACITY-RUNWAY.md](./CAPACITY-RUNWAY.md). |
+| `resources` | **`labs.capacity`**, **`staff.capacity`** (FTE-style team cap); legacy **`teams.*.size`** still sums to the same cap. |
+| `bau` | Preferred: **`days_in_use`** + **`weekly_cycle`** (`labs_required`, `staff_required`, optional `support_days`) + optional **`integration_tests`**. Legacy `weekly_promo_cycle` / `weekly_promo` still supported. |
+| `campaigns` | List or map. Preferred keys: **`start_date`**, **`testing_prep_duration`**, **`campaign_support`** (`tech_staff`, `labs_required`, …), **`live_campaign_support`**, **`business_uplift`**. Legacy `start`, `prep_before_live_days`, `load`, `live_support_load` still parse. |
+| `public_holidays` / `school_holidays` | **`auto`**, **`dates`**, **`staffing_multiplier`** (cap on that holiday type), optional **`trading_multiplier`**; school may include **`load_effects`** (replaces most `stress_correlations.school_holidays` use). |
+| `holidays` | Cross-cutting: **`capacity_taper_days`**, **`lab_capacity_scale`**. `auto_public` / `auto_school` can also be driven from the new blocks (see parser). |
+| `stress_correlations` | Legacy school-holiday load multipliers; merged with `school_holidays.load_effects` / `trading_multiplier` when both present. |
 | `operating_windows` | Named calendar windows that scale loads or tighten capacity. |
-| `holidays` | Flags for auto public/school stubs + optional capacity taper near holidays. |
-| `stress_correlations` | Extra multipliers when **school** holidays apply. |
-| `trading` | Weekly store-trading intensity + optional **seasonal** peak month/amplitude. |
+| `trading` | Weekly store-trading + optional **monthly_pattern**, seasonal, payday, campaign store boosts. |
 | `tech` | Weekly tech rhythm scaled into lab/team readiness load. |
 | `risk_heatmap_gamma` | Optional exponent on the score before palette mapping (clamped in parser). |
 | `risk_heatmap_curve` | Optional transfer curve id (`power`, `linear`, `sigmoid`, …). |
 
 **Dates:** Prefer quoted strings (`'2026-04-07'`). Some YAML loaders turn unquoted `YYYY-MM-DD` into `Date` objects and break lexicographic comparisons.
 
-**Multi-document:** Paste several markets in one editor buffer separated by `---`; the parser returns one `MarketConfig` per document.
+**Multi-document:** Paste several markets in one editor buffer separated by `---`; the parser returns one `MarketConfig` per document. UI helpers match **`market:`** or **`country:`** on the first line of each document (`src/lib/dslMarketLine.ts`).
+
+**LLM authoring:** See [LLM_MARKET_DSL_PROMPT.md](./LLM_MARKET_DSL_PROMPT.md) for the full prompt and schema.
 
 ---
 
@@ -90,6 +95,10 @@ If you omit `prep_before_live_days` but set **`readiness_duration`** (or camelCa
 
 Marks the campaign on the calendar for **presence / risk** purposes **without** adding phase loads. Use when the real load is already modeled elsewhere (e.g. **`operating_windows`**) to avoid double-counting.
 
+### 5.4b `replaces_bau_tech: true`
+
+When **true**, on **prep** days where this campaign contributes **labs, teams, or backend**, the engine **does not** add **`tech.weekly_pattern`** for that day and **zeros labs/teams/backend** on **BAU** loads (ops/commercial unchanged). Use when campaign delivery **reuses the same engineering pipe** as recurring non-prod work so loads should **not** stack. Default **false** (additive).
+
 ### 5.5 Staggered functional prep (`stagger_functional_loads`)
 
 When **`true`** (with `prep_before_live_days`), prep is **not** flat across the whole prep window. Instead:
@@ -136,37 +145,51 @@ Public holidays still set `holiday_flag` but use this block only when the day is
 
 ## 9. `trading`
 
-- **`weekly_pattern`** — For each weekday name (`Sun`–`Sat`), a level: `low`, `medium`, `high`, `very_high`. These map to numeric store-pressure contributions.
+- **`weekly_pattern`** — For each weekday name (`Sun`–`Sat`), a **0–1** number or the same named levels as tech (`low`, `medium`, `high`, `very_high`). Compact keys `default`, `weekdays`, `weekend` are expanded in the parser. These become numeric store-pressure contributions.
+- **`monthly_pattern`** — Optional Jan–Dec scalars multiplying weekly store pressure for that month.
+- **`campaign_effect_scale`** — Per-market **0–2.5** (default **1**). Scales **`campaign_risk`** (Marketing in the Business lens and in **`risk_score`**) and multiplies **`campaign_store_boost_prep`** / **`campaign_store_boost_live`**. **0** removes campaign-driven pressure (phase loads from campaigns are unchanged). The in-app **Campaign scenario overlay** slider multiplies this per market (not persisted in YAML); see [DSL_CAMPAIGNS_AND_TRADING.md](./DSL_CAMPAIGNS_AND_TRADING.md).
+- **`campaign_store_boost_prep`**, **`campaign_store_boost_live`** — Additive uplift on base store pressure while load-bearing campaigns are in prep / live (defaults 0 and 0.28). These are multiplied by **`campaign_effect_scale`** after YAML parse.
+- **`payday_month_peak_multiplier`** — First-week-of-month store lift; see `paydayMonthShape.ts`.
 - **`seasonal`** — `peak_month` (1–12) and `amplitude` (capped in parser, e.g. ≤ 0.6) define a gentle annual cosine on store pressure so summer vs winter markets differ without hand-editing every day.
 
-The pipeline may apply additional market-specific seasoning (e.g. December retail, AU summer) on top of this.
+### 9a. Non-YAML store seasoning (fair-comparison note)
+
+After YAML-derived weekly, monthly, and **seasonal** trading, **`getStorePressureForDate`** (`src/engine/pipeline.ts`) applies **fixed engine behaviour** (not controllable in DSL today):
+
+- **`applyDecemberRestaurantSeasoning`** — All markets: modest extra lift **1–24 Dec**, **0** on **25 Dec**, then YAML level only for the rest of December (`src/engine/weighting.ts`).
+- **`applyAustraliaPostChristmasSummerLift`** — **`market === 'AU'`** only: small extra lift **26–31 Dec** and through **January** (southern summer / holidays).
+
+Authors comparing markets should treat these as **shared platform seasoning**, not per-file DSL.
 
 ---
 
 ## 10. `tech`
 
-- **`weekly_pattern`** — Same level vocabulary as trading; drives recurring **tech rhythm** loads (scaled into lab/team readiness).
+- **`weekly_pattern`** — Same rules as `trading.weekly_pattern` (numeric 0–1 or named levels); drives recurring **tech rhythm** loads (scaled into lab/team readiness).
 - **`labs_scale`**, **`teams_scale`**, **`backend_scale`** — Scale factors for that rhythm (sensible defaults if omitted).
 
 ---
 
 ## 11. Heatmap tuning
 
-- **`risk_heatmap_gamma`** — After the main risk score is computed, the heatmap index may use **score γ** (gamma is clamped to a safe range in the parser). Some **`risk_heatmap_curve`** ids ignore or reinterpret gamma; see `RISK_HEATMAP_CURVE_OPTIONS` in `src/lib/riskHeatmapTransfer.ts`.
+- **`risk_heatmap_gamma`** / **`risk_heatmap_gamma_tech`** / **`risk_heatmap_gamma_business`** — Exponent on the **lens metric** before palette mapping (clamped in the parser). Per-lens gammas override the legacy single γ when set.
+- **`risk_heatmap_curve`** — Transfer curve id (`power`, `linear`, `sigmoid`, …); see `RISK_HEATMAP_CURVE_OPTIONS` in `src/lib/riskHeatmapTransfer.ts`.
+- **`riskHeatmapStressCutoff`** (UI only, Zustand) — Dims runway cells whose **transformed** score falls below a threshold (`RunwayGrid` → `riskHeatmapColors`). Not a YAML field.
 
 These affect **visualisation**, not the underlying load math.
 
 ---
 
-## 12. `releases` (typed, rarely in YAML)
+## 12. `releases`
 
-`MarketConfig` includes **`releases`** for phased deploy shapes. The main market YAML path today emphasizes **campaigns**; releases are part of the type system for future or advanced bundles.
+Optional YAML array: **`deploy_date`**, **`systems`**, **`phases`** (`name` + `offset_days`), **`load`**. See [CAPACITY-RUNWAY.md](./CAPACITY-RUNWAY.md). When omitted, **`releases`** defaults to `[]`.
 
 ---
 
 ## 13. Operational notes
 
-- **Determinism:** Core loads, parsing, carry-over, and blend weights are deterministic for a given YAML. A small **operational noise** layer may still add visual jitter to risk unless tuned off.
+- **Determinism:** Core loads, parsing, carry-over, and blend weights are deterministic for a given YAML. A small **operational noise** layer jitters **`risk_score`** and **`tech_pressure`** (`dataNoise.ts`); Business lens colouring is mostly unaffected.
+- **Auto holidays:** **`auto_public`** / **`auto_school`** use **stub** multi-year lists in `holidayCalc.ts`, not an authoritative calendar API — treat flags as **illustrative** for PMO conversations.
 - **New markets:** Add `XX.yaml`, run **`npm run generate:markets`** (or rely on `dev` / `prebuild`) so **`manifest.json`** includes the id.
 - **Build output:** `dist/data/markets/` is emitted from `public/`; treat **`public/data/markets/`** as source of truth.
 

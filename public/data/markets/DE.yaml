@@ -1,387 +1,142 @@
-# Germany — KMK / Land school breaks (NRW-style stub in `holidayCalc.ts`). Easter: 2026-04-05, 2027-03-28, 2028-04-16.
-# Stub calendars + Monopoly windows span **~five quarters** (MODEL_MONTHS=15) from any quarter start.
-country: DE
+# Germany — KMK-style school stubs (`school_holidays.auto`); public bank days (`public_holidays.auto`).
+# Campaign narrative: Monopoly 2025–26 ends mid‑Jan 2026; Spring (Easter), summer holidays kickoff,
+# Herbst‑Kalender (Oct), then Monopoly 2026–27 as the dominant annual programme (mid‑Nov → mid‑Jan).
+market: DE
+title: Germany
+risk_heatmap_gamma_tech: 1.06
+risk_heatmap_gamma_business: 1.22
 
 resources:
   labs:
     capacity: 5
-  teams:
-    pos_team:
-      size: 4
-      sme_depth: 2
+  staff:
+    capacity: 4
+  testing_capacity: 5
 
 bau:
-  weekly_promo_cycle:
-    day: Tue
-    labs: 2
+  days_in_use: [mo, tu, we, th, fr]
+  weekly_cycle:
+    labs_required: 2
+    staff_required: 0
     support_days: 2
   integration_tests:
-    frequency: weekly
     day: Thu
     labs: 2
 
-# Simulated seasonal mega-campaigns (NRW-style school breaks in `holidayCalc.ts` / KMK-style patterns).
-# prep_before_live_days = max prep calendar; live_support_load = in-campaign (ops/commercial-heavy).
-# Optional stagger_functional_loads: tech in last ~6 weeks of prep ending ~2 weeks before live; commercial ~30d;
-# supply (ops) ~21d before live in prep; live segment unchanged.
+# Chronological. Monopoly live windows: ~8 weeks mid‑Nov through 2nd week Jan (half‑open duration in engine).
 campaigns:
-  - name: spring_easter_peak_2026
-    start: 2026-03-30
-    duration: 12
-    prep_before_live_days: 56
+  - name: monopoly_live_2025_26
+    start_date: '2025-11-17'
+    duration: 57
+    testing_prep_duration: 63
+    impact: very_high
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 5.1
+      tech_staff: 3.95
+    live_campaign_support:
+      labs_required: 1.35
+      tech_staff: 1.28
+  - name: spring_campaign_easter_2026
+    # 30 live days spanning Easter (Sun 2026-04-05)
+    start_date: '2026-03-18'
+    duration: 30
+    testing_prep_duration: 28
+    impact: high
+    business_uplift: 0.88
     stagger_functional_loads: true
-    impact: very_high
-    load:
-      labs: 4.2
-      teams: 3.2
-      backend: 1.7
-      ops: 1.2
-      commercial: 0.76
-    live_support_load:
-      labs: 1.1
-      teams: 1.15
-      backend: 0.5
-      ops: 2.6
-      commercial: 0.93
-  - name: summer_school_hol_peak_2026
-    start: 2026-07-15
-    duration: 42
-    prep_before_live_days: 63
-    impact: very_high
-    load:
-      labs: 4.5
-      teams: 3.4
-      backend: 1.85
-      ops: 1.35
-      commercial: 0.82
-    live_support_load:
-      labs: 1.05
-      teams: 1.2
-      backend: 0.48
-      ops: 2.85
-      commercial: 0.95
-  - name: autumn_herbst_peak_2026
-    start: 2026-10-12
-    duration: 14
-    prep_before_live_days: 45
+    campaign_support:
+      labs_required: 3.55
+      tech_staff: 2.75
+    live_campaign_support:
+      labs_required: 0.95
+      tech_staff: 1.02
+  - name: summer_campaign_2026
+    # ~30 days from the start of the German summer school break (varies by Land; anchor late July)
+    start_date: '2026-07-24'
+    duration: 30
+    testing_prep_duration: 28
     impact: high
-    load:
-      labs: 3.6
-      teams: 2.8
-      backend: 1.4
-      ops: 1.1
-      commercial: 0.72
-    live_support_load:
-      labs: 1
-      teams: 1.05
-      backend: 0.42
-      ops: 2.35
-      commercial: 0.88
-  - name: spring_easter_peak_2027
-    start: 2027-04-19
-    duration: 12
-    prep_before_live_days: 56
-    impact: very_high
-    load:
-      labs: 4.2
-      teams: 3.2
-      backend: 1.7
-      ops: 1.2
-      commercial: 0.76
-    live_support_load:
-      labs: 1.1
-      teams: 1.15
-      backend: 0.5
-      ops: 2.6
-      commercial: 0.93
-  - name: summer_school_hol_peak_2027
-    start: 2027-07-14
-    duration: 42
-    prep_before_live_days: 63
-    impact: very_high
-    load:
-      labs: 4.5
-      teams: 3.4
-      backend: 1.85
-      ops: 1.35
-      commercial: 0.82
-    live_support_load:
-      labs: 1.05
-      teams: 1.2
-      backend: 0.48
-      ops: 2.85
-      commercial: 0.95
-  - name: autumn_herbst_peak_2027
-    start: 2027-10-11
-    duration: 14
-    prep_before_live_days: 45
-    impact: high
-    load:
-      labs: 3.6
-      teams: 2.8
-      backend: 1.4
-      ops: 1.1
-      commercial: 0.72
-    live_support_load:
-      labs: 1
-      teams: 1.05
-      backend: 0.42
-      ops: 2.35
-      commercial: 0.88
-  - name: spring_easter_peak_2028
-    start: 2028-03-27
-    duration: 12
-    prep_before_live_days: 56
-    impact: very_high
-    load:
-      labs: 4.2
-      teams: 3.2
-      backend: 1.7
-      ops: 1.2
-      commercial: 0.76
-    live_support_load:
-      labs: 1.1
-      teams: 1.15
-      backend: 0.5
-      ops: 2.6
-      commercial: 0.93
-  - name: summer_school_hol_peak_2028
-    start: 2028-07-12
-    duration: 42
-    prep_before_live_days: 63
-    impact: very_high
-    load:
-      labs: 4.5
-      teams: 3.4
-      backend: 1.85
-      ops: 1.35
-      commercial: 0.82
-    live_support_load:
-      labs: 1.05
-      teams: 1.2
-      backend: 0.48
-      ops: 2.85
-      commercial: 0.95
-  - name: autumn_herbst_peak_2028
-    start: 2028-10-09
-    duration: 14
-    prep_before_live_days: 45
-    impact: high
-    load:
-      labs: 3.6
-      teams: 2.8
-      backend: 1.4
-      ops: 1.1
-      commercial: 0.72
-    live_support_load:
-      labs: 1
-      teams: 1.05
-      backend: 0.42
-      ops: 2.35
-      commercial: 0.88
-  # Monopoly — same dates as operating_windows below; presence_only avoids double-counting commercial loads.
-  - name: monopoly_digital_readiness_2025
-    start: 2025-10-01
-    duration: 61
+    business_uplift: 0.9
+    campaign_support:
+      labs_required: 3.75
+      tech_staff: 2.88
+    live_campaign_support:
+      labs_required: 1.0
+      tech_staff: 1.05
+  - name: herbst_kalender_2026
+    start_date: '2026-10-01'
+    duration: 30
+    testing_prep_duration: 24
     impact: medium
-    presence_only: true
-  - name: monopoly_live_2025_26
-    start: 2025-12-01
-    duration: 45
-    impact: very_high
-    presence_only: true
-  - name: monopoly_digital_readiness_2026
-    start: 2026-10-01
-    duration: 61
-    impact: medium
-    presence_only: true
+    business_uplift: 0.82
+    campaign_support:
+      labs_required: 3.15
+      tech_staff: 2.45
+    live_campaign_support:
+      labs_required: 0.85
+      tech_staff: 0.95
   - name: monopoly_live_2026_27
-    start: 2026-12-01
-    duration: 45
+    start_date: '2026-11-17'
+    duration: 57
+    testing_prep_duration: 63
     impact: very_high
-    presence_only: true
-  - name: monopoly_digital_readiness_2027
-    start: 2027-10-01
-    duration: 61
-    impact: medium
-    presence_only: true
-  - name: monopoly_live_2027_28
-    start: 2027-12-01
-    duration: 45
-    impact: very_high
-    presence_only: true
-  - name: monopoly_digital_readiness_2028
-    start: 2028-10-01
-    duration: 61
-    impact: medium
-    presence_only: true
-  - name: monopoly_live_2028_29
-    start: 2028-12-01
-    duration: 45
-    impact: very_high
-    presence_only: true
-  # Mega advent: ~2-month prep (build/content/menu) then full December live; complements Monopoly presence_only rows above.
-  - name: advent_mega_campaign_2026
-    start: 2026-12-01
-    duration: 31
-    prep_before_live_days: 61
-    impact: very_high
-    load:
-      labs: 4.7
-      teams: 3.55
-      backend: 1.88
-      ops: 1.45
-      commercial: 0.88
-    live_support_load:
-      labs: 1.12
-      teams: 1.22
-      backend: 0.52
-      ops: 2.95
-      commercial: 0.97
-  - name: advent_mega_campaign_2027
-    start: 2027-12-01
-    duration: 31
-    prep_before_live_days: 61
-    impact: very_high
-    load:
-      labs: 4.7
-      teams: 3.55
-      backend: 1.88
-      ops: 1.45
-      commercial: 0.88
-    live_support_load:
-      labs: 1.12
-      teams: 1.22
-      backend: 0.52
-      ops: 2.95
-      commercial: 0.97
-  - name: advent_mega_campaign_2028
-    start: 2028-12-01
-    duration: 31
-    prep_before_live_days: 61
-    impact: very_high
-    load:
-      labs: 4.7
-      teams: 3.55
-      backend: 1.88
-      ops: 1.45
-      commercial: 0.88
-    live_support_load:
-      labs: 1.12
-      teams: 1.22
-      backend: 0.52
-      ops: 2.95
-      commercial: 0.97
+    business_uplift: 1.0
+    campaign_support:
+      labs_required: 5.35
+      tech_staff: 4.1
+    live_campaign_support:
+      labs_required: 1.42
+      tech_staff: 1.32
 
-holidays:
-  auto_public: true
-  auto_school: true
+public_holidays:
+  auto: true
+  dates: []
+  staffing_multiplier: 0.5
+  trading_multiplier: 1.05
 
-# Not a public holiday — busier restaurants + HQ/field resourcing pinch (effective lab/team cap −25%).
-operating_windows:
-  - name: oktoberfest_trade_2026
-    start: 2026-09-19
-    end: 2026-10-05
-    store_pressure_mult: 1.2
-    lab_team_capacity_mult: 0.75
-  - name: oktoberfest_trade_2027
-    start: 2027-09-18
-    end: 2027-10-03
-    store_pressure_mult: 1.2
-    lab_team_capacity_mult: 0.75
-  - name: oktoberfest_trade_2028
-    start: 2028-09-16
-    end: 2028-10-03
-    store_pressure_mult: 1.2
-    lab_team_capacity_mult: 0.75
-
-# Monopoly DE — annual readiness + live/protection (2025–26 includes early Jan 2026 live tail).
-  - name: monopoly_digital_readiness_2025
-    start: 2025-10-01
-    end: 2025-11-30
-    lab_load_mult: 1.22
-    team_load_mult: 1.15
-    backend_load_mult: 1.28
-    ops_activity_mult: 1.12
-    commercial_activity_mult: 1.06
-  - name: monopoly_live_2025_26
-    start: 2025-12-01
-    end: 2026-01-14
-    store_pressure_mult: 1.5
-    lab_load_mult: 1.06
-    team_load_mult: 1.06
-    backend_load_mult: 1.12
-    ops_activity_mult: 1.1
-    commercial_activity_mult: 1.12
-  - name: monopoly_digital_readiness_2026
-    start: 2026-10-01
-    end: 2026-11-30
-    lab_load_mult: 1.22
-    team_load_mult: 1.15
-    backend_load_mult: 1.28
-    ops_activity_mult: 1.12
-    commercial_activity_mult: 1.06
-  - name: monopoly_live_2026_27
-    start: 2026-12-01
-    end: 2027-01-14
-    store_pressure_mult: 1.5
-    lab_load_mult: 1.06
-    team_load_mult: 1.06
-    backend_load_mult: 1.12
-    ops_activity_mult: 1.1
-    commercial_activity_mult: 1.12
-  - name: monopoly_digital_readiness_2027
-    start: 2027-10-01
-    end: 2027-11-30
-    lab_load_mult: 1.22
-    team_load_mult: 1.15
-    backend_load_mult: 1.28
-    ops_activity_mult: 1.12
-    commercial_activity_mult: 1.06
-  - name: monopoly_live_2027_28
-    start: 2027-12-01
-    end: 2028-01-14
-    store_pressure_mult: 1.5
-    lab_load_mult: 1.06
-    team_load_mult: 1.06
-    backend_load_mult: 1.12
-    ops_activity_mult: 1.1
-    commercial_activity_mult: 1.12
-  - name: monopoly_digital_readiness_2028
-    start: 2028-10-01
-    end: 2028-11-30
-    lab_load_mult: 1.22
-    team_load_mult: 1.15
-    backend_load_mult: 1.28
-    ops_activity_mult: 1.12
-    commercial_activity_mult: 1.06
-  - name: monopoly_live_2028_29
-    start: 2028-12-01
-    end: 2029-01-14
-    store_pressure_mult: 1.5
-    lab_load_mult: 1.06
-    team_load_mult: 1.06
-    backend_load_mult: 1.12
-    ops_activity_mult: 1.1
-    commercial_activity_mult: 1.12
-
-stress_correlations:
-  school_holidays:
-    store_pressure_mult: 1.08
+school_holidays:
+  auto: true
+  dates: []
+  staffing_multiplier: 0.88
+  trading_multiplier: 1.08
+  load_effects:
     lab_load_mult: 1.05
     team_load_mult: 1.08
     backend_load_mult: 1.04
     ops_activity_mult: 1.05
     commercial_activity_mult: 1.08
-    lab_team_capacity_mult: 0.94
+
+holidays:
+  capacity_taper_days: 3
+  lab_capacity_scale: 0.5
 
 trading:
-  # Compact: `default` + overrides (parser expands to Mon–Sun; same as listing all seven days).
+  campaign_store_boost_prep: 0
+  campaign_store_boost_live: 0.28
+  payday_month_peak_multiplier: 1.12
+  campaign_effect_scale: 1.05
+  monthly_pattern:
+    Jan: 1
+    Feb: 1
+    Mar: 0.8
+    Apr: 0.7
+    May: 0.68
+    Jun: 0.69
+    Jul: 0.71
+    Aug: 0.73
+    Sep: 0.75
+    Oct: 0.8
+    Nov: 0.78
+    Dec: 1
   weekly_pattern:
-    default: medium
-    Thu: high
-    Fri: high
-    Sat: very_high
+    Mon: 0.7
+    Tue: 0.72
+    Wed: 0.74
+    Thu: 0.8
+    Fri: 0.95
+    Sat: 1.0
+    Sun: 0.6
   seasonal:
     peak_month: 7
     amplitude: 0.11

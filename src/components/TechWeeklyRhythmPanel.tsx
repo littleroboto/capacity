@@ -15,6 +15,7 @@ import { gammaFocusMarket, isRunwayAllMarkets } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import type { TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import type { TradingMonthlyPatternPatch } from '@/lib/dslTradingMonthlyPatch';
+import { WeightingLineMiniChart } from '@/components/WeightingLineMiniChart';
 
 function clampInput01(raw: string): number | null {
   const n = parseFloat(raw);
@@ -111,6 +112,16 @@ export function TechWeeklyRhythmPanel() {
     return fullTradingMonthlyPatternFromPartial(c?.monthlyTradingPattern);
   }, [configs, focusMarket]);
 
+  const weeklySeries = useMemo(
+    () => TECH_WEEKLY_DAY_KEYS.map((d) => roundTechUnit(techPattern[d])),
+    [techPattern]
+  );
+
+  const monthlySeries = useMemo(
+    () => TRADING_MONTH_KEYS.map((m) => roundMonthlyUnit(monthlyPattern[m])),
+    [monthlyPattern]
+  );
+
   const patchTechDay = (day: TechWeeklyDayKey, n: number) => {
     const next: TechWeeklyPatternPatch = { ...techPattern, [day]: roundTechUnit(n) };
     setTechWeeklyPattern(next);
@@ -152,6 +163,10 @@ export function TechWeeklyRhythmPanel() {
             />
           ))}
         </div>
+        <WeightingLineMiniChart
+          values={weeklySeries}
+          ariaLabel={`Tech weekly rhythm 0 to 1 by weekday for ${focusMarket}`}
+        />
       </div>
 
       <div className="flex flex-col gap-0.5 pt-1">
@@ -183,6 +198,11 @@ export function TechWeeklyRhythmPanel() {
             />
           ))}
         </div>
+        <WeightingLineMiniChart
+          values={monthlySeries}
+          ariaLabel={`Trading monthly store multipliers 0 to 1 by month for ${focusMarket}`}
+          height={62}
+        />
       </div>
     </div>
   );

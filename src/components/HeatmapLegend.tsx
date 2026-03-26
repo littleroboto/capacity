@@ -1,5 +1,11 @@
 import type { ViewModeId } from '@/lib/constants';
-import { heatmapColorContinuous, STRESS_BELOW_CUTOFF_FILL } from '@/lib/riskHeatmapColors';
+import {
+  heatmapColorDiscrete,
+  heatmapColorForViewMode,
+  HEATMAP_TEMPERATURE_BAND_LABELS,
+  HEATMAP_TEMPERATURE_STEP_COUNT,
+  type HeatmapColorOpts,
+} from '@/lib/riskHeatmapColors';
 
 /** Match `HeatCell` non-motion box rounding. */
 const LEGEND_CELL_ROUNDED = 'rounded-[3px]';
@@ -22,74 +28,57 @@ function LegendSquare({
   );
 }
 
-function LegendRow({
-  color,
-  label,
-  cellSizePx,
-  cellGapPx,
-}: {
-  color: string;
-  label: string;
-  cellSizePx: number;
-  cellGapPx: number;
-}) {
-  return (
-    <div className="flex shrink-0 items-center" style={{ gap: cellGapPx }}>
-      <LegendSquare color={color} title={label} cellSizePx={cellSizePx} />
-      <span className="max-w-[12rem] text-[10px] leading-tight text-muted-foreground">{label}</span>
-    </div>
-  );
-}
-
 export type HeatmapLegendProps = {
   viewMode: ViewModeId;
-  stressCutoff?: number;
   /** Same as heatmap `CELL_PX`. */
   cellSizePx: number;
   /** Same as `RUNWAY_CELL_GAP_PX` between heat cells. */
   cellGapPx: number;
   className?: string;
+  /** With `heatmapOpts`, ramp matches runway cells (γ / curve, same as grid). */
+  heatmapOpts?: HeatmapColorOpts;
 };
 
 export function HeatmapLegend({
   viewMode,
-  stressCutoff = 0,
   cellSizePx,
   cellGapPx,
   className,
+  heatmapOpts,
 }: HeatmapLegendProps) {
   const stackStyle = { gap: cellGapPx } as const;
 
-  /** Top = high (red); bottom = low (green). Same stepped preview as the continuous cell ramp for both lenses. */
-  const legendSteps = 22;
-  const gradientTopToBottom = Array.from({ length: legendSteps }, (_, i) =>
-    heatmapColorContinuous(1 - i / (legendSteps - 1))
-  );
+  /** One swatch per temperature band (hot at top); sample band centre so colour matches grid cells. */
+  const legendSteps = HEATMAP_TEMPERATURE_STEP_COUNT;
+  const monoLegend = heatmapOpts?.renderStyle === 'mono';
+
+  const gradientTopToBottom = Array.from({ length: legendSteps }, (_, i) => {
+    const bandFromLow = legendSteps - 1 - i;
+    const metric01 = (bandFromLow + 0.5) / legendSteps;
+    const color = heatmapOpts
+      ? heatmapColorForViewMode(viewMode, metric01, heatmapOpts)
+      : heatmapColorDiscrete(metric01);
+    return {
+      color,
+      title: HEATMAP_TEMPERATURE_BAND_LABELS[bandFromLow]!,
+    };
+  });
 
   return (
     <div className={className} data-view-mode={viewMode}>
       <div className="flex flex-col" style={stackStyle}>
-        {stressCutoff > 0 ? (
-          <LegendRow
-            color={STRESS_BELOW_CUTOFF_FILL}
-            label={`Below cutoff (< ${Math.round(stressCutoff * 100)}%)`}
-            cellSizePx={cellSizePx}
-            cellGapPx={cellGapPx}
-          />
-        ) : null}
-
         <div
           className="flex shrink-0 flex-col items-start"
           style={stackStyle}
           role="img"
-          aria-label="Colour scale from high to low"
+          aria-label={monoLegend ? 'Opacity scale from high to low (single colour)' : 'Colour scale from high to low'}
         >
           <span className="w-full text-left text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
             High
           </span>
           <div className="flex flex-col" style={{ width: cellSizePx, ...stackStyle }}>
-            {gradientTopToBottom.map((c, i) => (
-              <LegendSquare key={i} color={c} cellSizePx={cellSizePx} />
+            {gradientTopToBottom.map((row, i) => (
+              <LegendSquare key={i} color={row.color} title={row.title} cellSizePx={cellSizePx} />
             ))}
           </div>
           <span className="w-full text-left text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">

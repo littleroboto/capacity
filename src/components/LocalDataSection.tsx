@@ -89,6 +89,12 @@ function parseScenariosImport(raw: unknown): ScenarioState[] | null {
     }
     if (typeof o.discoMode === 'boolean') s.discoMode = o.discoMode;
     if (o.theme === 'light' || o.theme === 'dark') s.theme = o.theme;
+    if (o.heatmapRenderStyle === 'mono' || o.heatmapRenderStyle === 'spectrum') {
+      s.heatmapRenderStyle = o.heatmapRenderStyle;
+    }
+    if (typeof o.heatmapMonoColor === 'string' && o.heatmapMonoColor.trim()) {
+      s.heatmapMonoColor = o.heatmapMonoColor.trim();
+    }
 
     out.push(s);
   }

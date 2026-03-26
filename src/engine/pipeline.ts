@@ -5,6 +5,7 @@
 import { PRESSURE_SURFACE_IDS } from '@/domain/pressureSurfaces';
 import { emptySurfaceTotals } from '@/domain/pressureSurfaces';
 import { applyLoadCarryover } from '@/planning/carryover';
+import { campaignLoadBearingPrepLiveForDate } from './campaignPrepLive';
 import { buildCalendar, parseDate } from './calendar';
 import { computeCapacity } from './capacityModel';
 import { createHolidayCheck } from './holidayLoader';
@@ -18,8 +19,9 @@ import {
 import { withOperationalNoise } from './dataNoise';
 import { computeRisk, type RiskRow } from './riskModel';
 import { storePaydayMonthMultiplier } from '@/engine/paydayMonthShape';
+import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
 import { DEFAULT_RISK_TUNING, type RiskModelTuning } from './riskModelTuning';
-import type { MarketConfig } from './types';
+import type { CampaignConfig, MarketConfig } from './types';
 import { TRADING_MONTH_KEYS } from '@/lib/tradingMonthlyDsl';
 import { parseAllYamlDocuments } from './yamlDslParser';
 import {
@@ -34,7 +36,6 @@ import {
 } from './weighting';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const TRADING_LEVELS: Record<string, number> = { low: 0.25, medium: 0.5, high: 0.75, very_high: 1 };
 const CAMPAIGN_IMPACT: Record<string, number> = { low: 0.25, medium: 0.5, high: 0.8, very_high: 1 };
 
 export function parseYamlToConfigs(dslText: string): MarketConfig[] {
@@ -68,6 +69,14 @@ export function runPipeline(
       if (sch.length) {
         mergedSchool[market] = [...(mergedSchool[market] || []), ...sch];
       }
+    }
+    const extraPub = c.publicHolidayExtraDates ?? [];
+    if (extraPub.length) {
+      mergedPublic[market] = [...(mergedPublic[market] || []), ...extraPub];
+    }
+    const extraSch = c.schoolHolidayExtraDates ?? [];
+    if (extraSch.length) {
+      mergedSchool[market] = [...(mergedSchool[market] || []), ...extraSch];
     }
   }
   const allMarkets = new Set<string>([
@@ -114,10 +123,17 @@ export function runPipeline(
   };
 
   type Meta = {
+    /** Base store-trading rhythm (weekly × monthly × seasonal × regional), including payday month shape. */
+    store_trading_base: number;
+    /** Trading pressure after campaign live/prep multipliers (before operating windows / school store mult). */
     store_pressure: number;
     campaign_active: boolean;
     campaign_risk: number;
     campaign_presence: number;
+    /** Load-bearing campaign in prep (excludes `presence_only`). */
+    campaign_in_prep: boolean;
+    /** Load-bearing campaign in live segment (excludes `presence_only`). */
+    campaign_in_live: boolean;
     holiday_flag: boolean;
     public_holiday_flag: boolean;
     school_holiday_flag: boolean;
@@ -129,12 +145,35 @@ export function runPipeline(
     const dayRow = agg.find((r) => r.date === date && r.market === market);
     const config = configByMarket[market];
     const rawStore = getStorePressureForDate(date, config);
+    const paydayPeak =
+      config?.tradingPressure?.payday_month_peak_multiplier ?? tuning.storePaydayMonthPeakMultiplier;
+    let store_trading_base = Math.min(
+      1,
+      Math.max(0, rawStore * storePaydayMonthMultiplier(date, paydayPeak))
+    );
+    const public_holiday_flag = isPublicHoliday(market, date);
+    const pubTrad = config?.publicHolidayTradingMultiplier;
+    if (public_holiday_flag && pubTrad != null && Number.isFinite(pubTrad) && pubTrad > 0) {
+      store_trading_base = Math.min(1, Math.max(0, store_trading_base * pubTrad));
+    }
+    const {
+      campaign_active,
+      campaign_risk,
+      campaign_in_prep_loaded,
+      campaign_in_live_loaded,
+    } = getCampaignStateForDate(date, config);
+    const yamlCampaignScale = config?.tradingPressure?.campaign_effect_scale ?? 1;
+    const campaignEffectScale = Math.min(
+      2.5,
+      Math.max(0, yamlCampaignScale * (tuning.campaignEffectUiMultiplier ?? 1))
+    );
+    const scaledCampaignRisk = Math.min(1, Math.max(0, campaign_risk * campaignEffectScale));
+    const boostPrep = (config?.tradingPressure?.campaign_store_boost_prep ?? 0) * campaignEffectScale;
+    const boostLive = (config?.tradingPressure?.campaign_store_boost_live ?? 0.28) * campaignEffectScale;
     const store_pressure = Math.min(
       1,
-      Math.max(0, rawStore * storePaydayMonthMultiplier(date, tuning.storePaydayMonthPeakMultiplier))
+      store_trading_base * (1 + boostPrep * (campaign_in_prep_loaded ? 1 : 0) + boostLive * (campaign_in_live_loaded ? 1 : 0))
     );
-    const { campaign_active, campaign_risk } = getCampaignRiskForDate(date, config);
-    const public_holiday_flag = isPublicHoliday(market, date);
     const school_holiday_flag = isSchoolHoliday(market, date);
     const holiday_flag = public_holiday_flag || school_holiday_flag;
     aggregated.push({
@@ -154,10 +193,13 @@ export function runPipeline(
       surfaceTotals: dayRow?.surfaceTotals ?? emptySurfaceTotals(),
     });
     metaByIndex.push({
+      store_trading_base,
       store_pressure,
       campaign_active,
-      campaign_risk,
+      campaign_risk: scaledCampaignRisk,
       campaign_presence: campaign_active ? 1 : 0,
+      campaign_in_prep: campaign_in_prep_loaded,
+      campaign_in_live: campaign_in_live_loaded,
       holiday_flag,
       public_holiday_flag,
       school_holiday_flag,
@@ -185,12 +227,31 @@ export function runPipeline(
     return m;
   };
 
+  const holidayCapScaleAtFullStress = (market: string, date: string): number => {
+    const c = configByMarket[market];
+    const baseHol =
+      c?.holidayLabCapacityScale != null && Number.isFinite(c.holidayLabCapacityScale)
+        ? Math.min(1, Math.max(0.12, c.holidayLabCapacityScale))
+        : tuning.holidayCapacityScale;
+    const pubDay = isPublicHoliday(market, date);
+    const schDay = isSchoolHoliday(market, date);
+    const pm = c?.publicHolidayStaffingMultiplier;
+    const sm = c?.schoolHolidayStaffingMultiplier;
+    const p = pm != null && Number.isFinite(pm) ? Math.min(1, Math.max(0.12, pm)) : baseHol;
+    const s = sm != null && Number.isFinite(sm) ? Math.min(1, Math.max(0.12, sm)) : baseHol;
+    if (pubDay && schDay) return Math.min(p, s);
+    if (pubDay) return p;
+    if (schDay) return s;
+    return baseHol;
+  };
+
   const withCapacity = computeCapacity(
     aggregated,
     configs,
     holidayCapacityStress,
     tuning.holidayCapacityScale,
-    labTeamCapMultForDay
+    labTeamCapMultForDay,
+    holidayCapScaleAtFullStress
   );
   const withStoreCampaign = withCapacity.map((r, i) => ({
     ...r,
@@ -311,13 +372,14 @@ function applySchoolStressCorrelations(
 
 function getStorePressureForDate(dateStr: string, config: MarketConfig | undefined): number {
   if (!config?.trading || typeof config.trading !== 'object') return 0;
-  const weekly = (config.trading as { weekly_pattern?: Record<string, string> }).weekly_pattern;
+  const weekly = (config.trading as { weekly_pattern?: Record<string, unknown> }).weekly_pattern;
   if (!weekly) return 0;
   const d = parseDate(dateStr);
   const dayName = DAY_NAMES[d.getDay()];
   const level = weekly[dayName];
   if (level == null) return 0;
-  let p = TRADING_LEVELS[String(level).toLowerCase()] ?? 0.5;
+  const parsed = parseTechRhythmScalar(level);
+  let p = parsed ?? 0.5;
   const monthKey = TRADING_MONTH_KEYS[d.getMonth()];
   if (monthKey) {
     const mm = config.monthlyTradingPattern?.[monthKey];
@@ -377,52 +439,41 @@ function scaleSurfaceCommercial(row: AggregatedDay, m: number): void {
   recomputeAggregatedTotals(row);
 }
 
-function getCampaignRiskForDate(dateStr: string, config: MarketConfig | undefined): {
+function campaignImpactValue(c: CampaignConfig): number {
+  const fromImpact =
+    c.impact && Object.prototype.hasOwnProperty.call(CAMPAIGN_IMPACT, c.impact)
+      ? CAMPAIGN_IMPACT[c.impact as keyof typeof CAMPAIGN_IMPACT]
+      : undefined;
+  const fromLoad =
+    c.load?.commercial != null && Number.isFinite(c.load.commercial) ? c.load.commercial : undefined;
+  const base = fromImpact ?? fromLoad ?? 0.5;
+  const uplift = c.businessUplift;
+  const u = uplift != null && Number.isFinite(uplift) ? uplift : 1;
+  return Math.min(1, Math.max(0, base * u));
+}
+
+/**
+ * Calendar + marketing intensity for any campaign row (including `presence_only`).
+ * Load-bearing prep/live flags exclude `presence_only` so store boost does not double-count operating_windows.
+ */
+function getCampaignStateForDate(dateStr: string, config: MarketConfig | undefined): {
   campaign_active: boolean;
   campaign_risk: number;
+  campaign_in_prep_loaded: boolean;
+  campaign_in_live_loaded: boolean;
 } {
   let campaign_active = false;
   let campaign_risk = 0;
+  let campaign_in_prep_loaded = false;
+  let campaign_in_live_loaded = false;
   const campaigns = config?.campaigns ?? [];
-  const t = parseDate(dateStr);
   for (const c of campaigns) {
-    if (!c.start) continue;
-    const start = parseDate(c.start);
-    const prepDays = c.prepBeforeLiveDays;
-    if (prepDays != null && prepDays > 0) {
-      const prepStart = new Date(start);
-      prepStart.setDate(prepStart.getDate() - prepDays);
-      const liveEnd = new Date(start);
-      liveEnd.setDate(liveEnd.getDate() + c.durationDays);
-      const inPrep = t >= prepStart && t < start;
-      const inLive = c.durationDays > 0 && t >= start && t < liveEnd;
-      if (inPrep || inLive) {
-        campaign_active = true;
-        const fromImpact =
-          c.impact && Object.prototype.hasOwnProperty.call(CAMPAIGN_IMPACT, c.impact)
-            ? CAMPAIGN_IMPACT[c.impact as keyof typeof CAMPAIGN_IMPACT]
-            : undefined;
-        const fromLoad =
-          c.load?.commercial != null && Number.isFinite(c.load.commercial) ? c.load.commercial : undefined;
-        const impact = fromImpact ?? fromLoad ?? 0.5;
-        campaign_risk = Math.max(campaign_risk, impact);
-      }
-      continue;
-    }
-    if (!c.durationDays) continue;
-    const end = new Date(start);
-    end.setDate(end.getDate() + c.durationDays);
-    if (t >= start && t < end) {
-      campaign_active = true;
-      const fromImpact =
-        c.impact && Object.prototype.hasOwnProperty.call(CAMPAIGN_IMPACT, c.impact)
-          ? CAMPAIGN_IMPACT[c.impact as keyof typeof CAMPAIGN_IMPACT]
-          : undefined;
-      const fromLoad =
-        c.load?.commercial != null && Number.isFinite(c.load.commercial) ? c.load.commercial : undefined;
-      const impact = fromImpact ?? fromLoad ?? 0.5;
-      campaign_risk = Math.max(campaign_risk, impact);
-    }
+    const seg = campaignLoadBearingPrepLiveForDate(c, dateStr);
+    if (!seg.inCampaignWindow) continue;
+    campaign_active = true;
+    campaign_risk = Math.max(campaign_risk, campaignImpactValue(c));
+    if (seg.inPrepLoaded) campaign_in_prep_loaded = true;
+    if (seg.inLiveLoaded) campaign_in_live_loaded = true;
   }
-  return { campaign_active, campaign_risk };
+  return { campaign_active, campaign_risk, campaign_in_prep_loaded, campaign_in_live_loaded };
 }

@@ -1,3 +1,4 @@
+import { parseDslMarketId } from '@/lib/dslMarketLine';
 import { MULTI_DOC_SPLIT } from '@/lib/multiDocMarketYaml';
 import { TECH_WEEKLY_DAY_KEYS, roundTechUnit, type TechWeeklyDayKey } from '@/lib/techRhythmDsl';
 
@@ -59,8 +60,8 @@ function findWeeklyPatternInTech(
 }
 
 function patchSegment(segment: string, market: string, pattern: TechWeeklyPatternPatch): string {
-  const m = segment.match(/^country:\s*(\S+)/m);
-  if (!m || m[1] !== market) return segment;
+  const id = parseDslMarketId(segment);
+  if (!id || id !== market) return segment;
 
   const lines = segment.split('\n');
   const blockLines = buildWeeklyPatternLines(pattern);

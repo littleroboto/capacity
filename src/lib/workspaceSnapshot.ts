@@ -23,8 +23,11 @@ export function buildWorkspaceSnapshot(name: string, id: string): ScenarioState 
     dslByMarket: { ...s.dslByMarket },
     riskHeatmapGamma: s.riskHeatmapGamma,
     riskHeatmapCurve: s.riskHeatmapCurve,
+    riskHeatmapStressCutoff: s.riskHeatmapStressCutoff,
     discoMode: s.discoMode,
     theme: s.theme,
+    heatmapRenderStyle: s.heatmapRenderStyle,
+    heatmapMonoColor: s.heatmapMonoColor,
   };
 }
 
