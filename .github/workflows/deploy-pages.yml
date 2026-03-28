@@ -1,8 +1,7 @@
 # Build the Vite app and publish `dist/` to GitHub Pages.
-# Repo settings → Pages → Source: GitHub Actions.
+# Settings → Pages → Build: GitHub Actions.
 #
-# The default GITHUB_TOKEN must include `actions: write` so upload-pages-artifact can publish
-# the build output; `pages: write` + `id-token: write` are required for deploy-pages.
+# upload-pages-artifact@v4 emits the artifact format deploy-pages@v4 expects (v3 used legacy upload-artifact).
 name: Deploy to GitHub Pages
 
 on:
@@ -25,14 +24,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Omit configure-pages: it can fail before Pages is enabled and Vite uses relative base (`./`) anyway.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
       - run: npm ci
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
@@ -40,7 +38,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       pages: write
       id-token: write
       actions: read
