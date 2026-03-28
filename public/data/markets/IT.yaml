@@ -158,11 +158,12 @@ trading:
 tech:
   weekly_pattern:
     default: medium
-    Mon: high
-    Tue: very_high
-    Thu: high
-    Fri: very_high
-    Sat: high
+    Mon: medium
+    Tue: medium
+    Thu: medium
+    Fri: medium
+    Sat: low
     Sun: low
-  labs_scale: 1.32
-  teams_scale: 0.82
+  labs_scale: 1
+  teams_scale: 1
+
