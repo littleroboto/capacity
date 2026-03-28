@@ -76,7 +76,7 @@ export function scenarioFromMarketConfig(config: MarketConfig, dslText?: string)
     },
     {
       functionId: 'delivery_teams',
-      baseUnits: config.capacity.teams ?? 6,
+      baseUnits: config.capacity.teams ?? 4,
       complexityMult: 1,
       efficiencyMult: 1,
     },

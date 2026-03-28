@@ -5,14 +5,14 @@
 # `resources` nominal caps: `labs.capacity` integrated-test labs; `staff.capacity` team headcount denominator; `testing_capacity` optional parallel-test slots for lab utilisation (defaults to lab count when omitted).
 market: ES
 title: Spain
-risk_heatmap_gamma_tech: 2.5
-risk_heatmap_gamma_business: 2.5
+risk_heatmap_gamma_tech: 1.5
+risk_heatmap_gamma_business: 1.5
 resources:
   labs:
-    capacity: 5
+    capacity: 6
   staff:
     capacity: 4
-  testing_capacity: 6
+  testing_capacity: 10
 
 # BAU baseline demand (business-as-usual): repeating weekday loads that sit under tech rhythm, campaigns, and releases in the phase engine.
 # `days_in_use` picks which weekdays carry that strip (`mo`…`sun` tokens). `weekly_cycle` sets nominal lab vs team mass (`labs_required`, `staff_required`).

@@ -84,8 +84,8 @@ resources:
   labs:
     capacity: 5
   staff:
-    capacity: 6                    # FTE-style team capacity (preferred)
-  testing_capacity: 5             # optional; parallel test slots (max 50 in parser)
+    capacity: 4                    # FTE-style team capacity (preferred)
+  testing_capacity: 10            # optional; parallel test slots (max 50 in parser)
   # Legacy alternative: teams as a map of { size: N } — sizes are summed
 ```
 
@@ -318,7 +318,7 @@ Aliases: `riskHeatmapGammaTech`, `riskHeatmapGammaBusiness`.
 | Topic | Behaviour |
 | --- | --- |
 | `resources.labs.capacity` | **5** |
-| Team capacity | **`staff.capacity`** or sum of `teams.*.size`, else **6** |
+| Team capacity | **`staff.capacity`** or sum of `teams.*.size`, else **4** |
 | Campaign prep `commercial` | From **`impact`** mapping or **0.5** |
 | Live segment with empty live support | Prep load × **`live_support_scale`** (~**0.45**) |
 | `live_tech_load_scale` | ~**0.55** on labs/teams/backend in live |

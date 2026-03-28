@@ -8,9 +8,10 @@ import {
 import type { ViewModeId } from '@/lib/constants';
 import { isGregorianChristmasDay } from '@/engine/weighting';
 
-/** Technology lens: lab/team/backend utilisation only (0–1). */
+/** Technology lens: uncapped demand vs caps (can exceed 1); heatmap colour still clamps for the ramp. */
 export function technologyHeatmapMetric(row: RiskRow): number {
-  return Math.min(1, Math.max(0, row.tech_pressure ?? 0));
+  const u = row.tech_demand_ratio ?? row.tech_pressure ?? 0;
+  return Math.max(0, u);
 }
 
 /**

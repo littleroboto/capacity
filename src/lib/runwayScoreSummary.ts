@@ -27,50 +27,50 @@ export function buildDriverSummaryBlocks(
     campBullets.push(...activeCampaigns.slice(0, 6));
   }
   if (row.campaign_in_live) {
-    campBullets.push('Campaign live window — demand is expressed mainly through amplified store / pipeline load.');
+    campBullets.push('Campaign is live — store and pipeline demand are turned up in the model.');
   }
   if (row.campaign_in_prep && !row.campaign_in_live) {
-    campBullets.push('Campaign prep window — adds a marketing-weighted term to the Business blend (when that lens is active).');
+    campBullets.push('Campaign prep is running — marketing load counts toward trading pressure until go-live.');
   }
   if (!campBullets.length) {
-    campBullets.push('No active named campaigns on this date (check YAML campaign windows).');
+    campBullets.push('No campaigns cover this day in the market file.');
   }
-  blocks.push({ heading: 'Campaigns & marketing', bullets: campBullets });
+  blocks.push({ heading: 'Campaigns', bullets: campBullets });
 
   const holBullets: string[] = [];
-  if (row.public_holiday_flag) holBullets.push('Public holiday — trading and capacity assumptions use holiday rules.');
-  if (row.school_holiday_flag) holBullets.push('School break — may apply stress / capacity multipliers.');
+  if (row.public_holiday_flag) holBullets.push('Public holiday — store and staffing rules follow the holiday settings.');
+  if (row.school_holiday_flag) holBullets.push('School break — can raise load or tighten capacity in the model.');
   if (row.holiday_flag && !isGregorianChristmasDay(row.date)) {
-    holBullets.push('Holiday pressure dial can apply to the Business heatmap blend.');
+    holBullets.push('Holiday factor is on — trading pressure can get extra weight on top of stores and campaigns.');
   }
   if (!holBullets.length) {
-    holBullets.push('No holiday flags on this day.');
+    holBullets.push('No public or school holiday flags for this day.');
   }
-  blocks.push({ heading: 'Holidays & closures', bullets: holBullets });
+  blocks.push({ heading: 'Holidays', bullets: holBullets });
 
   if (viewMode !== 'in_store') {
     const resBullets = [techExplanation];
     const topSurfaces = pressureSurfaceLines.slice(0, 3).map((l) => l.replace(/\s*\(max of lab\/team\/backend blend\)\s*$/, ''));
-    if (topSurfaces.length) resBullets.push(...topSurfaces.map((s) => `Surface load: ${s}`));
+    if (topSurfaces.length) resBullets.push(...topSurfaces.map((s) => `Where the work sits: ${s}`));
     if (operatingWindows.length) {
-      resBullets.push('Operating windows today may scale lab, team, backend, or store multipliers.');
+      resBullets.push('Special windows today can bump lab, team, backend, or store levels.');
       resBullets.push(...operatingWindows.slice(0, 3));
     }
-    if (bauToday.length) resBullets.push(...bauToday.map((b) => `Scheduled BAU: ${b}`));
-    blocks.push({ heading: 'Delivery & resourcing', bullets: resBullets });
+    if (bauToday.length) resBullets.push(...bauToday.map((b) => `Routine work: ${b}`));
+    blocks.push({ heading: 'Delivery & capacity', bullets: resBullets });
   } else {
     const storeBullets: string[] = [];
     if (storeTradingLine) storeBullets.push(storeTradingLine);
-    storeBullets.push(`Store pressure index after model rules: ${pctStorePressure(row.store_pressure)}%.`);
+    storeBullets.push(`Store activity level in the model: about ${pctStorePressure(row.store_pressure)}%.`);
     if (operatingWindows.length) {
-      storeBullets.push('Operating windows adjust load or capacity multipliers:');
+      storeBullets.push('These windows adjust load or how tight capacity feels:');
       storeBullets.push(...operatingWindows.slice(0, 4));
     }
     if (bauToday.length) {
-      storeBullets.push('Scheduled BAU peaks / support:');
+      storeBullets.push('Usual weekly BAU peaks or support:');
       storeBullets.push(...bauToday.slice(0, 4));
     }
-    blocks.push({ heading: 'Store rhythm & resourcing', bullets: storeBullets });
+    blocks.push({ heading: 'Stores & routine work', bullets: storeBullets });
   }
 
   return blocks;

@@ -5,11 +5,11 @@
 # `resources` nominal caps: `labs.capacity` integrated-test labs; `staff.capacity` team headcount denominator; `testing_capacity` optional parallel-test slots for lab utilisation (defaults to lab count when omitted).
 market: AU
 title: Australia
-risk_heatmap_gamma_tech: 2.5
-risk_heatmap_gamma_business: 2.5
+risk_heatmap_gamma_tech: 1.5
+risk_heatmap_gamma_business: 1.5
 resources:
   labs:
-    capacity: 5
+    capacity: 6
   staff:
     capacity: 4
   testing_capacity: 10

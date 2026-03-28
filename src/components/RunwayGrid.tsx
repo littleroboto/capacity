@@ -247,9 +247,9 @@ const WEEKDAY_GRID_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
 function fillMetricHeadlineForView(mode: ViewModeId): string {
   switch (mode) {
     case 'combined':
-      return 'Technology capacity';
+      return 'Tech capacity demand';
     case 'in_store':
-      return 'Business pressure';
+      return 'Trading pressure';
     default:
       return 'Pressure';
   }
@@ -258,9 +258,9 @@ function fillMetricHeadlineForView(mode: ViewModeId): string {
 function fillMetricLabelForView(mode: ViewModeId): string {
   switch (mode) {
     case 'combined':
-      return 'Utilisation vs capacity (labs · teams · backend)';
+      return 'Scheduled work on labs, field teams, and backend versus each lane’s capacity';
     case 'in_store':
-      return 'Business blend (store rhythm · prep marketing · holidays)';
+      return 'Store rhythm, campaigns, and holidays blended into one trading-pressure read';
     default:
       return 'Metric';
   }

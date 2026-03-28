@@ -12,8 +12,8 @@ export type CarryoverOptions = {
 };
 
 const DEFAULT_CARRY: CarryoverOptions = {
-  // Gentle defaults: YAML was authored for the pre-carry pipeline; high rates made totals explode.
-  overloadToCarryRate: 0.12,
+  /** 0 = do not roll intrinsic overload into future days; same-day load stays visible as >100% util. */
+  overloadToCarryRate: 0,
   decayPerDay: 0.92,
   maxCarryMultVsCap: 1.25,
 };
@@ -47,7 +47,7 @@ export function applyLoadCarryover(
   for (const c of configs) {
     nominal[c.market] = {
       labs: c.capacity.labs ?? 5,
-      teams: c.capacity.teams ?? 6,
+      teams: c.capacity.teams ?? 4,
       backend: c.capacity.backend ?? 1000,
     };
   }
@@ -65,7 +65,7 @@ export function applyLoadCarryover(
     let carryBack = 0;
 
     for (const row of list) {
-      const cap = nominal[row.market] ?? { labs: 5, teams: 6, backend: 1000 };
+      const cap = nominal[row.market] ?? { labs: 5, teams: 4, backend: 1000 };
       carryLab *= opts.decayPerDay;
       carryTeam *= opts.decayPerDay;
       carryBack *= opts.decayPerDay;

@@ -27,6 +27,11 @@ export type RiskRow = CapacityRow & {
   campaign_in_prep: boolean;
   /** Load-bearing campaign in live window. */
   campaign_in_live: boolean;
+  /**
+   * Same lane logic as `tech_pressure` (max of lab, team, ½ backend vs caps) but **not** capped at 1 —
+   * used for the Technology heatmap and day summary so overload shows as e.g. 105%.
+   */
+  tech_demand_ratio: number;
   tech_pressure: number;
   /**
    * Utilisation-style pressure from readiness-tagged loads only (change/BAU work).
@@ -105,6 +110,10 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
     const backend = r.backend_pressure ?? 0;
     const rawTechPressure = Math.min(1, Math.max(lab, team, backend * 0.5));
     const tech_pressure = compressTechUtilisation01(rawTechPressure);
+    const labR = r.lab_load_ratio ?? lab;
+    const teamR = r.team_load_ratio ?? team;
+    const backR = r.backend_load_ratio ?? backend;
+    const tech_demand_ratio = Math.max(0, labR, teamR, backR * 0.5);
     const labsCap = r.labs_effective_cap ?? 0;
     const teamsCap = r.teams_effective_cap ?? 0;
     const backCap = r.backend_effective_cap ?? 0;
@@ -169,6 +178,7 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
       store_trading_base: Math.round(store_trading_base * 100) / 100,
       campaign_in_prep,
       campaign_in_live,
+      tech_demand_ratio: Math.round(tech_demand_ratio * 1000) / 1000,
       tech_pressure: Math.round(tech_pressure * 100) / 100,
       tech_readiness_pressure: Math.round(tech_readiness_pressure * 100) / 100,
       tech_sustain_pressure: Math.round(tech_sustain_pressure * 100) / 100,

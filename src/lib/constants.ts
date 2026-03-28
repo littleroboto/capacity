@@ -18,16 +18,16 @@ export const VIEW_MODES = [
     id: 'combined',
     label: 'Technology',
     /** Short heading above the main runway heatmap. */
-    runwayHeatmapTitle: 'Tech Capacity Utilisation',
+    runwayHeatmapTitle: 'Tech capacity demand',
     title:
-      'Tech utilisation (labs / teams / backend vs effective capacity). Prep-heavy periods read hotter than live campaign support. γ_tech and transfer curve apply.',
+      'Tech capacity demand: labs, teams, and backend versus effective capacity. Prep-heavy periods read hotter than live campaign support. γ_tech and transfer curve apply.',
   },
   {
     id: 'in_store',
     label: 'Business',
-    runwayHeatmapTitle: 'Restaurant Trading',
+    runwayHeatmapTitle: 'Trading pressure',
     title:
-      'Store-trading rhythm with live-campaign amplification on top of BAU; prep shows marketing weight without inflating stores. Same absolute heatmap scale as Technology (0–1 blend); γ_business and transfer curve apply.',
+      'Trading pressure from store rhythm, live campaigns, and BAU; prep adds marketing load without inflating stores until go-live. Same 0–1 heatmap scale as Technology; γ_business and transfer curve apply.',
   },
   {
     id: 'code',

@@ -775,12 +775,12 @@ function mapStressCorrelations(raw: Record<string, unknown>): StressCorrelations
 }
 
 function sumTeamSizes(teams: Record<string, { size?: number }> | undefined): number {
-  if (!teams || typeof teams !== 'object') return 6;
+  if (!teams || typeof teams !== 'object') return 4;
   let n = 0;
   for (const t of Object.values(teams)) {
     n += Number(t?.size) || 0;
   }
-  return n || 6;
+  return n || 4;
 }
 
 /** Brief `weekly_promo` + legacy `weekly_promo_cycle` */

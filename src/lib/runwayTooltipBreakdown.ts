@@ -39,11 +39,11 @@ export function activeCampaignNames(config: MarketConfig | undefined, dateStr: s
       liveEnd.setDate(liveEnd.getDate() + c.durationDays);
       const inPrep = t >= prepStart && t < start;
       const inLive = c.durationDays > 0 && t >= start && t < liveEnd;
-      if (inPrep || inLive) {
+        if (inPrep || inLive) {
         let tag: string;
-        if (c.presenceOnly) tag = 'calendar marker';
-        else if (inPrep) tag = `prep (${prepDays}d lead)`;
-        else tag = 'live / sustain';
+        if (c.presenceOnly) tag = 'on calendar only';
+        else if (inPrep) tag = `prep, ${prepDays} days before go-live`;
+        else tag = 'live';
         out.push(`${c.name.replace(/_/g, ' ')} (${tag})`);
       }
       continue;
@@ -53,9 +53,9 @@ export function activeCampaignNames(config: MarketConfig | undefined, dateStr: s
     end.setDate(end.getDate() + c.durationDays);
     if (t >= start && t < end) {
       let tag: string;
-      if (c.presenceOnly) tag = 'calendar marker';
-      else if (c.readinessDurationDays != null) tag = `readiness ${c.readinessDurationDays}d + live support`;
-      else tag = 'campaign load';
+      if (c.presenceOnly) tag = 'on calendar only';
+      else if (c.readinessDurationDays != null) tag = `${c.readinessDurationDays}d readiness then live`;
+      else tag = 'active';
       out.push(`${c.name.replace(/_/g, ' ')} (${tag})`);
     }
   }
@@ -113,15 +113,15 @@ export function storeTradingLine(config: MarketConfig | undefined, dateStr: stri
   const v = parseTechRhythmScalar(level) ?? 0.5;
   const pretty =
     typeof level === 'number' ? level.toFixed(2) : String(level).replace(/_/g, ' ');
-  return `${dayName} store pattern: ${pretty} → base pressure ${v.toFixed(2)}`;
+  return `${dayName} in the weekly pattern (${pretty}) → about ${(v * 100).toFixed(0)}% base store load before campaigns and holidays`;
 }
 
 const SURFACE_LABEL: Record<string, string> = {
-  bau: 'BAU & rhythm',
-  change: 'Change / readiness',
-  campaign: 'Campaign / live',
-  coordination: 'Coordination layer',
-  carryover: 'Carry-over / backlog',
+  bau: 'Routine (BAU)',
+  change: 'Change & readiness',
+  campaign: 'Campaign work',
+  coordination: 'Coordination',
+  carryover: 'Carry-over',
 };
 
 /** Tech-pressure contribution by surface (same cap logic as combined tech; not additive to headline). */
@@ -132,26 +132,27 @@ export function pressureSurfaceLines(row: RiskRow): string[] {
   const sorted = entries.filter(([, v]) => v >= 0.02).sort((a, b) => b[1] - a[1]);
   return sorted.map(([k, v]) => {
     const label = SURFACE_LABEL[k] ?? k;
-    return `${label}: ${(v * 100).toFixed(0)}% of effective capacity (max of lab/team/backend blend)`;
+    return `${label}: about ${(v * 100).toFixed(0)}% of the busiest lane (lab, team, or backend)`;
   });
 }
 
 export function techPressureExplanation(row: RiskRow): string {
-  const lab = row.lab_utilisation ?? 0;
-  const team = row.team_utilisation ?? 0;
-  const backHalf = (row.backend_pressure ?? 0) * 0.5;
+  const lab = row.lab_load_ratio ?? row.lab_utilisation ?? 0;
+  const team = row.team_load_ratio ?? row.team_utilisation ?? 0;
+  const backR = row.backend_load_ratio ?? row.backend_pressure ?? 0;
+  const backHalf = backR * 0.5;
   const m = Math.max(lab, team, backHalf);
   if (m < 0.02) {
-    return 'Quiet tech day — little scheduled BAU / release load vs capacity.';
+    return 'Light day for tech — scheduled work is well below capacity.';
   }
   const eps = 0.001;
   if (Math.abs(m - lab) < eps || (lab >= team && lab >= backHalf)) {
-    return `Led by lab utilisation (${(lab * 100).toFixed(0)}% of lab capacity).`;
+    return `Led by lab load (${(lab * 100).toFixed(0)}% of lab capacity${lab > 1.001 ? ' — above full capacity' : ''}).`;
   }
   if (Math.abs(m - team) < eps || team >= backHalf) {
-    return `Led by field / team utilisation (${(team * 100).toFixed(0)}% of team capacity).`;
+    return `Led by field / team load (${(team * 100).toFixed(0)}% of team capacity${team > 1.001 ? ' — above full capacity' : ''}).`;
   }
-  return `Backend demand (${(row.backend_pressure * 100).toFixed(0)}% cap) dominates after halving in the blend.`;
+  return `Backend is the limiting lane (${(backR * 100).toFixed(0)}% of its cap; backend counts at half weight in the headline).`;
 }
 
 /** Explains readiness vs live/support sub-scores (same cap as combined tech; not additive to headline tech pressure). */
@@ -166,7 +167,7 @@ export function techReadinessSustainExplanation(row: RiskRow): string | null {
   if (s >= 0.02) {
     parts.push(`live / support segment ${(s * 100).toFixed(0)}%`);
   }
-  return `Tech split: ${parts.join(' · ')}. Headline score is total scheduled load vs the same capacity caps.`;
+  return `Breakdown: ${parts.join(' · ')}. The main tech number is still total scheduled work compared with those same caps.`;
 }
 
 export type RiskBlendTerm = {
@@ -186,13 +187,14 @@ export function buildLensRiskBlendTerms(
   tuning: RiskModelTuning
 ): RiskBlendTerm[] {
   if (viewMode === 'combined') {
+    const demand = row.tech_demand_ratio ?? row.tech_pressure ?? 0;
     return [
       {
         key: 'tech',
-        label: 'Tech utilisation (heatmap)',
-        factor: row.tech_pressure,
+        label: 'Tech workload (this heatmap)',
+        factor: demand,
         weight: 1,
-        contribution: row.tech_pressure,
+        contribution: Math.min(1, demand),
       },
     ];
   }
@@ -206,19 +208,19 @@ export function buildLensRiskBlendTerms(
   const denom = w.store + wCamp + w.holiday;
   if (denom < 1e-9) {
     return [
-      {
-        key: 'store',
-        label: 'Store trading',
-        factor: store,
-        weight: 1,
-        contribution: store,
-      },
+    {
+      key: 'store',
+      label: 'Store activity',
+      factor: store,
+      weight: 1,
+      contribution: store,
+    },
     ];
   }
   const terms: RiskBlendTerm[] = [
     {
       key: 'store',
-      label: 'Store trading (live campaigns amplify base rhythm)',
+      label: 'Store demand',
       factor: store,
       weight: w.store / denom,
       contribution: (w.store / denom) * store,
@@ -227,7 +229,7 @@ export function buildLensRiskBlendTerms(
   if (wCamp > 0) {
     terms.push({
       key: 'campaign',
-      label: 'Campaign (prep window)',
+      label: 'Campaign prep',
       factor: camp,
       weight: wCamp / denom,
       contribution: (wCamp / denom) * camp,
@@ -236,7 +238,7 @@ export function buildLensRiskBlendTerms(
   if (w.holiday > 0) {
     terms.push({
       key: 'holiday',
-      label: 'Holiday (pressure dial)',
+      label: 'Holiday factor',
       factor: holidayTerm,
       weight: w.holiday / denom,
       contribution: (w.holiday / denom) * holidayTerm,
@@ -259,14 +261,14 @@ export function buildRiskBlendTerms(row: RiskRow, tuning: RiskModelTuning): Risk
     },
     {
       key: 'store',
-      label: 'Store trading',
+      label: 'Stores',
       factor: row.store_pressure,
       weight: w.store,
       contribution: w.store * row.store_pressure,
     },
     {
       key: 'campaign',
-      label: 'Campaign impact',
+      label: 'Campaigns',
       factor: row.campaign_risk,
       weight: w.campaign,
       contribution: w.campaign * row.campaign_risk,
@@ -275,7 +277,7 @@ export function buildRiskBlendTerms(row: RiskRow, tuning: RiskModelTuning): Risk
   if (w.holiday > 0) {
     terms.push({
       key: 'holiday',
-      label: 'Holiday (pressure dial)',
+      label: 'Holidays',
       factor: holidayN,
       weight: w.holiday,
       contribution: w.holiday * holidayN,
@@ -298,7 +300,7 @@ export type RunwayTooltipPayload = {
   techReadinessSustainLine: string | null;
   riskTerms: RiskBlendTerm[];
   riskBand: string;
-  /** Short card title (e.g. Technology capacity / Business pressure). */
+  /** Short card title (e.g. Tech capacity demand / Trading pressure). */
   fillMetricHeadline: string;
   fillMetricLabel: string;
   fillMetricValue: number;
@@ -373,7 +375,7 @@ export function buildRunwayTooltipPayload(input: {
     pressureSurfaceLines: pressureLines,
     headroomLine:
       row.headroom != null
-        ? `Headroom (1 − combined pressure): ${(row.headroom * 100).toFixed(0)}%`
+        ? `Room left before max pressure: about ${(row.headroom * 100).toFixed(0)}%`
         : null,
     driverSummaryBlocks: buildDriverSummaryBlocks(
       viewMode,

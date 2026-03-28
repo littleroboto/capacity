@@ -5,6 +5,10 @@ export type CapacityRow = AggregatedDay & {
   lab_utilisation: number;
   team_utilisation: number;
   backend_pressure: number;
+  /** Load ÷ cap without a 1.0 ceiling (can exceed 1 when over capacity). */
+  lab_load_ratio: number;
+  team_load_ratio: number;
+  backend_load_ratio: number;
   /** Effective denominators for the day (after holiday / school cap multipliers). */
   labs_effective_cap: number;
   teams_effective_cap: number;
@@ -37,7 +41,7 @@ export function computeCapacity(
     capByMarket[c.market] = {
       labs: c.capacity.labs ?? 5,
       testingCapacity: c.testingCapacity,
-      teams: c.capacity.teams ?? 6,
+      teams: c.capacity.teams ?? 4,
       backend: c.capacity.backend ?? 1000,
       holidayLabCapacityScale: c.holidayLabCapacityScale,
     };
@@ -46,7 +50,7 @@ export function computeCapacity(
   return dailyRows.map((r) => {
     const cap = capByMarket[r.market] || {
       labs: 5,
-      teams: 6,
+      teams: 4,
       backend: 1000,
     };
     const stress = Math.min(1, Math.max(0, holidayCapacityStress(r.market, r.date)));
@@ -69,18 +73,24 @@ export function computeCapacity(
     const schoolM = Math.min(1.05, Math.max(0.65, schoolLabTeamCapMult(r.market, r.date)));
     const labDenom = cap.testingCapacity ?? cap.labs ?? 5;
     const labsCap = (labDenom || 5) * scale * schoolM;
-    const teamsCap = (cap.teams || 6) * scale * schoolM;
+    const teamsCap = (cap.teams || 4) * scale * schoolM;
     const backendCap = cap.backend || 1000;
 
-    const lab_utilisation = labsCap > 0 ? Math.min(1, (r.lab_load || 0) / labsCap) : 0;
-    const team_utilisation = teamsCap > 0 ? Math.min(1, (r.team_load || 0) / teamsCap) : 0;
-    const backend_pressure = backendCap > 0 ? Math.min(1, (r.backend_load || 0) / backendCap) : 0;
+    const lab_load_ratio = labsCap > 0 ? Math.max(0, (r.lab_load || 0) / labsCap) : 0;
+    const team_load_ratio = teamsCap > 0 ? Math.max(0, (r.team_load || 0) / teamsCap) : 0;
+    const backend_load_ratio = backendCap > 0 ? Math.max(0, (r.backend_load || 0) / backendCap) : 0;
+    const lab_utilisation = Math.min(1, lab_load_ratio);
+    const team_utilisation = Math.min(1, team_load_ratio);
+    const backend_pressure = Math.min(1, backend_load_ratio);
 
     return {
       ...r,
       lab_utilisation,
       team_utilisation,
       backend_pressure,
+      lab_load_ratio,
+      team_load_ratio,
+      backend_load_ratio,
       labs_effective_cap: labsCap,
       teams_effective_cap: teamsCap,
       backend_effective_cap: backendCap,

@@ -121,7 +121,8 @@ function ContributorsBlock({
   const blendSum = terms.reduce((acc, t) => acc + t.contribution, 0);
   const denom = blendSum > 1e-9 ? blendSum : 1;
   const techLens = p.viewMode === 'combined';
-  const techPct = techLens && terms[0] ? Math.round(Math.min(1, Math.max(0, terms[0].factor)) * 100) : null;
+  const techPct =
+    techLens && terms[0] ? Math.min(999, Math.round(Math.max(0, terms[0].factor) * 100)) : null;
 
   const wrap = (inner: ReactNode) =>
     presentation === 'markdown' ? (
@@ -134,10 +135,10 @@ function ContributorsBlock({
 
   const title =
     presentation === 'markdown' ? (
-      <h3 className="text-sm font-semibold text-foreground">What drives this score</h3>
+      <h3 className="text-sm font-semibold text-foreground">How the score is built</h3>
     ) : (
       <SectionTitle presentation={presentation} className="mt-0 text-foreground">
-        What drives this score
+        How the score is built
       </SectionTitle>
     );
 
@@ -162,7 +163,7 @@ function ContributorsBlock({
                 presentation === 'markdown' ? 'mt-2 text-sm' : 'mt-1.5 text-[11px]'
               )}
             >
-              Utilisation vs capacity (cell): ~{techPct}%
+              About how full capacity is in this cell: ~{techPct}%
             </p>
           ) : null}
           {p.techReadinessSustainLine ? (
@@ -183,7 +184,7 @@ function ContributorsBlock({
               )}
             >
               {p.pressureSurfaceLines.slice(0, 4).map((line, i) => (
-                <li key={i}>{line.replace(/\s*\(max of lab\/team\/backend blend\)\s*$/, '')}</li>
+                <li key={i}>{line}</li>
               ))}
             </ul>
           ) : null}
@@ -212,11 +213,13 @@ function ContributorsBlock({
                   </div>
                   {!isHolidayDial ? (
                     <p className="mt-0.5 text-[13px] text-muted-foreground">
-                      Intensity ~{levelPct}%
-                      {t.weight < 0.999 ? ` · weight ${(t.weight * 100).toFixed(0)}%` : null}
+                      About {levelPct}% on this factor’s own scale
+                      {t.weight < 0.999
+                        ? ` · the model counts it as ${(t.weight * 100).toFixed(0)}% of the mix`
+                        : null}
                     </p>
                   ) : t.factor >= 0.5 ? (
-                    <p className="mt-0.5 text-[13px] text-muted-foreground">Holiday pressure dial active</p>
+                    <p className="mt-0.5 text-[13px] text-muted-foreground">Holiday boost is on for this view</p>
                   ) : null}
                 </li>
               );
@@ -238,10 +241,11 @@ function ContributorsBlock({
   );
 }
 
-/** Raw 0–1 heatmap input (before transfer curve / γ colouring). */
-function formatHeatmapScore01(v: number): string {
-  const x = Math.min(1, Math.max(0, v));
-  return (Math.round(x * 1000) / 1000).toFixed(3).replace(/\.?0+$/, '') || '0';
+/** Lens fill metric before transfer curve / γ (Technology can exceed 1 when over capacity). */
+function formatLensFillScore(v: number, viewMode: RunwayTooltipPayload['viewMode']): string {
+  const x = Math.max(0, v);
+  const clamped = viewMode === 'combined' ? x : Math.min(1, x);
+  return (Math.round(clamped * 1000) / 1000).toFixed(3).replace(/\.?0+$/, '') || '0';
 }
 
 export function RunwayDayDetailsPayloadBody({
@@ -251,8 +255,8 @@ export function RunwayDayDetailsPayloadBody({
   p: RunwayTooltipPayload;
   presentation?: DayDetailsPresentation;
 }) {
-  const pct = Math.round(Math.min(1, Math.max(0, p.fillMetricValue)) * 100);
-  const heatmapScoreStr = formatHeatmapScore01(p.fillMetricValue);
+  const pct = Math.min(999, Math.round(Math.max(0, p.fillMetricValue) * 100));
+  const heatmapScoreStr = formatLensFillScore(p.fillMetricValue, p.viewMode);
   const riskScore = p.row.risk_score ?? 0;
   const riskScoreStr = (Math.round(Math.min(1, Math.max(0, riskScore)) * 100) / 100).toFixed(2);
   const fg = foregroundOnHeatmapFill(p.cellFillHex);
@@ -297,11 +301,21 @@ export function RunwayDayDetailsPayloadBody({
             {p.fillMetricLabel}
           </p>
           <p className="mt-2 font-mono text-sm tabular-nums text-foreground">
-            <span className="text-muted-foreground">Heatmap (0–1)</span>{' '}
+            <span className="text-muted-foreground">Fill score</span>{' '}
             <span className="font-semibold">{heatmapScoreStr}</span>
             <span className="mx-2 text-muted-foreground/50">·</span>
-            <span className="text-muted-foreground">Combined risk</span>{' '}
+            <span className="text-muted-foreground">Risk score</span>{' '}
             <span className="font-semibold">{riskScoreStr}</span>
+          </p>
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
+            {p.viewMode === 'combined' ? (
+              <>
+                Fill score can go above 1 when demand exceeds capacity (e.g. 1.05 = 105%). Risk score stays
+                on a 0–1 scale for the blended model.
+              </>
+            ) : (
+              <>Each score is on a 0–1 scale: higher means a busier square or a heavier risk read.</>
+            )}
           </p>
         </header>
       ) : (
@@ -335,10 +349,10 @@ export function RunwayDayDetailsPayloadBody({
             {p.fillMetricLabel}
           </p>
           <p className="mt-2 text-[11px] font-mono tabular-nums leading-snug text-foreground">
-            <span className="text-muted-foreground">Heatmap 0–1</span>{' '}
+            <span className="text-muted-foreground">Fill 0–1</span>{' '}
             <span className="font-semibold">{heatmapScoreStr}</span>
             <span className="mx-1.5 text-muted-foreground/45">·</span>
-            <span className="text-muted-foreground">Risk</span>{' '}
+            <span className="text-muted-foreground">Risk 0–1</span>{' '}
             <span className="font-semibold">{riskScoreStr}</span>
           </p>
         </header>
@@ -348,7 +362,7 @@ export function RunwayDayDetailsPayloadBody({
         {presentation === 'markdown' ? (
           <>
             <h3 className="mt-6 text-sm font-semibold tracking-tight text-foreground first:mt-0">
-              What is driving it
+              What shaped this day
             </h3>
             <div className="mt-3 space-y-5">
               {p.driverSummaryBlocks.map((block) => (
@@ -371,7 +385,7 @@ export function RunwayDayDetailsPayloadBody({
 
         {camps.shown.length > 0 ? (
           <>
-            <SectionTitle presentation={presentation}>Active campaigns</SectionTitle>
+            <SectionTitle presentation={presentation}>Campaigns on the calendar</SectionTitle>
             <BulletList items={camps.shown} presentation={presentation} />
             {camps.more > 0 ? (
               <p className="mt-1 text-xs italic text-muted-foreground">+{camps.more} more</p>
@@ -381,7 +395,7 @@ export function RunwayDayDetailsPayloadBody({
 
         {wins.shown.length > 0 && presentation !== 'markdown' ? (
           <>
-            <SectionTitle presentation={presentation}>Operating windows</SectionTitle>
+            <SectionTitle presentation={presentation}>When teams are staffed</SectionTitle>
             <BulletList items={wins.shown} presentation={presentation} />
             {wins.more > 0 ? (
               <p className="mt-1 text-xs italic text-muted-foreground">+{wins.more} more</p>
@@ -391,7 +405,7 @@ export function RunwayDayDetailsPayloadBody({
 
         {bau.shown.length > 0 ? (
           <>
-            <SectionTitle presentation={presentation}>Scheduled BAU</SectionTitle>
+            <SectionTitle presentation={presentation}>Routine work on the schedule</SectionTitle>
             <BulletList items={bau.shown} presentation={presentation} />
             {bau.more > 0 ? (
               <p className="mt-1 text-xs italic text-muted-foreground">+{bau.more} more</p>
@@ -420,7 +434,7 @@ export function RunwayDayDetailsPayloadBody({
               presentation === 'markdown' ? 'mt-5 text-sm' : 'mt-3 text-[11px]'
             )}
           >
-            School break — stress / capacity multipliers may apply.
+            School break — the model may treat this as a busier or tighter week.
           </p>
         ) : null}
       </div>

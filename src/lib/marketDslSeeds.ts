@@ -29,7 +29,7 @@ risk_heatmap_gamma_business: 2.5
 
 resources:
   labs:
-    capacity: 5
+    capacity: 6
   staff:
     capacity: 4
   testing_capacity: 10

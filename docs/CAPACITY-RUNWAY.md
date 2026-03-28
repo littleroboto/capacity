@@ -85,7 +85,7 @@ resources:
     capacity: 5                # Integer; default 5 if missing
   teams:                       # Optional map of named teams
     pos_team:
-      size: 4                  # Summed for team capacity; default total 6 if no sizes
+      size: 4                  # Summed for team capacity; default total 4 if no sizes
       sme_depth: 2             # Parsed in YAML but NOT used in engine
 
 bau:
