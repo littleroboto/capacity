@@ -1,4 +1,8 @@
 # United Kingdom — England-style school terms (stub `holidayCalc.ts`).
+
+# Market identity: `market` is the stable id (routing, manifests, holiday catalogs); `title` is display-only in the UI.
+# `risk_heatmap_gamma_tech` / `risk_heatmap_gamma_business` shape how each lens maps combined risk into heatmap colour (transfer-curve exponent; higher → more separation in the mid bands).
+# `resources` nominal caps: `labs.capacity` integrated-test labs; `staff.capacity` team headcount denominator; `testing_capacity` optional parallel-test slots for lab utilisation (defaults to lab count when omitted).
 market: UK
 title: United Kingdom
 risk_heatmap_gamma_tech: 2.5
@@ -10,16 +14,22 @@ resources:
     capacity: 4
   testing_capacity: 10
 
+# BAU baseline demand (business-as-usual): repeating weekday loads that sit under tech rhythm, campaigns, and releases in the phase engine.
+# `days_in_use` picks which weekdays carry that strip (`mo`…`sun` tokens). `weekly_cycle` sets nominal lab vs team mass (`labs_required`, `staff_required`).
+# `support_days` widens each entry’s support window along the week (half-weight BAU support loads on weekdays inside that span, up to Saturday). `integration_tests` adds an extra anchor day with labs-only load alongside the modern weekly BAU.
 bau:
   days_in_use: [mo, tu, we, th, fr]
   weekly_cycle:
     labs_required: 1
-    staff_required: 2
+    staff_required: 1
     support_days: 1
   integration_tests:
     day: Mon
     labs: 1
 
+# Campaigns: each list item is one programme. `start_date` anchors the live window; `duration` is the live segment length in days on the calendar.
+# `testing_prep_duration` is the load-bearing **prep** runway before live (days). `impact` picks default commercial intensity when you omit a full `load` map; `business_uplift` scales business-side uplift in the risk blend (parser-capped).
+# `campaign_support` supplies lab/team-style staffing folded into **prep** loads; `live_campaign_support` does the same for the **live** / sustain phase (alongside optional `live_support_load`, etc., in richer entries).
 campaigns:
   - name: spring_easter_peak_2026
     start_date: '2026-03-28'
@@ -29,10 +39,10 @@ campaigns:
     business_uplift: 1.0
     campaign_support:
       labs_required: 1
-      tech_staff: 3.1
+      tech_staff: 1
     live_campaign_support:
       labs_required: 1
-      tech_staff: 1.15
+      tech_staff: 1
   - name: summer_school_hol_peak_2026
     start_date: '2026-07-23'
     duration: 38
@@ -41,10 +51,10 @@ campaigns:
     business_uplift: 1.0
     campaign_support:
       labs_required: 1
-      tech_staff: 3.35
+      tech_staff: 1
     live_campaign_support:
       labs_required: 1
-      tech_staff: 1.2
+      tech_staff: 1
   - name: autumn_half_term_peak_2026
     start_date: '2026-10-17'
     duration: 18
@@ -53,10 +63,10 @@ campaigns:
     business_uplift: 1.0
     campaign_support:
       labs_required: 1
-      tech_staff: 2.75
+      tech_staff: 1
     live_campaign_support:
       labs_required: 1
-      tech_staff: 1.05
+      tech_staff: 1
   - name: black_friday_uk_2026
     start_date: '2026-11-27'
     duration: 7
@@ -65,7 +75,7 @@ campaigns:
     readiness_duration: 3
     campaign_support:
       labs_required: 1
-      tech_staff: 2
+      tech_staff: 1
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
@@ -77,17 +87,26 @@ campaigns:
     business_uplift: 1.0
     campaign_support:
       labs_required: 1
-      tech_staff: 3.55
+      tech_staff: 1
     live_campaign_support:
       labs_required: 1
-      tech_staff: 1.22
+      tech_staff: 1
 
+# National/bank closures: which days count, and how they affect staffing vs store-trading in the model.
 public_holidays:
+  # true = merge dates from the engine’s catalog for this market (see docs/MARKET_DSL_AND_PIPELINE.md, sync:market-holidays).
   auto: true
+  # Extra YYYY-MM-DD days on top of auto (or the full manual list when auto is false). Empty = no YAML-only extras.
   dates: []
+  # On each public-holiday day: scales effective lab+team capacity (clamped 0–1; 0.5 ≈ half normal caps at full holiday stress).
   staffing_multiplier: 0.5
+  # Multiplies the day’s store-trading baseline after rhythm/payday shaping (>1 = busier stores vs the same day without this flag).
   trading_multiplier: 1.05
 
+# School breaks (vacation periods): `auto`/`dates` choose which days count (same pattern as `public_holidays` — catalog vs extra ISO YYYY-MM-DD).
+# `staffing_multiplier` scales lab+team capacity caps on those days (0–1, like public holidays).
+# `trading_multiplier` lifts store pressure on those days (multiplies store pressure after campaign boosts).
+# `load_effects` bumps modeled demand surfaces on school holidays only (lab/team/backend/ops/commercial multipliers).
 school_holidays:
   auto: true
   dates: []
@@ -100,10 +119,16 @@ school_holidays:
     ops_activity_mult: 1.06
     commercial_activity_mult: 1.12
 
+# Holiday capacity shaping for lab/team utilisation denominators (which calendar days count as holidays live in `public_holidays` / `school_holidays`).
+# `capacity_taper_days`: when >0, holiday “stress” ramps smoothly within ±N days of each listed holiday (easier build-up/cool-down); omit or 0 = stress only on exact holiday dates.
+# `lab_capacity_scale`: at full holiday stress, effective lab+team caps move toward this fraction of normal capacity (engine-clamped ~0.12–1; higher = less pinch).
 holidays:
   capacity_taper_days: 3
   lab_capacity_scale: 0.5
 
+# Store-trading rhythm (modeled store / restaurant demand): `weekly_pattern` sets a 0–1 level per weekday (raw numbers or tier names like `low` / `medium` / `high` / `very_high` after parse).
+# `monthly_pattern` scales that by calendar month; `seasonal` applies a gentle annual wave around `peak_month` with `amplitude`. `payday_month_peak_multiplier` lifts the base in the first part of each month.
+# `campaign_store_boost_prep` and `campaign_store_boost_live` add fractional uplift on that base during campaign prep vs live; optional `campaign_effect_scale` in the same block scales both boosts and business-side campaign risk.
 trading:
   campaign_store_boost_prep: 0
   campaign_store_boost_live: 0.28
@@ -133,6 +158,8 @@ trading:
     peak_month: 7
     amplitude: 0.1
 
+# BAU tech-load rhythm: `weekly_pattern` resolves each weekday to a 0–1 intensity (tiers + `default` / `weekdays` / `weekend` shortcuts are expanded in the parser); the engine emits a daily “TechRhythm” readiness load from that shape.
+# `labs_scale` and `teams_scale` split how strongly that daily base hits lab vs team buckets (same 0–1 spine, different weights). Optional `backend_scale` (not set here) would add backend mass the same way.
 tech:
   weekly_pattern:
     default: medium
