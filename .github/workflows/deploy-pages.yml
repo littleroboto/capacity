@@ -1,7 +1,5 @@
-# Build the Vite app and publish `dist/` to GitHub Pages.
-# Settings → Pages → Build: GitHub Actions.
-#
-# upload-pages-artifact@v4 emits the artifact format deploy-pages@v4 expects (v3 used legacy upload-artifact).
+# Build Vite `dist/` and deploy to GitHub Pages in one job (same OIDC context as GitHub’s static starter).
+# Settings → Pages → Source: **GitHub Actions** (required or deploy-pages errors).
 name: Deploy to GitHub Pages
 
 on:
@@ -20,8 +18,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,20 +31,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          GITHUB_PAGES: 'true'
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-      actions: read
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
