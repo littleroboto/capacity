@@ -1,5 +1,8 @@
 # Build the Vite app and publish `dist/` to GitHub Pages.
-# Repo settings → Pages → Source: GitHub Actions (first deploy may require enabling this once).
+# Repo settings → Pages → Source: GitHub Actions.
+#
+# The default GITHUB_TOKEN must include `actions: write` so upload-pages-artifact can publish
+# the build output; `pages: write` + `id-token: write` are required for deploy-pages.
 name: Deploy to GitHub Pages
 
 on:
@@ -11,6 +14,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write
 
 concurrency:
   group: pages
@@ -21,11 +25,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      # Requires package-lock.json committed and in sync with package.json (run `npm install` locally after dep changes).
       - run: npm ci
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
@@ -35,6 +39,11 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      actions: read
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
