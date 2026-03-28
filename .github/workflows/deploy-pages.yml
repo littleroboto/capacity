@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      # Omit configure-pages: it can fail before Pages is enabled and Vite uses relative base (`./`) anyway.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
