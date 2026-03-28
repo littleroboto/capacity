@@ -1,5 +1,10 @@
 import type { RiskRow } from '@/engine/riskModel';
-import { DEFAULT_RISK_TUNING, normalizedRiskWeights, type RiskModelTuning } from '@/engine/riskModelTuning';
+import {
+  DEFAULT_RISK_TUNING,
+  normalizedRiskWeights,
+  STORE_PRESSURE_MAX,
+  type RiskModelTuning,
+} from '@/engine/riskModelTuning';
 import type { ViewModeId } from '@/lib/constants';
 import { isGregorianChristmasDay } from '@/engine/weighting';
 
@@ -35,7 +40,7 @@ export function inStoreHeatmapMetric(
   row: RiskRow,
   tuning: RiskModelTuning = DEFAULT_RISK_TUNING
 ): number {
-  const store = Math.min(1, Math.max(0, row.store_pressure ?? 0));
+  const store = Math.min(STORE_PRESSURE_MAX, Math.max(0, row.store_pressure ?? 0));
   const inPrepOnly = Boolean(row.campaign_in_prep) && !row.campaign_in_live;
   const camp = inPrepOnly ? Math.min(1, Math.max(0, row.campaign_risk ?? 0)) : 0;
   const holidayTerm = row.holiday_flag && !isGregorianChristmasDay(row.date) ? 1 : 0;

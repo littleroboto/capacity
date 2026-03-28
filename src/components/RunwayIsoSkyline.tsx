@@ -4,7 +4,7 @@ import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import type { HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import { heatmapColorForViewMode, HEATMAP_RUNWAY_PAD_FILL } from '@/lib/riskHeatmapColors';
-import { heatmapOpacityForStressCutoff, transformedHeatmapMetric } from '@/lib/riskHeatmapColors';
+import { transformedHeatmapMetric } from '@/lib/riskHeatmapColors';
 import { heatmapCellMetric } from '@/lib/runwayViewMetrics';
 import {
   skylineChronologyGroups,
@@ -179,7 +179,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           const row = dateStr ? riskByDate.get(dateStr) : undefined;
           const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
           const fill = !dateStr ? HEATMAP_RUNWAY_PAD_FILL : heatmapColorForViewMode(viewMode, metric, heatmapOpts);
-          const dimOpacity = !dateStr ? 1 : heatmapOpacityForStressCutoff(viewMode, metric, heatmapOpts);
+          const dimOpacity = 1;
           const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
           const isPad = !dateStr;
           const height01 = transformedHeatmapMetric(viewMode, metric, heatmapOpts);

@@ -24,19 +24,25 @@ const BUNDLED_BY_MARKET: Record<string, string> = {
 
 function minimalDsl(country: string): string {
   return `market: ${country || 'DE'}
+risk_heatmap_gamma_tech: 2.5
+risk_heatmap_gamma_business: 2.5
 
 resources:
   labs:
     capacity: 5
   staff:
-    capacity: 6
+    capacity: 4
+  testing_capacity: 10
 
 bau:
   days_in_use: [mo, tu, we, th, fr]
   weekly_cycle:
-    labs_required: 2
-    staff_required: 0
-    support_days: 2
+    labs_required: 1
+    staff_required: 2
+    support_days: 1
+  integration_tests:
+    day: Mon
+    labs: 1
 
 campaigns: []
 
@@ -51,14 +57,28 @@ school_holidays:
   staffing_multiplier: 0.85
 
 trading:
+  payday_month_peak_multiplier: 1.12
+  monthly_pattern:
+    Jan: 0.56
+    Feb: 0.58
+    Mar: 0.69
+    Apr: 0.77
+    May: 0.85
+    Jun: 0.91
+    Jul: 0.97
+    Aug: 0.92
+    Sep: 0.84
+    Oct: 0.72
+    Nov: 0.60
+    Dec: 1.0
   weekly_pattern:
-    Mon: 0.7
-    Tue: 0.72
-    Wed: 0.74
-    Thu: 0.8
-    Fri: 0.95
+    Mon: 0.6
+    Tue: 0.7
+    Wed: 0.8
+    Thu: 0.9
+    Fri: 1.0
     Sat: 1.0
-    Sun: 0.6
+    Sun: 0.8
 
 tech:
   weekly_pattern:

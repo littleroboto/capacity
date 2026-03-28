@@ -25,7 +25,7 @@ export default defineConfig({
     __GIT_COMMIT__: JSON.stringify(gitCommitShort()),
   },
   plugins: [react()],
-  base: './',
+  base: './', // required for static hosting without server rewrite rules
   root: '.',
   publicDir: 'public',
   resolve: {

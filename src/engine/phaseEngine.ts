@@ -147,6 +147,30 @@ function phaseLoadTechMass(pl: PhaseLoad): boolean {
 }
 
 /**
+ * Campaign **live** (sustain) load attributed to `date`, matching {@link expandPhases} live branches, or **null**
+ * if this campaign adds no load-bearing live row that day. Used for `replacesBauTech` during the live window.
+ */
+function campaignLivePhaseLoadForDate(camp: CampaignConfig, date: string): PhaseLoad | null {
+  if (!camp.start || camp.presenceOnly) return null;
+  const seg = campaignLoadBearingPrepLiveForDate(camp, date);
+  if (!seg.inLiveLoaded) return null;
+
+  const prepDays = camp.prepBeforeLiveDays;
+  if (prepDays != null && prepDays > 0) {
+    return scaleCampaignLiveTechBuckets(resolveLivePhaseLoad(camp), camp.liveTechLoadScale);
+  }
+
+  if (!camp.durationDays) return null;
+  if (seg.inPrepLoaded) return null;
+  const phaseLoad: PhaseLoad = camp.live_support_load ?? {};
+  const sustainLoad =
+    !liveSupportHasValues(camp.live_support_load)
+      ? phaseLoad
+      : scaleCampaignLiveTechBuckets(phaseLoad, camp.liveTechLoadScale);
+  return sustainLoad;
+}
+
+/**
  * Campaign **prep** (readiness) load attributed to `date`, or **null** if this campaign adds no prep row that day.
  * Used for `replacesBauTech` (same delivery pipe as recurring tech / BAU lab work).
  */
@@ -178,6 +202,15 @@ function anyReplacingCampaignPrepTechMass(config: MarketConfig, date: string): b
   for (const camp of config.campaigns || []) {
     if (!camp.replacesBauTech) continue;
     const pl = campaignPrepPhaseLoadForDate(camp, date);
+    if (pl && phaseLoadTechMass(pl)) return true;
+  }
+  return false;
+}
+
+function anyReplacingCampaignLiveTechMass(config: MarketConfig, date: string): boolean {
+  for (const camp of config.campaigns || []) {
+    if (!camp.replacesBauTech) continue;
+    const pl = campaignLivePhaseLoadForDate(camp, date);
     if (pl && phaseLoadTechMass(pl)) return true;
   }
   return false;
@@ -234,7 +267,8 @@ export function expandPhases(calendar: CalendarRow[], config: MarketConfig): Exp
   for (const { date, market } of marketRows) {
     const d = parseDate(date);
     const weekday = d.getDay();
-    const stripBauTechBuckets = anyReplacingCampaignPrepTechMass(config, date);
+    const stripBauTechBuckets =
+      anyReplacingCampaignPrepTechMass(config, date) || anyReplacingCampaignLiveTechMass(config, date);
 
     for (const bau of bauList) {
       if (!bau) continue;

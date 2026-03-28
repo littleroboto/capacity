@@ -52,7 +52,7 @@ export function DslSyntaxHelpBody({ className }: { className?: string }) {
       <span className="font-mono text-foreground/80">ramp_out_days</span>,{' '}
       <span className="font-mono text-foreground/80">envelope</span> (smoothstep),{' '}
       <span className="font-mono text-foreground/80">holidays.capacity_taper_days</span>, campaign{' '}
-      <span className="font-mono text-foreground/80">replaces_bau_tech</span>, optional top-level{' '}
+      <span className="font-mono text-foreground/80">replaces_bau_tech</span> (prep + live when campaign carries tech), optional top-level{' '}
       <span className="font-mono text-foreground/80">title</span> /{' '}
       <span className="font-mono text-foreground/80">description</span>, and optional{' '}
       <span className="font-mono text-foreground/80">releases</span> (deploy phases with{' '}
@@ -181,7 +181,9 @@ export function DslEditorCore({
           'flex min-h-0 w-full flex-col overflow-hidden bg-background',
           editorFixedHeight ? 'shrink-0' : 'min-h-0 flex-1',
           studio
-            ? 'rounded-2xl border border-violet-500/25 shadow-[0_0_0_1px_rgba(139,92,246,0.12),0_20px_50px_-15px_rgba(0,0,0,0.35)] dark:shadow-[0_0_0_1px_rgba(167,139,250,0.18),0_24px_60px_-12px_rgba(0,0,0,0.55)]'
+            ? isDark
+              ? 'rounded-2xl border border-violet-500/25 shadow-[0_0_0_1px_rgba(167,139,250,0.18),0_24px_60px_-12px_rgba(0,0,0,0.55)]'
+              : 'rounded-2xl border border-border/80 shadow-sm shadow-black/[0.06]'
             : 'rounded-md border border-border',
           editorWrapClassName
         )}
@@ -191,7 +193,9 @@ export function DslEditorCore({
           className={cn(
             'flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-2 py-1.5',
             studio
-              ? 'border-violet-500/20 bg-gradient-to-r from-violet-100/90 via-fuchsia-50/80 to-violet-100/90 dark:from-[#12101c] dark:via-[#1a1428] dark:to-[#12101c]'
+              ? isDark
+                ? 'border-violet-500/20 bg-gradient-to-r from-[#12101c] via-[#1a1428] to-[#12101c]'
+                : 'border-border/70 bg-gradient-to-r from-zinc-100/95 via-background to-zinc-100/95'
               : 'border-border/80 bg-muted/25'
           )}
           role="toolbar"
@@ -199,7 +203,14 @@ export function DslEditorCore({
         >
           <div className="flex flex-wrap items-center gap-1">
             {studio ? (
-              <span className="mr-1 flex items-center gap-1 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-violet-700 dark:border-violet-400/25 dark:bg-violet-500/15 dark:text-violet-200">
+              <span
+                className={cn(
+                  'mr-1 flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider',
+                  isDark
+                    ? 'border-violet-400/25 bg-violet-500/15 text-violet-200'
+                    : 'border-border/70 bg-muted/90 text-foreground'
+                )}
+              >
                 <Sparkles className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
                 YAML
               </span>
@@ -330,17 +341,27 @@ export function DslEditorCore({
             beforeMount={handleBeforeMount as BeforeMount}
             onMount={handleMount}
             loading={
-              <div className="flex h-full min-h-[12rem] items-center justify-center bg-[#0f0f14] text-sm font-medium text-violet-200/80 dark:bg-[#0f0f14]">
+              <div
+                className={cn(
+                  'flex h-full min-h-[12rem] items-center justify-center text-sm font-medium',
+                  isDark ? 'bg-[#0f0f14] text-violet-200/80' : 'bg-[#f8fafc] text-muted-foreground'
+                )}
+              >
                 Loading editor…
               </div>
             }
           />
         </div>
         {studio ? (
-          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-violet-500/15 bg-muted/20 px-3 py-1.5 dark:bg-black/20">
+          <div
+            className={cn(
+              'flex shrink-0 items-center justify-between gap-2 border-t px-3 py-1.5',
+              isDark ? 'border-violet-500/15 bg-black/20' : 'border-border/70 bg-muted/35'
+            )}
+          >
             <p className="font-mono text-[10px] text-muted-foreground">
-              <span className="text-violet-600 dark:text-violet-300">Capacity</span> syntax theme · keys / dates /
-              strings highlighted
+              <span className={cn(isDark ? 'text-violet-300' : 'font-semibold text-foreground')}>Capacity</span> syntax
+              theme · keys / dates / strings highlighted
             </p>
             <span className="font-mono text-[10px] tabular-nums text-muted-foreground sm:hidden">
               {cursorPos.line}:{cursorPos.column}

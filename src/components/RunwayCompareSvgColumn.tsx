@@ -4,7 +4,6 @@ import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import {
   heatmapColorForViewMode,
-  heatmapOpacityForStressCutoff,
   HEATMAP_RUNWAY_PAD_FILL,
   type HeatmapColorOpts,
 } from '@/lib/riskHeatmapColors';
@@ -111,7 +110,7 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
         const row = dateStr ? riskByDate.get(dateStr) : undefined;
         const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
         const fill = !dateStr ? HEATMAP_RUNWAY_PAD_FILL : heatmapColorForViewMode(viewMode, metric, heatmapOpts);
-        const dimOp = !dateStr ? 1 : heatmapOpacityForStressCutoff(viewMode, metric, heatmapOpts);
+        const dimOp = 1;
         const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
         const opacity = pastDimmed ? 0.25 * dimOp : dimOp;
         const isToday = typeof dateStr === 'string' && dateStr === todayYmd;

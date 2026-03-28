@@ -1,11 +1,16 @@
 import { parseDate } from '@/engine/calendar';
 import { getStubPublicHolidayName } from '@/engine/holidayCalc';
 import type { RiskRow } from '@/engine/riskModel';
-import { normalizedRiskWeights, type RiskModelTuning } from '@/engine/riskModelTuning';
+import {
+  normalizedRiskWeights,
+  STORE_PRESSURE_MAX,
+  type RiskModelTuning,
+} from '@/engine/riskModelTuning';
 import type { BauEntry, MarketConfig } from '@/engine/types';
 import type { ViewModeId } from '@/lib/constants';
 import { isGregorianChristmasDay } from '@/engine/weighting';
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
+import { buildDriverSummaryBlocks, type RunwayDriverBlock } from '@/lib/runwayScoreSummary';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
@@ -191,7 +196,7 @@ export function buildLensRiskBlendTerms(
       },
     ];
   }
-  const store = Math.min(1, Math.max(0, row.store_pressure ?? 0));
+  const store = Math.min(STORE_PRESSURE_MAX, Math.max(0, row.store_pressure ?? 0));
   const inPrepOnly = Boolean(row.campaign_in_prep) && !row.campaign_in_live;
   const camp = inPrepOnly ? Math.min(1, Math.max(0, row.campaign_risk ?? 0)) : 0;
   const holidayTerm = row.holiday_flag && !isGregorianChristmasDay(row.date) ? 1 : 0;
@@ -303,7 +308,16 @@ export type RunwayTooltipPayload = {
   publicHolidayName: string | null;
   pressureSurfaceLines: string[];
   headroomLine: string | null;
+  /** Campaigns / holidays / resourcing groupings for the summary panel. */
+  driverSummaryBlocks: RunwayDriverBlock[];
 };
+
+export type { RunwayDriverBlock };
+
+/** Pointer anchor + payload for day-details popover or side summary panel. */
+export type RunwayTipState =
+  | { x: number; y: number; payload: RunwayTooltipPayload }
+  | { x: number; y: number; simple: string };
 
 export function buildRunwayTooltipPayload(input: {
   dateStr: string;
@@ -331,17 +345,23 @@ export function buildRunwayTooltipPayload(input: {
     fillMetricValue,
     cellFillHex,
   } = input;
+  const activeCampaigns = activeCampaignNames(config, dateStr);
+  const operatingWindows = activeOperatingWindowSummaries(config, dateStr);
+  const bauToday = bauActivityLabels(config, dateStr);
+  const storeTradingLineResolved = storeTradingLine(config, dateStr);
+  const techExplanation = techPressureExplanation(row);
+  const pressureLines = pressureSurfaceLines(row);
   return {
     dateStr,
     weekdayShort,
     market,
     viewMode,
     row,
-    activeCampaigns: activeCampaignNames(config, dateStr),
-    operatingWindows: activeOperatingWindowSummaries(config, dateStr),
-    bauToday: bauActivityLabels(config, dateStr),
-    storeTradingLine: storeTradingLine(config, dateStr),
-    techExplanation: techPressureExplanation(row),
+    activeCampaigns,
+    operatingWindows,
+    bauToday,
+    storeTradingLine: storeTradingLineResolved,
+    techExplanation,
     techReadinessSustainLine: techReadinessSustainExplanation(row),
     riskTerms: buildLensRiskBlendTerms(viewMode, row, tuning),
     riskBand: row.risk_band,
@@ -350,10 +370,20 @@ export function buildRunwayTooltipPayload(input: {
     fillMetricValue,
     cellFillHex,
     publicHolidayName: row.public_holiday_flag ? getStubPublicHolidayName(market, dateStr) : null,
-    pressureSurfaceLines: pressureSurfaceLines(row),
+    pressureSurfaceLines: pressureLines,
     headroomLine:
       row.headroom != null
         ? `Headroom (1 − combined pressure): ${(row.headroom * 100).toFixed(0)}%`
         : null,
+    driverSummaryBlocks: buildDriverSummaryBlocks(
+      viewMode,
+      row,
+      activeCampaigns,
+      operatingWindows,
+      bauToday,
+      storeTradingLineResolved,
+      techExplanation,
+      pressureLines
+    ),
   };
 }

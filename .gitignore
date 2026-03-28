@@ -1,5 +1,6 @@
 node_modules
 dist
+.cursor
 .DS_Store
 *.local
 .env
@@ -8,3 +9,4 @@ dist
 coverage
 *.log
 .vite
+pnpm-lock.yaml

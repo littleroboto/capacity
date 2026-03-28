@@ -2,7 +2,12 @@ import { PRESSURE_SURFACE_IDS, type PressureSurfaceId } from '@/domain/pressureS
 import type { SurfaceLoadSlice } from '@/domain/pressureSurfaces';
 import { RISK_BANDS } from '@/lib/constants';
 import type { CapacityRow } from './capacityModel';
-import { DEFAULT_RISK_TUNING, normalizedRiskWeights, type RiskModelTuning } from './riskModelTuning';
+import {
+  DEFAULT_RISK_TUNING,
+  normalizedRiskWeights,
+  STORE_PRESSURE_MAX,
+  type RiskModelTuning,
+} from './riskModelTuning';
 
 /**
  * Scales tech utilisation before the Technology heatmap and combined-risk tech term so peaks sit
@@ -16,7 +21,7 @@ function compressTechUtilisation01(u: number): number {
 }
 
 export type RiskRow = CapacityRow & {
-  /** Base store-trading rhythm before campaign live amplification (0–1). */
+  /** Base store-trading rhythm before campaign live amplification (capped at STORE_PRESSURE_MAX; can exceed 1 with early-month boost). */
   store_trading_base: number;
   /** Load-bearing campaign in prep window (for business-lens marketing term). */
   campaign_in_prep: boolean;
@@ -123,8 +128,11 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
         backCap,
       })
     );
-    const store_trading_base = Math.min(1, r.store_trading_base ?? r.store_pressure ?? 0);
-    const store_pressure = Math.min(1, r.store_pressure ?? 0);
+    const store_trading_base = Math.min(
+      STORE_PRESSURE_MAX,
+      Math.max(0, r.store_trading_base ?? r.store_pressure ?? 0)
+    );
+    const store_pressure = Math.min(STORE_PRESSURE_MAX, Math.max(0, r.store_pressure ?? 0));
     const campaign_risk = Math.min(1, r.campaign_risk ?? 0);
     const campaign_presence = r.campaign_presence ?? (r.campaign_active ? 1 : 0);
     const campaign_in_prep = Boolean(r.campaign_in_prep);
@@ -134,11 +142,12 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
     const holiday_flag = Boolean(r.holiday_flag);
     const holiday_n = holiday_flag ? 1 : 0;
 
-    const risk_score =
+    const raw_risk_score =
       w.tech * tech_pressure +
       w.store * store_pressure +
       w.campaign * campaign_risk +
       w.holiday * holiday_n;
+    const risk_score = Math.min(1, Math.max(0, raw_risk_score));
 
     const pressure_surfaces = {} as Record<PressureSurfaceId, number>;
     for (const sid of PRESSURE_SURFACE_IDS) {

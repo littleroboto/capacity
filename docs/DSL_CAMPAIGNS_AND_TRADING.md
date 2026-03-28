@@ -1,4 +1,4 @@
-# Campaigns, trading rhythm, and payday month shape
+# Campaigns, trading rhythm, and early-month store boost
 
 ## Campaigns (`campaigns[]`)
 
@@ -67,12 +67,12 @@ flowchart TD
 
 ### `replaces_bau_tech` (optional boolean)
 
-When **`true`**, on any **prep** day where this campaign contributes **labs, teams, or backend** (including stagger slices that include tech):
+When **`true`**, on any **prep** or **live** day where this campaign contributes **labs, teams, or backend** (including stagger slices that include tech in prep, and the resolved sustain load in live — same rules as phase expansion):
 
 - The market’s recurring **`tech.weekly_pattern`** row is **not** added for that day.
 - **BAU** rows still run, but **labs / teams / backend** are forced to **0** (ops/commercial from BAU unchanged).
 
-So big programmes that **use the same delivery channel** as weekly non-prod work can **replace** that baseline instead of stacking on top. Default **`false`** preserves the old additive behaviour. Aliases: **`replacesBauTech`**, **`replace_bau_tech`**.
+So programmes that **run through the same BAU delivery channel** can **replace** the weekly tech baseline for the whole in-flight window instead of stacking. If the **live** segment has no tech buckets (e.g. only ops/commercial hypercare), BAU tech is **not** stripped on those days. Default **`false`** preserves additive behaviour. Aliases: **`replacesBauTech`**, **`replace_bau_tech`**.
 
 ---
 
@@ -85,7 +85,7 @@ After YAML parse, the DSL parser expands this the **same way as `tech.weekly_pat
 - Per day (`Sun` … `Sat`): a **number in [0, 1]** or a named level: `low` (0.25), `medium` (0.5), `high` (0.75), `very_high` (1).
 - Compact form: `default`, `weekdays`, `weekend`, then optional per-day overrides.
 
-`getStorePressureForDate` in `src/engine/pipeline.ts` reads the numeric value for that weekday. Further multipliers (monthly pattern, seasonal wave, payday shape, holidays, campaigns) stack on top in the pipeline.
+`getStorePressureForDate` in `src/engine/pipeline.ts` reads the numeric value for that weekday. Further multipliers (monthly pattern, seasonal wave, early-month boost, holidays, campaigns) stack on top in the pipeline.
 
 ### `monthly_pattern`
 
@@ -95,14 +95,17 @@ Per-calendar-month scalar (Jan–Dec) multiplying the weekly base for that month
 
 Gentle annual wave (`peak_month`, `amplitude`) on store pressure.
 
-### Payday / “week 1 hotter than week 4”
+### Early-month store boost (`payday_month_peak_multiplier`)
 
 `storePaydayMonthMultiplier` in `src/engine/paydayMonthShape.ts` applies when `payday_month_peak_multiplier` (YAML `trading.payday_month_peak_multiplier` or tuning default) is **> 1**:
 
-- Days **1–7** of the calendar month get the **peak** multiplier on YAML-derived store pressure.
-- Toward **month-end**, the multiplier moves down symmetrically (see function for the exact taper).
+- Calendar **week 1** (days **1–7**): full **peak** multiplier on YAML-derived store pressure.
+- **Days 8–21**: linear fade from peak down to **1×** (boost mostly gone by **week 3**).
+- **Day 22 onward**: **1×** (no boost).
 
-So “first week of month vs last week” is modeled on **day-of-month** (first seven days), not ISO week-of-month. If you need a different rule (e.g. aligned to pay cycles per country), that would be a product/engine change.
+Uses **day-of-month** bands, not ISO week numbers. The YAML key name is legacy; behaviour is “early-month lift that dies away by week 3,” not pay-cycle alignment.
+
+The pipeline applies this multiplier **after** the weekly/monthly/seasonal rhythm is already normalised to **0–1**, so the boost can push **`store_trading_base` / `store_pressure` above 1** (hard-capped at **`STORE_PRESSURE_MAX`** / 2.5 after campaign terms in `riskModelTuning.ts`). Combined **`risk_score`** still clamps to **1**.
 
 ---
 

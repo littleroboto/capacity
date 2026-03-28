@@ -19,7 +19,6 @@ const MIN_DSL_PANEL_PX = 280;
 const DEFAULT_DSL_PANEL_PX = 520;
 
 export default function App() {
-  const [marketIds, setMarketIds] = useState<string[]>([]);
   const onSlotSelection = useCallback((_s: SlotSelection | null) => {}, []);
 
   const riskSurface = useAtcStore((s) => s.riskSurface);
@@ -28,6 +27,7 @@ export default function App() {
   const setDslByMarket = useAtcStore((s) => s.setDslByMarket);
   const setRunwayMarketOrder = useAtcStore((s) => s.setRunwayMarketOrder);
   const hydrateFromStorage = useAtcStore((s) => s.hydrateFromStorage);
+  const theme = useAtcStore((s) => s.theme);
 
   const [dslPanelCollapsed, setDslPanelCollapsed] = useState(() => {
     try {
@@ -104,6 +104,10 @@ export default function App() {
   }, [dslPanelCollapsed]);
 
   useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       const order = await fetchRunwayMarketOrder();
@@ -125,7 +129,6 @@ export default function App() {
       }
       if (cancelled) return;
       setRunwayMarketOrder(order);
-      setMarketIds([...order]);
       setDslByMarket(dslByMarket);
       const merged = mergeMarketsToMultiDocYaml(dslByMarket, order);
       hydrateFromStorage(merged);
@@ -138,14 +141,20 @@ export default function App() {
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
       <Header />
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent text-foreground">
+      <main
+        className={cn(
+          'flex min-h-0 flex-1 flex-col bg-transparent text-foreground',
+          lgUp ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]'
+        )}
+      >
         <div
           ref={mainGridRef}
-          className={
-            dslPanelLayoutCollapsed
-              ? 'grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-0 lg:grid-cols-[minmax(0,1fr)_2.75rem]'
-              : 'grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-0'
-          }
+          className={cn(
+            'grid grid-cols-1 gap-0',
+            dslPanelLayoutCollapsed && 'lg:grid-cols-[minmax(0,1fr)_2.75rem]',
+            lgUp && 'min-h-0 flex-1 grid-rows-1',
+            !lgUp && 'w-full shrink-0'
+          )}
           style={
             lgUp && !dslPanelLayoutCollapsed
               ? {
@@ -159,7 +168,7 @@ export default function App() {
               'flex min-h-0 min-w-0 flex-col gap-2 p-4',
               viewMode === 'code'
                 ? 'flex-1 overflow-hidden'
-                : 'overflow-y-auto overflow-x-auto'
+                : 'overflow-y-auto overflow-x-auto [scrollbar-gutter:stable]'
             )}
           >
             {viewMode === 'code' ? (
@@ -188,11 +197,7 @@ export default function App() {
               minRightPx={MIN_DSL_PANEL_PX}
             />
           ) : null}
-          <DSLPanel
-            marketIds={marketIds}
-            collapsed={dslPanelLayoutCollapsed}
-            onCollapsedChange={setDslPanelCollapsed}
-          />
+          <DSLPanel collapsed={dslPanelLayoutCollapsed} onCollapsedChange={setDslPanelCollapsed} />
         </div>
       </main>
     </div>

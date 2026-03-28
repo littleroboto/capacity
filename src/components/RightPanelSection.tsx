@@ -6,7 +6,7 @@ type RightPanelSectionProps = {
   expanded: boolean;
   onExpandedChange: (next: boolean) => void;
   title: string;
-  /** Shown under the title row (e.g. pressure heatmap “Show / Hide tuning”). */
+  /** Shown under the title row (e.g. heatmap adjustments “Show / Hide tuning”). */
   belowTitleMeta?: ReactNode;
   /** Shown under the title when collapsed. */
   collapsedSummary?: ReactNode;
@@ -14,6 +14,11 @@ type RightPanelSectionProps = {
   headerExtras?: ReactNode;
   children: ReactNode;
   className?: string;
+  /**
+   * When true (default), expanded section uses flex-1 so it shares remaining column height with siblings.
+   * Set false for compact footer-style sections that should only use their content height.
+   */
+  fillHeight?: boolean;
 };
 
 /** Collapsible section for the right-hand controls panel: chevron disclosure + consistent chrome. */
@@ -26,15 +31,17 @@ export function RightPanelSection({
   headerExtras,
   children,
   className,
+  fillHeight = true,
 }: RightPanelSectionProps) {
   return (
     <div
       className={cn(
         'flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-muted/20 shadow-sm',
+        expanded && fillHeight && 'flex-1',
         className
       )}
     >
-      <div className="border-b border-border/50 bg-card/40 px-3 py-2.5">
+      <div className="shrink-0 border-b border-border/50 bg-card/40 px-3 py-2.5">
         <div className="flex items-start justify-between gap-2">
           <button
             type="button"
@@ -60,7 +67,16 @@ export function RightPanelSection({
           {headerExtras ? <div className="flex shrink-0 items-center gap-1">{headerExtras}</div> : null}
         </div>
       </div>
-      {expanded ? children : null}
+      {expanded ? (
+        <div
+          className={cn(
+            'flex flex-col justify-start overflow-hidden',
+            fillHeight ? 'min-h-0 flex-1' : 'shrink-0'
+          )}
+        >
+          {children}
+        </div>
+      ) : null}
     </div>
   );
 }

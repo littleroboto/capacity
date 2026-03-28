@@ -18,9 +18,13 @@ import {
 } from './phaseEngine';
 import { withOperationalNoise } from './dataNoise';
 import { computeRisk, type RiskRow } from './riskModel';
-import { storePaydayMonthMultiplier } from '@/engine/paydayMonthShape';
+import {
+  isPaydayKnotTuple,
+  storePaydayMonthMultiplier,
+  storePaydayMonthMultiplierFromKnots,
+} from '@/engine/paydayMonthShape';
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
-import { DEFAULT_RISK_TUNING, type RiskModelTuning } from './riskModelTuning';
+import { DEFAULT_RISK_TUNING, STORE_PRESSURE_MAX, type RiskModelTuning } from './riskModelTuning';
 import type { CampaignConfig, MarketConfig } from './types';
 import { TRADING_MONTH_KEYS } from '@/lib/tradingMonthlyDsl';
 import { parseAllYamlDocuments } from './yamlDslParser';
@@ -123,7 +127,7 @@ export function runPipeline(
   };
 
   type Meta = {
-    /** Base store-trading rhythm (weekly × monthly × seasonal × regional), including payday month shape. */
+    /** Base store-trading rhythm (weekly × monthly × seasonal × regional), including early-month store boost shape. */
     store_trading_base: number;
     /** Trading pressure after campaign live/prep multipliers (before operating windows / school store mult). */
     store_pressure: number;
@@ -145,16 +149,28 @@ export function runPipeline(
     const dayRow = agg.find((r) => r.date === date && r.market === market);
     const config = configByMarket[market];
     const rawStore = getStorePressureForDate(date, config);
-    const paydayPeak =
-      config?.tradingPressure?.payday_month_peak_multiplier ?? tuning.storePaydayMonthPeakMultiplier;
+    // Early-month store boost: per-market YAML knots override legacy YAML peak; else global tuning knots.
+    const yamlKnots = config?.tradingPressure?.payday_month_knot_multipliers;
+    const yamlPeak = config?.tradingPressure?.payday_month_peak_multiplier;
+    const tuningKnots = tuning.storePaydayMonthKnotMultipliers;
+    const paydayMult = isPaydayKnotTuple(yamlKnots)
+      ? storePaydayMonthMultiplierFromKnots(date, yamlKnots)
+      : yamlPeak != null && Number.isFinite(yamlPeak)
+        ? storePaydayMonthMultiplier(date, yamlPeak)
+        : storePaydayMonthMultiplierFromKnots(date, tuningKnots);
+    // Rhythm is already 0–1 from weekly/monthly/seasonal; apply early-month boost *after* that cap so
+    // week-1 lift is visible (peak ≤ paydayMult ≤ 2).
     let store_trading_base = Math.min(
-      1,
-      Math.max(0, rawStore * storePaydayMonthMultiplier(date, paydayPeak))
+      paydayMult,
+      Math.max(0, rawStore * paydayMult)
     );
     const public_holiday_flag = isPublicHoliday(market, date);
     const pubTrad = config?.publicHolidayTradingMultiplier;
     if (public_holiday_flag && pubTrad != null && Number.isFinite(pubTrad) && pubTrad > 0) {
-      store_trading_base = Math.min(1, Math.max(0, store_trading_base * pubTrad));
+      store_trading_base = Math.min(
+        paydayMult,
+        Math.max(0, store_trading_base * pubTrad)
+      );
     }
     const {
       campaign_active,
@@ -171,8 +187,14 @@ export function runPipeline(
     const boostPrep = (config?.tradingPressure?.campaign_store_boost_prep ?? 0) * campaignEffectScale;
     const boostLive = (config?.tradingPressure?.campaign_store_boost_live ?? 0.28) * campaignEffectScale;
     const store_pressure = Math.min(
-      1,
-      store_trading_base * (1 + boostPrep * (campaign_in_prep_loaded ? 1 : 0) + boostLive * (campaign_in_live_loaded ? 1 : 0))
+      STORE_PRESSURE_MAX,
+      Math.max(
+        0,
+        store_trading_base *
+          (1 +
+            boostPrep * (campaign_in_prep_loaded ? 1 : 0) +
+            boostLive * (campaign_in_live_loaded ? 1 : 0))
+      )
     );
     const school_holiday_flag = isSchoolHoliday(market, date);
     const holiday_flag = public_holiday_flag || school_holiday_flag;
@@ -365,7 +387,10 @@ function applySchoolStressCorrelations(
     if (s.ops_activity_mult != null) scaleSurfaceOps(row, s.ops_activity_mult);
     if (s.commercial_activity_mult != null) scaleSurfaceCommercial(row, s.commercial_activity_mult);
     if (s.store_pressure_mult != null) {
-      meta.store_pressure = Math.min(1, meta.store_pressure * s.store_pressure_mult);
+      meta.store_pressure = Math.min(
+        STORE_PRESSURE_MAX,
+        Math.max(0, meta.store_pressure * s.store_pressure_mult)
+      );
     }
   }
 }

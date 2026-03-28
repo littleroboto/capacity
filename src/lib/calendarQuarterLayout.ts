@@ -402,3 +402,45 @@ export function buildQuarterGridRunwayLayout(
 
   return { sections, contentWidth, contentHeight: yPos, placedCells };
 }
+
+/** Must match `RunwayGrid` runway zoom bounds. */
+const RUNWAY_COMPARE_FIT_CELL_PX_MIN = 12;
+const RUNWAY_COMPARE_FIT_CELL_PX_MAX = 28;
+const RUNWAY_COMPARE_FIT_CELL_PX_STEP = 2;
+
+/**
+ * Horizontal span of the LIOM compare row: shared gutter column, each market strip + side labels,
+ * flex gaps (`CALENDAR_QUARTER_GRID_COL_GAP_PX`), and inner `px-0.5` on the flex row in `RunwayGridBody`.
+ */
+export function compareAllRunwayTotalContentWidthPx(
+  cellPx: number,
+  marketCount: number,
+  cellGapPx: number = RUNWAY_CELL_GAP_PX
+): number {
+  if (marketCount < 1) return 0;
+  const monthStripW = runwayDayStripWidth(cellPx, cellGapPx, RUNWAY_DAY_COLUMNS);
+  const colW = monthStripW + CALENDAR_MONTH_SIDE_LABEL_W + CALENDAR_MONTH_SIDE_LABEL_GAP_PX;
+  const innerHorizontalPad = 4;
+  return (
+    innerHorizontalPad +
+    CALENDAR_QUARTER_GUTTER_W +
+    marketCount * colW +
+    marketCount * CALENDAR_QUARTER_GRID_COL_GAP_PX
+  );
+}
+
+/** Largest allowed cell size (stepped) so the full LIOM compare row fits `availableWidth` (e.g. scrollport `clientWidth`). */
+export function bestCellPxForCompareAllRunwayFit(availableWidth: number, marketCount: number): number {
+  if (marketCount < 1 || !Number.isFinite(availableWidth) || availableWidth <= 0) {
+    return RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+  }
+  let best = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+  for (
+    let px = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+    px <= RUNWAY_COMPARE_FIT_CELL_PX_MAX;
+    px += RUNWAY_COMPARE_FIT_CELL_PX_STEP
+  ) {
+    if (compareAllRunwayTotalContentWidthPx(px, marketCount) <= availableWidth) best = px;
+  }
+  return best;
+}

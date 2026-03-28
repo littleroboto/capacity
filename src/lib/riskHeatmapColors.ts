@@ -42,9 +42,6 @@ const EMPTY_CELL_FILL = '#94a3b8';
 /** In-month calendar cells with no runway row (outside model window or missing day); adjacent-month grid slots are not drawn. */
 export const HEATMAP_RUNWAY_PAD_FILL = '#cbd5e1';
 
-/** Opacity for runway cells whose transformed score is below {@link HeatmapColorOpts.stressCutoff}. */
-export const HEATMAP_BELOW_CUTOFF_DIM_OPACITY = 0.26;
-
 /** Legacy mapping: same discrete temperature bands as the runway. */
 export function riskScoreToHeatmapColor(riskScore: number | undefined): string {
   if (riskScore == null || Number.isNaN(riskScore)) return EMPTY_CELL_FILL;
@@ -101,25 +98,21 @@ export type HeatmapColorOpts = {
   riskHeatmapCurve?: RiskHeatmapCurveId;
   /** γ for power/sigmoid/log; stored as `risk_heatmap_gamma`. */
   riskHeatmapGamma?: number;
-  /**
-   * 0 = off. Compared on the **transformed** scale (after curve + γ, same as colour mapping). Cells strictly below
-   * this level keep their band colour but render at {@link HEATMAP_BELOW_CUTOFF_DIM_OPACITY}.
-   */
-  stressCutoff?: number;
   /** Default spectrum bands; mono uses {@link monoColor} with alpha from transformed 0–1. */
   renderStyle?: HeatmapRenderStyle;
   /** `#rrggbb` for mono mode (invalid values fall back to sky). */
   monoColor?: string;
 };
 
-/** Preset hues for the mono heatmap (Controls panel). */
+/** Preset hues for the mono heatmap (Controls panel) — vivid mids for readable cells + punchy swatches. */
 export const HEATMAP_MONO_COLOR_PRESETS: readonly { label: string; hex: string }[] = [
   { label: 'Sky', hex: '#0ea5e9' },
-  { label: 'Amber', hex: '#f59e0b' },
-  { label: 'Rose', hex: '#f43f5e' },
-  { label: 'Violet', hex: '#8b5cf6' },
-  { label: 'Emerald', hex: '#10b981' },
-  { label: 'Slate', hex: '#64748b' },
+  { label: 'Cyan', hex: '#06b6d4' },
+  { label: 'Amber', hex: '#fbbf24' },
+  { label: 'Rose', hex: '#fb7185' },
+  { label: 'Violet', hex: '#a78bfa' },
+  { label: 'Emerald', hex: '#34d399' },
+  { label: 'Slate', hex: '#94a3b8' },
 ] as const;
 
 export const DEFAULT_HEATMAP_MONO_COLOR = HEATMAP_MONO_COLOR_PRESETS[0]!.hex;
@@ -190,20 +183,3 @@ export function transformedHeatmapMetric(
   return heatmapTransformedMetric01(metric, opts) ?? 0;
 }
 
-/**
- * Cell opacity for dimming low scores when {@link HeatmapColorOpts.stressCutoff} is set (after the same curve + γ
- * as {@link heatmapColorForViewMode}).
- */
-export function heatmapOpacityForStressCutoff(
-  _mode: ViewModeId,
-  metric: number | undefined,
-  opts?: HeatmapColorOpts
-): number {
-  const v = heatmapTransformedMetric01(metric, opts);
-  if (v == null) return 1;
-  const cut = opts?.stressCutoff;
-  if (cut != null && cut > 1e-6 && cut < 1 - 1e-6 && v < cut) {
-    return HEATMAP_BELOW_CUTOFF_DIM_OPACITY;
-  }
-  return 1;
-}

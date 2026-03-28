@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { DslAssistantPanel } from '@/components/DslAssistantPanel';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
+import { RightPanelSection } from '@/components/RightPanelSection';
 import { RiskModelPanel } from '@/components/RiskModelPanel';
 import { WorkbenchRunwayControls } from '@/components/WorkbenchRunwayControls';
 import { Button } from '@/components/ui/button';
@@ -16,16 +18,17 @@ import { useAtcStore } from '@/store/useAtcStore';
 import { ChevronLeft, ChevronRight, Database, FileCode2, Save } from 'lucide-react';
 
 type DSLPanelProps = {
-  marketIds: string[];
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
 };
 
 /** Sits in a split layout: runway/heatmap left, controls + workbench right. */
-export function DSLPanel({ marketIds, collapsed, onCollapsedChange }: DSLPanelProps) {
+export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
   const [localDataOpen, setLocalDataOpen] = useState(false);
+  const [dslAuthoringExpanded, setDslAuthoringExpanded] = useState(true);
   const parseError = useAtcStore((s) => s.parseError);
   const setViewMode = useAtcStore((s) => s.setViewMode);
+  const viewMode = useAtcStore((s) => s.viewMode);
 
   const localDataDialog = (
     <Dialog open={localDataOpen} onOpenChange={setLocalDataOpen}>
@@ -129,80 +132,89 @@ export function DSLPanel({ marketIds, collapsed, onCollapsedChange }: DSLPanelPr
           </Button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain pr-0.5">
-          <WorkbenchRunwayControls marketIds={marketIds} />
-          <RiskModelPanel />
-          <div className="flex shrink-0 flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold tracking-tight text-foreground">DSL authoring</p>
-                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-                  Use <span className="font-medium text-foreground/85">Code</span> in{' '}
-                  <span className="font-medium text-foreground/85">View mode</span> for the full YAML editor. Switch to{' '}
-                  <span className="font-medium text-foreground/85">Technology</span> or{' '}
-                  <span className="font-medium text-foreground/85">Business</span> to apply and refresh the runway. This
-                  panel is reserved for a future BYOK assistant that reuses the same authoring prompt you use in
-                  Cursor—not wired yet while the DSL evolves.
-                </p>
-              </div>
-              {parseError ? (
+        <div className="flex min-h-0 flex-1 flex-col justify-start gap-3 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-0.5 [scrollbar-gutter:stable]">
+          <WorkbenchRunwayControls />
+          <RightPanelSection
+            expanded={dslAuthoringExpanded}
+            onExpandedChange={setDslAuthoringExpanded}
+            title={viewMode === 'code' ? 'DSL assistant' : 'DSL authoring'}
+            fillHeight={false}
+            className="w-full shrink-0 self-start border-border/60 bg-muted/15"
+            collapsedSummary={
+              viewMode === 'code' ? (
+                <span>Open for BYOK chat, model picker, and apply preview.</span>
+              ) : (
+                <span>
+                  View mode → <span className="font-medium text-foreground/85">Code</span> for YAML and the assistant.
+                </span>
+              )
+            }
+            headerExtras={
+              parseError ? (
                 <span
                   className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-500 dark:bg-red-400"
                   title={parseError}
                   aria-label="Parse error"
                 />
-              ) : null}
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 w-full justify-center gap-2 text-xs font-medium"
-              disabled
-              title="Use View mode in the header to open Code"
-            >
-              <FileCode2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-              Open Code view
-            </Button>
-          </div>
+              ) : null
+            }
+          >
+            {viewMode === 'code' ? (
+              <div className="flex w-full flex-col justify-start border-t border-border/50 bg-background/20 px-3 pb-3 pt-3 dark:bg-background/10">
+                <DslAssistantPanel />
+              </div>
+            ) : (
+              <div className="flex shrink-0 flex-col gap-2 border-t border-border/50 bg-background/20 px-3 pb-3 pt-3 dark:bg-background/10">
+                <p className="text-xs leading-snug text-muted-foreground">
+                  Use <span className="font-medium text-foreground/85">Code</span> in{' '}
+                  <span className="font-medium text-foreground/85">View mode</span> for the YAML editor and this
+                  assistant. Switch to <span className="font-medium text-foreground/85">Technology</span> or{' '}
+                  <span className="font-medium text-foreground/85">Business</span> to run the model on the runway.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-full justify-center gap-2 text-xs font-medium"
+                  onClick={() => setViewMode('code')}
+                  title="Open Code view"
+                >
+                  <FileCode2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                  Open Code view
+                </Button>
+              </div>
+            )}
+          </RightPanelSection>
+          <RiskModelPanel />
         </div>
 
-        <div className="shrink-0 border-t border-border/60 bg-card/40 px-0 pt-2">
-          <div className="flex w-full flex-col items-end gap-1 text-right">
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-2 px-2.5 text-xs font-normal"
-                onClick={() => setLocalDataOpen(true)}
-                title="History table, export & import JSON"
-                aria-label="Open local data — workspace history"
-              >
-                <Database className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                Local data
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-2 px-2.5 text-xs font-normal"
-                onClick={() => {
-                  saveNamedWorkspaceInteractive();
-                }}
-                title="Save workspace snapshot (DSL + config) to browser history"
-                aria-label="Save workspace snapshot"
-              >
-                <Save className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                Save snapshot
-              </Button>
-            </div>
-            <p className="max-w-[20rem] text-[10px] leading-snug text-muted-foreground">
-              Snapshots capture multi-market YAML, country, view, pressure mix controls, heatmap UI, theme, and runway
-              order. Open <span className="font-medium text-foreground/80">Local data</span> to reload from the table or
-              export JSON.
-            </p>
-          </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1.5 border-t border-border/60 bg-card/40 px-0 pt-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-[11px] font-normal leading-none"
+            onClick={() => setLocalDataOpen(true)}
+            title="History table, export & import JSON"
+            aria-label="Open local data — workspace history"
+          >
+            <Database className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+            Local data
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-[11px] font-normal leading-none"
+            onClick={() => {
+              saveNamedWorkspaceInteractive();
+            }}
+            title="Save workspace snapshot (DSL + config) to browser history"
+            aria-label="Save workspace snapshot"
+          >
+            <Save className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+            Save snapshot
+          </Button>
         </div>
       </aside>
       {localDataDialog}

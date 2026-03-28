@@ -304,12 +304,23 @@ function mapTradingPressureKnobs(
   const live = pick('campaign_store_boost_live', 'campaignStoreBoostLive');
   const payday = pick('payday_month_peak_multiplier', 'paydayMonthPeakMultiplier');
   const effect = pick('campaign_effect_scale', 'campaignEffectScale');
-  if (prep == null && live == null && payday == null && effect == null) return undefined;
+  const rawKnots =
+    (trading as Record<string, unknown>).payday_month_knot_multipliers ??
+    (trading as Record<string, unknown>).paydayMonthKnotMultipliers;
+  let paydayKnots: [number, number, number, number] | undefined;
+  if (Array.isArray(rawKnots) && rawKnots.length === 4) {
+    const nums = rawKnots.map((x) => Number(x));
+    if (nums.every((n) => Number.isFinite(n))) {
+      paydayKnots = nums.map((n) => Math.min(2, Math.max(1, n))) as [number, number, number, number];
+    }
+  }
+  if (prep == null && live == null && payday == null && effect == null && paydayKnots == null) return undefined;
   const out: TradingPressureKnobs = {};
   if (effect != null) out.campaign_effect_scale = Math.min(2.5, Math.max(0, effect));
   if (prep != null) out.campaign_store_boost_prep = Math.min(0.9, prep);
   if (live != null) out.campaign_store_boost_live = Math.min(1.5, live);
   if (payday != null) out.payday_month_peak_multiplier = Math.min(2, Math.max(1, payday));
+  if (paydayKnots != null) out.payday_month_knot_multipliers = paydayKnots;
   return Object.keys(out).length ? out : undefined;
 }
 

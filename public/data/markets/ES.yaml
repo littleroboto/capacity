@@ -1,24 +1,23 @@
 # Spain — Madrid-region school stubs (`holidayCalc.ts`).
 market: ES
 title: Spain
-risk_heatmap_gamma_tech: 1.06
-risk_heatmap_gamma_business: 1.22
-
+risk_heatmap_gamma_tech: 2.5
+risk_heatmap_gamma_business: 2.5
 resources:
   labs:
-    capacity: 4
+    capacity: 5
   staff:
     capacity: 4
-  testing_capacity: 4
+  testing_capacity: 10
 
 bau:
   days_in_use: [mo, tu, we, th, fr]
   weekly_cycle:
-    labs_required: 2
-    staff_required: 0
-    support_days: 3
+    labs_required: 1
+    staff_required: 2
+    support_days: 1
   integration_tests:
-    day: Wed
+    day: Mon
     labs: 1
 
 campaigns:
@@ -29,10 +28,10 @@ campaigns:
     impact: very_high
     business_uplift: 1.0
     campaign_support:
-      labs_required: 3.75
+      labs_required: 1
       tech_staff: 2.9
     live_campaign_support:
-      labs_required: 1.02
+      labs_required: 1
       tech_staff: 1.1
   - name: summer_verano_escolar_2026
     start_date: '2026-06-22'
@@ -41,7 +40,7 @@ campaigns:
     impact: very_high
     business_uplift: 1.0
     campaign_support:
-      labs_required: 4.15
+      labs_required: 1
       tech_staff: 3.15
     live_campaign_support:
       labs_required: 1
@@ -53,10 +52,10 @@ campaigns:
     impact: high
     business_uplift: 1.0
     campaign_support:
-      labs_required: 3.35
+      labs_required: 1
       tech_staff: 2.6
     live_campaign_support:
-      labs_required: 0.92
+      labs_required: 1
       tech_staff: 1
   - name: advent_mega_campaign_2026
     start_date: '2026-12-01'
@@ -65,10 +64,10 @@ campaigns:
     impact: very_high
     business_uplift: 1.0
     campaign_support:
-      labs_required: 4.7
+      labs_required: 1
       tech_staff: 3.55
     live_campaign_support:
-      labs_required: 1.12
+      labs_required: 1
       tech_staff: 1.22
 
 public_holidays:
@@ -97,14 +96,27 @@ trading:
   campaign_store_boost_prep: 0
   campaign_store_boost_live: 0.28
   payday_month_peak_multiplier: 1.12
+  monthly_pattern:
+    Jan: 0.56
+    Feb: 0.58
+    Mar: 0.69
+    Apr: 0.77
+    May: 0.85
+    Jun: 0.91
+    Jul: 0.96
+    Aug: 0.76
+    Sep: 0.82
+    Oct: 0.72
+    Nov: 0.60
+    Dec: 1.0
   weekly_pattern:
-    Mon: 0.68
-    Tue: 0.72
-    Wed: 0.76
-    Thu: 0.85
-    Fri: 0.95
+    Mon: 0.6
+    Tue: 0.7
+    Wed: 0.8
+    Thu: 0.9
+    Fri: 1.0
     Sat: 1.0
-    Sun: 0.78
+    Sun: 0.8
   seasonal:
     peak_month: 8
     amplitude: 0.11

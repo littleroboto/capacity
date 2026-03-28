@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "generate:markets": "node scripts/generate-market-manifest.mjs",
+    "sync:market-holidays": "tsx scripts/sync-market-holiday-dates.ts",
     "dev": "node scripts/generate-market-manifest.mjs && vite",
     "prebuild": "node scripts/generate-market-manifest.mjs",
     "build": "tsc --noEmit && vite build",
@@ -45,6 +46,7 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.21.0",
     "typescript": "~5.7.2",
     "vite": "^6.0.0"
   },

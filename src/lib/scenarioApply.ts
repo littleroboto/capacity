@@ -1,7 +1,7 @@
 import { normalizeViewModeId } from '@/lib/constants';
 import { normalizeHeatmapMonoHex, type HeatmapRenderStyle } from '@/lib/riskHeatmapColors';
 import { looksLikeYamlDsl } from '@/lib/dslGuards';
-import { clampRiskTuning, DEFAULT_RISK_TUNING } from '@/engine/riskModelTuning';
+import { DEFAULT_RISK_TUNING, riskTuningFromPersisted } from '@/engine/riskModelTuning';
 import { runPipelineFromDsl } from '@/engine/pipeline';
 import { syncRiskHeatmapVisualFromConfigs } from '@/lib/heatmapVisualFromConfigs';
 import {
@@ -37,17 +37,10 @@ export function applyScenarioToStore(s: ScenarioState): void {
     if (!looksLikeYamlDsl(dslText)) dslText = full;
   }
 
-  const riskTuning = s.riskTuning
-    ? clampRiskTuning({ ...DEFAULT_RISK_TUNING, ...s.riskTuning })
-    : DEFAULT_RISK_TUNING;
+  const riskTuning = s.riskTuning ? riskTuningFromPersisted(s.riskTuning) : DEFAULT_RISK_TUNING;
 
   setStored('picker', country);
   setStored('layer', normalizeViewModeId(s.layer));
-
-  const stressCut =
-    s.riskHeatmapStressCutoff != null && Number.isFinite(s.riskHeatmapStressCutoff)
-      ? Math.min(0.95, Math.max(0, Math.round(Math.round(s.riskHeatmapStressCutoff / 0.05) * 0.05 * 100) / 100))
-      : undefined;
 
   const heatmapRenderStyle: HeatmapRenderStyle | undefined =
     s.heatmapRenderStyle === 'mono' || s.heatmapRenderStyle === 'spectrum' ? s.heatmapRenderStyle : undefined;
@@ -60,7 +53,6 @@ export function applyScenarioToStore(s: ScenarioState): void {
     riskTuning,
     viewMode: normalizeViewModeId(s.layer),
     discoMode: s.discoMode ?? false,
-    ...(stressCut !== undefined ? { riskHeatmapStressCutoff: stressCut } : {}),
     ...(heatmapRenderStyle ? { heatmapRenderStyle } : {}),
     ...(typeof s.heatmapMonoColor === 'string'
       ? { heatmapMonoColor: normalizeHeatmapMonoHex(s.heatmapMonoColor) }

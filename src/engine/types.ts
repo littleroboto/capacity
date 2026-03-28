@@ -68,8 +68,13 @@ export type TradingPressureKnobs = {
   campaign_store_boost_prep?: number;
   /** Extra fraction on base store pressure during campaign live (non-presence); default 0.28. */
   campaign_store_boost_live?: number;
-  /** Overrides global tuning for post-payday month shape (≥1). */
+  /** Overrides global tuning for early-month store boost (peak week 1, fade to 1× by day 21; ≥1). */
   payday_month_peak_multiplier?: number;
+  /**
+   * Optional four knot multipliers (≥1) on DOM 4, 11, 18, 25 — piecewise linear early-month curve; see
+   * `storePaydayMonthMultiplierFromKnots`. When set, overrides {@link payday_month_peak_multiplier} for that market.
+   */
+  payday_month_knot_multipliers?: readonly [number, number, number, number];
 };
 
 export type MarketConfig = {
@@ -165,9 +170,10 @@ export type CampaignConfig = {
   load: PhaseLoad;
   impact?: string;
   /**
-   * When **true**, on days this campaign contributes **prep** (readiness) **labs / teams / backend**, recurring
-   * **`tech.weekly_pattern`** load is omitted and **BAU** loads have those three buckets zeroed (ops/commercial unchanged)
-   * so campaign work **replaces** the default tech/BAU pipe instead of stacking. Default **false** (additive).
+   * When **true**, on **prep** and **live** days where this campaign contributes **labs / teams / backend** (after the
+   * same resolution as phase expansion — staggered prep slices, scaled live sustain load), recurring
+   * **`tech.weekly_pattern`** is omitted and **BAU** loads have those three buckets zeroed (ops/commercial unchanged)
+   * so campaign delivery **replaces** the weekly tech/BAU pipe instead of stacking. Default **false** (additive).
    */
   replacesBauTech?: boolean;
   /** If true, drives campaign_presence / campaign_risk dates only; does not add phase loads (avoid duplicating operating_windows). */

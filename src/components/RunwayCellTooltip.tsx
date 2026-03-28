@@ -1,63 +1,14 @@
-import type { ReactNode, Ref, RefObject } from 'react';
+import type { Ref, RefObject } from 'react';
 import { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
-import type { RunwayTooltipPayload } from '@/lib/runwayTooltipBreakdown';
+import type { RunwayTipState } from '@/lib/runwayTooltipBreakdown';
+import { RunwayDayDetailsPayloadBody } from '@/components/RunwayDayDetailsBody';
 import { cn } from '@/lib/utils';
 
 const TOOLTIP_POINTER_OFFSET_PX = 14;
 const TOOLTIP_VIEWPORT_MARGIN_PX = 12;
-
-function parseRgbHex6(hex: string): [number, number, number] | null {
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
-  if (!m) return null;
-  const n = parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
-function parseRgbaCss(css: string): [number, number, number, number] | null {
-  const m =
-    /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)$/.exec(css.trim()) ??
-    /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(css.trim());
-  if (!m) return null;
-  const r = Number(m[1]);
-  const g = Number(m[2]);
-  const b = Number(m[3]);
-  const a = m[4] != null ? Math.min(1, Math.max(0, Number(m[4]))) : 1;
-  if (![r, g, b].every((x) => Number.isFinite(x))) return null;
-  return [r, g, b, a];
-}
-
-function relativeLuminanceFromSrgb(r: number, g: number, b: number): number {
-  const lin = [r, g, b].map((c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!;
-}
-
-/** Readable text on arbitrary heatmap cell fills (relative luminance; blends rgba on white). */
-function foregroundOnHeatmapFill(cssColor: string): string {
-  const rgba = parseRgbaCss(cssColor);
-  if (rgba) {
-    const [r, g, b, a] = rgba;
-    const br = Math.round(r * a + 255 * (1 - a));
-    const bg = Math.round(g * a + 255 * (1 - a));
-    const bb = Math.round(b * a + 255 * (1 - a));
-    const L = relativeLuminanceFromSrgb(br, bg, bb);
-    return L > 0.52 ? 'rgb(15 23 42)' : 'rgb(255 252 250)';
-  }
-  const rgb = parseRgbHex6(cssColor);
-  if (!rgb) return 'rgb(15 23 42)';
-  const L = relativeLuminanceFromSrgb(rgb[0], rgb[1], rgb[2]);
-  return L > 0.52 ? 'rgb(15 23 42)' : 'rgb(255 252 250)';
-}
-
-function clampList<T>(items: T[], max: number): { shown: T[]; more: number } {
-  if (items.length <= max) return { shown: items, more: 0 };
-  return { shown: items.slice(0, max), more: items.length - max };
-}
 
 /**
  * Keep the day-details popover near the click point but inside the viewport (flip above / left when needed).
@@ -96,9 +47,7 @@ function clampTooltipInViewport(
   return { left, top };
 }
 
-export type RunwayTipState =
-  | { x: number; y: number; payload: RunwayTooltipPayload }
-  | { x: number; y: number; simple: string };
+export type { RunwayTipState };
 
 type RunwayCellTooltipProps = {
   tip: RunwayTipState | null;
@@ -106,33 +55,6 @@ type RunwayCellTooltipProps = {
   onDismiss: () => void;
   rootRef: RefObject<HTMLDivElement | null>;
 };
-
-function SectionTitle({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <h4
-      className={cn(
-        'mb-1.5 mt-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground',
-        className
-      )}
-    >
-      {children}
-    </h4>
-  );
-}
-
-function BulletList({ items }: { items: string[] }) {
-  if (!items.length) return null;
-  return (
-    <ul className="space-y-1.5 text-xs leading-snug text-foreground">
-      {items.map((t) => (
-        <li key={t} className="flex gap-2">
-          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden />
-          <span>{t}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 function TooltipDismissButton({ onDismiss }: { onDismiss: () => void }) {
   return (
@@ -147,186 +69,6 @@ function TooltipDismissButton({ onDismiss }: { onDismiss: () => void }) {
     >
       <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
     </button>
-  );
-}
-
-function contributorShortLabel(label: string): string {
-  return label.replace(/\s*\(heatmap\)\s*/i, '').replace(/\s*\(live campaigns[^)]*\)\s*/i, '').trim();
-}
-
-function ContributorsBlock({ p }: { p: RunwayTooltipPayload }) {
-  const terms = [...p.riskTerms].sort((a, b) => b.contribution - a.contribution);
-  const blendSum = terms.reduce((acc, t) => acc + t.contribution, 0);
-  const denom = blendSum > 1e-9 ? blendSum : 1;
-  const techLens = p.viewMode === 'combined';
-  const techPct = techLens && terms[0] ? Math.round(Math.min(1, Math.max(0, terms[0].factor)) * 100) : null;
-
-  return (
-    <div className="mt-4 rounded-lg border border-border bg-muted/25 px-3 py-3">
-      <SectionTitle className="mt-0 text-foreground">What drives this score</SectionTitle>
-
-      {techLens ? (
-        <>
-          <p className="mt-2 text-xs font-semibold leading-relaxed text-foreground">{p.techExplanation}</p>
-          {techPct != null ? (
-            <p className="mt-1.5 text-[11px] tabular-nums text-muted-foreground">
-              Utilisation vs capacity (cell): ~{techPct}%
-            </p>
-          ) : null}
-          {p.techReadinessSustainLine ? (
-            <p className="mt-3 border-t border-border pt-2.5 text-[11px] leading-relaxed text-muted-foreground">
-              {p.techReadinessSustainLine}
-            </p>
-          ) : null}
-          {p.pressureSurfaceLines.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-[11px] leading-relaxed text-muted-foreground">
-              {p.pressureSurfaceLines.slice(0, 4).map((line, i) => (
-                <li key={i} className="pl-2">
-                  <span className="text-muted-foreground/70" aria-hidden>
-                    ·{' '}
-                  </span>
-                  {line.replace(/\s*\(max of lab\/team\/backend blend\)\s*$/, '')}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <ul className="mt-2 space-y-2.5">
-            {terms.map((t) => {
-              const share = (t.contribution / denom) * 100;
-              const levelPct = Math.round(Math.min(1, Math.max(0, t.factor)) * 100);
-              const isHolidayDial = t.key === 'holiday';
-              return (
-                <li key={t.key} className="text-xs leading-snug">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="min-w-0 font-semibold text-foreground">{contributorShortLabel(t.label)}</span>
-                    <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {isHolidayDial
-                        ? t.factor >= 0.5
-                          ? 'On'
-                          : '—'
-                        : `${Math.round(share)}% of blend`}
-                    </span>
-                  </div>
-                  {!isHolidayDial ? (
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      Intensity ~{levelPct}%
-                      {t.weight < 0.999 ? ` · weight ${(t.weight * 100).toFixed(0)}%` : null}
-                    </p>
-                  ) : t.factor >= 0.5 ? (
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">Holiday pressure dial active</p>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-          {p.storeTradingLine ? (
-            <p className="mt-3 border-t border-border pt-2.5 text-[11px] leading-relaxed text-muted-foreground">
-              {p.storeTradingLine}
-            </p>
-          ) : null}
-        </>
-      )}
-    </div>
-  );
-}
-
-function TooltipPayloadBody({ p }: { p: RunwayTooltipPayload }) {
-  const pct = Math.round(Math.min(1, Math.max(0, p.fillMetricValue)) * 100);
-  const fg = foregroundOnHeatmapFill(p.cellFillHex);
-  const camps = clampList(p.activeCampaigns, 4);
-  const wins = clampList(p.operatingWindows, 3);
-  const bau = clampList(p.bauToday, 3);
-
-  return (
-    <div
-      key={p.dateStr + p.market + p.viewMode}
-      className="min-h-0 font-sans antialiased [font-feature-settings:'tnum','lnum']"
-    >
-      <header className="relative border-b border-border bg-muted/15 px-4 pb-4 pt-11">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              {p.fillMetricHeadline}
-            </p>
-            <p className="mt-1.5 text-xl font-bold tabular-nums leading-none tracking-tight text-foreground sm:text-2xl">
-              {p.dateStr}
-            </p>
-            <p className="mt-1 text-sm font-medium text-muted-foreground">
-              {p.market} · {p.weekdayShort}
-            </p>
-          </div>
-          <div
-            className="shrink-0 rounded-lg border border-border/80 px-3 py-2 shadow-sm ring-1 ring-border/50"
-            style={{ backgroundColor: p.cellFillHex, color: fg }}
-            aria-label={`${pct} percent`}
-          >
-            <span className="block text-center text-2xl font-bold tabular-nums leading-none tracking-tight sm:text-[1.75rem]">
-              {pct}
-              <span className="align-top text-base font-bold">%</span>
-            </span>
-          </div>
-        </div>
-        <p className="mt-3 text-[11px] font-medium leading-snug text-muted-foreground">
-          <span className="font-semibold text-foreground">{p.riskBand}</span>
-          <span className="mx-1.5 text-muted-foreground/50">·</span>
-          {p.fillMetricLabel}
-        </p>
-      </header>
-
-      <div className="px-4 pb-4 pt-3">
-        <ContributorsBlock p={p} />
-
-        {camps.shown.length > 0 ? (
-          <>
-            <SectionTitle>Active campaigns</SectionTitle>
-            <BulletList items={camps.shown} />
-            {camps.more > 0 ? (
-              <p className="mt-1 text-[11px] font-medium text-muted-foreground">+{camps.more} more</p>
-            ) : null}
-          </>
-        ) : null}
-
-        {wins.shown.length > 0 ? (
-          <>
-            <SectionTitle>Operating windows</SectionTitle>
-            <BulletList items={wins.shown} />
-            {wins.more > 0 ? (
-              <p className="mt-1 text-[11px] font-medium text-muted-foreground">+{wins.more} more</p>
-            ) : null}
-          </>
-        ) : null}
-
-        {bau.shown.length > 0 ? (
-          <>
-            <SectionTitle>Scheduled BAU</SectionTitle>
-            <BulletList items={bau.shown} />
-            {bau.more > 0 ? (
-              <p className="mt-1 text-[11px] font-medium text-muted-foreground">+{bau.more} more</p>
-            ) : null}
-          </>
-        ) : null}
-
-        {p.row.public_holiday_flag ? (
-          <div className="mt-4 rounded-lg border border-sky-500/35 bg-sky-500/10 px-3 py-2.5 dark:border-sky-400/30 dark:bg-sky-400/10">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-950 dark:text-sky-200">
-              Public holiday
-            </p>
-            <p className="mt-1 text-sm font-semibold leading-snug text-foreground">
-              {p.publicHolidayName ?? 'Stub calendar'}
-            </p>
-          </div>
-        ) : null}
-
-        {p.row.school_holiday_flag ? (
-          <p className="mt-3 text-[11px] font-medium leading-relaxed text-muted-foreground">
-            School break — stress / capacity multipliers may apply.
-          </p>
-        ) : null}
-      </div>
-    </div>
   );
 }
 
@@ -428,7 +170,7 @@ export function RunwayCellTooltip({
             <p className="relative z-[2] leading-snug text-card-foreground">{tip.simple}</p>
           ) : (
             <div className="relative z-[2] min-h-0">
-              <TooltipPayloadBody p={tip.payload} />
+              <RunwayDayDetailsPayloadBody p={tip.payload} presentation="popover" />
             </div>
           )}
         </motion.div>

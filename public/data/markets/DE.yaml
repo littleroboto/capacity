@@ -3,25 +3,24 @@
 # Herbst‑Kalender (Oct), then Monopoly 2026–27 as the dominant annual programme (mid‑Nov → mid‑Jan).
 market: DE
 title: Germany
-risk_heatmap_gamma_tech: 1.06
-risk_heatmap_gamma_business: 1.22
-
+risk_heatmap_gamma_tech: 2.5
+risk_heatmap_gamma_business: 2.5
 resources:
   labs:
     capacity: 5
   staff:
     capacity: 4
-  testing_capacity: 5
+  testing_capacity: 10
 
 bau:
   days_in_use: [mo, tu, we, th, fr]
   weekly_cycle:
-    labs_required: 2
-    staff_required: 0
-    support_days: 2
+    labs_required: 1
+    staff_required: 2
+    support_days: 1
   integration_tests:
-    day: Thu
-    labs: 2
+    day: Mon
+    labs: 1
 
 # Chronological. Monopoly live windows: ~8 weeks mid‑Nov through 2nd week Jan (half‑open duration in engine).
 campaigns:
@@ -32,10 +31,10 @@ campaigns:
     impact: very_high
     business_uplift: 1.0
     campaign_support:
-      labs_required: 5.1
+      labs_required: 1
       tech_staff: 3.95
     live_campaign_support:
-      labs_required: 1.35
+      labs_required: 1
       tech_staff: 1.28
   - name: spring_campaign_easter_2026
     # 30 live days spanning Easter (Sun 2026-04-05)
@@ -46,10 +45,10 @@ campaigns:
     business_uplift: 0.88
     stagger_functional_loads: true
     campaign_support:
-      labs_required: 3.55
+      labs_required: 1
       tech_staff: 2.75
     live_campaign_support:
-      labs_required: 0.95
+      labs_required: 1
       tech_staff: 1.02
   - name: summer_campaign_2026
     # ~30 days from the start of the German summer school break (varies by Land; anchor late July)
@@ -59,10 +58,10 @@ campaigns:
     impact: high
     business_uplift: 0.9
     campaign_support:
-      labs_required: 3.75
+      labs_required: 1
       tech_staff: 2.88
     live_campaign_support:
-      labs_required: 1.0
+      labs_required: 1
       tech_staff: 1.05
   - name: herbst_kalender_2026
     start_date: '2026-10-01'
@@ -71,10 +70,10 @@ campaigns:
     impact: medium
     business_uplift: 0.82
     campaign_support:
-      labs_required: 3.15
+      labs_required: 1
       tech_staff: 2.45
     live_campaign_support:
-      labs_required: 0.85
+      labs_required: 1
       tech_staff: 0.95
   - name: monopoly_live_2026_27
     start_date: '2026-11-17'
@@ -83,30 +82,352 @@ campaigns:
     impact: very_high
     business_uplift: 1.0
     campaign_support:
-      labs_required: 5.35
+      labs_required: 1
       tech_staff: 4.1
     live_campaign_support:
-      labs_required: 1.42
+      labs_required: 1
       tech_staff: 1.32
 
 public_holidays:
-  auto: true
-  dates: []
+  auto: false
+  # Stub bank/public holidays — source: src/engine/holidayPublicCatalog.ts (pnpm run sync:market-holidays).
+  # Each list entry is one closed day; trailing comments are English display names (not legal calendars).
+  # staffing_multiplier / trading_multiplier apply on every listed date.
+  dates:
+    - '2026-01-01'  # New Year's Day (Neujahr)
+    - '2026-04-03'  # Good Friday (Karfreitag)
+    - '2026-04-06'  # Easter Monday (Ostermontag)
+    - '2026-05-01'  # Labour Day (Tag der Arbeit)
+    - '2026-05-14'  # Ascension Day (Christi Himmelfahrt)
+    - '2026-05-25'  # Whit Monday (Pfingstmontag)
+    - '2026-10-03'  # German Unity Day (Tag der Deutschen Einheit)
+    - '2026-12-25'  # Christmas Day (1. Weihnachtstag)
+    - '2026-12-26'  # 2nd Christmas Day (2. Weihnachtstag)
+    - '2027-01-01'  # New Year's Day (Neujahr)
+    - '2027-04-02'  # Good Friday (Karfreitag)
+    - '2027-04-05'  # Easter Monday (Ostermontag)
+    - '2027-05-01'  # Labour Day (Tag der Arbeit)
+    - '2027-05-13'  # Ascension Day (Christi Himmelfahrt)
+    - '2027-05-24'  # Whit Monday (Pfingstmontag)
+    - '2027-10-03'  # German Unity Day (Tag der Deutschen Einheit)
+    - '2027-12-25'  # Christmas Day (1. Weihnachtstag)
+    - '2027-12-26'  # 2nd Christmas Day (2. Weihnachtstag)
+    - '2028-01-01'  # New Year's Day (Neujahr)
+    - '2028-04-14'  # Good Friday (Karfreitag)
+    - '2028-04-17'  # Easter Monday (Ostermontag)
+    - '2028-05-01'  # Labour Day (Tag der Arbeit)
+    - '2028-05-25'  # Whit Monday (Pfingstmontag)
+    - '2028-06-05'  # Ascension Day (Christi Himmelfahrt)
+    - '2028-10-03'  # German Unity Day (Tag der Deutschen Einheit)
+    - '2028-12-25'  # Christmas Day (1. Weihnachtstag)
+    - '2028-12-26'  # 2nd Christmas Day (2. Weihnachtstag)
   staffing_multiplier: 0.5
   trading_multiplier: 1.05
 
 school_holidays:
-  auto: true
-  dates: []
+  auto: false
+  # Stub school closure days — source: src/engine/holidayStubCalendar.ts (pnpm run sync:market-holidays).
+  # Each list entry is one non-school day (planning fiction). Range lines group contiguous runs.
+  # staffing_multiplier (and optional trading_multiplier / load_effects) apply on every listed date.
+  dates:
+    # 2025-04-14 – 2025-04-25 (12 consecutive days)
+    - '2025-04-14'
+    - '2025-04-15'
+    - '2025-04-16'
+    - '2025-04-17'
+    - '2025-04-18'
+    - '2025-04-19'
+    - '2025-04-20'
+    - '2025-04-21'
+    - '2025-04-22'
+    - '2025-04-23'
+    - '2025-04-24'
+    - '2025-04-25'
+    # 2026-02-02 – 2026-02-06 (5 consecutive days)
+    - '2026-02-02'
+    - '2026-02-03'
+    - '2026-02-04'
+    - '2026-02-05'
+    - '2026-02-06'
+    # 2026-03-30 – 2026-04-10 (12 consecutive days)
+    - '2026-03-30'
+    - '2026-03-31'
+    - '2026-04-01'
+    - '2026-04-02'
+    - '2026-04-03'
+    - '2026-04-04'
+    - '2026-04-05'
+    - '2026-04-06'
+    - '2026-04-07'
+    - '2026-04-08'
+    - '2026-04-09'
+    - '2026-04-10'
+    # 2026-07-15 – 2026-08-26 (43 consecutive days)
+    - '2026-07-15'
+    - '2026-07-16'
+    - '2026-07-17'
+    - '2026-07-18'
+    - '2026-07-19'
+    - '2026-07-20'
+    - '2026-07-21'
+    - '2026-07-22'
+    - '2026-07-23'
+    - '2026-07-24'
+    - '2026-07-25'
+    - '2026-07-26'
+    - '2026-07-27'
+    - '2026-07-28'
+    - '2026-07-29'
+    - '2026-07-30'
+    - '2026-07-31'
+    - '2026-08-01'
+    - '2026-08-02'
+    - '2026-08-03'
+    - '2026-08-04'
+    - '2026-08-05'
+    - '2026-08-06'
+    - '2026-08-07'
+    - '2026-08-08'
+    - '2026-08-09'
+    - '2026-08-10'
+    - '2026-08-11'
+    - '2026-08-12'
+    - '2026-08-13'
+    - '2026-08-14'
+    - '2026-08-15'
+    - '2026-08-16'
+    - '2026-08-17'
+    - '2026-08-18'
+    - '2026-08-19'
+    - '2026-08-20'
+    - '2026-08-21'
+    - '2026-08-22'
+    - '2026-08-23'
+    - '2026-08-24'
+    - '2026-08-25'
+    - '2026-08-26'
+    # 2026-10-12 – 2026-10-24 (13 consecutive days)
+    - '2026-10-12'
+    - '2026-10-13'
+    - '2026-10-14'
+    - '2026-10-15'
+    - '2026-10-16'
+    - '2026-10-17'
+    - '2026-10-18'
+    - '2026-10-19'
+    - '2026-10-20'
+    - '2026-10-21'
+    - '2026-10-22'
+    - '2026-10-23'
+    - '2026-10-24'
+    # 2026-12-23 – 2027-01-06 (15 consecutive days)
+    - '2026-12-23'
+    - '2026-12-24'
+    - '2026-12-25'
+    - '2026-12-26'
+    - '2026-12-27'
+    - '2026-12-28'
+    - '2026-12-29'
+    - '2026-12-30'
+    - '2026-12-31'
+    - '2027-01-01'
+    - '2027-01-02'
+    - '2027-01-03'
+    - '2027-01-04'
+    - '2027-01-05'
+    - '2027-01-06'
+    # 2027-02-01 – 2027-02-05 (5 consecutive days)
+    - '2027-02-01'
+    - '2027-02-02'
+    - '2027-02-03'
+    - '2027-02-04'
+    - '2027-02-05'
+    # 2027-04-19 – 2027-04-30 (12 consecutive days)
+    - '2027-04-19'
+    - '2027-04-20'
+    - '2027-04-21'
+    - '2027-04-22'
+    - '2027-04-23'
+    - '2027-04-24'
+    - '2027-04-25'
+    - '2027-04-26'
+    - '2027-04-27'
+    - '2027-04-28'
+    - '2027-04-29'
+    - '2027-04-30'
+    # 2027-07-14 – 2027-08-25 (43 consecutive days)
+    - '2027-07-14'
+    - '2027-07-15'
+    - '2027-07-16'
+    - '2027-07-17'
+    - '2027-07-18'
+    - '2027-07-19'
+    - '2027-07-20'
+    - '2027-07-21'
+    - '2027-07-22'
+    - '2027-07-23'
+    - '2027-07-24'
+    - '2027-07-25'
+    - '2027-07-26'
+    - '2027-07-27'
+    - '2027-07-28'
+    - '2027-07-29'
+    - '2027-07-30'
+    - '2027-07-31'
+    - '2027-08-01'
+    - '2027-08-02'
+    - '2027-08-03'
+    - '2027-08-04'
+    - '2027-08-05'
+    - '2027-08-06'
+    - '2027-08-07'
+    - '2027-08-08'
+    - '2027-08-09'
+    - '2027-08-10'
+    - '2027-08-11'
+    - '2027-08-12'
+    - '2027-08-13'
+    - '2027-08-14'
+    - '2027-08-15'
+    - '2027-08-16'
+    - '2027-08-17'
+    - '2027-08-18'
+    - '2027-08-19'
+    - '2027-08-20'
+    - '2027-08-21'
+    - '2027-08-22'
+    - '2027-08-23'
+    - '2027-08-24'
+    - '2027-08-25'
+    # 2027-10-11 – 2027-10-23 (13 consecutive days)
+    - '2027-10-11'
+    - '2027-10-12'
+    - '2027-10-13'
+    - '2027-10-14'
+    - '2027-10-15'
+    - '2027-10-16'
+    - '2027-10-17'
+    - '2027-10-18'
+    - '2027-10-19'
+    - '2027-10-20'
+    - '2027-10-21'
+    - '2027-10-22'
+    - '2027-10-23'
+    # 2027-12-23 – 2028-01-05 (14 consecutive days)
+    - '2027-12-23'
+    - '2027-12-24'
+    - '2027-12-25'
+    - '2027-12-26'
+    - '2027-12-27'
+    - '2027-12-28'
+    - '2027-12-29'
+    - '2027-12-30'
+    - '2027-12-31'
+    - '2028-01-01'
+    - '2028-01-02'
+    - '2028-01-03'
+    - '2028-01-04'
+    - '2028-01-05'
+    # 2028-02-07 – 2028-02-11 (5 consecutive days)
+    - '2028-02-07'
+    - '2028-02-08'
+    - '2028-02-09'
+    - '2028-02-10'
+    - '2028-02-11'
+    # 2028-03-27 – 2028-04-07 (12 consecutive days)
+    - '2028-03-27'
+    - '2028-03-28'
+    - '2028-03-29'
+    - '2028-03-30'
+    - '2028-03-31'
+    - '2028-04-01'
+    - '2028-04-02'
+    - '2028-04-03'
+    - '2028-04-04'
+    - '2028-04-05'
+    - '2028-04-06'
+    - '2028-04-07'
+    # 2028-07-12 – 2028-08-23 (43 consecutive days)
+    - '2028-07-12'
+    - '2028-07-13'
+    - '2028-07-14'
+    - '2028-07-15'
+    - '2028-07-16'
+    - '2028-07-17'
+    - '2028-07-18'
+    - '2028-07-19'
+    - '2028-07-20'
+    - '2028-07-21'
+    - '2028-07-22'
+    - '2028-07-23'
+    - '2028-07-24'
+    - '2028-07-25'
+    - '2028-07-26'
+    - '2028-07-27'
+    - '2028-07-28'
+    - '2028-07-29'
+    - '2028-07-30'
+    - '2028-07-31'
+    - '2028-08-01'
+    - '2028-08-02'
+    - '2028-08-03'
+    - '2028-08-04'
+    - '2028-08-05'
+    - '2028-08-06'
+    - '2028-08-07'
+    - '2028-08-08'
+    - '2028-08-09'
+    - '2028-08-10'
+    - '2028-08-11'
+    - '2028-08-12'
+    - '2028-08-13'
+    - '2028-08-14'
+    - '2028-08-15'
+    - '2028-08-16'
+    - '2028-08-17'
+    - '2028-08-18'
+    - '2028-08-19'
+    - '2028-08-20'
+    - '2028-08-21'
+    - '2028-08-22'
+    - '2028-08-23'
+    # 2028-10-09 – 2028-10-21 (13 consecutive days)
+    - '2028-10-09'
+    - '2028-10-10'
+    - '2028-10-11'
+    - '2028-10-12'
+    - '2028-10-13'
+    - '2028-10-14'
+    - '2028-10-15'
+    - '2028-10-16'
+    - '2028-10-17'
+    - '2028-10-18'
+    - '2028-10-19'
+    - '2028-10-20'
+    - '2028-10-21'
+    # 2028-12-23 – 2029-01-05 (14 consecutive days)
+    - '2028-12-23'
+    - '2028-12-24'
+    - '2028-12-25'
+    - '2028-12-26'
+    - '2028-12-27'
+    - '2028-12-28'
+    - '2028-12-29'
+    - '2028-12-30'
+    - '2028-12-31'
+    - '2029-01-01'
+    - '2029-01-02'
+    - '2029-01-03'
+    - '2029-01-04'
+    - '2029-01-05'
   staffing_multiplier: 0.88
   trading_multiplier: 1.08
   load_effects:
-    lab_load_mult: 1.05
-    team_load_mult: 1.08
     backend_load_mult: 1.04
-    ops_activity_mult: 1.05
     commercial_activity_mult: 1.08
-
+    lab_load_mult: 1.05
+    ops_activity_mult: 1.05
+    team_load_mult: 1.08
 holidays:
   capacity_taper_days: 3
   lab_capacity_scale: 0.5
@@ -117,38 +438,26 @@ trading:
   payday_month_peak_multiplier: 1.12
   campaign_effect_scale: 1.05
   monthly_pattern:
-    Jan: 1
-    Feb: 1
-    Mar: 0.8
-    Apr: 0.7
-    May: 0.68
-    Jun: 0.69
-    Jul: 0.71
-    Aug: 0.73
-    Sep: 0.75
-    Oct: 0.8
-    Nov: 0.78
-    Dec: 1
+    Jan: 0.56
+    Feb: 0.58
+    Mar: 0.69
+    Apr: 0.77
+    May: 0.85
+    Jun: 0.91
+    Jul: 0.97
+    Aug: 0.92
+    Sep: 0.84
+    Oct: 0.72
+    Nov: 0.60
+    Dec: 1.0
   weekly_pattern:
-    Mon: 0.7
-    Tue: 0.72
-    Wed: 0.74
-    Thu: 0.8
-    Fri: 0.95
+    Mon: 0.6
+    Tue: 0.7
+    Wed: 0.8
+    Thu: 0.9
+    Fri: 1.0
     Sat: 1.0
-    Sun: 0.6
+    Sun: 0.8
   seasonal:
     peak_month: 7
     amplitude: 0.11
-
-tech:
-  weekly_pattern:
-    default: medium
-    Mon: high
-    Tue: very_high
-    Thu: high
-    Fri: very_high
-    Sat: medium
-    Sun: low
-  labs_scale: 1.35
-  teams_scale: 0.85

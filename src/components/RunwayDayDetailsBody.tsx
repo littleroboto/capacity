@@ -1,0 +1,429 @@
+import type { ReactNode } from 'react';
+import type { RunwayTooltipPayload } from '@/lib/runwayTooltipBreakdown';
+import { cn } from '@/lib/utils';
+
+export type DayDetailsPresentation = 'popover' | 'markdown';
+
+function parseRgbHex6(hex: string): [number, number, number] | null {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function parseRgbaCss(css: string): [number, number, number, number] | null {
+  const m =
+    /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)$/.exec(css.trim()) ??
+    /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(css.trim());
+  if (!m) return null;
+  const r = Number(m[1]);
+  const g = Number(m[2]);
+  const b = Number(m[3]);
+  const a = m[4] != null ? Math.min(1, Math.max(0, Number(m[4]))) : 1;
+  if (![r, g, b].every((x) => Number.isFinite(x))) return null;
+  return [r, g, b, a];
+}
+
+function relativeLuminanceFromSrgb(r: number, g: number, b: number): number {
+  const lin = [r, g, b].map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!;
+}
+
+/** Readable text on arbitrary heatmap cell fills (relative luminance; blends rgba on white). */
+function foregroundOnHeatmapFill(cssColor: string): string {
+  const rgba = parseRgbaCss(cssColor);
+  if (rgba) {
+    const [r, g, b, a] = rgba;
+    const br = Math.round(r * a + 255 * (1 - a));
+    const bg = Math.round(g * a + 255 * (1 - a));
+    const bb = Math.round(b * a + 255 * (1 - a));
+    const L = relativeLuminanceFromSrgb(br, bg, bb);
+    return L > 0.52 ? 'rgb(15 23 42)' : 'rgb(255 252 250)';
+  }
+  const rgb = parseRgbHex6(cssColor);
+  if (!rgb) return 'rgb(15 23 42)';
+  const L = relativeLuminanceFromSrgb(rgb[0], rgb[1], rgb[2]);
+  return L > 0.52 ? 'rgb(15 23 42)' : 'rgb(255 252 250)';
+}
+
+function clampList<T>(items: T[], max: number): { shown: T[]; more: number } {
+  if (items.length <= max) return { shown: items, more: 0 };
+  return { shown: items.slice(0, max), more: items.length - max };
+}
+
+function SectionTitle({
+  children,
+  className,
+  presentation,
+}: {
+  children: ReactNode;
+  className?: string;
+  presentation: DayDetailsPresentation;
+}) {
+  return (
+    <h4
+      className={cn(
+        presentation === 'markdown'
+          ? 'mb-2 mt-6 text-sm font-semibold tracking-tight text-foreground first:mt-0'
+          : 'mb-1.5 mt-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground',
+        className
+      )}
+    >
+      {children}
+    </h4>
+  );
+}
+
+function BulletList({
+  items,
+  presentation,
+}: {
+  items: string[];
+  presentation: DayDetailsPresentation;
+}) {
+  if (!items.length) return null;
+  if (presentation === 'markdown') {
+    return (
+      <ul className="my-2 list-disc space-y-1.5 pl-5 text-[14px] leading-relaxed text-foreground marker:text-muted-foreground">
+        {items.map((t) => (
+          <li key={t}>{t}</li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <ul className="space-y-1.5 text-xs leading-snug text-foreground">
+      {items.map((t) => (
+        <li key={t} className="flex gap-2">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden />
+          <span>{t}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function contributorShortLabel(label: string): string {
+  return label.replace(/\s*\(heatmap\)\s*/i, '').replace(/\s*\(live campaigns[^)]*\)\s*/i, '').trim();
+}
+
+function ContributorsBlock({
+  p,
+  presentation,
+}: {
+  p: RunwayTooltipPayload;
+  presentation: DayDetailsPresentation;
+}) {
+  const terms = [...p.riskTerms].sort((a, b) => b.contribution - a.contribution);
+  const blendSum = terms.reduce((acc, t) => acc + t.contribution, 0);
+  const denom = blendSum > 1e-9 ? blendSum : 1;
+  const techLens = p.viewMode === 'combined';
+  const techPct = techLens && terms[0] ? Math.round(Math.min(1, Math.max(0, terms[0].factor)) * 100) : null;
+
+  const wrap = (inner: ReactNode) =>
+    presentation === 'markdown' ? (
+      <div className="mt-6 border-l-2 border-primary/35 bg-muted/20 py-3 pl-4 pr-2 dark:border-primary/25 dark:bg-muted/10">
+        {inner}
+      </div>
+    ) : (
+      <div className="mt-4 rounded-lg border border-border bg-muted/25 px-3 py-3">{inner}</div>
+    );
+
+  const title =
+    presentation === 'markdown' ? (
+      <h3 className="text-sm font-semibold text-foreground">What drives this score</h3>
+    ) : (
+      <SectionTitle presentation={presentation} className="mt-0 text-foreground">
+        What drives this score
+      </SectionTitle>
+    );
+
+  return wrap(
+    <>
+      {title}
+
+      {techLens ? (
+        <>
+          <p
+            className={cn(
+              'font-semibold leading-relaxed text-foreground',
+              presentation === 'markdown' ? 'mt-3 text-[15px]' : 'mt-2 text-xs'
+            )}
+          >
+            {p.techExplanation}
+          </p>
+          {techPct != null ? (
+            <p
+              className={cn(
+                'tabular-nums text-muted-foreground',
+                presentation === 'markdown' ? 'mt-2 text-sm' : 'mt-1.5 text-[11px]'
+              )}
+            >
+              Utilisation vs capacity (cell): ~{techPct}%
+            </p>
+          ) : null}
+          {p.techReadinessSustainLine ? (
+            <p
+              className={cn(
+                'border-t border-border leading-relaxed text-muted-foreground',
+                presentation === 'markdown' ? 'mt-4 border-border/60 pt-3 text-sm' : 'mt-3 pt-2.5 text-[11px]'
+              )}
+            >
+              {p.techReadinessSustainLine}
+            </p>
+          ) : null}
+          {p.pressureSurfaceLines.length > 0 ? (
+            <ul
+              className={cn(
+                'space-y-1 leading-relaxed text-muted-foreground',
+                presentation === 'markdown' ? 'mt-3 list-disc pl-5 text-sm' : 'mt-2 text-[11px]'
+              )}
+            >
+              {p.pressureSurfaceLines.slice(0, 4).map((line, i) => (
+                <li key={i}>{line.replace(/\s*\(max of lab\/team\/backend blend\)\s*$/, '')}</li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <ul className={cn('space-y-2.5', presentation === 'markdown' ? 'mt-3' : 'mt-2')}>
+            {terms.map((t) => {
+              const share = (t.contribution / denom) * 100;
+              const levelPct = Math.round(Math.min(1, Math.max(0, t.factor)) * 100);
+              const isHolidayDial = t.key === 'holiday';
+              return (
+                <li
+                  key={t.key}
+                  className={cn('leading-snug', presentation === 'markdown' ? 'text-[14px]' : 'text-xs')}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 font-semibold text-foreground">{contributorShortLabel(t.label)}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                      {isHolidayDial
+                        ? t.factor >= 0.5
+                          ? 'On'
+                          : '—'
+                        : `${Math.round(share)}% of blend`}
+                    </span>
+                  </div>
+                  {!isHolidayDial ? (
+                    <p className="mt-0.5 text-[13px] text-muted-foreground">
+                      Intensity ~{levelPct}%
+                      {t.weight < 0.999 ? ` · weight ${(t.weight * 100).toFixed(0)}%` : null}
+                    </p>
+                  ) : t.factor >= 0.5 ? (
+                    <p className="mt-0.5 text-[13px] text-muted-foreground">Holiday pressure dial active</p>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {p.storeTradingLine ? (
+            <p
+              className={cn(
+                'border-t border-border leading-relaxed text-muted-foreground',
+                presentation === 'markdown' ? 'mt-4 border-border/60 pt-3 text-sm' : 'mt-3 pt-2.5 text-[11px]'
+              )}
+            >
+              {p.storeTradingLine}
+            </p>
+          ) : null}
+        </>
+      )}
+    </>
+  );
+}
+
+/** Raw 0–1 heatmap input (before transfer curve / γ colouring). */
+function formatHeatmapScore01(v: number): string {
+  const x = Math.min(1, Math.max(0, v));
+  return (Math.round(x * 1000) / 1000).toFixed(3).replace(/\.?0+$/, '') || '0';
+}
+
+export function RunwayDayDetailsPayloadBody({
+  p,
+  presentation = 'popover',
+}: {
+  p: RunwayTooltipPayload;
+  presentation?: DayDetailsPresentation;
+}) {
+  const pct = Math.round(Math.min(1, Math.max(0, p.fillMetricValue)) * 100);
+  const heatmapScoreStr = formatHeatmapScore01(p.fillMetricValue);
+  const riskScore = p.row.risk_score ?? 0;
+  const riskScoreStr = (Math.round(Math.min(1, Math.max(0, riskScore)) * 100) / 100).toFixed(2);
+  const fg = foregroundOnHeatmapFill(p.cellFillHex);
+  const camps = clampList(p.activeCampaigns, 4);
+  const wins = clampList(p.operatingWindows, 3);
+  const bau = clampList(p.bauToday, 3);
+
+  const bodyPad = presentation === 'markdown' ? 'px-0 pb-0 pt-1' : 'px-4 pb-4 pt-3';
+
+  return (
+    <article
+      key={p.dateStr + p.market + p.viewMode}
+      className={cn(
+        'min-h-0 font-sans antialiased [font-feature-settings:"tnum","lnum"]',
+        presentation === 'markdown' && 'text-[15px] leading-[1.65] text-foreground'
+      )}
+    >
+      {presentation === 'markdown' ? (
+        <header className="border-b border-border/70 pb-4">
+          <p className="text-xs font-medium text-muted-foreground">{p.fillMetricHeadline}</p>
+          <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="font-mono text-2xl font-bold tracking-tight text-foreground">{p.dateStr}</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {p.market} · {p.weekdayShort}
+              </p>
+            </div>
+            <div
+              className="shrink-0 rounded-lg border border-border/80 px-3.5 py-2.5 shadow-sm"
+              style={{ backgroundColor: p.cellFillHex, color: fg }}
+              aria-label={`${pct} percent`}
+            >
+              <span className="block text-center text-3xl font-extrabold tabular-nums leading-none tracking-tight">
+                {pct}
+                <span className="align-top text-xl font-extrabold tracking-tight">%</span>
+              </span>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-muted-foreground">
+            <strong className="font-semibold text-foreground">{p.riskBand}</strong>
+            <span className="mx-2 text-muted-foreground/40">·</span>
+            {p.fillMetricLabel}
+          </p>
+          <p className="mt-2 font-mono text-sm tabular-nums text-foreground">
+            <span className="text-muted-foreground">Heatmap (0–1)</span>{' '}
+            <span className="font-semibold">{heatmapScoreStr}</span>
+            <span className="mx-2 text-muted-foreground/50">·</span>
+            <span className="text-muted-foreground">Combined risk</span>{' '}
+            <span className="font-semibold">{riskScoreStr}</span>
+          </p>
+        </header>
+      ) : (
+        <header className="relative border-b border-border bg-muted/15 px-4 pb-4 pt-11">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {p.fillMetricHeadline}
+              </p>
+              <p className="mt-1.5 text-xl font-bold tabular-nums leading-none tracking-tight text-foreground sm:text-2xl">
+                {p.dateStr}
+              </p>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
+                {p.market} · {p.weekdayShort}
+              </p>
+            </div>
+            <div
+              className="shrink-0 rounded-lg border border-border/80 px-3.5 py-2.5 shadow-sm ring-1 ring-border/50"
+              style={{ backgroundColor: p.cellFillHex, color: fg }}
+              aria-label={`${pct} percent`}
+            >
+              <span className="block text-center text-3xl font-extrabold tabular-nums leading-none tracking-tight sm:text-[2.125rem]">
+                {pct}
+                <span className="align-top text-xl font-extrabold tracking-tight sm:text-2xl">%</span>
+              </span>
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] font-medium leading-snug text-muted-foreground">
+            <span className="font-semibold text-foreground">{p.riskBand}</span>
+            <span className="mx-1.5 text-muted-foreground/50">·</span>
+            {p.fillMetricLabel}
+          </p>
+          <p className="mt-2 text-[11px] font-mono tabular-nums leading-snug text-foreground">
+            <span className="text-muted-foreground">Heatmap 0–1</span>{' '}
+            <span className="font-semibold">{heatmapScoreStr}</span>
+            <span className="mx-1.5 text-muted-foreground/45">·</span>
+            <span className="text-muted-foreground">Risk</span>{' '}
+            <span className="font-semibold">{riskScoreStr}</span>
+          </p>
+        </header>
+      )}
+
+      <div className={bodyPad}>
+        {presentation === 'markdown' ? (
+          <>
+            <h3 className="mt-6 text-sm font-semibold tracking-tight text-foreground first:mt-0">
+              What is driving it
+            </h3>
+            <div className="mt-3 space-y-5">
+              {p.driverSummaryBlocks.map((block) => (
+                <div key={block.heading}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {block.heading}
+                  </p>
+                  <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[14px] leading-relaxed text-foreground marker:text-muted-foreground">
+                    {block.bullets.map((b, i) => (
+                      <li key={`${block.heading}-${i}`}>{b}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <ContributorsBlock p={p} presentation={presentation} />
+        )}
+
+        {camps.shown.length > 0 ? (
+          <>
+            <SectionTitle presentation={presentation}>Active campaigns</SectionTitle>
+            <BulletList items={camps.shown} presentation={presentation} />
+            {camps.more > 0 ? (
+              <p className="mt-1 text-xs italic text-muted-foreground">+{camps.more} more</p>
+            ) : null}
+          </>
+        ) : null}
+
+        {wins.shown.length > 0 && presentation !== 'markdown' ? (
+          <>
+            <SectionTitle presentation={presentation}>Operating windows</SectionTitle>
+            <BulletList items={wins.shown} presentation={presentation} />
+            {wins.more > 0 ? (
+              <p className="mt-1 text-xs italic text-muted-foreground">+{wins.more} more</p>
+            ) : null}
+          </>
+        ) : null}
+
+        {bau.shown.length > 0 ? (
+          <>
+            <SectionTitle presentation={presentation}>Scheduled BAU</SectionTitle>
+            <BulletList items={bau.shown} presentation={presentation} />
+            {bau.more > 0 ? (
+              <p className="mt-1 text-xs italic text-muted-foreground">+{bau.more} more</p>
+            ) : null}
+          </>
+        ) : null}
+
+        {p.row.public_holiday_flag ? (
+          <div
+            className={cn(
+              'mt-6 rounded-md border border-sky-500/35 bg-sky-500/10 dark:border-sky-400/30 dark:bg-sky-400/10',
+              presentation === 'markdown' ? 'px-3 py-3' : 'mt-4 px-3 py-2.5'
+            )}
+          >
+            <p className="text-xs font-semibold text-sky-950 dark:text-sky-200">Public holiday</p>
+            <p className="mt-1.5 text-sm font-medium leading-snug text-foreground">
+              {p.publicHolidayName ?? 'Stub calendar'}
+            </p>
+          </div>
+        ) : null}
+
+        {p.row.school_holiday_flag ? (
+          <p
+            className={cn(
+              'font-medium leading-relaxed text-muted-foreground',
+              presentation === 'markdown' ? 'mt-5 text-sm' : 'mt-3 text-[11px]'
+            )}
+          >
+            School break — stress / capacity multipliers may apply.
+          </p>
+        ) : null}
+      </div>
+    </article>
+  );
+}

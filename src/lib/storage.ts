@@ -62,8 +62,6 @@ export type ScenarioState = {
   dslByMarket?: Record<string, string>;
   riskHeatmapGamma?: number;
   riskHeatmapCurve?: RiskHeatmapCurveId;
-  /** Optional; 0–0.95 colour floor after curve + γ (UI only). */
-  riskHeatmapStressCutoff?: number;
   discoMode?: boolean;
   theme?: 'light' | 'dark';
   heatmapRenderStyle?: HeatmapRenderStyle;
