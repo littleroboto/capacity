@@ -25,6 +25,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      # Requires package-lock.json committed and in sync with package.json (run `npm install` locally after dep changes).
       - run: npm ci
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
