@@ -184,7 +184,7 @@ function RunwaySkeleton({
       >
       <div
         className={cn(
-          'flex w-[min(100%,14rem)] shrink-0 flex-col gap-3 self-center lg:border-r lg:border-border/50 lg:pr-6 lg:pl-2 lg:self-start',
+          'flex w-fit max-w-[min(100%,6rem)] shrink-0 flex-col gap-3 self-center lg:border-r lg:border-border/50 lg:pr-3 lg:pl-1 lg:self-start',
           compareAll ? 'pt-1' : 'pt-1 lg:pt-[var(--runway-year-strip)]'
         )}
         style={
@@ -195,7 +195,7 @@ function RunwaySkeleton({
       >
         <div className="h-3 w-24 rounded-md bg-muted/70" />
         <motion.div
-          className="h-36 w-full max-w-[12rem] rounded-md bg-muted/45"
+          className="h-36 w-full max-w-[4.5rem] rounded-md bg-muted/45"
           animate={reduceMotion ? {} : { opacity: [0.4, 0.72, 0.4] }}
           transition={
             reduceMotion ? {} : { duration: 1.2, repeat: Infinity, ease: 'easeInOut', delay: 0.12 }
@@ -1889,11 +1889,10 @@ function RunwayGridBody({
       >
       <div
         className={cn(
-          // Hard cap width so the legend column cannot steal the whole row (items-stretch + nested flex
-          // was letting this flex item grow to ~100% width on some breakpoints).
-          'box-border flex w-[min(100%,14rem)] shrink-0 grow-0 flex-col',
+          // Swatch-only legend: hug content; cap so large cell zoom still fits without eating the runway.
+          'box-border flex w-fit max-w-[min(100%,6.5rem)] shrink-0 grow-0 flex-col',
           'mx-auto lg:mx-0 lg:self-start',
-          'lg:border-r lg:border-border/40 lg:pr-4 lg:pl-1',
+          'lg:border-r lg:border-border/40 lg:pr-2.5 lg:pl-0.5',
           compareAllMarkets ? 'pt-0.5' : 'pt-0.5',
           !compareAllMarkets && !heatmap3d && 'lg:pt-[var(--runway-year-strip)]'
         )}
@@ -1904,7 +1903,7 @@ function RunwayGridBody({
         }
       >
         <HeatmapLegend
-          className="w-full min-w-0 text-left"
+          className="w-fit max-w-full min-w-0 text-left"
           viewMode={viewMode}
           heatmapOpts={heatmapOpts}
           cellSizePx={cellPx}

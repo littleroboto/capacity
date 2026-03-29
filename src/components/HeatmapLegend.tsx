@@ -54,7 +54,7 @@ export function HeatmapLegend({
 
   return (
     <div
-      className={cn('flex w-full min-w-0 flex-col items-start', className)}
+      className={cn('flex w-fit max-w-full min-w-0 flex-col items-start', className)}
       data-view-mode={viewMode}
     >
       <div
