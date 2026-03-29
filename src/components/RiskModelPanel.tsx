@@ -144,6 +144,8 @@ export function RiskModelPanel() {
     return Math.min(2.5, Math.max(0, n));
   }, [country, configs]);
 
+  if (isRunwayAllMarkets(country)) return null;
+
   const uiCampaignMult = snapCampaignUiMultiplier(riskTuning.campaignEffectUiMultiplier);
   const effectiveCampaignScale =
     yamlCampaignScaleFocused != null

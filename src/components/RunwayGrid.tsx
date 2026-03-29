@@ -176,7 +176,12 @@ function RunwaySkeleton({
       aria-live="polite"
       aria-label="Loading runway for selected market"
     >
-      <div className="flex w-full min-w-0 max-w-full flex-col-reverse items-stretch gap-6 lg:flex-row lg:items-start lg:gap-0">
+      <div
+        className={cn(
+          'flex w-full min-w-0 max-w-full flex-col-reverse items-stretch gap-6 lg:flex-row lg:gap-0',
+          compareAll && 'lg:min-h-0 lg:items-stretch'
+        )}
+      >
       <div
         className={cn(
           'flex w-[min(100%,14rem)] shrink-0 flex-col gap-3 self-center lg:border-r lg:border-border/50 lg:pr-6 lg:pl-2 lg:self-start',
@@ -260,7 +265,7 @@ function fillMetricLabelForView(mode: ViewModeId): string {
     case 'combined':
       return 'Scheduled work on labs, field teams, and backend versus each lane’s capacity';
     case 'in_store':
-      return 'Store rhythm, campaigns, and holidays blended into one trading-pressure read';
+      return 'Restaurant trading intensity from the store curve—rhythm, holidays, and store boosts when live (or prep if YAML says so)';
     default:
       return 'Metric';
   }
@@ -277,6 +282,17 @@ function riskByDateForMarket(surface: RiskRow[], market: string): Map<string, Ri
     if (r.market === market) m.set(r.date, r);
   }
   return m;
+}
+
+/** Avoid stealing ←/→ when typing or using form controls elsewhere on the page. */
+function isHeatmapKeyNavSuppressed(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (el.isContentEditable) return true;
+  if (el.closest?.('input, textarea, select, [contenteditable="true"]')) return true;
+  return false;
 }
 
 function TodayDot() {
@@ -1328,6 +1344,11 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     [configs, singleMarketId]
   );
 
+  const allDatesSorted = useMemo(
+    () => [...new Set(riskSurface.map((r) => r.date))].sort(),
+    [riskSurface]
+  );
+
   useLayoutEffect(() => {
     setTip(null);
   }, [country]);
@@ -1362,6 +1383,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   }, [compareAllMarkets, onSlotSelection]);
 
   const marketsFitKey = useMemo(() => marketsOrdered.join(','), [marketsOrdered]);
+  const compareDatesFitKey = useMemo(() => allDatesSorted.join(','), [allDatesSorted]);
 
   useLayoutEffect(() => {
     if (!compareAllMarkets || marketsOrdered.length === 0 || countrySwitchLoading) return;
@@ -1371,15 +1393,38 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     const applyFit = () => {
       const w = el.clientWidth;
       if (w < 48) return;
-      const next = bestCellPxForCompareAllRunwayFit(w, marketsOrdered.length);
+      const top = el.getBoundingClientRect().top;
+      const viewportBelow = Math.max(
+        80,
+        (typeof window !== 'undefined' ? window.innerHeight : 640) - top - 16
+      );
+      const measuredH = el.clientHeight;
+      const h =
+        measuredH > 48 ? Math.min(measuredH, viewportBelow) : viewportBelow;
+      const next = bestCellPxForCompareAllRunwayFit(
+        w,
+        h,
+        marketsOrdered.length,
+        allDatesSorted
+      );
       setRunwayCellPx((prev) => (prev === next ? prev : next));
     };
 
     applyFit();
     const ro = new ResizeObserver(() => applyFit());
     ro.observe(el);
-    return () => ro.disconnect();
-  }, [compareAllMarkets, marketsFitKey, marketsOrdered.length, countrySwitchLoading]);
+    window.addEventListener('resize', applyFit);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', applyFit);
+    };
+  }, [
+    compareAllMarkets,
+    compareDatesFitKey,
+    marketsFitKey,
+    marketsOrdered.length,
+    countrySwitchLoading,
+  ]);
 
   useEffect(() => {
     try {
@@ -1401,29 +1446,6 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     setTip(null);
   }, []);
 
-  useEffect(() => {
-    if (!tip) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dismissTip();
-    };
-    const onPointerDownCapture = (e: PointerEvent) => {
-      const n = e.target as Node | null;
-      if (!n) return;
-      if (heatmapInteractionRef.current?.contains(n)) return;
-      if (tooltipRootRef.current?.contains(n)) return;
-      if (summaryPanelRef.current?.contains(n)) return;
-      dismissTip();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('pointerdown', onPointerDownCapture, true);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('pointerdown', onPointerDownCapture, true);
-    };
-  }, [tip, dismissTip]);
-
-  const allDatesSorted = useMemo(() => [...new Set(riskSurface.map((r) => r.date))].sort(), [riskSurface]);
-
   const calendarLayout = useMemo(() => {
     if (compareAllMarkets) return buildVerticalMonthsRunwayLayout(allDatesSorted, cellPx);
     if (runway3dHeatmap) {
@@ -1444,8 +1466,35 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     [riskHeatmapCurve, riskHeatmapGamma, heatmapRenderStyle, heatmapMonoColor]
   );
 
+  const buildPayloadTipState = useCallback(
+    (market: string, dateStr: string, anchor: RunwayTipAnchor): RunwayTipState | null => {
+      const riskByDate = riskByDateForMarket(riskSurface, market);
+      const row = riskByDate.get(dateStr);
+      if (!row) return null;
+      const config = configs.find((c) => c.market === market);
+      const wd = weekdayShortFromYmd(dateStr);
+      const fillMetricValue = heatmapCellMetric(row, viewMode, riskTuning);
+      const cellFillHex = heatmapColorForViewMode(viewMode, fillMetricValue, heatmapOpts);
+      const payload = buildRunwayTooltipPayload({
+        dateStr,
+        weekdayShort: wd,
+        market,
+        viewMode,
+        row,
+        config,
+        tuning: riskTuning,
+        fillMetricHeadline: fillMetricHeadlineForView(viewMode),
+        fillMetricLabel: fillMetricLabelForView(viewMode),
+        fillMetricValue,
+        cellFillHex,
+      });
+      return { x: anchor.clientX, y: anchor.clientY, payload };
+    },
+    [riskSurface, configs, viewMode, riskTuning, heatmapOpts]
+  );
+
   const makeShowTip = useCallback(
-    (market: string, riskByDate: Map<string, RiskRow>, config: MarketConfig | undefined) =>
+    (market: string, riskByDate: Map<string, RiskRow>, _config: MarketConfig | undefined) =>
       (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => {
         const wd = dateStr ? weekdayShortFromYmd(dateStr) : WEEKDAY_HEADERS[weekdayCol];
         const prev = tipRef.current;
@@ -1474,25 +1523,57 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
           setTip(null);
           return;
         }
-        const fillMetricValue = heatmapCellMetric(row, viewMode, riskTuning);
-        const cellFillHex = heatmapColorForViewMode(viewMode, fillMetricValue, heatmapOpts);
-        const payload = buildRunwayTooltipPayload({
-          dateStr,
-          weekdayShort: wd,
-          market,
-          viewMode,
-          row,
-          config,
-          tuning: riskTuning,
-          fillMetricHeadline: fillMetricHeadlineForView(viewMode),
-          fillMetricLabel: fillMetricLabelForView(viewMode),
-          fillMetricValue,
-          cellFillHex,
-        });
-        setTip({ x: clientX, y: clientY, payload });
+        const next = buildPayloadTipState(market, dateStr, anchor);
+        if (next) setTip(next);
       },
-    [viewMode, riskTuning, heatmapOpts]
+    [buildPayloadTipState]
   );
+
+  useEffect(() => {
+    if (!tip) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        dismissTip();
+        return;
+      }
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (isHeatmapKeyNavSuppressed(e.target)) return;
+      const cur = tipRef.current;
+      if (!cur || !('payload' in cur)) return;
+      const { dateStr, market } = cur.payload;
+      const idx = allDatesSorted.indexOf(dateStr);
+      if (idx < 0) return;
+      const delta = e.key === 'ArrowRight' ? 1 : -1;
+      const anchor = { clientX: cur.x, clientY: cur.y };
+      let nextIdx = idx + delta;
+      while (nextIdx >= 0 && nextIdx < allDatesSorted.length) {
+        const nextDate = allDatesSorted[nextIdx]!;
+        const nextTip = buildPayloadTipState(market, nextDate, anchor);
+        if (nextTip) {
+          e.preventDefault();
+          setTip(nextTip);
+          return;
+        }
+        nextIdx += delta;
+      }
+    };
+    const onPointerDownCapture = (e: PointerEvent) => {
+      const n = e.target as Node | null;
+      if (!n) return;
+      const el = n as HTMLElement;
+      if (el.closest?.('[data-atc-definition-popover]')) return;
+      if (heatmapInteractionRef.current?.contains(n)) return;
+      if (tooltipRootRef.current?.contains(n)) return;
+      if (summaryPanelRef.current?.contains(n)) return;
+      dismissTip();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('pointerdown', onPointerDownCapture, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('pointerdown', onPointerDownCapture, true);
+    };
+  }, [tip, dismissTip, allDatesSorted, buildPayloadTipState]);
 
   const todayYmd = formatDateYmd(new Date());
   const gap = RUNWAY_CELL_GAP_PX;
@@ -1800,14 +1881,19 @@ function RunwayGridBody({
   return (
     <div className="flex w-full min-w-0 max-w-full justify-start pl-0.5 sm:pl-1">
       <div
+        ref={heatmapCaptureRef}
         className={cn(
           'flex w-full min-w-0 max-w-full flex-col-reverse items-stretch gap-4 lg:flex-row lg:gap-4',
-          heatmap3d ? 'lg:min-h-0 lg:items-stretch' : 'lg:items-start'
+          heatmap3d || compareAllMarkets ? 'lg:min-h-0 lg:items-stretch' : 'lg:items-start'
         )}
       >
       <div
         className={cn(
-          'flex shrink-0 items-start justify-start self-center lg:border-r lg:border-border/40 lg:pr-4 lg:pl-1 lg:self-start',
+          // Hard cap width so the legend column cannot steal the whole row (items-stretch + nested flex
+          // was letting this flex item grow to ~100% width on some breakpoints).
+          'box-border flex w-[min(100%,14rem)] shrink-0 grow-0 flex-col',
+          'mx-auto lg:mx-0 lg:self-start',
+          'lg:border-r lg:border-border/40 lg:pr-4 lg:pl-1',
           compareAllMarkets ? 'pt-0.5' : 'pt-0.5',
           !compareAllMarkets && !heatmap3d && 'lg:pt-[var(--runway-year-strip)]'
         )}
@@ -1818,7 +1904,7 @@ function RunwayGridBody({
         }
       >
         <HeatmapLegend
-          className="w-fit min-w-0 max-w-[min(100%,14rem)] text-left"
+          className="w-full min-w-0 text-left"
           viewMode={viewMode}
           heatmapOpts={heatmapOpts}
           cellSizePx={cellPx}
@@ -1829,17 +1915,16 @@ function RunwayGridBody({
         ref={heatmapInteractionRef as Ref<HTMLDivElement>}
         className={cn(
           'flex min-w-0 flex-1 flex-col bg-transparent p-0 shadow-none',
-          heatmap3d ? 'min-h-0 justify-stretch' : 'justify-center',
+          heatmap3d ? 'min-h-0 justify-stretch' : compareAllMarkets ? 'min-h-0 justify-stretch' : 'justify-center',
           !compareAllMarkets && useSideSummary && 'lg:flex-row lg:items-start'
         )}
       >
         {compareAllMarkets ? (
           <div
             ref={compareScrollRef as Ref<HTMLDivElement>}
-            className="w-full overflow-x-auto overflow-y-visible pb-1"
+            className="min-h-0 w-full flex-1 overflow-x-auto overflow-y-auto pb-1"
           >
             <div
-              ref={heatmapCaptureRef}
               className="flex w-max max-w-none flex-row items-start justify-start px-0.5"
               style={{ gap: CALENDAR_QUARTER_GRID_COL_GAP_PX }}
             >
@@ -1935,10 +2020,7 @@ function RunwayGridBody({
               )}
             >
               <div
-                ref={(el) => {
-                  heatmapCaptureRef.current = el;
-                  (outerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
-                }}
+                ref={outerRef}
                 className={cn(
                   'relative overflow-visible bg-transparent',
                   heatmap3d ? 'flex min-h-0 min-w-0 w-full max-w-full flex-1 flex-col' : 'shrink-0',

@@ -57,7 +57,7 @@ export function Header() {
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-1.5">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <h1 className="text-sm font-bold leading-tight tracking-tight text-foreground sm:text-[0.9375rem]">
-                {`Experiment: "Market Pressure Surface"`}
+                Experiment: Market Capacity Surface
               </h1>
               <span
                 className="text-[10px] tabular-nums leading-none text-muted-foreground"
@@ -155,7 +155,7 @@ export function Header() {
                   <div className="min-w-0">
                     <h1 className="text-foreground">
                       <span className="text-lg font-bold tracking-tight md:text-xl">
-                        {`Experiment: "Market Pressure Surface"`}
+                        Experiment: Market Capacity Surface
                       </span>
                     </h1>
                   </div>

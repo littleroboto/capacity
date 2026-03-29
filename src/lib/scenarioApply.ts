@@ -1,7 +1,11 @@
 import { normalizeViewModeId } from '@/lib/constants';
 import { normalizeHeatmapMonoHex, type HeatmapRenderStyle } from '@/lib/riskHeatmapColors';
 import { looksLikeYamlDsl } from '@/lib/dslGuards';
-import { DEFAULT_RISK_TUNING, riskTuningFromPersisted } from '@/engine/riskModelTuning';
+import {
+  DEFAULT_RISK_TUNING,
+  riskTuningForPipelineView,
+  riskTuningFromPersisted,
+} from '@/engine/riskModelTuning';
 import { runPipelineFromDsl } from '@/engine/pipeline';
 import { syncRiskHeatmapVisualFromConfigs } from '@/lib/heatmapVisualFromConfigs';
 import {
@@ -64,7 +68,7 @@ export function applyScenarioToStore(s: ScenarioState): void {
   }
 
   setAtcDsl(full);
-  const r = runPipelineFromDsl(full, riskTuning);
+  const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, country));
   useAtcStore.setState({
     riskSurface: r.riskSurface,
     configs: r.configs,

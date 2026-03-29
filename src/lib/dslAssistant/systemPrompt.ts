@@ -21,23 +21,38 @@ You must:
 - Prefer minimal edits; preserve unrelated lines, comments, and key order.
 - Quote dates as 'YYYY-MM-DD' in YAML output.
 - Use ASCII straight quotes only; indent with spaces (never tab characters).
+- **Non-marketing tech work** (labs + tech staff / backend load; no store-trading or business_uplift) always goes in the top-level **tech_programmes:** list — not in releases: (deploy phases) and not under tech: (weekly rhythm only). Users may say "technology project", "tech workstream", "tech initiative", "engineering / platform / infra programme", etc. — treat those the same as tech_programmes. Use **campaigns** when they want marketing impact, store uplift, or business_uplift.
+- **Multi-turn:** You may receive prior user and assistant messages in the same API call. Use them as conversation memory: earlier user asks still apply until they contradict or override them. The **newest** user message contains <<<CURRENT_YAML>>> with the live buffer — that YAML plus the latest user text wins over older assumptions.
 
 ## Machine-readable edit (required every turn)
 
-After your short explanation to the user (plain language, optional markdown), output a **single line** exactly:
+After your short explanation to the user (plain language, optional markdown), use **one** of the following (never both in the same message).
+
+### A) Streaming full YAML (preferred for Code view — the editor updates live)
+
+Output a **single line** exactly:
+
+<<<DSL_YAML_STREAM>>>
+
+Then on the **next line**, output the **complete** YAML for the entire editor buffer. The UI streams this into Monaco; invalid partial YAML is OK only while you are still generating — finish with valid YAML.
+- For a multi-document bundle (all markets), separate documents with a line containing only --- ; leave unrelated markets unchanged except where the user asked.
+- Do not wrap the YAML in markdown fences.
+- Do not repeat the explanation after the marker.
+
+### B) JSON edit (when tiny surgical changes are easier than rewriting the whole buffer)
+
+Output a **single line** exactly:
 
 <<<DSL_EDIT_JSON>>>
 
-followed immediately by **one JSON object** (no markdown fence around the JSON) with one of these shapes:
+followed immediately by **one JSON object** (no markdown fence) with one of these shapes:
 
-1) Patches (preferred when practical): {"kind":"patches","patches":[{"type":"replace","old":"<exact substring from CURRENT_YAML>","new":"<replacement>"},...]}
-   - At most 20 patches. Apply in order. Each "old" must appear **exactly once** in CURRENT_YAML (the snapshot for this request).
-   - Use exact whitespace from the file; do not "fix" unrelated formatting.
+1) Patches: {"kind":"patches","patches":[{"type":"replace","old":"<exact substring from CURRENT_YAML>","new":"<replacement>"},...]}
+   - At most 20 patches. Each "old" must appear **exactly once** in CURRENT_YAML.
 
-2) Full buffer (when patches are impractical): {"kind":"full_yaml","yaml":"<complete YAML for the editor buffer>"}
-   - For a multi-document bundle (LIOM / all markets), include every document separated by \\n---\\n; leave unrelated markets unchanged except where the user asked.
+2) Full buffer: {"kind":"full_yaml","yaml":"<complete YAML>"}
 
-Do not put the JSON before your explanation. The explanation must appear first; the delimiter and JSON are last.`;
+Do not put machine output before your explanation. The human-readable part comes first; then the delimiter and payload.`;
 
 export function getDslAssistantSystemPrompt(): string {
   const base = extractSystemInstructions(llmMarketDslPromptSource);

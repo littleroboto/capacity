@@ -11,7 +11,7 @@ For planning-domain layering, pressure surfaces, and export shapes, see [PLANNIN
 1. **Input** — One or more YAML documents (separated by `---`). Each document is one **market** (`country` code). Files live under `public/data/markets/*.yaml`; `manifest.json` lists which ids the app loads.
 2. **Parse** — `parseAllYamlDocuments` / `yamlToPipelineConfig` in `src/engine/yamlDslParser.ts` produce a typed **`MarketConfig`** per document (`src/engine/types.ts`).
 3. **Calendar** — A shared date grid is built for all loaded markets (`buildCalendar`).
-4. **Phase expansion** — `expandPhases` walks each day and applies **BAU**, **tech weekly rhythm**, and **campaign** prep/live rules. Loads are tagged into **pressure surfaces** (bau, change, campaign, carryover) for explainability.
+4. **Phase expansion** — `expandPhases` walks each day and applies **BAU**, **tech weekly rhythm**, **campaign** prep/live rules, and optional **`tech_programmes`** (same timing shape as campaigns, but tech load only — **change** surface, no campaign/trading uplift). Loads are tagged into **pressure surfaces** (bau, change, campaign, carryover) for explainability.
 5. **Aggregation** — Daily totals per market (lab/team/backend/ops/commercial, split readiness vs sustain where relevant).
 6. **Carry-over** — `applyLoadCarryover` adds backlog-style spill from **intrinsic** overload (not from carry-in alone), applied **before** operating-window scaling.
 7. **Operating windows** — Date-bounded multipliers (and optional ramps) adjust loads and sometimes **effective lab+team capacity**.
@@ -33,6 +33,7 @@ The result is a per-day **`RiskRow`** series rendered as the runway grid and too
 | `resources` | **`labs.capacity`**, **`staff.capacity`** (FTE-style team cap); legacy **`teams.*.size`** still sums to the same cap. |
 | `bau` | Preferred: **`days_in_use`** + **`weekly_cycle`** (`labs_required`, `staff_required`, optional `support_days`) + optional **`integration_tests`**. Legacy `weekly_promo_cycle` / `weekly_promo` still supported. |
 | `campaigns` | List or map. Preferred keys: **`start_date`**, **`testing_prep_duration`**, **`campaign_support`** (`tech_staff`, `labs_required`, …), **`live_campaign_support`**, **`business_uplift`**. Legacy `start`, `prep_before_live_days`, `load`, `live_support_load` still parse. |
+| `tech_programmes` | Optional list or map. **Same prep/live timing as campaigns** (`start_date`, `duration`, `testing_prep_duration` or `readiness_duration`, `load`, `live_support_load`). Use **`programme_support`** / **`live_programme_support`** (or the same **`campaign_support`** / **`live_campaign_support`** aliases). **Only labs, teams, and backend** are applied — ops/commercial YAML keys are ignored. No **`impact`**, **`business_uplift`**, or **`campaign_risk`** / store boosts. Supports **`replaces_bau_tech`** like campaigns. |
 | `public_holidays` / `school_holidays` | **`staffing_multiplier`** (cap on that holiday type), optional **`trading_multiplier`**, optional **`load_effects`** on school; **`auto: true`** pulls stub lists from the engine, or **`auto: false`** with explicit quoted **`dates:`** (bundled files use the latter — refresh via **`pnpm run sync:market-holidays`** when `holidayStubCalendar` / `holidayPublicCatalog` change). |
 | `holidays` | Cross-cutting: **`capacity_taper_days`**, **`lab_capacity_scale`**. `auto_public` / `auto_school` can also be driven from the new blocks (see parser). |
 | `stress_correlations` | Legacy school-holiday load multipliers; merged with `school_holidays.load_effects` / `trading_multiplier` when both present. |
@@ -112,6 +113,16 @@ This matches a common QSR pattern: engineering finishes early with a cut-over bu
 ### 5.6 Load semantics
 
 Numbers are **dimensionless multipliers / relative intensity**, not FTE. Typical bands: higher values on **labs/teams** during build; higher **ops/commercial** during live. Keep one market self-consistent so comparisons across time make sense.
+
+### 5.7 `tech_programmes`
+
+Use for **platform / infra** work scheduled like a campaign (patching waves, POS/kiosk refresh, hardware cycles) when it is **not** marketing-driven and should **not** increase **Business** lens campaign pressure or store boosts.
+
+- **Timing** — Identical rules to §5.1 / §5.2 (lead model with `testing_prep_duration` / `prep_before_live_days`, or interval + `readiness_duration`).
+- **Loads** — `programme_support` + `live_programme_support` (or `campaign_support` / `live_campaign_support` for the same shape). **`load`** / **`live_support_load`** also parse. Only **labs**, **teams**, and **backend** are kept; **ops** and **commercial** are stripped.
+- **Surfaces** — Prep and live both accrue to the **change** surface (not **campaign**), so they do not feed **`campaign_risk`** or **`campaign_store_boost_*`**.
+- **`live_tech_load_scale`** — Optional; default **1** for tech programmes (full YAML intensity in the live segment), unlike campaigns where the engine defaults to a lighter sustain scale unless you override.
+- **`replaces_bau_tech`** — Same meaning as §5.4b: can suppress **BAU** tech buckets and **`tech.weekly_pattern`** on loaded prep/live days.
 
 ---
 

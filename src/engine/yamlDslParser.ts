@@ -11,6 +11,7 @@ import type {
   SeasonalTradingConfig,
   StressCorrelations,
   TechRhythmConfig,
+  TechProgrammeConfig,
   TradingPressureKnobs,
 } from './types';
 import { expandTechWeeklyPattern } from './techWeeklyPattern';
@@ -151,6 +152,15 @@ function mapCampaignSupportToPhaseLoad(raw: unknown): PhaseLoad {
   return out;
 }
 
+/** Tech programmes: labs / teams / backend only (YAML ops/commercial ignored). */
+function stripNonTechPhaseLoad(pl: PhaseLoad): PhaseLoad {
+  const out: PhaseLoad = {};
+  if (pl.labs != null) out.labs = pl.labs;
+  if (pl.teams != null) out.teams = pl.teams;
+  if (pl.backend != null) out.backend = pl.backend;
+  return out;
+}
+
 /**
  * Expand `trading.weekly_pattern` the same way as `tech.weekly_pattern`: per-day **0–1** numbers after parse,
  * or named levels (`low` / `medium` / `high` / `very_high`). Supports `default`, `weekdays`, `weekend`, and `Mon`…`Sun`.
@@ -178,6 +188,8 @@ export type ParsedYaml = {
   };
   bau: Record<string, unknown>;
   campaigns: unknown[];
+  /** Infra / platform work (same timing shape as campaigns; no trading uplift). */
+  tech_programmes: unknown[];
   holidays: Record<string, unknown>;
   /** New schema: `public_holidays` block (dates, auto, multipliers). */
   public_holidays?: Record<string, unknown>;
@@ -201,6 +213,7 @@ const EMPTY: ParsedYaml = {
   resources: { labs: {}, teams: {}, testing_capacity: undefined },
   bau: {},
   campaigns: [],
+  tech_programmes: [],
   holidays: {},
   trading: {},
   tech: {},
@@ -254,6 +267,7 @@ function normalizeYamlObject(raw: unknown): ParsedYaml {
     },
     bau: (o.bau as Record<string, unknown>) ?? {},
     campaigns: normalizeCampaignsInput(o.campaigns),
+    tech_programmes: normalizeCampaignsInput(o.tech_programmes ?? o.techProgrammes),
     holidays: baseHolidays,
     public_holidays: pubBlock && typeof pubBlock === 'object' ? pubBlock : undefined,
     school_holidays: schBlock && typeof schBlock === 'object' ? schBlock : undefined,
@@ -394,13 +408,16 @@ function mapBauModern(bauSection: Record<string, unknown> | undefined): BauEntry
   const entries: BauEntry[] = [];
   for (const w of days) {
     const end = supportDays > 0 ? Math.min(6, w + supportDays - 1) : w;
-    entries.push({
+    const entry: BauEntry = {
       name: `bau_${WEEKDAYS[w] ?? 'day'}`,
       weekday: w,
-      supportStart: w,
-      supportEnd: end,
       load,
-    });
+    };
+    if (supportDays > 0) {
+      entry.supportStart = w;
+      entry.supportEnd = end;
+    }
+    entries.push(entry);
   }
   if (entries.length === 0) return undefined;
   return entries.length === 1 ? entries[0]! : entries;
@@ -439,6 +456,72 @@ function stressFromSchoolHolidayBlock(block: Record<string, unknown>): StressCor
   const tm = Number(block.trading_multiplier ?? block.tradingMultiplier);
   if (Number.isFinite(tm) && tm > 0) school_holidays.store_pressure_mult = tm;
   return Object.keys(school_holidays).length ? { school_holidays } : undefined;
+}
+
+function mapTechProgrammeFromYamlRow(row: Record<string, unknown>): TechProgrammeConfig {
+  const progSupport =
+    row.programme_support ?? row.programmeSupport ?? row.campaign_support ?? row.campaignSupport;
+  const cs = mapCampaignSupportToPhaseLoad(progSupport);
+  const yamlLoad = pickPhaseLoad(row.load);
+  const mergedPrep: PhaseLoad = Object.keys(cs).length > 0 ? { ...yamlLoad, ...cs } : yamlLoad;
+  const prepStrip = stripNonTechPhaseLoad(mergedPrep);
+
+  const prepRaw =
+    row.testing_prep_duration ??
+    row.testingPrepDuration ??
+    row.prep_before_live_days ??
+    row.prepBeforeLiveDays;
+  const pbd = Number(prepRaw);
+  const prepBeforeLiveDays =
+    prepRaw != null && prepRaw !== '' && Number.isFinite(pbd) && pbd > 0 ? Math.floor(pbd) : undefined;
+  const readinessDurRaw = row.readiness_duration ?? row.readinessDurationDays;
+  const rd = Number(readinessDurRaw);
+  const readinessDurationDays =
+    prepBeforeLiveDays != null
+      ? undefined
+      : readinessDurRaw != null && readinessDurRaw !== '' && Number.isFinite(rd) && rd > 0
+        ? Math.floor(rd)
+        : undefined;
+
+  const liveProg =
+    row.live_programme_support ??
+    row.liveProgrammeSupport ??
+    row.live_campaign_support ??
+    row.liveCampaignSupport ??
+    row.live_support ??
+    row.liveSupport;
+  const liveCs = mapCampaignSupportToPhaseLoad(liveProg);
+  const liveExplicit = pickPhaseLoad(row.live_support_load ?? row.liveSupportLoad);
+  const liveMerged: PhaseLoad =
+    Object.keys(liveCs).length > 0 ? { ...liveExplicit, ...liveCs } : liveExplicit;
+  const liveStrip = stripNonTechPhaseLoad(liveMerged);
+  const hasLiveKeys = Object.keys(liveStrip).length > 0;
+  const lssRaw = row.live_support_scale ?? row.liveSupportScale;
+  const lssNum = Number(lssRaw);
+  const liveSupportScale =
+    lssRaw != null && lssRaw !== '' && Number.isFinite(lssNum) && lssNum > 0 && lssNum <= 1
+      ? lssNum
+      : undefined;
+  const ltRaw = row.live_tech_load_scale ?? row.liveTechLoadScale;
+  const ltNum = Number(ltRaw);
+  const liveTechLoadScale =
+    ltRaw != null && ltRaw !== '' && Number.isFinite(ltNum) && ltNum >= 0 ? Math.min(2.5, ltNum) : undefined;
+
+  return {
+    name: String(row.name ?? 'tech_programme'),
+    start: coerceYamlDateString(row.start_date ?? row.startDate ?? row.start),
+    durationDays: Number(row.duration) || 0,
+    prepBeforeLiveDays,
+    readinessDurationDays,
+    live_support_load: hasLiveKeys ? liveStrip : undefined,
+    liveSupportScale,
+    liveTechLoadScale,
+    load: prepStrip,
+    replacesBauTech:
+      row.replaces_bau_tech === true ||
+      row.replacesBauTech === true ||
+      row.replace_bau_tech === true,
+  };
 }
 
 export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
@@ -543,6 +626,9 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
       supplyPrepDaysBeforeLive: pickU('supply_prep_days_before_live', 'supplyPrepDaysBeforeLive'),
     };
   });
+  const techProgrammes: TechProgrammeConfig[] = (parsed.tech_programmes || []).map((c) =>
+    mapTechProgrammeFromYamlRow(c as Record<string, unknown>)
+  );
   let riskHeatmapGamma: number | undefined;
   const pg = parsed.risk_heatmap_gamma;
   if (pg != null && Number.isFinite(pg) && pg > 0) {
@@ -627,6 +713,7 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     tradingPressure,
     bau,
     campaigns,
+    techProgrammes,
     releases: mapReleases(parsed.releases),
     trading: expandTradingWeeklyPattern(parsed.trading as Record<string, unknown> | undefined),
     monthlyTradingPattern: mapMonthlyTradingPattern(parsed.trading as Record<string, unknown> | undefined),
@@ -790,13 +877,17 @@ function mapWeeklyPromo(wp: Record<string, unknown>, name: string): BauEntry | n
   const weekday = WEEKDAYS.indexOf(dayStr);
   const w = weekday >= 0 ? weekday : 2;
   const supportDays = Number(wp.support_days) || 0;
-  return {
+  const span = Math.min(6, w + (supportDays || 1) - 1);
+  const entry: BauEntry = {
     name,
     weekday: w,
-    supportStart: w,
-    supportEnd: Math.min(6, w + (supportDays || 1) - 1),
     load: { labs: Number(wp.labs) || 0, teams: 0 },
   };
+  if (supportDays > 0) {
+    entry.supportStart = w;
+    entry.supportEnd = span;
+  }
+  return entry;
 }
 
 function mapBau(bauSection: Record<string, unknown> | undefined): BauEntry | BauEntry[] | undefined {
@@ -819,8 +910,6 @@ function mapBau(bauSection: Record<string, unknown> | undefined): BauEntry | Bau
     entries.push({
       name: 'integration_tests',
       weekday: w,
-      supportStart: w,
-      supportEnd: w,
       load: { labs: Number(it.labs) || 0, teams: 0 },
     });
   }
@@ -855,8 +944,6 @@ function combineBau(bauSection: Record<string, unknown> | undefined): BauEntry |
       entries.push({
         name: 'integration_tests',
         weekday: w,
-        supportStart: w,
-        supportEnd: w,
         load: { labs: Number(it.labs) || 0, teams: 0 },
       });
     }
@@ -882,7 +969,12 @@ export function parseAllYamlDocuments(dslText: string): MarketConfig[] {
   for (const doc of docs) {
     if (doc == null) continue;
     const parsed = normalizeYamlObject(doc);
-    if (parsed.country || (parsed.resources?.labs as { capacity?: number })?.capacity != null || parsed.campaigns.length) {
+    if (
+      parsed.country ||
+      (parsed.resources?.labs as { capacity?: number })?.capacity != null ||
+      parsed.campaigns.length ||
+      parsed.tech_programmes.length
+    ) {
       configs.push(yamlToPipelineConfig(parsed));
     }
   }

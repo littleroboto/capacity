@@ -1,39 +1,74 @@
-# Germany — KMK-style school stubs (`school_holidays.auto`); public bank days (`public_holidays.auto`).
-# Campaign narrative: Monopoly 2025–26 ends mid‑Jan 2026; Spring (Easter), summer holidays kickoff,
-# Herbst‑Kalender (Oct), then Monopoly 2026–27 as the dominant annual programme (mid‑Nov → mid‑Jan).
+# =============================================================================
+# Germany — sample market (KMK-style school pattern, manual holiday lists)
+# =============================================================================
+#
+# Campaign story in this sample: a large annual “Monopoly” programme runs from
+# mid-November into January; spring (Easter), summer, and autumn windows sit
+# between those peaks.
+#
+# What this file is
+# -----------------
+# A recipe the planning tool turns into calendar heat maps. Warmer colours mean
+# heavier load or tighter capacity for technology teams and restaurants.
+#
+# How to read it
+# --------------
+# • Each major section is one topic (capacity, routine work, campaigns, …).
+# • Short codes (DE, mo, tu, …) are fixed words the tool recognises.
+# • Dates look like 2026-11-17. Indented lists belong to the heading above them.
+#
+# =============================================================================
 
-# Market identity: `market` is the stable id (routing, manifests, holiday catalogs); `title` is display-only in the UI.
-# `risk_heatmap_gamma_tech` / `risk_heatmap_gamma_business` shape how each lens maps combined risk into heatmap colour (transfer-curve exponent; higher → more separation in the mid bands).
-# `resources` nominal caps: `labs.capacity` integrated-test labs; `staff.capacity` team headcount denominator; `testing_capacity` optional parallel-test slots for lab utilisation (defaults to lab count when omitted).
+#
+# Market name and heat-map contrast (optional)
+# --------------------------------------------
+# market / title — Country code and full name shown in the app.
+#
+# risk_heatmap_gamma_* — Visual contrast on Technology Teams / Business Teams views.
+#
 market: DE
 title: Germany
-risk_heatmap_gamma_tech: 1.5
-risk_heatmap_gamma_business: 1.5
+risk_heatmap_gamma_tech: 0.35
+risk_heatmap_gamma_business: 0.35
+
+#
+# Capacity — labs, people, and test throughput
+# ---------------------------------------------
+# labs.capacity — Integrated lab environments counted as units.
+#
+# staff.capacity — Full-time-equivalent headcount (team “ceiling”).
+#
+# testing_capacity — Parallel test slots (widens lab capacity in the model).
+#
 resources:
   labs:
     capacity: 6
   staff:
     capacity: 4
-  testing_capacity: 10
+  testing_capacity: 4
 
-# BAU baseline demand (business-as-usual): repeating weekday loads that sit under tech rhythm, campaigns, and releases in the phase engine.
-# `days_in_use` picks which weekdays carry that strip (`mo`…`sun` tokens). `weekly_cycle` sets nominal lab vs team mass (`labs_required`, `staff_required`).
-# `support_days` widens each entry’s support window along the week (half-weight BAU support loads on weekdays inside that span, up to Saturday). `integration_tests` adds an extra anchor day with labs-only load alongside the modern weekly BAU.
+#
+# Everyday workload (BAU — business as usual)
+# --------------------------------------------
+# Steady background work under campaigns and releases.
+#
+# weekly_cycle — One lab and one staff unit on each peak weekday (sample default).
+#   support_days > 0 adds a lighter 0.5× support slice on the same span; 0 keeps BAU minimal.
+#
 bau:
   days_in_use: [mo, tu, we, th, fr]
   weekly_cycle:
     labs_required: 1
     staff_required: 1
-    support_days: 1
-  integration_tests:
-    day: Mon
-    labs: 1
+    support_days: 0
 
-# Chronological. Monopoly live windows: ~8 weeks mid‑Nov through 2nd week Jan (half‑open duration in engine).
-
-# Campaigns: each list item is one programme. `start_date` anchors the live window; `duration` is the live segment length in days on the calendar.
-# `testing_prep_duration` is the load-bearing **prep** runway before live (days). `impact` picks default commercial intensity when you omit a full `load` map; `business_uplift` scales business-side uplift in the risk blend (parser-capped).
-# `campaign_support` supplies lab/team-style staffing folded into **prep** loads; `live_campaign_support` does the same for the **live** / sustain phase (alongside optional `live_support_load`, etc., in richer entries).
+#
+# Campaigns — marketing and change programmes (chronological in this file)
+# ------------------------------------------------------------------------
+# Includes long Monopoly live windows (~8 weeks from mid-November) plus Easter,
+# summer, autumn, and the following year’s Monopoly window. stagger_functional_loads
+# spreads some work types when set.
+#
 campaigns:
   - name: monopoly_live_2025_26
     start_date: '2025-11-17'
@@ -48,7 +83,6 @@ campaigns:
       labs_required: 1
       tech_staff: 1
   - name: spring_campaign_easter_2026
-    # 30 live days spanning Easter (Sun 2026-04-05)
     start_date: '2026-03-18'
     duration: 30
     testing_prep_duration: 28
@@ -62,7 +96,6 @@ campaigns:
       labs_required: 1
       tech_staff: 1
   - name: summer_campaign_2026
-    # ~30 days from the start of the German summer school break (varies by Land; anchor late July)
     start_date: '2026-07-24'
     duration: 30
     testing_prep_duration: 28
@@ -99,34 +132,46 @@ campaigns:
       labs_required: 1
       tech_staff: 1
 
+#
+# Tech programmes — engineering work that is not a marketing campaign
+# -------------------------------------------------------------------
+# Same timing keys as campaigns (start_date, duration, testing_prep_duration,
+# programme_support, live_programme_support). Only labs / teams / backend count —
+# no impact, business_uplift, or store-trading boost. Load accrues on the
+# “change & readiness” surface, not the campaign surface.
+#
+tech_programmes: []
+
+#
+# Public holidays — manual list for this sample
+# ---------------------------------------------
+# Each date is a bank/public closure day. staffing_multiplier and
+# trading_multiplier apply to every listed day.
+#
 public_holidays:
   auto: false
-  # Stub bank/public holidays — source: src/engine/holidayPublicCatalog.ts (pnpm run sync:market-holidays).
-  # Each list entry is one closed day; trailing comments are English display names (not legal calendars).
-  # staffing_multiplier / trading_multiplier apply on every listed date.
   dates:
-    - '2026-01-01'  # New Year's Day (Neujahr)
-    - '2026-04-03'  # Good Friday (Karfreitag)
-    - '2026-04-06'  # Easter Monday (Ostermontag)
-    - '2026-05-01'  # Labour Day (Tag der Arbeit)
-    - '2026-05-14'  # Ascension Day (Christi Himmelfahrt)
-    - '2026-05-25'  # Whit Monday (Pfingstmontag)
-    - '2026-10-03'  # German Unity Day (Tag der Deutschen Einheit)
-    - '2026-12-25'  # Christmas Day (1. Weihnachtstag)
-    - '2026-12-26'  # 2nd Christmas Day (2. Weihnachtstag)
-    - '2027-01-01'  # New Year's Day (Neujahr)
-  staffing_multiplier: 0.5
-  trading_multiplier: 1.05
+    - '2026-01-01'
+    - '2026-04-03'
+    - '2026-04-06'
+    - '2026-05-01'
+    - '2026-05-14'
+    - '2026-05-25'
+    - '2026-10-03'
+    - '2026-12-25'
+    - '2026-12-26'
+    - '2027-01-01'
+  staffing_multiplier: 1.0
+  trading_multiplier: 1.0
 
-# School breaks (vacation periods): `auto`/`dates` choose which days count (same pattern as `public_holidays` — catalog vs extra ISO YYYY-MM-DD).
-# `staffing_multiplier` scales lab+team capacity caps on those days (0–1, like public holidays).
-# `trading_multiplier` lifts store pressure on those days (multiplies store pressure after campaign boosts).
-# `load_effects` bumps modeled demand surfaces on school holidays only (lab/team/backend/ops/commercial multipliers).
+#
+# School holidays — manual list (sample planning calendar)
+# --------------------------------------------------------
+# Comment bands group consecutive non-school days. staffing_multiplier,
+# trading_multiplier, and load_effects apply across all listed days.
+#
 school_holidays:
   auto: false
-  # Stub school closure days — source: src/engine/holidayStubCalendar.ts (pnpm run sync:market-holidays).
-  # Each list entry is one non-school day (planning fiction). Range lines group contiguous runs.
-  # staffing_multiplier (and optional trading_multiplier / load_effects) apply on every listed date.
   dates:
     # 2025-04-14 – 2025-04-25 (12 consecutive days)
     - '2025-04-14'
@@ -240,24 +285,29 @@ school_holidays:
     - '2027-02-03'
     - '2027-02-04'
     - '2027-02-05'
-  staffing_multiplier: 0.88
-  trading_multiplier: 1.08
+  staffing_multiplier: 1.0
+  trading_multiplier: 1.0
   load_effects:
-    backend_load_mult: 1.04
-    commercial_activity_mult: 1.08
-    lab_load_mult: 1.05
-    ops_activity_mult: 1.05
-    team_load_mult: 1.08
-# Holiday capacity shaping for lab/team utilisation denominators (which calendar days count as holidays live in `public_holidays` / `school_holidays`).
-# `capacity_taper_days`: when >0, holiday “stress” ramps smoothly within ±N days of each listed holiday (easier build-up/cool-down); omit or 0 = stress only on exact holiday dates.
-# `lab_capacity_scale`: at full holiday stress, effective lab+team caps move toward this fraction of normal capacity (engine-clamped ~0.12–1; higher = less pinch).
+    lab_load_mult: 1.0
+    team_load_mult: 1.0
+    backend_load_mult: 1.0
+    ops_activity_mult: 1.0
+    commercial_activity_mult: 1.0
+#
+# Holiday capacity shaping
+# ------------------------
+# capacity_taper_days — Smooths capacity changes across a few days around holidays.
+# lab_capacity_scale — Target fraction of normal lab/team capacity on peak stress days.
+#
 holidays:
-  capacity_taper_days: 3
-  lab_capacity_scale: 0.5
+  capacity_taper_days: 0
+  lab_capacity_scale: 1.0
 
-# Store-trading rhythm (modeled store / restaurant demand): `weekly_pattern` sets a 0–1 level per weekday (raw numbers or tier names like `low` / `medium` / `high` / `very_high` after parse).
-# `monthly_pattern` scales that by calendar month; `seasonal` applies a gentle annual wave around `peak_month` with `amplitude`. `payday_month_peak_multiplier` lifts the base in the first part of each month.
-# `campaign_store_boost_prep` and `campaign_store_boost_live` add fractional uplift on that base during campaign prep vs live; optional `campaign_effect_scale` in the same block scales both boosts and business-side campaign risk.
+#
+# Store trading rhythm — restaurant / retail intensity
+# ------------------------------------------------------
+# campaign_effect_scale — Optional extra scaling on store boosts tied to campaigns.
+#
 trading:
   campaign_store_boost_prep: 0
   campaign_store_boost_live: 0.28
@@ -287,18 +337,3 @@ trading:
   seasonal:
     peak_month: 7
     amplitude: 0.11
-
-# BAU tech-load rhythm: `weekly_pattern` resolves each weekday to a 0–1 intensity (tiers + `default` / `weekdays` / `weekend` shortcuts are expanded in the parser); the engine emits a daily “TechRhythm” readiness load from that shape.
-# `labs_scale` and `teams_scale` split how strongly that daily base hits lab vs team buckets (same 0–1 spine, different weights). Optional `backend_scale` (not set here) would add backend mass the same way.
-tech:
-  weekly_pattern:
-    default: medium
-    Mon: medium
-    Tue: medium
-    Thu: medium
-    Fri: medium
-    Sat: low
-    Sun: low
-  labs_scale: 1
-  teams_scale: 1
-

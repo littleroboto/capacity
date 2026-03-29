@@ -1,5 +1,5 @@
 import { parseDate } from './calendar';
-import type { CampaignConfig } from './types';
+import type { ProgrammeWindowFields } from './types';
 
 const MS_PER_DAY = 86_400_000;
 
@@ -17,7 +17,7 @@ export type CampaignPrepLiveSegment = {
  * Matches {@link expandPhases} campaign date rules (readiness-duration split and lead model).
  */
 export function campaignLoadBearingPrepLiveForDate(
-  camp: CampaignConfig,
+  camp: ProgrammeWindowFields,
   dateStr: string
 ): CampaignPrepLiveSegment {
   if (!camp.start) {

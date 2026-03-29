@@ -39,8 +39,8 @@ Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL**
 | **Parser** | `src/engine/yamlDslParser.ts` → `src/engine/types.ts` (`MarketConfig`) |
 | **Pipeline** | `src/engine/pipeline.ts` orchestrates calendar → phases → capacity → risk → noise |
 | **Runway** | **7 days wide** (Mon–Sun) per month; **months stacked vertically** in one column (Q1–Q4 labels on Jan / Apr / Jul / Oct). **All markets**: one column per market, horizontal scroll, shared colour scale |
-| **Heatmap colour** | 10-step green→red from the **active lens metric** after γ and transfer curve (`heatmapCellMetric` → `src/lib/riskHeatmapColors.ts`). **Technology** (view id `combined`): **`tech_pressure`**. **Business** (`in_store`): **`inStoreHeatmapMetric`** (store + prep campaign term + holidays). Not raw **`risk_score`**. |
-| **View modes** | **Technology** and **Business** only in the header; legacy id **`combined`** maps to Technology. |
+| **Heatmap colour** | 10-step green→red from the **active lens metric** after γ and transfer curve (`heatmapCellMetric` → `src/lib/riskHeatmapColors.ts`). **Technology** (view id `combined`): **`tech_pressure`**. **Business** (`in_store`): **`inStoreHeatmapMetric`** = normalized **`store_pressure`** (restaurant trading curve only; no separate marketing-prep or holiday dial). Not raw **`risk_score`**. |
+| **View modes** | **Technology Teams** and **Restaurant Activity** (UI label; id **`in_store`**) in the header; legacy id **`combined`** maps to Technology. |
 | **Slot selection** | Drag rectangle aggregates the **same lens metric** as the heatmap (`heatmapCellMetric`); no footer readout while status bar is absent |
 | **Scenarios** | Save/load named scenarios in `localStorage` (`atc_scenarios`) |
 | **Guards** | Reject HTML/page source in editor/storage; sane `public/` URLs (`src/lib/dslGuards.ts`, `src/lib/publicUrl.ts`) |
@@ -278,7 +278,7 @@ If YAML omits **`releases`**, the list is empty.
 
 ### Heatmap colour (runway cells)
 
-- **Input** = **`heatmapCellMetric(row, viewMode, riskTuning)`** — Technology lens uses **`tech_pressure`** (after noise); Business lens uses **`inStoreHeatmapMetric`** (mostly **`store_pressure`**, noised only indirectly if that metric ever incorporated a noised field).
+- **Input** = **`heatmapCellMetric(row, viewMode, riskTuning)`** — Technology lens uses **`tech_pressure`** (after noise); Business lens uses **`inStoreHeatmapMetric`** = **`store_pressure` / `STORE_PRESSURE_MAX`** clamped 0–1 (restaurant busyness; **`store_pressure`** is not noise-jittered).
 - **index** = `floor(clamp(transformedMetric,0,1) * 9)` into a fixed **10-colour** array (green → red), after per-lens γ and optional **stress cutoff** dimming (UI-only; see `MARKET_DSL_AND_PIPELINE.md`).
 - **`risk_score`** remains the weighted **tech / store / campaign** blend for banding and explanations where the UI shows “combined risk,” not for default cell fill.
 

@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { DslAssistantPanel } from '@/components/DslAssistantPanel';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
-import { RightPanelSection } from '@/components/RightPanelSection';
 import { RiskModelPanel } from '@/components/RiskModelPanel';
 import { WorkbenchRunwayControls } from '@/components/WorkbenchRunwayControls';
 import { Button } from '@/components/ui/button';
@@ -14,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { saveNamedWorkspaceInteractive } from '@/lib/workspaceSnapshot';
+import { isRunwayAllMarkets } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import { ChevronLeft, ChevronRight, Database, FileCode2, Save } from 'lucide-react';
 
@@ -25,10 +24,11 @@ type DSLPanelProps = {
 /** Sits in a split layout: runway/heatmap left, controls + workbench right. */
 export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
   const [localDataOpen, setLocalDataOpen] = useState(false);
-  const [dslAuthoringExpanded, setDslAuthoringExpanded] = useState(true);
   const parseError = useAtcStore((s) => s.parseError);
+  const country = useAtcStore((s) => s.country);
   const setViewMode = useAtcStore((s) => s.setViewMode);
   const viewMode = useAtcStore((s) => s.viewMode);
+  const compareAllMarkets = isRunwayAllMarkets(country);
 
   const localDataDialog = (
     <Dialog open={localDataOpen} onOpenChange={setLocalDataOpen}>
@@ -74,17 +74,19 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
             <ChevronLeft className="h-5 w-5" aria-hidden />
           </Button>
           <div className="min-h-0 flex-1" aria-hidden />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
-            onClick={() => setViewMode('code')}
-            title="Code — YAML editor in the main area"
-            aria-label="Open Code view — YAML editor"
-          >
-            <FileCode2 className="h-4 w-4" aria-hidden />
-          </Button>
+          {!compareAllMarkets ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setViewMode('code')}
+              title="Code — YAML editor in the main area"
+              aria-label="Open Code view — YAML editor"
+            >
+              <FileCode2 className="h-4 w-4" aria-hidden />
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -100,7 +102,11 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
             <span
               className="h-2 w-2 shrink-0 rounded-full bg-red-500 dark:bg-red-400"
               title={parseError}
-              aria-label="DSL parse error — switch to Code view to review"
+              aria-label={
+                compareAllMarkets
+                  ? 'DSL parse error — choose a single market in Focus to open Code view and fix YAML'
+                  : 'DSL parse error — switch to Code view to review'
+              }
             />
           ) : null}
         </aside>
@@ -133,58 +139,27 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col justify-start gap-3 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-0.5 [scrollbar-gutter:stable]">
-          <WorkbenchRunwayControls />
-          <RightPanelSection
-            expanded={dslAuthoringExpanded}
-            onExpandedChange={setDslAuthoringExpanded}
-            title={viewMode === 'code' ? 'DSL assistant' : 'DSL authoring'}
-            fillHeight={false}
-            className="w-full shrink-0 self-start border-border/60 bg-muted/15"
-            collapsedSummary={
-              viewMode === 'code' ? (
-                <span>Open for BYOK chat, model picker, and apply preview.</span>
-              ) : (
-                <span>
-                  View mode → <span className="font-medium text-foreground/85">Code</span> for YAML and the assistant.
-                </span>
-              )
-            }
-            headerExtras={
-              parseError ? (
-                <span
-                  className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-500 dark:bg-red-400"
-                  title={parseError}
-                  aria-label="Parse error"
-                />
-              ) : null
-            }
-          >
-            {viewMode === 'code' ? (
-              <div className="flex w-full flex-col justify-start border-t border-border/50 bg-background/20 px-3 pb-3 pt-3 dark:bg-background/10">
-                <DslAssistantPanel />
-              </div>
-            ) : (
-              <div className="flex shrink-0 flex-col gap-2 border-t border-border/50 bg-background/20 px-3 pb-3 pt-3 dark:bg-background/10">
-                <p className="text-xs leading-snug text-muted-foreground">
-                  Use <span className="font-medium text-foreground/85">Code</span> in{' '}
-                  <span className="font-medium text-foreground/85">View mode</span> for the YAML editor and this
-                  assistant. Switch to <span className="font-medium text-foreground/85">Technology</span> or{' '}
-                  <span className="font-medium text-foreground/85">Business</span> to run the model on the runway.
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 w-full justify-center gap-2 text-xs font-medium"
-                  onClick={() => setViewMode('code')}
-                  title="Open Code view"
-                >
-                  <FileCode2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-                  Open Code view
-                </Button>
-              </div>
-            )}
-          </RightPanelSection>
+          <WorkbenchRunwayControls compareAllMarkets={compareAllMarkets} />
+          {!compareAllMarkets && parseError ? (
+            <div
+              className="flex w-full shrink-0 items-center gap-2 rounded-md border border-destructive/35 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
+              role="status"
+              title={parseError}
+            >
+              <span className="h-2 w-2 shrink-0 rounded-full bg-red-500 dark:bg-red-400" aria-hidden />
+              <span className="min-w-0 leading-snug">
+                {viewMode === 'code'
+                  ? 'YAML parse error — check the editor.'
+                  : 'YAML parse error — choose Code in View mode to fix.'}
+              </span>
+            </div>
+          ) : null}
+          {compareAllMarkets ? (
+            <p className="text-pretty text-xs leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground/85">Focus</span> a single market for YAML editing, the DSL
+              assistant, <span className="font-medium text-foreground/85">Code</span> view, and heatmap adjustments.
+            </p>
+          ) : null}
           <RiskModelPanel />
         </div>
 

@@ -6,6 +6,7 @@ import type { RiskRow } from '@/engine/riskModel';
 import {
   applyRiskTuningPatch,
   DEFAULT_RISK_TUNING,
+  riskTuningForPipelineView,
   riskTuningFromPersisted,
   type RiskModelTuning,
 } from '@/engine/riskModelTuning';
@@ -105,6 +106,9 @@ type AtcState = {
    * LIOM column header). Not persisted.
    */
   runwayReturnPicker: string | null;
+  /** When true, Monaco YAML editor is read-only (DSL assistant is streaming or applying). Not persisted. */
+  dslAssistantEditorLock: boolean;
+  setDslAssistantEditorLock: (v: boolean) => void;
   setCountry: (c: string, options?: SetCountryOptions) => void;
   setViewMode: (v: ViewModeId) => void;
   setTheme: (t: 'light' | 'dark') => void;
@@ -134,7 +138,7 @@ function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) =>
   const full = mergeStateToFullMultiDoc(get());
   if (!full.trim() || !looksLikeYamlDsl(full)) return;
   const { riskTuning, country, runwayMarketOrder } = get();
-  const r = runPipelineFromDsl(full, riskTuning);
+  const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, country));
   set({
     riskSurface: r.riskSurface,
     configs: r.configs,
@@ -163,13 +167,16 @@ export const useAtcStore = create<AtcState>()(
       riskHeatmapCurve: 'power',
       runway3dHeatmap: false,
       runwaySvgHeatmap: true,
-      heatmapRenderStyle: 'mono',
+      heatmapRenderStyle: 'spectrum',
       heatmapMonoColor: DEFAULT_HEATMAP_MONO_COLOR,
       riskSurface: [],
       configs: [],
       parseError: null,
       discoMode: false,
       runwayReturnPicker: null,
+      dslAssistantEditorLock: false,
+
+      setDslAssistantEditorLock: (v) => set({ dslAssistantEditorLock: v }),
 
       setCountry: (c, options?: SetCountryOptions) => {
         const nextRunwayReturnPicker =
@@ -203,7 +210,7 @@ export const useAtcStore = create<AtcState>()(
           }
           set({ dslText: full });
           if (get().viewMode === 'code') return;
-          const r = runPipelineFromDsl(full, riskTuning);
+          const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, c));
           set({
             riskSurface: r.riskSurface,
             configs: r.configs,
@@ -224,7 +231,7 @@ export const useAtcStore = create<AtcState>()(
         set({ dslText: nextSingle });
         if (get().viewMode === 'code') return;
         const full = mergeStateToFullMultiDoc(get());
-        const r = runPipelineFromDsl(full, riskTuning);
+        const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, c));
         set({
           riskSurface: r.riskSurface,
           configs: r.configs,
@@ -388,7 +395,10 @@ export const useAtcStore = create<AtcState>()(
           dslText: isRunwayAllMarkets(co) ? fullFinal : dsl,
           dslByMarket,
         });
-        const r = runPipelineFromDsl(fullFinal, get().riskTuning);
+        const r = runPipelineFromDsl(
+          fullFinal,
+          riskTuningForPipelineView(get().riskTuning, co)
+        );
         set({
           riskSurface: r.riskSurface,
           configs: r.configs,
@@ -415,7 +425,7 @@ export const useAtcStore = create<AtcState>()(
             defaultDslForMarket(fallbackMarket);
         set({ dslText: looksLikeYamlDsl(editorText) ? editorText : full, dslByMarket: nextByMarket });
         setAtcDsl(full);
-        const r = runPipelineFromDsl(full, riskTuning);
+        const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, country));
         set({
           riskSurface: r.riskSurface,
           configs: r.configs,
@@ -469,7 +479,7 @@ export const useAtcStore = create<AtcState>()(
           if (!looksLikeYamlDsl(dslText)) dslText = singleFallback;
         }
         set({ dslText, dslByMarket: nextByMarket, runwayReturnPicker: null });
-        const r = runPipelineFromDsl(dsl, riskTuning);
+        const r = runPipelineFromDsl(dsl, riskTuningForPipelineView(riskTuning, country));
         set({
           riskSurface: r.riskSurface,
           configs: r.configs,
@@ -482,8 +492,8 @@ export const useAtcStore = create<AtcState>()(
     }),
     {
       name: STORAGE_KEYS.capacity_atc,
-      /** v1: balanced risk tuning. v2: default heatmap to blue single-colour (mono) mode. */
-      version: 2,
+      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. */
+      version: 3,
       migrate: (persistedState, fromVersion) => {
         let ps = { ...(persistedState ?? {}) } as Record<string, unknown>;
         if (fromVersion < 1) {
@@ -497,6 +507,12 @@ export const useAtcStore = create<AtcState>()(
             ...ps,
             heatmapRenderStyle: 'mono',
             heatmapMonoColor: normalizeHeatmapMonoHex(DEFAULT_HEATMAP_MONO_COLOR),
+          };
+        }
+        if (fromVersion < 3) {
+          ps = {
+            ...ps,
+            heatmapRenderStyle: 'spectrum',
           };
         }
         return ps;

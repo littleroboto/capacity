@@ -110,6 +110,14 @@ export function DslEditorCore({
 
   const studio = editorChrome === 'studio';
 
+  const dslText = useAtcStore((s) => s.dslText);
+  const parseError = useAtcStore((s) => s.parseError);
+  const dslAssistantEditorLock = useAtcStore((s) => s.dslAssistantEditorLock);
+  const theme = useAtcStore((s) => s.theme);
+  const setDslText = useAtcStore((s) => s.setDslText);
+  const applyDsl = useAtcStore((s) => s.applyDsl);
+  const resetDsl = useAtcStore((s) => s.resetDsl);
+
   const editorOptions = useMemo(
     () => ({
       minimap: { enabled: minimapEnabled, scale: studio ? (0.9 as const) : (0.85 as const) },
@@ -118,6 +126,7 @@ export function DslEditorCore({
       fontLigatures: true,
       wordWrap,
       lineNumbers,
+      readOnly: dslAssistantEditorLock,
       scrollBeyondLastLine: false,
       tabSize: 2,
       automaticLayout: true,
@@ -138,16 +147,10 @@ export function DslEditorCore({
       matchBrackets: 'always' as const,
       unicodeHighlight: { ambiguousCharacters: false, invisibleCharacters: false },
     }),
-    [fontSize, wordWrap, minimapEnabled, lineNumbers, studio]
+    [fontSize, wordWrap, minimapEnabled, lineNumbers, studio, dslAssistantEditorLock]
   );
 
-  const dslText = useAtcStore((s) => s.dslText);
-  const parseError = useAtcStore((s) => s.parseError);
-  const theme = useAtcStore((s) => s.theme);
   const isDark = theme === 'dark';
-  const setDslText = useAtcStore((s) => s.setDslText);
-  const applyDsl = useAtcStore((s) => s.applyDsl);
-  const resetDsl = useAtcStore((s) => s.resetDsl);
 
   const monacoTheme = capacityYamlThemeId(isDark);
 
@@ -330,6 +333,19 @@ export function DslEditorCore({
             </Button>
           </div>
         </div>
+        {dslAssistantEditorLock && studio ? (
+          <div
+            className={cn(
+              'flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-[11px] font-medium',
+              isDark ? 'border-violet-500/30 bg-violet-950/40 text-violet-200' : 'border-border/70 bg-primary/10 text-primary'
+            )}
+            role="status"
+            aria-live="polite"
+          >
+            <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+            Assistant is updating this buffer — editing is paused until the response finishes or you stop.
+          </div>
+        ) : null}
         <div className="min-h-0 min-w-0 flex-1">
           <Editor
             height="100%"

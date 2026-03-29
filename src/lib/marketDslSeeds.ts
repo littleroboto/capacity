@@ -23,39 +23,79 @@ const BUNDLED_BY_MARKET: Record<string, string> = {
 };
 
 function minimalDsl(country: string): string {
-  return `market: ${country || 'DE'}
-risk_heatmap_gamma_tech: 2.5
-risk_heatmap_gamma_business: 2.5
+  return `# Minimal market recipe (fallback when no bundled file exists).
+# Same ideas as the full sample markets: capacity, routine work (BAU), holidays,
+# and store rhythm. Edit values to match your organisation.
 
+#
+# Identity and heat-map contrast
+# --------------------------------
+#
+market: ${country || 'DE'}
+risk_heatmap_gamma_tech: 0.35
+risk_heatmap_gamma_business: 0.35
+
+#
+# Capacity — labs, people, test slots
+# -----------------------------------
+#
 resources:
   labs:
     capacity: 6
   staff:
     capacity: 4
-  testing_capacity: 10
+  testing_capacity: 4
 
+#
+# Everyday workload (BAU)
+# -----------------------
+#
 bau:
   days_in_use: [mo, tu, we, th, fr]
   weekly_cycle:
     labs_required: 1
-    staff_required: 2
-    support_days: 1
-  integration_tests:
-    day: Mon
-    labs: 1
+    staff_required: 1
+    support_days: 0
 
+#
+# Campaigns (none in this stub — add list entries like other markets)
+# --------------------------------------------------------------------
+#
 campaigns: []
 
+# Tech programmes — same date keys as campaigns, but only labs/teams/backend load (no store/campaign uplift).
+tech_programmes: []
+
+#
+# Holidays — empty manual lists; turn auto: true to use catalog merge like UK/CA
+# ------------------------------------------------------------------------------
+#
 public_holidays:
   auto: false
   dates: []
-  staffing_multiplier: 0.5
+  staffing_multiplier: 1.0
+  trading_multiplier: 1.0
 
 school_holidays:
   auto: false
   dates: []
-  staffing_multiplier: 0.85
+  staffing_multiplier: 1.0
+  trading_multiplier: 1.0
+  load_effects:
+    lab_load_mult: 1.0
+    team_load_mult: 1.0
+    backend_load_mult: 1.0
+    ops_activity_mult: 1.0
+    commercial_activity_mult: 1.0
 
+holidays:
+  capacity_taper_days: 0
+  lab_capacity_scale: 1.0
+
+#
+# Store trading rhythm
+# ----------------------
+#
 trading:
   payday_month_peak_multiplier: 1.12
   monthly_pattern:
@@ -79,13 +119,6 @@ trading:
     Fri: 1.0
     Sat: 1.0
     Sun: 0.8
-
-tech:
-  weekly_pattern:
-    weekdays: medium
-    weekend: low
-  labs_scale: 2
-  teams_scale: 1
 `;
 }
 

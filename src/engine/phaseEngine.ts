@@ -146,6 +146,15 @@ function phaseLoadTechMass(pl: PhaseLoad): boolean {
   return (pl.labs ?? 0) + (pl.teams ?? 0) + (pl.backend ?? 0) > 0;
 }
 
+/** Tech programmes never apply ops/commercial; strip if present in YAML. */
+function techOnlyPhaseLoad(pl: PhaseLoad): PhaseLoad {
+  const out: PhaseLoad = {};
+  if (pl.labs != null) out.labs = pl.labs;
+  if (pl.teams != null) out.teams = pl.teams;
+  if (pl.backend != null) out.backend = pl.backend;
+  return out;
+}
+
 /**
  * Campaign **live** (sustain) load attributed to `date`, matching {@link expandPhases} live branches, or **null**
  * if this campaign adds no load-bearing live row that day. Used for `replacesBauTech` during the live window.
@@ -204,6 +213,11 @@ function anyReplacingCampaignPrepTechMass(config: MarketConfig, date: string): b
     const pl = campaignPrepPhaseLoadForDate(camp, date);
     if (pl && phaseLoadTechMass(pl)) return true;
   }
+  for (const tp of config.techProgrammes || []) {
+    if (!tp.replacesBauTech) continue;
+    const pl = campaignPrepPhaseLoadForDate(tp as CampaignConfig, date);
+    if (pl && phaseLoadTechMass(techOnlyPhaseLoad(pl))) return true;
+  }
   return false;
 }
 
@@ -212,6 +226,11 @@ function anyReplacingCampaignLiveTechMass(config: MarketConfig, date: string): b
     if (!camp.replacesBauTech) continue;
     const pl = campaignLivePhaseLoadForDate(camp, date);
     if (pl && phaseLoadTechMass(pl)) return true;
+  }
+  for (const tp of config.techProgrammes || []) {
+    if (!tp.replacesBauTech) continue;
+    const pl = campaignLivePhaseLoadForDate(tp as CampaignConfig, date);
+    if (pl && phaseLoadTechMass(techOnlyPhaseLoad(pl))) return true;
   }
   return false;
 }
@@ -281,7 +300,12 @@ export function expandPhases(calendar: CalendarRow[], config: MarketConfig): Exp
           addLoad(rows, date, market, 'BAU', bau.name || 'bau', bauLoad, 1, 'readiness', 'bau');
         }
       }
-      if (bau.supportStart != null && weekday >= bau.supportStart && weekday <= bau.supportEnd) {
+      if (
+        bau.supportStart != null &&
+        bau.supportEnd != null &&
+        weekday >= bau.supportStart &&
+        weekday <= bau.supportEnd
+      ) {
         if (phaseLoadHasMass(bauLoad)) {
           addLoad(rows, date, market, 'BAU', 'support', bauLoad, 0.5, 'readiness', 'bau');
         }
@@ -356,6 +380,66 @@ export function expandPhases(calendar: CalendarRow[], config: MarketConfig): Exp
         1,
         inReadiness ? 'readiness' : 'sustain',
         inReadiness ? 'change' : 'campaign'
+      );
+    }
+
+    for (const tp of config.techProgrammes || []) {
+      if (!tp.start) continue;
+      const prepDaysTp = tp.prepBeforeLiveDays;
+
+      if (prepDaysTp != null && prepDaysTp > 0) {
+        const segTp = campaignLoadBearingPrepLiveForDate(tp, date);
+        if (segTp.inPrepLoaded) {
+          addLoad(
+            rows,
+            date,
+            market,
+            'TechProgramme',
+            `${tp.name}__prep`,
+            techOnlyPhaseLoad(tp.load),
+            1,
+            'readiness',
+            'change'
+          );
+        } else if (segTp.inLiveLoaded) {
+          const liveLoadTp = scaleCampaignLiveTechBuckets(
+            resolveLivePhaseLoad(tp),
+            tp.liveTechLoadScale ?? 1
+          );
+          addLoad(
+            rows,
+            date,
+            market,
+            'TechProgramme',
+            tp.name,
+            techOnlyPhaseLoad(liveLoadTp),
+            1,
+            'sustain',
+            'change'
+          );
+        }
+        continue;
+      }
+
+      if (!tp.durationDays) continue;
+      const segIntervalTp = campaignLoadBearingPrepLiveForDate(tp, date);
+      if (!segIntervalTp.inCampaignWindow) continue;
+      const inReadinessTp = segIntervalTp.inPrepLoaded;
+      const phaseLoadTp: PhaseLoad = inReadinessTp ? tp.load : (tp.live_support_load ?? {});
+      const sustainLoadTp =
+        inReadinessTp || !liveSupportHasValues(tp.live_support_load)
+          ? phaseLoadTp
+          : scaleCampaignLiveTechBuckets(phaseLoadTp, tp.liveTechLoadScale ?? 1);
+      addLoad(
+        rows,
+        date,
+        market,
+        'TechProgramme',
+        tp.name,
+        techOnlyPhaseLoad(inReadinessTp ? phaseLoadTp : sustainLoadTp),
+        1,
+        inReadinessTp ? 'readiness' : 'sustain',
+        'change'
       );
     }
 

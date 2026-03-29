@@ -74,7 +74,14 @@ export type PressureEvent = {
   /** 0–1 intensity for explainability (derived from YAML loads / impact). */
   intensityHint?: number;
   affectedFunctionIds?: string[];
-  source?: 'yaml_campaign' | 'yaml_bau' | 'yaml_release' | 'yaml_operating_window' | 'dsl' | 'manual';
+  source?:
+    | 'yaml_campaign'
+    | 'yaml_tech_programme'
+    | 'yaml_bau'
+    | 'yaml_release'
+    | 'yaml_operating_window'
+    | 'dsl'
+    | 'manual';
 };
 
 export type SimulationConfig = {

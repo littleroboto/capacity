@@ -14,6 +14,11 @@ export type ViewModeRadiosProps = {
   className?: string;
   /** Suffix for stable `id`s on radio inputs (e.g. `panel` vs `header`). */
   idSuffix?: string;
+  /**
+   * When set, only these runway lenses are shown (order follows {@link VIEW_MODES}).
+   * Use on LIOM to offer Technology Teams / Restaurant Activity without Code.
+   */
+  allowedIds?: readonly ViewModeId[];
 };
 
 export function ViewModeRadios({
@@ -26,10 +31,18 @@ export function ViewModeRadios({
   labelledBy,
   className,
   idSuffix = 'default',
+  allowedIds,
 }: ViewModeRadiosProps) {
+  const visibleModes =
+    allowedIds?.length ?
+      VIEW_MODES.filter((m) => allowedIds.includes(m.id))
+    : [...VIEW_MODES];
+  if (!visibleModes.length) return null;
+  const groupValue = visibleModes.some((m) => m.id === viewMode) ? viewMode : visibleModes[0]!.id;
+
   return (
     <RadioGroup
-      value={viewMode}
+      value={groupValue}
       onValueChange={(v) => setViewMode(v as ViewModeId)}
       aria-labelledby={labelledBy}
       aria-label={labelledBy ? undefined : 'View mode'}
@@ -40,7 +53,7 @@ export function ViewModeRadios({
       )}
     >
       <LayoutGroup id={layoutGroupId}>
-        {VIEW_MODES.map((m) => {
+        {visibleModes.map((m) => {
           const selected = viewMode === m.id;
           const pillSpring = reduceMotion
             ? { duration: 0.01 }

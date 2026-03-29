@@ -1,14 +1,10 @@
 import { parseDate } from '@/engine/calendar';
 import { getStubPublicHolidayName } from '@/engine/holidayCalc';
 import type { RiskRow } from '@/engine/riskModel';
-import {
-  normalizedRiskWeights,
-  STORE_PRESSURE_MAX,
-  type RiskModelTuning,
-} from '@/engine/riskModelTuning';
+import { normalizedRiskWeights, type RiskModelTuning } from '@/engine/riskModelTuning';
 import type { BauEntry, MarketConfig } from '@/engine/types';
 import type { ViewModeId } from '@/lib/constants';
-import { isGregorianChristmasDay } from '@/engine/weighting';
+import { inStoreHeatmapMetric } from '@/lib/runwayViewMetrics';
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
 import { buildDriverSummaryBlocks, type RunwayDriverBlock } from '@/lib/runwayScoreSummary';
 
@@ -62,6 +58,42 @@ export function activeCampaignNames(config: MarketConfig | undefined, dateStr: s
   return out;
 }
 
+/** Scheduled tech-only programmes (infra / POS / patching) whose window contains `dateStr`. */
+export function activeTechProgrammeNames(config: MarketConfig | undefined, dateStr: string): string[] {
+  if (!config?.techProgrammes?.length) return [];
+  const t = parseDate(dateStr);
+  const out: string[] = [];
+  for (const tp of config.techProgrammes) {
+    if (!tp.start) continue;
+    const start = parseDate(tp.start);
+    const prepDays = tp.prepBeforeLiveDays;
+    if (prepDays != null && prepDays > 0) {
+      const prepStart = new Date(start);
+      prepStart.setDate(prepStart.getDate() - prepDays);
+      const liveEnd = new Date(start);
+      liveEnd.setDate(liveEnd.getDate() + tp.durationDays);
+      const inPrep = t >= prepStart && t < start;
+      const inLive = tp.durationDays > 0 && t >= start && t < liveEnd;
+      if (inPrep || inLive) {
+        const tag = inPrep ? `prep, ${prepDays} days before go-live` : 'live';
+        out.push(`${tp.name.replace(/_/g, ' ')} (${tag}, tech only — no marketing uplift)`);
+      }
+      continue;
+    }
+    if (!tp.durationDays) continue;
+    const end = new Date(start);
+    end.setDate(end.getDate() + tp.durationDays);
+    if (t >= start && t < end) {
+      const tag =
+        tp.readinessDurationDays != null
+          ? `${tp.readinessDurationDays}d readiness then sustain`
+          : 'active';
+      out.push(`${tp.name.replace(/_/g, ' ')} (${tag}, tech only — no marketing uplift)`);
+    }
+  }
+  return out;
+}
+
 export function activeOperatingWindowSummaries(
   config: MarketConfig | undefined,
   dateStr: string
@@ -93,6 +125,7 @@ export function bauActivityLabels(config: MarketConfig | undefined, dateStr: str
     }
     if (
       bau.supportStart != null &&
+      bau.supportEnd != null &&
       weekday >= bau.supportStart &&
       weekday <= bau.supportEnd &&
       !(weekday === bau.weekday)
@@ -198,53 +231,16 @@ export function buildLensRiskBlendTerms(
       },
     ];
   }
-  const store = Math.min(STORE_PRESSURE_MAX, Math.max(0, row.store_pressure ?? 0));
-  const inPrepOnly = Boolean(row.campaign_in_prep) && !row.campaign_in_live;
-  const camp = inPrepOnly ? Math.min(1, Math.max(0, row.campaign_risk ?? 0)) : 0;
-  const holidayTerm = row.holiday_flag && !isGregorianChristmasDay(row.date) ? 1 : 0;
-  const w = normalizedRiskWeights(tuning);
-  let wCamp = w.campaign;
-  if (row.campaign_in_live) wCamp = 0;
-  const denom = w.store + wCamp + w.holiday;
-  if (denom < 1e-9) {
-    return [
+  const fill01 = inStoreHeatmapMetric(row, tuning);
+  return [
     {
       key: 'store',
-      label: 'Store activity',
-      factor: store,
+      label: 'Restaurant trading (this heatmap)',
+      factor: fill01,
       weight: 1,
-      contribution: store,
-    },
-    ];
-  }
-  const terms: RiskBlendTerm[] = [
-    {
-      key: 'store',
-      label: 'Store demand',
-      factor: store,
-      weight: w.store / denom,
-      contribution: (w.store / denom) * store,
+      contribution: fill01,
     },
   ];
-  if (wCamp > 0) {
-    terms.push({
-      key: 'campaign',
-      label: 'Campaign prep',
-      factor: camp,
-      weight: wCamp / denom,
-      contribution: (wCamp / denom) * camp,
-    });
-  }
-  if (w.holiday > 0) {
-    terms.push({
-      key: 'holiday',
-      label: 'Holiday factor',
-      factor: holidayTerm,
-      weight: w.holiday / denom,
-      contribution: (w.holiday / denom) * holidayTerm,
-    });
-  }
-  return terms;
 }
 
 /** Full combined-risk blend (planning / diagnostics). */
@@ -293,6 +289,7 @@ export type RunwayTooltipPayload = {
   viewMode: ViewModeId;
   row: RiskRow;
   activeCampaigns: string[];
+  activeTechProgrammes: string[];
   operatingWindows: string[];
   bauToday: string[];
   storeTradingLine: string | null;
@@ -348,6 +345,7 @@ export function buildRunwayTooltipPayload(input: {
     cellFillHex,
   } = input;
   const activeCampaigns = activeCampaignNames(config, dateStr);
+  const activeTechProgrammes = activeTechProgrammeNames(config, dateStr);
   const operatingWindows = activeOperatingWindowSummaries(config, dateStr);
   const bauToday = bauActivityLabels(config, dateStr);
   const storeTradingLineResolved = storeTradingLine(config, dateStr);
@@ -360,6 +358,7 @@ export function buildRunwayTooltipPayload(input: {
     viewMode,
     row,
     activeCampaigns,
+    activeTechProgrammes,
     operatingWindows,
     bauToday,
     storeTradingLine: storeTradingLineResolved,
@@ -381,6 +380,7 @@ export function buildRunwayTooltipPayload(input: {
       viewMode,
       row,
       activeCampaigns,
+      activeTechProgrammes,
       operatingWindows,
       bauToday,
       storeTradingLineResolved,

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { TermWithDefinition } from '@/components/DefinitionInfo';
 import type { RunwayTooltipPayload } from '@/lib/runwayTooltipBreakdown';
+import { glossaryFillScore, glossaryRiskScore } from '@/lib/runwayDayDetailsGlossary';
 import { cn } from '@/lib/utils';
 
 export type DayDetailsPresentation = 'popover' | 'markdown';
@@ -188,6 +190,17 @@ function ContributorsBlock({
               ))}
             </ul>
           ) : null}
+          {p.storeTradingLine ? (
+            <p
+              className={cn(
+                'border-t border-border leading-relaxed text-muted-foreground',
+                presentation === 'markdown' ? 'mt-4 border-border/60 pt-3 text-sm' : 'mt-3 border-border/60 pt-2.5 text-[11px]'
+              )}
+            >
+              <span className="font-medium text-foreground">Store rhythm (context): </span>
+              {p.storeTradingLine}
+            </p>
+          ) : null}
         </>
       ) : (
         <>
@@ -237,7 +250,56 @@ function ContributorsBlock({
           ) : null}
         </>
       )}
+      <p
+        className={cn(
+          'border-t border-border leading-snug text-muted-foreground',
+          presentation === 'markdown' ? 'mt-4 border-border/60 pt-3 text-[13px]' : 'mt-3 border-border/60 pt-2.5 text-[10px]'
+        )}
+      >
+        {techLens ? (
+          <>
+            Risk band uses the full planning blend (tech, stores, campaigns, holidays)—not only the Technology heatmap
+            number.
+          </>
+        ) : (
+          <>
+            Risk band includes tech delivery too; this heatmap highlights trading-style pressure only.
+          </>
+        )}
+      </p>
     </>
+  );
+}
+
+function lensScoreFootnoteClass(presentation: DayDetailsPresentation): string {
+  return presentation === 'markdown'
+    ? 'mt-2 text-xs leading-snug text-muted-foreground'
+    : 'mt-2 text-[10px] leading-snug text-muted-foreground';
+}
+
+function LensScoreFootnote({
+  viewMode,
+  presentation,
+}: {
+  viewMode: RunwayTooltipPayload['viewMode'];
+  presentation: DayDetailsPresentation;
+}) {
+  const cls = lensScoreFootnoteClass(presentation);
+  if (viewMode === 'combined') {
+    return (
+      <p className={cls}>
+        Fill score can exceed 100% when demand beats capacity.{' '}
+        <span className="font-medium text-foreground">Risk</span> uses the full planning blend (tech, stores,
+        campaigns, holidays)—not the same as the Technology heatmap tile.
+      </p>
+    );
+  }
+  return (
+    <p className={cls}>
+      Fill score is modeled restaurant busyness from the store curve (0–1 before colour tweaks).{' '}
+      <span className="font-medium text-foreground">Risk</span> still includes tech delivery and campaign risk, so the
+      two numbers can diverge.
+    </p>
   );
 }
 
@@ -261,8 +323,11 @@ export function RunwayDayDetailsPayloadBody({
   const riskScoreStr = (Math.round(Math.min(1, Math.max(0, riskScore)) * 100) / 100).toFixed(2);
   const fg = foregroundOnHeatmapFill(p.cellFillHex);
   const camps = clampList(p.activeCampaigns, 4);
+  const techProgs = clampList(p.activeTechProgrammes, 4);
   const wins = clampList(p.operatingWindows, 3);
   const bau = clampList(p.bauToday, 3);
+  const fillGlossary = glossaryFillScore(p.viewMode);
+  const riskGlossary = glossaryRiskScore(p.viewMode);
 
   const bodyPad = presentation === 'markdown' ? 'px-0 pb-0 pt-1' : 'px-4 pb-4 pt-3';
 
@@ -301,22 +366,17 @@ export function RunwayDayDetailsPayloadBody({
             {p.fillMetricLabel}
           </p>
           <p className="mt-2 font-mono text-sm tabular-nums text-foreground">
-            <span className="text-muted-foreground">Fill score</span>{' '}
+            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+              <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
+            </span>{' '}
             <span className="font-semibold">{heatmapScoreStr}</span>
             <span className="mx-2 text-muted-foreground/50">·</span>
-            <span className="text-muted-foreground">Risk score</span>{' '}
+            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+              <TermWithDefinition label="Risk score" definition={riskGlossary} dense />
+            </span>{' '}
             <span className="font-semibold">{riskScoreStr}</span>
           </p>
-          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
-            {p.viewMode === 'combined' ? (
-              <>
-                Fill score can go above 1 when demand exceeds capacity (e.g. 1.05 = 105%). Risk score stays
-                on a 0–1 scale for the blended model.
-              </>
-            ) : (
-              <>Each score is on a 0–1 scale: higher means a busier square or a heavier risk read.</>
-            )}
-          </p>
+          <LensScoreFootnote viewMode={p.viewMode} presentation={presentation} />
         </header>
       ) : (
         <header className="relative border-b border-border bg-muted/15 px-4 pb-4 pt-11">
@@ -349,12 +409,17 @@ export function RunwayDayDetailsPayloadBody({
             {p.fillMetricLabel}
           </p>
           <p className="mt-2 text-[11px] font-mono tabular-nums leading-snug text-foreground">
-            <span className="text-muted-foreground">Fill 0–1</span>{' '}
+            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+              <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
+            </span>{' '}
             <span className="font-semibold">{heatmapScoreStr}</span>
             <span className="mx-1.5 text-muted-foreground/45">·</span>
-            <span className="text-muted-foreground">Risk 0–1</span>{' '}
+            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+              <TermWithDefinition label="Risk score" definition={riskGlossary} dense />
+            </span>{' '}
             <span className="font-semibold">{riskScoreStr}</span>
           </p>
+          <LensScoreFootnote viewMode={p.viewMode} presentation={presentation} />
         </header>
       )}
 
@@ -391,6 +456,30 @@ export function RunwayDayDetailsPayloadBody({
               <p className="mt-1 text-xs italic text-muted-foreground">+{camps.more} more</p>
             ) : null}
           </>
+        ) : null}
+
+        {techProgs.shown.length > 0 ? (
+          p.viewMode === 'combined' ? (
+            <>
+              <SectionTitle presentation={presentation}>Tech programmes (no marketing uplift)</SectionTitle>
+              <BulletList items={techProgs.shown} presentation={presentation} />
+              {techProgs.more > 0 ? (
+                <p className="mt-1 text-xs italic text-muted-foreground">+{techProgs.more} more</p>
+              ) : null}
+            </>
+          ) : (
+            <p
+              className={cn(
+                'text-muted-foreground',
+                presentation === 'markdown' ? 'mt-6 text-sm leading-relaxed' : 'mt-4 text-[11px] leading-snug'
+              )}
+            >
+              <span className="font-semibold text-foreground">Engineering-only windows: </span>
+              {techProgs.shown.join(' · ')}
+              {techProgs.more > 0 ? ` · +${techProgs.more} more` : null}
+              <span className="text-muted-foreground/90"> — no store marketing uplift.</span>
+            </p>
+          )
         ) : null}
 
         {wins.shown.length > 0 && presentation !== 'markdown' ? (

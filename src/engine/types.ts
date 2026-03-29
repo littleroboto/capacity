@@ -95,6 +95,8 @@ export type MarketConfig = {
   tradingPressure?: TradingPressureKnobs;
   bau?: BauEntry | BauEntry[];
   campaigns: CampaignConfig[];
+  /** Tech-only scheduled work; same timing keys as campaigns; never affects campaign_risk or store boosts. */
+  techProgrammes: TechProgrammeConfig[];
   releases: ReleaseConfig[];
   /** Parsed `trading` blob; `weekly_pattern` is expanded to per-day **0–1** (same rules as `techRhythm.weekly_pattern`). */
   trading?: Record<string, unknown>;
@@ -128,8 +130,9 @@ export type MarketConfig = {
 export type BauEntry = {
   name: string;
   weekday: number;
-  supportStart: number;
-  supportEnd: number;
+  /** Inclusive range for the lighter `support` slice (0.5× load); omit when `support_days` is 0. */
+  supportStart?: number;
+  supportEnd?: number;
   load: { labs?: number; teams?: number; backend?: number; ops?: number; commercial?: number };
 };
 
@@ -194,6 +197,28 @@ export type CampaignConfig = {
   marketingPrepDaysBeforeLive?: number;
   /** Default 21 — ops prep starts N days before go-live; live ops still from `live_support_load`. */
   supplyPrepDaysBeforeLive?: number;
+};
+
+/** Shared prep/live window fields for {@link campaignLoadBearingPrepLiveForDate}. */
+export type ProgrammeWindowFields = Pick<
+  CampaignConfig,
+  'start' | 'durationDays' | 'prepBeforeLiveDays' | 'readinessDurationDays' | 'presenceOnly'
+>;
+
+/**
+ * Platform / infra work (patching, POS refresh, hardware) that uses the same **prep + live** timing as a campaign
+ * but **only** consumes labs / teams / backend — no marketing, ops, or trading-pressure uplift.
+ */
+export type TechProgrammeConfig = ProgrammeWindowFields & {
+  name: string;
+  load: PhaseLoad;
+  live_support_load?: PhaseLoad;
+  liveSupportScale?: number;
+  /**
+   * Live-segment scale for labs/teams/backend only; default **1** (full YAML intensity) unlike campaigns (~0.55).
+   */
+  liveTechLoadScale?: number;
+  replacesBauTech?: boolean;
 };
 
 export type ReleaseConfig = {

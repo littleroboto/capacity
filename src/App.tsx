@@ -12,6 +12,7 @@ import { defaultDslForMarket } from '@/lib/marketDslSeeds';
 import { publicAsset } from '@/lib/publicUrl';
 import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
 import { fetchRunwayMarketOrder } from '@/lib/runwayManifest';
+import { isRunwayAllMarkets } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 
 const DSL_PANEL_COLLAPSED_STORAGE_KEY = 'capacity:dsl-panel-collapsed';
@@ -25,6 +26,8 @@ export default function App() {
   const riskSurface = useAtcStore((s) => s.riskSurface);
   const parseError = useAtcStore((s) => s.parseError);
   const viewMode = useAtcStore((s) => s.viewMode);
+  const country = useAtcStore((s) => s.country);
+  const setViewMode = useAtcStore((s) => s.setViewMode);
   const setDslByMarket = useAtcStore((s) => s.setDslByMarket);
   const setRunwayMarketOrder = useAtcStore((s) => s.setRunwayMarketOrder);
   const hydrateFromStorage = useAtcStore((s) => s.hydrateFromStorage);
@@ -107,6 +110,12 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
+
+  useEffect(() => {
+    if (isRunwayAllMarkets(country) && viewMode === 'code') {
+      setViewMode('combined');
+    }
+  }, [country, viewMode, setViewMode]);
 
   useEffect(() => {
     let cancelled = false;

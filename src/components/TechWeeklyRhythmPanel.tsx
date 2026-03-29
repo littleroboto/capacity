@@ -281,7 +281,7 @@ export function TechWeeklyRhythmPanel() {
           <strong className="font-medium text-foreground/80">week 3</strong> (day 21). Uses tuning + optional YAML{' '}
           <span className="font-mono text-foreground/80">trading.payday_month_peak_multiplier</span> or{' '}
           <span className="font-mono text-foreground/80">payday_month_knot_multipliers</span>.{' '}
-          <strong className="font-medium text-foreground/80">Business</strong> heatmap; store is capped at{' '}
+          <strong className="font-medium text-foreground/80">Restaurant Activity</strong> heatmap; store is capped at{' '}
           <span className="font-mono text-foreground/80">1</span> after YAML rhythm.
         </p>
       </div>

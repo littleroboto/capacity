@@ -10,7 +10,7 @@ Hint: Use spaces (not tabs) for indentation; quote values that contain ":"; use 
   if (/No valid config/i.test(m)) {
     return `${m}
 
-Hint: Each document needs a market (or country) and recognizable fields (e.g. resources, campaigns).`;
+Hint: Each document needs a market (or country) and recognizable fields (e.g. resources, campaigns, or tech_programmes).`;
   }
   return m;
 }

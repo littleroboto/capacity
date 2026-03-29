@@ -16,7 +16,7 @@ export const RISK_BANDS = {
 export const VIEW_MODES = [
   {
     id: 'combined',
-    label: 'Technology',
+    label: 'Technology Teams',
     /** Short heading above the main runway heatmap. */
     runwayHeatmapTitle: 'Tech capacity demand',
     title:
@@ -24,17 +24,17 @@ export const VIEW_MODES = [
   },
   {
     id: 'in_store',
-    label: 'Business',
+    label: 'Restaurant Activity',
     runwayHeatmapTitle: 'Trading pressure',
     title:
-      'Trading pressure from store rhythm, live campaigns, and BAU; prep adds marketing load without inflating stores until go-live. Same 0–1 heatmap scale as Technology; γ_business and transfer curve apply.',
+      'Restaurant busyness from the store trading curve: rhythm, holidays, and store-facing campaign boosts in YAML. Marketing prep does not add a separate heatmap bump (see Technology Teams for delivery load). Same 0–1 scale; γ_business and transfer curve apply.',
   },
   {
     id: 'code',
     label: 'Code',
     runwayHeatmapTitle: 'Market configuration',
     title:
-      'Full multi-market YAML in the main area. Edits stay local until you switch back to Technology or Business — then the model re-runs and the runway updates.',
+      'Full multi-market YAML in the main area. Edits stay local until you switch back to Technology Teams or Restaurant Activity — then the model re-runs and the runway updates.',
   },
 ] as const;
 

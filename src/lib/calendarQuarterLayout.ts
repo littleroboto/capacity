@@ -429,18 +429,53 @@ export function compareAllRunwayTotalContentWidthPx(
   );
 }
 
-/** Largest allowed cell size (stepped) so the full LIOM compare row fits `availableWidth` (e.g. scrollport `clientWidth`). */
-export function bestCellPxForCompareAllRunwayFit(availableWidth: number, marketCount: number): number {
+/**
+ * Compare column: `mb-1.5` (6px) + market sticker row `h-[32px]` above each strip (`RunwayGridBody`).
+ */
+export const RUNWAY_COMPARE_MARKET_STICKER_STACK_PX = 6 + 32;
+
+/** Total vertical pixel height of one LIOM compare column (sticker + calendar stack) for a given cell size. */
+export function compareAllRunwayTotalContentHeightPx(
+  cellPx: number,
+  sortedDatesYmd: string[]
+): number {
+  const layout = buildVerticalMonthsRunwayLayout(sortedDatesYmd, cellPx);
+  if (!layout) return RUNWAY_COMPARE_MARKET_STICKER_STACK_PX;
+  return RUNWAY_COMPARE_MARKET_STICKER_STACK_PX + layout.contentHeight;
+}
+
+/** Minimum scrollport height before we apply vertical fitting (avoid tiny viewports over-shrinking cells). */
+const RUNWAY_COMPARE_FIT_MIN_VIEWPORT_H = 120;
+
+/**
+ * Largest stepped cell size so the full LIOM compare row fits `availableWidth` and, when `availableHeight` is
+ * large enough, the full calendar stack fits vertically without scrolling inside the compare scrollport.
+ */
+export function bestCellPxForCompareAllRunwayFit(
+  availableWidth: number,
+  availableHeight: number,
+  marketCount: number,
+  sortedDatesYmd: string[]
+): number {
   if (marketCount < 1 || !Number.isFinite(availableWidth) || availableWidth <= 0) {
     return RUNWAY_COMPARE_FIT_CELL_PX_MIN;
   }
+  const useHeight =
+    Number.isFinite(availableHeight) && availableHeight >= RUNWAY_COMPARE_FIT_MIN_VIEWPORT_H;
   let best = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
   for (
     let px = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
     px <= RUNWAY_COMPARE_FIT_CELL_PX_MAX;
     px += RUNWAY_COMPARE_FIT_CELL_PX_STEP
   ) {
-    if (compareAllRunwayTotalContentWidthPx(px, marketCount) <= availableWidth) best = px;
+    if (compareAllRunwayTotalContentWidthPx(px, marketCount) > availableWidth) continue;
+    if (
+      useHeight &&
+      compareAllRunwayTotalContentHeightPx(px, sortedDatesYmd) > availableHeight
+    ) {
+      continue;
+    }
+    best = px;
   }
   return best;
 }

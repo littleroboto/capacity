@@ -5,34 +5,38 @@ import {
 } from '@/lib/riskHeatmapTransfer';
 
 /**
- * **9 discrete bands** (low → high): classic **temperature / weather-radar** order — calm ice → blues →
- * cyan → green → yellow → orange → red — as flat swatches tuned for modern UI (readable on grid cells).
- * Runway cells pick one colour per band after clamp 0–1 and γ ({@link heatmapColorDiscrete}).
+ * **10 discrete bands** (low → high): **deep blue → blue-cyan → cyan → green → yellow-green → yellow → soft orange →
+ * bright orange → red → deep burgundy red** (weather-style; peak is darker red, not more orange).
+ *
+ * Cells map **transformed** 0–1 (curve + γ) into equal-width bins via {@link heatmapColorDiscrete}; with a
+ * steep power curve (small γ), mid raw scores can land high on that scale — see legend note in UI.
  * {@link heatmapColorContinuous} lerps these anchors for smooth ramps.
  */
 export const RISK_HEATMAP_COLORS = [
-  '#f0f9ff',
-  '#bae6fd',
-  '#0ea5e9',
-  '#06b6d4',
-  '#34d399',
-  '#facc15',
-  '#fb923c',
-  '#ef4444',
-  '#ff1f1f',
+  '#2b6cb0',
+  '#2c9bcb',
+  '#34c6c3',
+  '#6edb8f',
+  '#b8e986',
+  '#f6e05e',
+  '#f6ad55',
+  '#f97316',
+  '#dc2626',
+  '#7f1d1d',
 ] as const;
 
-/** One label per {@link RISK_HEATMAP_COLORS} entry, index 0 = coldest / lowest KPI (temperature-scale wording). */
+/** Tooltip / aria text per {@link RISK_HEATMAP_COLORS} band (0 = lowest on heatmap scale). */
 export const HEATMAP_TEMPERATURE_BAND_LABELS = [
-  'Calm · lowest',
-  'Cool',
-  'Cold',
-  'Chill',
-  'Mild',
-  'Warm',
-  'Hot',
-  'Very hot',
-  'Extreme · highest',
+  'Lowest · deep blue',
+  'Very low · blue to cyan',
+  'Low · cyan',
+  'Below mid · green',
+  'Mid · yellow-green',
+  'Above mid · yellow',
+  'High · soft orange',
+  'High+ · orange',
+  'Very high · red',
+  'Peak · deep red',
 ] as const;
 
 export const HEATMAP_TEMPERATURE_STEP_COUNT = RISK_HEATMAP_COLORS.length;
@@ -169,6 +173,22 @@ export function heatmapColorForViewMode(
   }
 
   return heatmapColorDiscrete(t);
+}
+
+/**
+ * Legend swatch for discrete band `bandFromLow` (0 = lowest, n−1 = highest). Matches runway cell colours:
+ * **spectrum** — {@link heatmapColorDiscrete} at the bin centre (same as a cell whose transformed metric falls in that bin).
+ * **mono** — alpha from that same transformed-space bin centre (curve/γ are **not** applied again; they only apply to raw cell metrics via {@link heatmapColorForViewMode}).
+ */
+export function heatmapLegendSwatchAtBand(bandFromLow: number, opts?: HeatmapColorOpts): string {
+  const n = HEATMAP_TEMPERATURE_STEP_COUNT;
+  const b = Math.min(n - 1, Math.max(0, bandFromLow));
+  const tBinCentre = (b + 0.5) / n;
+  if (opts?.renderStyle === 'mono') {
+    const hex = normalizeHeatmapMonoHex(opts.monoColor ?? '');
+    return hexToRgba(hex, MONO_ALPHA_MIN + tBinCentre * (1 - MONO_ALPHA_MIN));
+  }
+  return heatmapColorDiscrete(tBinCentre);
 }
 
 /**

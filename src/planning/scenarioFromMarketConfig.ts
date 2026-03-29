@@ -18,6 +18,33 @@ export function scenarioFromMarketConfig(config: MarketConfig, dslText?: string)
   const marketId = config.market;
   const events: PressureEvent[] = [];
 
+  for (const tp of config.techProgrammes ?? []) {
+    if (!tp.start) continue;
+    const start = parseDate(tp.start);
+    const end = new Date(start);
+    end.setDate(end.getDate() + Math.max(0, tp.durationDays));
+    const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+    const prep = tp.prepBeforeLiveDays ?? 0;
+    const startStr =
+      prep > 0
+        ? (() => {
+            const p = new Date(start);
+            p.setDate(p.getDate() - prep);
+            return `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}-${String(p.getDate()).padStart(2, '0')}`;
+          })()
+        : `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+
+    events.push({
+      id: `techprog_${tp.name}`,
+      kind: 'programme',
+      name: tp.name.replace(/_/g, ' '),
+      startDate: startStr,
+      endDate: endStr,
+      intensityHint: 0.5,
+      source: 'yaml_tech_programme',
+    });
+  }
+
   for (const c of config.campaigns ?? []) {
     if (!c.start) continue;
     const start = parseDate(c.start);

@@ -55,6 +55,31 @@ These rules override any urge to “complete” a calendar from memory.
 
 3. After adding a new market file, the project expects **`npm run generate:markets`** (or **`npm run build`**, which runs the manifest step).
 
+### F. User vocabulary → **`tech_programmes`** vs **`campaigns`**
+
+Users rarely say “tech programme” verbatim. Treat requests as **`tech_programmes`** when they describe **technology / engineering / platform work** that loads **labs, tech staff, or backend** but is **not** a **marketing or restaurant-demand** programme — even if they call it:
+
+- **technology project**, **tech project**, **engineering project**, **platform project**
+- **tech workstream**, **engineering workstream**, **delivery workstream**
+- **tech initiative**, **engineering initiative**, **platform initiative**
+- **infra / infrastructure** rollout or upgrade, **non-production** programme, **systems** change (when they mean capacity on tech teams, not a dated **release** deploy grid)
+- **change programme** or **programme of work** when the context is **IT / labs / product engineering** and they **do not** ask for **store uplift**, **campaign impact**, or **business_uplift**
+
+Use **`campaigns`** when they want **marketing / trading / store** effects (`impact`, `business_uplift`, live store pressure) or explicitly describe **promotional** or **customer-facing** campaigns.
+
+**YAML key is always `tech_programmes`** for the non-marketing case — do not invent a separate section for “project” vs “workstream”; add or edit **list items** under `tech_programmes:`.
+
+If the user is ambiguous, you may add a one-line clarification in your reply, but still choose **`tech_programmes`** when the described work is **tech-team capacity** without **marketing / store** intent.
+
+### G. Multi-turn chat (conversation memory)
+
+When the product sends you a **chat history** (alternating user and assistant messages) before the latest request:
+
+1. **Treat earlier user messages as still in force** unless the user explicitly reverses them (e.g. “undo that”, “ignore my previous ask”). Cumulative refinements (“also…”, “same but…”, “now shorten…”) build on what they already said.
+2. **The latest user message** includes **`<<<CURRENT_YAML>>>`** … **`<<<END>>>`** with the **live editor buffer** — that file is always the source of truth for structure and values **right now**. Older user lines in the thread are usually **short instructions without** a repeated full YAML; do not assume the editor still matches text from a much earlier turn unless the current YAML shows it.
+3. **Your own prior replies** (including explanations and, where present, streamed YAML or edit markers) are context for **intent and wording**; if they conflict with **`<<<CURRENT_YAML>>>`** in the newest message, **prefer the current YAML** and the **newest** user instructions.
+4. **Do not reset** to a one-shot interpretation on every turn: keep names, scope, and decisions from the thread unless the user changes them.
+
 ---
 
 ## Schema overview (one market document)
@@ -66,6 +91,7 @@ These rules override any urge to “complete” a calendar from memory.
 | `resources` | `labs.capacity`, `staff.capacity`; optional `testing_capacity`; legacy `teams` map with `size` summed into team cap. |
 | `bau` | `days_in_use` + `weekly_cycle` + optional `integration_tests`; legacy `weekly_promo` / `weekly_promo_cycle`. |
 | `campaigns` | List or map of programmes (prep + live semantics below). |
+| **`tech_programmes`** | **Top-level list** for **non-marketing tech work** (users may say *technology project*, *tech workstream*, *tech initiative*, *platform rollout*, etc. — same YAML). Same **timing** shape as campaigns; **no** `impact` / `business_uplift` / store-trading boost. **Not** `releases`; **not** under `tech:`. |
 | `public_holidays`, `school_holidays` | `auto`, `dates`, `staffing_multiplier`, optional `trading_multiplier`; school may add `load_effects`. |
 | `holidays` | Cross-cutting: `capacity_taper_days`, `lab_capacity_scale`; `auto_public` / `auto_school` can be implied from the `*_holidays` blocks. |
 | `stress_correlations` | Legacy; `school_holidays.*` multipliers merged with `school_holidays.load_effects`. |
@@ -174,6 +200,64 @@ campaigns:
       labs_required: 1
       tech_staff: 1
 ```
+
+---
+
+## `tech_programmes` (platform / engineering — **not** marketing campaigns)
+
+Use this **top-level** key for lab+tech work that should **not** drive restaurant trading or `business_uplift`. Parser: `mapTechProgrammeFromYamlRow` in `yamlDslParser.ts`.
+
+**Natural language:** Whatever the user calls it — *technology project*, *tech workstream*, *tech initiative*, *engineering programme*, *platform work*, *infra change*, *non-BAU tech*, *systems rollout* (in the sense of sustained team load, not the **`releases:`** deploy schema) — map it here as **`tech_programmes:`** list entries with `programme_support` / `live_programme_support` as needed.
+
+**Do not** put these under `tech:` (that block is only `weekly_pattern` + scales). **Do not** use `releases:` unless you mean phased **deploy_date** loads (`systems`, `phases`, `load` map) — a different schema.
+
+### Timing (same keys as campaigns)
+
+| Key | Meaning |
+| --- | --- |
+| `name` | String id. |
+| `start_date` | Quoted ISO (aliases `startDate`, `start`). |
+| `duration` | Live window length in days (integer ≥ 0). |
+| **`testing_prep_duration`** | Optional. Calendar days of **prep** ending the day before go-live (aliases `testingPrepDuration`, `prep_before_live_days`). **Omit** (or `0`) for **no prep**. |
+| **`readiness_duration`** | Optional interval model: first N days of `[start_date, start_date+duration)` use prep `load`, remainder use live load. **Omit** when using `testing_prep_duration` lead model. When **both** prep keys are omitted, the engine treats the **whole** window as the prep/readiness segment using **`programme_support`** / merged `load` only (see engine `campaignLoadBearingPrepLiveForDate`). |
+| **`programme_support`** | Prep-phase labs/teams/backend (aliases **`campaign_support`**, `campaignSupport`). Keys: **`labs_required`** → labs, **`tech_staff`** → teams, optional `backend`. |
+| **`live_programme_support`** | Live segment (aliases **`live_campaign_support`**, `live_support`, `liveSupport`). |
+| `live_tech_load_scale` | Optional multiplier on labs/teams/backend in live (default **1** for tech programmes). |
+| `replaces_bau_tech` | Same semantics as campaigns when `true`. |
+
+**Forbidden on tech programme rows:** `impact`, `business_uplift`, `presence_only` (ignored if pasted; prefer not to include).
+
+### Minimal examples
+
+**One month, no prep, constant lab + tech staff across the window** (put load in `programme_support` only; omit `testing_prep_duration` and `live_programme_support` if the same intensity should apply for all 30 days):
+
+```yaml
+tech_programmes:
+  - name: test_lab_rollout_30d
+    start_date: '2026-06-01'
+    duration: 30
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+```
+
+**Prep + different live intensity** (matches shipped UK sample style):
+
+```yaml
+tech_programmes:
+  - name: pos_kiosk_refresh_q2_2026
+    start_date: '2026-05-12'
+    duration: 10
+    testing_prep_duration: 14
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 0.5
+```
+
+List vs map: same as `campaigns` — YAML list of objects, or map keyed by id with `name` defaulted from the key.
 
 ---
 

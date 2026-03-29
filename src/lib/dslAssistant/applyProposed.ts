@@ -1,4 +1,5 @@
 import { runPipelineFromDsl } from '@/engine/pipeline';
+import { riskTuningForPipelineView } from '@/engine/riskModelTuning';
 import { looksLikeYamlDsl } from '@/lib/dslGuards';
 import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
 import { isRunwayAllMarkets } from '@/lib/markets';
@@ -28,7 +29,7 @@ export function validateProposedEditorBuffer(
     return { ok: false, error: 'Content does not look like market YAML (possible HTML or bundle pasted).' };
   }
   const { riskTuning, country } = useAtcStore.getState();
-  const r = runPipelineFromDsl(full, riskTuning);
+  const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, country));
   if (r.parseError) {
     let err = r.parseError;
     if (!isRunwayAllMarkets(country)) {

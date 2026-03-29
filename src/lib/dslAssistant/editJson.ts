@@ -1,5 +1,8 @@
 export const DSL_EDIT_MARKER = '<<<DSL_EDIT_JSON>>>';
 
+/** After this marker the model streams raw YAML into the editor (Code workspace / dock). */
+export const DSL_YAML_STREAM_MARKER = '<<<DSL_YAML_STREAM>>>';
+
 export type ReplacePatch = { type: 'replace'; old: string; new: string };
 
 export type DslEditPayload =
@@ -85,9 +88,26 @@ export function applyReplacePatches(
   return { ok: true, text };
 }
 
-/** Strip the machine block for display in the chat bubble. */
+/** Strip machine / YAML stream tails for display in the chat bubble. */
 export function assistantContentForDisplay(full: string): string {
-  const idx = full.indexOf(DSL_EDIT_MARKER);
-  if (idx === -1) return full.trimEnd();
-  return full.slice(0, idx).trimEnd();
+  const cuts: number[] = [];
+  const j = full.indexOf(DSL_EDIT_MARKER);
+  if (j !== -1) cuts.push(j);
+  const y = full.indexOf(DSL_YAML_STREAM_MARKER);
+  if (y !== -1) cuts.push(y);
+  if (!cuts.length) return full.trimEnd();
+  return full.slice(0, Math.min(...cuts)).trimEnd();
+}
+
+/**
+ * While the model streams, content after {@link DSL_YAML_STREAM_MARKER} is the in-progress YAML buffer
+ * (shown live in Monaco). Before the marker appears, `yaml` is null.
+ */
+export function yamlStreamBufferFromAssistantAccumulated(accumulated: string): {
+  yaml: string | null;
+} {
+  const idx = accumulated.indexOf(DSL_YAML_STREAM_MARKER);
+  if (idx === -1) return { yaml: null };
+  const tail = accumulated.slice(idx + DSL_YAML_STREAM_MARKER.length).replace(/^\r?\n/, '');
+  return { yaml: tail };
 }
