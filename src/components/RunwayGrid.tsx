@@ -2,6 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, mem
 import type { ReactNode, Ref, RefObject } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { runwayHeatmapTitleForViewMode, type ViewModeId } from '@/lib/constants';
+import {
+  heatmapCellMetric,
+  technologyFillMetricHeadline,
+  technologyFillMetricLabel,
+  technologyRunwayTitleForWorkloadScope,
+  type TechWorkloadScope,
+} from '@/lib/runwayViewMetrics';
 import { parseDate } from '@/engine/calendar';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
@@ -57,7 +64,6 @@ import { useAtcStore } from '@/store/useAtcStore';
 import { SlotOverlay } from '@/components/SlotOverlay';
 import type { MarketConfig } from '@/engine/types';
 import { downloadRunwayHeatmapPng } from '@/lib/runwayPngExport';
-import { heatmapCellMetric } from '@/lib/runwayViewMetrics';
 import { RunwayIsoSkyline } from '@/components/RunwayIsoSkyline';
 import { RunwayCompareSvgColumn } from '@/components/RunwayCompareSvgColumn';
 import { RunwayQuarterGridSvg } from '@/components/RunwayQuarterGridSvg';
@@ -249,10 +255,10 @@ function RunwaySkeleton({
 /** Two-letter weekday keys for Mon–Sun columns (fits narrow cells; avoids duplicate “T”). */
 const WEEKDAY_GRID_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
 
-function fillMetricHeadlineForView(mode: ViewModeId): string {
+function fillMetricHeadlineForView(mode: ViewModeId, techWorkloadScope: TechWorkloadScope): string {
   switch (mode) {
     case 'combined':
-      return 'Tech capacity demand';
+      return technologyFillMetricHeadline(techWorkloadScope);
     case 'in_store':
       return 'Trading pressure';
     default:
@@ -260,10 +266,10 @@ function fillMetricHeadlineForView(mode: ViewModeId): string {
   }
 }
 
-function fillMetricLabelForView(mode: ViewModeId): string {
+function fillMetricLabelForView(mode: ViewModeId, techWorkloadScope: TechWorkloadScope): string {
   switch (mode) {
     case 'combined':
-      return 'Scheduled work on labs, field teams, and backend versus each lane’s capacity';
+      return technologyFillMetricLabel(techWorkloadScope);
     case 'in_store':
       return 'Restaurant trading intensity from the store curve—rhythm, holidays, and store boosts when live (or prep if YAML says so)';
     default:
@@ -342,8 +348,8 @@ type HeatCellProps = {
   /** When false during color sweep, only the grey→colour reveal runs. */
   postSweep: boolean;
   sweepDelaySec: number;
-  /** Remounts the colour layer so the grey→fill sweep replays when the view mode changes. */
-  viewMode: ViewModeId;
+  /** Remounts the colour layer so the grey→fill sweep replays when the lens or tech workload scope changes. */
+  colorLayerKey: string;
   /** &lt;1 when score is below heatmap dim cutoff (after curve + γ). */
   dimOpacity?: number;
   openDayDetailsFromCell: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
@@ -400,7 +406,7 @@ const HeatCell = memo(function HeatCell({
   enableColorSweep,
   postSweep,
   sweepDelaySec,
-  viewMode,
+  colorLayerKey,
   dimOpacity = 1,
   openDayDetailsFromCell,
 }: HeatCellProps) {
@@ -471,7 +477,7 @@ const HeatCell = memo(function HeatCell({
     <div className="relative shrink-0" style={{ width: CELL_PX, height: CELL_PX }}>
       <div className="pointer-events-none absolute inset-0 rounded-[3px] bg-muted" aria-hidden />
       <motion.div
-        key={viewMode}
+        key={colorLayerKey}
         className={cn(
           'absolute inset-0 cursor-pointer rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
           isToday && 'z-[1]',
@@ -537,7 +543,7 @@ const HeatCellSized = memo(function HeatCellSized({
   enableColorSweep,
   postSweep,
   sweepDelaySec,
-  viewMode,
+  colorLayerKey,
   dimOpacity = 1,
   openDayDetailsFromCell,
 }: HeatCellSizedProps) {
@@ -608,7 +614,7 @@ const HeatCellSized = memo(function HeatCellSized({
     <div className="relative shrink-0" style={{ width: cellPx, height: cellPx }}>
       <div className="pointer-events-none absolute inset-0 rounded-[2px] bg-muted" aria-hidden />
       <motion.div
-        key={viewMode}
+        key={colorLayerKey}
         className={cn(
           'absolute inset-0 cursor-pointer rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
           isToday && 'z-[1]',
@@ -670,6 +676,7 @@ type RunwayVerticalHeatmapBodyProps = {
   heatmapOpts: HeatmapColorOpts;
   riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
+  techWorkloadScope: TechWorkloadScope;
   todayYmd: string;
   dimPastDays: boolean;
   shimmer: boolean;
@@ -816,6 +823,7 @@ function RunwayMonthMiniGrid({
   heatmapOpts,
   riskTuning,
   viewMode,
+  techWorkloadScope,
   todayYmd,
   shimmer,
   discoMode,
@@ -839,6 +847,7 @@ function RunwayMonthMiniGrid({
   heatmapOpts: HeatmapColorOpts;
   riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
+  techWorkloadScope: TechWorkloadScope;
   todayYmd: string;
   shimmer: boolean;
   discoMode: boolean;
@@ -852,6 +861,7 @@ function RunwayMonthMiniGrid({
   showWeekdayRow?: boolean;
   monthLabelPlacement?: 'above' | 'side';
 }) {
+  const colorLayerKey = viewMode === 'combined' ? `c-${techWorkloadScope}` : viewMode;
   const weekdayRow = showWeekdayRow ? (
     <div className="flex shrink-0 items-end" style={{ height: CALENDAR_WEEKDAY_HEADER_H, gap }}>
       {WEEKDAY_GRID_LABELS.map((abbr, di) => (
@@ -892,7 +902,9 @@ function RunwayMonthMiniGrid({
             }
             const dateStr = cell;
             const row = dateStr ? riskByDate.get(dateStr) : undefined;
-            const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
+            const metric = row
+              ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope)
+              : undefined;
             const fill = !dateStr
               ? HEATMAP_RUNWAY_PAD_FILL
               : heatmapColorForViewMode(viewMode, metric, heatmapOpts);
@@ -914,7 +926,7 @@ function RunwayMonthMiniGrid({
                 enableColorSweep={enableColorSweep}
                 postSweep={postSweep}
                 sweepDelaySec={sweepDelaySec}
-                viewMode={viewMode}
+                colorLayerKey={colorLayerKey}
                 dimOpacity={dimOpacity}
                 openDayDetailsFromCell={openDayDetailsFromCell}
               />
@@ -933,7 +945,7 @@ function RunwayMonthMiniGrid({
                 enableColorSweep={enableColorSweep}
                 postSweep={postSweep}
                 sweepDelaySec={sweepDelaySec}
-                viewMode={viewMode}
+                colorLayerKey={colorLayerKey}
                 dimOpacity={dimOpacity}
                 openDayDetailsFromCell={openDayDetailsFromCell}
               />
@@ -996,6 +1008,7 @@ function RunwayVerticalHeatmapBody({
   heatmapOpts,
   riskTuning,
   viewMode,
+  techWorkloadScope,
   todayYmd,
   dimPastDays,
   shimmer,
@@ -1031,6 +1044,7 @@ function RunwayVerticalHeatmapBody({
           heatmapOpts={heatmapOpts}
           riskTuning={riskTuning}
           viewMode={viewMode}
+          techWorkloadScope={techWorkloadScope}
           todayYmd={todayYmd}
           dimPastDays={dimPastDays}
           openDayDetailsFromCell={openDayDetailsFromCell}
@@ -1109,6 +1123,7 @@ function RunwayVerticalHeatmapBody({
                         heatmapOpts={heatmapOpts}
                         riskTuning={riskTuning}
                         viewMode={viewMode}
+                        techWorkloadScope={techWorkloadScope}
                         todayYmd={todayYmd}
                         shimmer={shimmer}
                         discoMode={discoMode}
@@ -1218,6 +1233,7 @@ function RunwayVerticalHeatmapBody({
                           heatmapOpts={heatmapOpts}
                           riskTuning={riskTuning}
                           viewMode={viewMode}
+                          techWorkloadScope={techWorkloadScope}
                           todayYmd={todayYmd}
                           shimmer={shimmer}
                           discoMode={discoMode}
@@ -1267,10 +1283,13 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     [onSlotSelection, setCountry]
   );
   const configs = useAtcStore((s) => s.configs);
+  const techWorkloadScope = useAtcStore((s) => s.techWorkloadScope);
   const compareAllMarkets = isRunwayAllMarkets(country);
-  const runwayTitleWithMarket = `${runwayHeatmapTitleForViewMode(viewMode)}: ${
-    compareAllMarkets ? RUNWAY_ALL_MARKETS_LABEL : country
-  }`;
+  const runwayTitleWithMarket = `${
+    viewMode === 'combined'
+      ? technologyRunwayTitleForWorkloadScope(techWorkloadScope)
+      : runwayHeatmapTitleForViewMode(viewMode)
+  }: ${compareAllMarkets ? RUNWAY_ALL_MARKETS_LABEL : country}`;
   const riskTuning = useAtcStore((s) => s.riskTuning);
   const riskHeatmapGamma = useAtcStore((s) => s.riskHeatmapGamma);
   const riskHeatmapCurve = useAtcStore((s) => s.riskHeatmapCurve);
@@ -1473,7 +1492,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
       if (!row) return null;
       const config = configs.find((c) => c.market === market);
       const wd = weekdayShortFromYmd(dateStr);
-      const fillMetricValue = heatmapCellMetric(row, viewMode, riskTuning);
+      const fillMetricValue = heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope);
       const cellFillHex = heatmapColorForViewMode(viewMode, fillMetricValue, heatmapOpts);
       const payload = buildRunwayTooltipPayload({
         dateStr,
@@ -1483,14 +1502,14 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
         row,
         config,
         tuning: riskTuning,
-        fillMetricHeadline: fillMetricHeadlineForView(viewMode),
-        fillMetricLabel: fillMetricLabelForView(viewMode),
+        fillMetricHeadline: fillMetricHeadlineForView(viewMode, techWorkloadScope),
+        fillMetricLabel: fillMetricLabelForView(viewMode, techWorkloadScope),
         fillMetricValue,
         cellFillHex,
       });
       return { x: anchor.clientX, y: anchor.clientY, payload };
     },
-    [riskSurface, configs, viewMode, riskTuning, heatmapOpts]
+    [riskSurface, configs, viewMode, riskTuning, heatmapOpts, techWorkloadScope]
   );
 
   const makeShowTip = useCallback(
@@ -1735,6 +1754,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
                   heatmapOpts={heatmapOpts}
                   riskTuning={riskTuning}
                   viewMode={viewMode}
+                  techWorkloadScope={techWorkloadScope}
                   todayYmd={todayYmd}
                   dimPastDays={dimPastDays}
                   shimmer={shimmer}
@@ -1788,6 +1808,7 @@ type RunwayGridBodyProps = {
   heatmapOpts: HeatmapColorOpts;
   riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
+  techWorkloadScope: TechWorkloadScope;
   todayYmd: string;
   dimPastDays: boolean;
   shimmer: boolean;
@@ -1833,6 +1854,7 @@ function RunwayGridBody({
   heatmapOpts,
   riskTuning,
   viewMode,
+  techWorkloadScope,
   todayYmd,
   dimPastDays,
   shimmer,
@@ -1866,7 +1888,7 @@ function RunwayGridBody({
     setPostSweep(false);
     const t = window.setTimeout(() => setPostSweep(true), SWOOSH_POST_MS);
     return () => clearTimeout(t);
-  }, [reduceMotion, viewMode]);
+  }, [reduceMotion, viewMode, techWorkloadScope]);
 
   const firstCompareCalendarMonthKey = useMemo(
     () => firstCalendarMonthKeyFromSections(sections),
@@ -1969,6 +1991,7 @@ function RunwayGridBody({
                           heatmapOpts={heatmapOpts}
                           riskTuning={riskTuning}
                           viewMode={viewMode}
+                          techWorkloadScope={techWorkloadScope}
                           todayYmd={todayYmd}
                           dimPastDays={dimPastDays}
                           firstCalendarMonthKey={firstCompareCalendarMonthKey}
@@ -1984,6 +2007,7 @@ function RunwayGridBody({
                           heatmapOpts={heatmapOpts}
                           riskTuning={riskTuning}
                           viewMode={viewMode}
+                          techWorkloadScope={techWorkloadScope}
                           todayYmd={todayYmd}
                           dimPastDays={dimPastDays}
                           shimmer={shimmer}
@@ -2036,6 +2060,7 @@ function RunwayGridBody({
                   market={country}
                   riskByDate={singleRiskByDate!}
                   viewMode={viewMode}
+                  techWorkloadScope={techWorkloadScope}
                   riskTuning={riskTuning}
                   onSlotSelection={onSlotSelection}
                   disabled={heatmap3d}
@@ -2051,6 +2076,7 @@ function RunwayGridBody({
                     heatmapOpts={heatmapOpts}
                     riskTuning={riskTuning}
                     viewMode={viewMode}
+                    techWorkloadScope={techWorkloadScope}
                     todayYmd={todayYmd}
                     dimPastDays={dimPastDays}
                     openDayDetailsFromCell={makeShowTip(country, singleRiskByDate!, marketConfig)}
@@ -2065,6 +2091,7 @@ function RunwayGridBody({
                     heatmapOpts={heatmapOpts}
                     riskTuning={riskTuning}
                     viewMode={viewMode}
+                    techWorkloadScope={techWorkloadScope}
                     todayYmd={todayYmd}
                     dimPastDays={dimPastDays}
                     shimmer={shimmer}

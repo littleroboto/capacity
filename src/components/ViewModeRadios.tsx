@@ -19,6 +19,10 @@ export type ViewModeRadiosProps = {
    * Use on LIOM to offer Technology Teams / Restaurant Activity without Code.
    */
   allowedIds?: readonly ViewModeId[];
+  /**
+   * Omit outer chrome (border, muted background, top margin). Parent supplies the frame — e.g. workbench combined lens control.
+   */
+  unstyled?: boolean;
 };
 
 export function ViewModeRadios({
@@ -32,6 +36,7 @@ export function ViewModeRadios({
   className,
   idSuffix = 'default',
   allowedIds,
+  unstyled = false,
 }: ViewModeRadiosProps) {
   const visibleModes =
     allowedIds?.length ?
@@ -47,8 +52,11 @@ export function ViewModeRadios({
       aria-labelledby={labelledBy}
       aria-label={labelledBy ? undefined : 'View mode'}
       className={cn(
-        'flex flex-wrap gap-x-1 gap-y-1 rounded-lg border border-border/80 bg-muted/20 md:gap-x-0 md:gap-y-1',
-        compact ? 'p-0.5' : 'mt-2 p-2',
+        'flex flex-wrap gap-x-1 gap-y-1 md:gap-x-0 md:gap-y-1',
+        !unstyled && 'rounded-lg border border-border/80 bg-muted/20',
+        !unstyled && (compact ? 'p-0.5' : 'mt-2 p-2'),
+        unstyled && !compact && 'gap-y-0.5',
+        unstyled && compact && 'p-0',
         className
       )}
     >

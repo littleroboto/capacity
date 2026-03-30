@@ -3,7 +3,7 @@ import { useDrag } from '@use-gesture/react';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import type { ViewModeId } from '@/lib/constants';
-import { heatmapCellMetric } from '@/lib/runwayViewMetrics';
+import { heatmapCellMetric, type TechWorkloadScope } from '@/lib/runwayViewMetrics';
 import type { PlacedRunwayCell } from '@/lib/calendarQuarterLayout';
 import type { SlotSelection } from '@/components/RunwayGrid';
 
@@ -19,6 +19,7 @@ type SlotOverlayProps = {
   market: string;
   riskByDate: Map<string, RiskRow>;
   viewMode: ViewModeId;
+  techWorkloadScope: TechWorkloadScope;
   riskTuning: RiskModelTuning;
   onSlotSelection: (s: SlotSelection | null) => void;
   /**
@@ -61,6 +62,7 @@ export function SlotOverlay({
   market,
   riskByDate,
   viewMode,
+  techWorkloadScope,
   riskTuning,
   onSlotSelection,
   disabled = false,
@@ -101,7 +103,7 @@ export function SlotOverlay({
       let maxR = 0;
       for (const d of picked) {
         const row = riskByDate.get(d);
-        const rv = row ? heatmapCellMetric(row, viewMode, riskTuning) : 0;
+        const rv = row ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope) : 0;
         sum += rv;
         n += 1;
         maxR = Math.max(maxR, rv);
@@ -114,7 +116,19 @@ export function SlotOverlay({
         maxPressure: maxR,
       });
     },
-    [cellSize, hitH, market, onSlotSelection, outerRef, placedCells, riskByDate, riskTuning, scrollTopRef, viewMode]
+    [
+      cellSize,
+      hitH,
+      market,
+      onSlotSelection,
+      outerRef,
+      placedCells,
+      riskByDate,
+      riskTuning,
+      scrollTopRef,
+      techWorkloadScope,
+      viewMode,
+    ]
   );
 
   useDrag(

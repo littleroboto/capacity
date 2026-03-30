@@ -10,7 +10,7 @@ type RightPanelSectionProps = {
   belowTitleMeta?: ReactNode;
   /** Shown under the title when collapsed. */
   collapsedSummary?: ReactNode;
-  /** Extra controls in the header row (e.g. Reset, Syntax reference). */
+  /** Extra controls in the header row (e.g. Reset). */
   headerExtras?: ReactNode;
   children: ReactNode;
   className?: string;

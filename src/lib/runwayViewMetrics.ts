@@ -1,11 +1,87 @@
+import type { PressureSurfaceId } from '@/domain/pressureSurfaces';
+import { emptySurfaceSlice, emptySurfaceTotals, mergeSurfaceSlices } from '@/domain/pressureSurfaces';
 import type { RiskRow } from '@/engine/riskModel';
 import { DEFAULT_RISK_TUNING, STORE_PRESSURE_MAX, type RiskModelTuning } from '@/engine/riskModelTuning';
 import type { ViewModeId } from '@/lib/constants';
 
+/** Technology heatmap: all scheduled tech load, BAU surface only, or non-BAU (programmes, campaigns, coordination, carryover). */
+export type TechWorkloadScope = 'all' | 'bau' | 'project';
+
+const TECH_BAU_SURFACES: readonly PressureSurfaceId[] = ['bau'];
+
+const TECH_PROJECT_SURFACES: readonly PressureSurfaceId[] = [
+  'change',
+  'campaign',
+  'coordination',
+  'carryover',
+];
+
+function techDemandRatioFromMergedLoads(
+  row: RiskRow,
+  merged: { lab_readiness: number; lab_sustain: number; team_readiness: number; team_sustain: number; backend_readiness: number; backend_sustain: number }
+): number {
+  const labsCap = row.labs_effective_cap ?? 0;
+  const teamsCap = row.teams_effective_cap ?? 0;
+  const backCap = row.backend_effective_cap ?? 0;
+  const labL = merged.lab_readiness + merged.lab_sustain;
+  const teamL = merged.team_readiness + merged.team_sustain;
+  const backL = merged.backend_readiness + merged.backend_sustain;
+  const labR = labsCap > 0 ? labL / labsCap : 0;
+  const teamR = teamsCap > 0 ? teamL / teamsCap : 0;
+  const backR = backCap > 0 ? backL / backCap : 0;
+  return Math.max(0, labR, teamR, backR * 0.5);
+}
+
+/** Uncapped tech demand ratio from the union of the given pressure surfaces (same formula as {@link RiskRow.tech_demand_ratio}). */
+export function technologyHeatmapMetricForSurfaces(
+  row: RiskRow,
+  surfaces: readonly PressureSurfaceId[]
+): number {
+  const totals = row.surfaceTotals ?? emptySurfaceTotals();
+  const slices = surfaces.map((id) => totals[id] ?? emptySurfaceSlice());
+  const merged = mergeSurfaceSlices(...slices);
+  return techDemandRatioFromMergedLoads(row, merged);
+}
+
+/** Heading above the runway for the Technology lens + workload scope. */
+export function technologyRunwayTitleForWorkloadScope(scope: TechWorkloadScope): string {
+  switch (scope) {
+    case 'bau':
+      return 'BAU only';
+    case 'project':
+      return 'Project work';
+    default:
+      return 'Combined tech load';
+  }
+}
+
+/** Day-details headline for the cell fill % in Technology lens. */
+export function technologyFillMetricHeadline(scope: TechWorkloadScope): string {
+  return technologyRunwayTitleForWorkloadScope(scope);
+}
+
+/** Day-details explainer under the headline for Technology lens. */
+export function technologyFillMetricLabel(scope: TechWorkloadScope): string {
+  switch (scope) {
+    case 'bau':
+      return 'BAU only—routine BAU and weekly tech rhythm; labs, teams, and backend versus capacity';
+    case 'project':
+      return 'Project work only—campaigns, tech programmes, releases, coordination, and carryover versus capacity';
+    default:
+      return 'Combined load—scheduled work on labs, field teams, and backend versus each lane’s capacity';
+  }
+}
+
 /** Technology lens: uncapped demand vs caps (can exceed 1); heatmap colour still clamps for the ramp. */
-export function technologyHeatmapMetric(row: RiskRow): number {
-  const u = row.tech_demand_ratio ?? row.tech_pressure ?? 0;
-  return Math.max(0, u);
+export function technologyHeatmapMetric(row: RiskRow, scope: TechWorkloadScope = 'all'): number {
+  if (scope === 'all') {
+    const u = row.tech_demand_ratio ?? row.tech_pressure ?? 0;
+    return Math.max(0, u);
+  }
+  if (scope === 'bau') {
+    return technologyHeatmapMetricForSurfaces(row, TECH_BAU_SURFACES);
+  }
+  return technologyHeatmapMetricForSurfaces(row, TECH_PROJECT_SURFACES);
 }
 
 /**
@@ -14,15 +90,16 @@ export function technologyHeatmapMetric(row: RiskRow): number {
 export function heatmapCellMetric(
   row: RiskRow,
   mode: ViewModeId,
-  tuning: RiskModelTuning = DEFAULT_RISK_TUNING
+  tuning: RiskModelTuning = DEFAULT_RISK_TUNING,
+  techWorkloadScope: TechWorkloadScope = 'all'
 ): number {
   switch (mode) {
     case 'combined':
-      return technologyHeatmapMetric(row);
+      return technologyHeatmapMetric(row, techWorkloadScope);
     case 'in_store':
       return inStoreHeatmapMetric(row, tuning);
     default:
-      return technologyHeatmapMetric(row);
+      return technologyHeatmapMetric(row, techWorkloadScope);
   }
 }
 

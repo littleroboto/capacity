@@ -56,6 +56,9 @@ function clampList<T>(items: T[], max: number): { shown: T[]; more: number } {
   return { shown: items.slice(0, max), more: items.length - max };
 }
 
+/** Side-panel markdown: show full programme/campaign names without the popover’s short list cap. */
+const LENS_PRIMARY_LIST_MAX = 50;
+
 function SectionTitle({
   children,
   className,
@@ -324,6 +327,9 @@ export function RunwayDayDetailsPayloadBody({
   const fg = foregroundOnHeatmapFill(p.cellFillHex);
   const camps = clampList(p.activeCampaigns, 4);
   const techProgs = clampList(p.activeTechProgrammes, 4);
+  const primaryTech = clampList(p.activeTechProgrammes, LENS_PRIMARY_LIST_MAX);
+  const primaryCamps = clampList(p.activeCampaigns, LENS_PRIMARY_LIST_MAX);
+  const primaryTechInline = clampList(p.activeTechProgrammes, 12);
   const wins = clampList(p.operatingWindows, 3);
   const bau = clampList(p.bauToday, 3);
   const fillGlossary = glossaryFillScore(p.viewMode);
@@ -424,6 +430,42 @@ export function RunwayDayDetailsPayloadBody({
       )}
 
       <div className={bodyPad}>
+        {presentation === 'markdown' && p.viewMode === 'combined' ? (
+          <>
+            <h3 className="mt-5 text-sm font-semibold tracking-tight text-foreground">Tech programmes</h3>
+            {primaryTech.shown.length > 0 ? (
+              <BulletList items={primaryTech.shown} presentation={presentation} />
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">None scheduled on this day.</p>
+            )}
+            {primaryTech.more > 0 ? (
+              <p className="mt-1 text-xs italic text-muted-foreground">+{primaryTech.more} more</p>
+            ) : null}
+          </>
+        ) : null}
+
+        {presentation === 'markdown' && p.viewMode === 'in_store' ? (
+          <>
+            <h3 className="mt-5 text-sm font-semibold tracking-tight text-foreground">Marketing campaigns</h3>
+            {primaryCamps.shown.length > 0 ? (
+              <BulletList items={primaryCamps.shown} presentation={presentation} />
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">None on the calendar for this day.</p>
+            )}
+            {primaryCamps.more > 0 ? (
+              <p className="mt-1 text-xs italic text-muted-foreground">+{primaryCamps.more} more</p>
+            ) : null}
+            {primaryTechInline.shown.length > 0 ? (
+              <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                <span className="font-semibold text-foreground">Tech programmes (engineering only): </span>
+                {primaryTechInline.shown.join(' · ')}
+                {primaryTechInline.more > 0 ? ` · +${primaryTechInline.more} more` : null}
+                <span className="text-muted-foreground/90"> — no store marketing uplift.</span>
+              </p>
+            ) : null}
+          </>
+        ) : null}
+
         {presentation === 'markdown' ? (
           <>
             <h3 className="mt-6 text-sm font-semibold tracking-tight text-foreground first:mt-0">
@@ -448,7 +490,7 @@ export function RunwayDayDetailsPayloadBody({
           <ContributorsBlock p={p} presentation={presentation} />
         )}
 
-        {camps.shown.length > 0 ? (
+        {camps.shown.length > 0 && presentation !== 'markdown' ? (
           <>
             <SectionTitle presentation={presentation}>Campaigns on the calendar</SectionTitle>
             <BulletList items={camps.shown} presentation={presentation} />
@@ -458,7 +500,7 @@ export function RunwayDayDetailsPayloadBody({
           </>
         ) : null}
 
-        {techProgs.shown.length > 0 ? (
+        {techProgs.shown.length > 0 && presentation !== 'markdown' ? (
           p.viewMode === 'combined' ? (
             <>
               <SectionTitle presentation={presentation}>Tech programmes (no marketing uplift)</SectionTitle>
@@ -468,12 +510,7 @@ export function RunwayDayDetailsPayloadBody({
               ) : null}
             </>
           ) : (
-            <p
-              className={cn(
-                'text-muted-foreground',
-                presentation === 'markdown' ? 'mt-6 text-sm leading-relaxed' : 'mt-4 text-[11px] leading-snug'
-              )}
-            >
+            <p className="mt-4 text-[11px] leading-snug text-muted-foreground">
               <span className="font-semibold text-foreground">Engineering-only windows: </span>
               {techProgs.shown.join(' · ')}
               {techProgs.more > 0 ? ` · +${techProgs.more} more` : null}
