@@ -1,4 +1,5 @@
 import llmMarketDslPromptSource from '../../../docs/LLM_MARKET_DSL_PROMPT.md?raw';
+import llmMarketDslSchemaCompactSource from '../../../docs/LLM_MARKET_DSL_SCHEMA_COMPACT.md?raw';
 
 /** Extract the canonical SYSTEM / INSTRUCTIONS body (between ## SYSTEM / INSTRUCTIONS and the next ## section). */
 export function extractSystemInstructions(markdown: string): string {
@@ -26,9 +27,30 @@ You must:
 
 ## Machine-readable edit (required every turn)
 
-After your short explanation to the user (plain language, optional markdown), use **one** of the following (never both in the same message).
+After your short explanation to the user (plain language, optional markdown), use **one** primary mechanism below. **Prefer small output:** use JSON patches whenever the change can be done with exact substring replacements from CURRENT_YAML; reserve full-buffer mechanisms for wide rewrites.
 
-### A) Streaming full YAML (preferred for Code view — the editor updates live)
+### A) JSON edit (**default** — surgical updates, smallest response)
+
+Output a **single line** exactly:
+
+<<<DSL_EDIT_JSON>>>
+
+followed immediately by **one JSON object** (no markdown fence) with one of these shapes:
+
+1) **Patches (strongly preferred for localized edits):** {"kind":"patches","patches":[{"type":"replace","old":"<exact substring from CURRENT_YAML>","new":"<replacement>"},...]}
+   - At most 40 patches. Apply in order. Each "old" must appear **exactly once** in CURRENT_YAML at the time that patch runs (after prior patches).
+   - Copy "old" verbatim from CURRENT_YAML (including indentation and line breaks). Prefer one patch per logical change; split large unrelated edits across multiple patches.
+
+2) **Full buffer (when patches are impractical):** {"kind":"full_yaml","yaml":"<complete YAML>"}
+   - Use when restructuring most of the file, reordering many documents, or when patches would be fragile.
+
+**Alternate form (also accepted):** after your explanation, put **only** that JSON object inside a markdown \`\`\`json fenced block (you may omit the \`<<<DSL_EDIT_JSON>>>\` line). Use valid JSON: double-quoted keys and strings.
+
+Do not put machine output before your explanation. The human-readable part comes first; then the delimiter and/or fenced JSON payload.
+
+### B) Streaming full YAML (only when you intentionally replace the whole buffer)
+
+Use **only** when the user asked for a full rewrite or the file is small and patches would not reduce output meaningfully.
 
 Output a **single line** exactly:
 
@@ -38,25 +60,13 @@ Then on the **next line**, output the **complete** YAML for the entire editor bu
 - For a multi-document bundle (all markets), separate documents with a line containing only --- ; leave unrelated markets unchanged except where the user asked.
 - Do not wrap the YAML in markdown fences.
 - Do not repeat the explanation after the marker.
-
-### B) JSON edit (when tiny surgical changes are easier than rewriting the whole buffer)
-
-Output a **single line** exactly:
-
-<<<DSL_EDIT_JSON>>>
-
-followed immediately by **one JSON object** (no markdown fence) with one of these shapes:
-
-1) Patches: {"kind":"patches","patches":[{"type":"replace","old":"<exact substring from CURRENT_YAML>","new":"<replacement>"},...]}
-   - At most 20 patches. Each "old" must appear **exactly once** in CURRENT_YAML.
-
-2) Full buffer: {"kind":"full_yaml","yaml":"<complete YAML>"}
-
-Do not put machine output before your explanation. The human-readable part comes first; then the delimiter and payload.`;
+- **Never** paste prompt delimiters into the YAML: do not output lines that are only \`<<<END>>>\`, \`<<<CURRENT_YAML>>>\`, \`<<<DSL_YAML_STREAM>>>\`, or \`<<<DSL_EDIT_JSON>>>\` (those appear only in the chat protocol, not in market files).
+- The **Compact schema** block in your instructions lists keys, shapes, and aliases—follow it for every natural-language edit; full narrative examples are not duplicated there.`;
 
 export function getDslAssistantSystemPrompt(): string {
   const base = extractSystemInstructions(llmMarketDslPromptSource);
-  return `${base}\n\n---\n\n${PRODUCT_EMBEDDED_BLOCK}`;
+  const schema = llmMarketDslSchemaCompactSource.trim();
+  return `${base}\n\n---\n\n${schema}\n\n---\n\n${PRODUCT_EMBEDDED_BLOCK}`;
 }
 
 export const CURRENT_YAML_START = '<<<CURRENT_YAML>>>';

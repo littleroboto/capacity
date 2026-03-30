@@ -20,11 +20,15 @@ import {
 import {
   applyReplacePatches,
   assistantContentForDisplay,
+  assistantHasYamlStreamMarker,
   DSL_EDIT_MARKER,
   DSL_YAML_STREAM_MARKER,
+  mapPatchFocusToNormalizedBuffer,
   parseDslEditPayload,
+  patchFocusCharRangeInPatchedText,
   yamlStreamBufferFromAssistantAccumulated,
 } from '@/lib/dslAssistant/editJson';
+import { normalizeAssistantYaml } from '@/lib/dslAssistant/normalizeAssistantYaml';
 import {
   commitProposedEditorBuffer,
   validateProposedEditorBuffer,
@@ -45,14 +49,28 @@ import { cn } from '@/lib/utils';
 import { useAtcStore } from '@/store/useAtcStore';
 import { BookOpen, KeyRound, Loader2, Send, Square, Eye, EyeOff, Terminal } from 'lucide-react';
 
-const SESSION_KEY = 'cpm_openai_api_key';
+/** Persists across browser sessions (localStorage). Legacy sessionStorage value is migrated once. */
+const OPENAI_API_KEY_STORAGE_KEY = 'cpm_openai_api_key';
 const MAX_USER_CHARS = 8000;
 /** Prior user/assistant pairs in the API payload (excludes the current turn, which is sent as CURRENT_YAML + request). */
 const ASSISTANT_API_HISTORY_MESSAGE_CAP = 28;
 
 function readStoredApiKey(): string {
   try {
-    return sessionStorage.getItem(SESSION_KEY) ?? '';
+    let v = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) ?? '';
+    if (!v.trim()) {
+      const legacy = sessionStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) ?? '';
+      if (legacy.trim()) {
+        v = legacy.trim();
+        try {
+          localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, v);
+          sessionStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
+        } catch {
+          /* localStorage unavailable (e.g. private mode); keep using in-memory / legacy */
+        }
+      }
+    }
+    return v;
   } catch {
     return '';
   }
@@ -82,6 +100,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
   const parseError = useAtcStore((s) => s.parseError);
   const setDslText = useAtcStore((s) => s.setDslText);
   const setDslAssistantEditorLock = useAtcStore((s) => s.setDslAssistantEditorLock);
+  const requestDslEditorReveal = useAtcStore((s) => s.requestDslEditorReveal);
 
   const [apiKey, setApiKey] = useState(readStoredApiKey);
   /** When false and a key exists, the key field + note are hidden (use header “API key” to expand). */
@@ -114,8 +133,13 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
 
   const persistKey = useCallback(() => {
     try {
-      if (apiKey.trim()) sessionStorage.setItem(SESSION_KEY, apiKey.trim());
-      else sessionStorage.removeItem(SESSION_KEY);
+      if (apiKey.trim()) {
+        localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, apiKey.trim());
+        sessionStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
+      } else {
+        localStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
+        sessionStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
+      }
     } catch {
       /* ignore */
     }
@@ -195,63 +219,78 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
   const finishAssistantResponse = useCallback(
     (assistantRaw: string, snapshot: string) => {
       const streamedYaml = yamlStreamBufferFromAssistantAccumulated(assistantRaw).yaml;
-      const hadYamlMarker = assistantRaw.includes(DSL_YAML_STREAM_MARKER);
-      if (hadYamlMarker && streamedYaml !== null && streamedYaml.trim().length > 0) {
-        const finalYaml = streamedYaml;
-        setDslText(finalYaml);
-        setStatus('Applying edit…');
-        const v = validateProposedEditorBuffer(finalYaml);
-        if (!v.ok) {
-          setDslText(snapshot);
-          setStatus('Parse check: failed — see error');
-          setStatusDetail(v.error);
+      const hadYamlMarker = assistantHasYamlStreamMarker(assistantRaw);
+      const payload = parseDslEditPayload(assistantRaw);
+
+      /** Prefer JSON patches → JSON full_yaml → streaming YAML (legacy / full rewrites). */
+      const applyProposed = (
+        proposed: string,
+        opts?: { scrollToNormalizedRange?: { start: number; end: number } | null }
+      ) => {
+        if (docked) {
+          setDslText(proposed);
+          setStatus('Applying edit…');
+          const v = validateProposedEditorBuffer(proposed);
+          if (!v.ok) {
+            setDslText(snapshot);
+            setStatus('Parse check: failed — see error');
+            setStatusDetail(v.error);
+            return;
+          }
+          commitProposedEditorBuffer(proposed);
+          setStatus('Parse check: OK');
+          setStatusDetail(null);
+          const range = opts?.scrollToNormalizedRange;
+          if (range && range.start >= 0) {
+            requestDslEditorReveal(range.start, Math.max(range.end, range.start + 1));
+          }
+        } else {
+          openPreview(snapshot, proposed);
+        }
+      };
+
+      if (payload?.kind === 'patches') {
+        const r = applyReplacePatches(snapshot, payload.patches);
+        if (r.ok) {
+          const normalized = normalizeAssistantYaml(r.text);
+          const focus = patchFocusCharRangeInPatchedText(snapshot, payload.patches);
+          const mapped =
+            docked && focus ? mapPatchFocusToNormalizedBuffer(r.text, normalized, focus) : null;
+          applyProposed(r.text, {
+            scrollToNormalizedRange: mapped,
+          });
           return;
         }
-        commitProposedEditorBuffer(finalYaml);
-        setStatus('Parse check: OK');
-        setStatusDetail(null);
-        return;
-      }
-
-      const payload = parseDslEditPayload(assistantRaw);
-      if (!payload) {
-        setStatus('Idle');
-        setStatusDetail(
-          docked
-            ? `No edit payload found. Ask the model to use ${DSL_YAML_STREAM_MARKER} or ${DSL_EDIT_MARKER}.`
-            : 'No structured edit in the reply (missing ' + DSL_EDIT_MARKER + ').'
-        );
-        return;
-      }
-      let proposed: string;
-      if (payload.kind === 'full_yaml') {
-        proposed = payload.yaml;
-      } else {
-        const r = applyReplacePatches(snapshot, payload.patches);
-        if (!r.ok) {
+        // Fall through to YAML stream or report patch error if nothing else applies.
+        if (!hadYamlMarker || streamedYaml === null || streamedYaml.trim().length === 0) {
           setStatus('Idle');
           setStatusDetail(r.error);
           return;
         }
-        proposed = r.text;
       }
-      if (docked) {
-        setStatus('Applying edit…');
-        const v = validateProposedEditorBuffer(proposed);
-        if (!v.ok) {
-          setDslText(snapshot);
-          setStatus('Parse check: failed — see error');
-          setStatusDetail(v.error);
-          return;
-        }
-        commitProposedEditorBuffer(proposed);
-        setStatus('Parse check: OK');
-        setStatusDetail(null);
-      } else {
-        openPreview(snapshot, proposed);
+
+      if (payload?.kind === 'full_yaml') {
+        applyProposed(payload.yaml);
+        return;
+      }
+
+      if (hadYamlMarker && streamedYaml !== null && streamedYaml.trim().length > 0) {
+        applyProposed(streamedYaml);
+        return;
+      }
+
+      if (!payload) {
+        setStatus('Idle');
+        setStatusDetail(
+          docked
+            ? `No valid edit found. The reply must include ${DSL_EDIT_MARKER} plus JSON, or the same JSON inside a markdown json code fence, or ${DSL_YAML_STREAM_MARKER} plus the full YAML. Expected shapes: {"kind":"patches","patches":[{"type":"replace","old":"…","new":"…"}]} or {"kind":"full_yaml","yaml":"…"}.`
+            : 'No structured edit in the reply — use ' +
+                DSL_EDIT_MARKER +
+                ' or a json code block with kind/patches or kind/full_yaml.'
+        );
       }
     },
-    [docked, openPreview, setDslText]
+    [docked, openPreview, requestDslEditorReveal, setDslText]
   );
 
   const send = useCallback(async () => {
@@ -305,6 +344,8 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
           acc += d;
           setStreamingAssistant(acc);
           if (docked) {
+            // Once the model commits to JSON patches, do not stream full YAML into Monaco (avoids whole-buffer churn).
+            if (acc.includes(DSL_EDIT_MARKER)) return;
             const { yaml } = yamlStreamBufferFromAssistantAccumulated(acc);
             if (yaml !== null) {
               pendingYamlRef.current = yaml;
@@ -319,8 +360,10 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
 
       flushYamlRaf();
       if (docked) {
-        const { yaml } = yamlStreamBufferFromAssistantAccumulated(acc);
-        if (yaml !== null) setDslText(yaml);
+        if (!acc.includes(DSL_EDIT_MARKER)) {
+          const { yaml } = yamlStreamBufferFromAssistantAccumulated(acc);
+          if (yaml !== null) setDslText(yaml);
+        }
       }
 
       const assistantMsg: ThreadMsg = { id: crypto.randomUUID(), role: 'assistant', content: acc };
@@ -485,7 +528,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
             <div className="flex shrink-0 flex-col gap-2 rounded-md border border-border/50 bg-muted/15 px-2.5 py-2 dark:bg-muted/10">
               <div className="flex items-center gap-2">
                 <Label htmlFor={`${threadId}-key`} className="sr-only">
-                  API key (session only)
+                  OpenAI API key
                 </Label>
                 <input
                   id={`${threadId}-key`}
@@ -534,7 +577,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
                 ) : null}
               </div>
               <p className="text-[9px] leading-snug text-muted-foreground">
-                Session-only in this tab; sent only to OpenAI from your browser.
+                Saved in this browser (local storage); sent only to OpenAI from your machine.
               </p>
             </div>
           ) : null}
@@ -670,7 +713,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
               <>
                 <div className="space-y-1">
                   <Label htmlFor={`${threadId}-key-panel`} className="text-[11px] text-muted-foreground">
-                    API key (session only)
+                    API key
                   </Label>
                   <div className="flex gap-1.5">
                     <input
@@ -695,9 +738,9 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
                     </Button>
                   </div>
                   <p className="text-[10px] leading-snug text-muted-foreground">
-                    Stored in this browser tab session only (not on disk by default). Your key never leaves your
-                    machine except to OpenAI. Static sites cannot hide secrets from the device owner — BYOK risk is
-                    accepted.
+                    Stored in this browser&apos;s local storage until you clear site data or remove it here. Your key
+                    never leaves your machine except to OpenAI. Static sites cannot hide secrets from the device owner
+                    — BYOK risk is accepted.
                   </p>
                 </div>
 
@@ -709,7 +752,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
                     className="h-8 flex-1 text-xs"
                     onClick={persistKeyAndCollapse}
                   >
-                    Save key to session
+                    Save key
                   </Button>
                   {hasApiKey ? (
                     <Button
@@ -853,7 +896,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
 function AssistantBubble({ content, streaming }: { content: string; streaming?: boolean }) {
   const shown = assistantContentForDisplay(content);
   const machine = content.includes(DSL_EDIT_MARKER);
-  const yamlStreaming = Boolean(streaming && content.includes(DSL_YAML_STREAM_MARKER));
+  const yamlStreaming = Boolean(streaming && assistantHasYamlStreamMarker(content));
   return (
     <div className="mt-0.5 space-y-1">
       {shown ? (

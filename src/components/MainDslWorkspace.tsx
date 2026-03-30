@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { DslAssistantPanel } from '@/components/DslAssistantPanel';
-import { DslEditorCore, DslSyntaxHelpBody } from '@/components/DslEditorCore';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { DslEditorCore } from '@/components/DslEditorCore';
 import { cn } from '@/lib/utils';
 import { GripHorizontal } from 'lucide-react';
 
@@ -31,7 +23,6 @@ function readDockHeight(): number {
 
 /** Full-width IDE layout: Monaco + resizable assistant dock (single main column). */
 export function MainDslWorkspace() {
-  const [syntaxOpen, setSyntaxOpen] = useState(false);
   const [dockHeight, setDockHeight] = useState(readDockHeight);
   const [maxDockPx, setMaxDockPx] = useState(560);
   const [dragging, setDragging] = useState(false);
@@ -127,7 +118,6 @@ export function MainDslWorkspace() {
         initialFontSize={16}
         showApplyButton={false}
         editorChrome="studio"
-        onSyntaxReference={() => setSyntaxOpen(true)}
       />
 
       <div
@@ -183,22 +173,6 @@ export function MainDslWorkspace() {
       >
         <DslAssistantPanel layout="dock" />
       </div>
-
-      <Dialog open={syntaxOpen} onOpenChange={setSyntaxOpen}>
-        <DialogContent className="max-h-[min(85dvh,720px)] gap-0 overflow-hidden sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>DSL syntax reference</DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[55vh] overflow-y-auto py-2">
-            <DslSyntaxHelpBody />
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="secondary" onClick={() => setSyntaxOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

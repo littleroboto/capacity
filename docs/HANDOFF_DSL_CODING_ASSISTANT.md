@@ -24,7 +24,7 @@ The assistant must **not** invent or “normalize” **dates**, **holiday lists*
 
 | Concern | Location |
 | --- | --- |
-| **Authoring rules for the LLM** | [`docs/LLM_MARKET_DSL_PROMPT.md`](./LLM_MARKET_DSL_PROMPT.md) — treat the **SYSTEM / INSTRUCTIONS** block as the canonical system prompt; ship it verbatim or load it at build time. |
+| **Authoring rules for the LLM** | [`docs/LLM_MARKET_DSL_PROMPT.md`](./LLM_MARKET_DSL_PROMPT.md) (§A–§H) + [`docs/LLM_MARKET_DSL_SCHEMA_COMPACT.md`](./LLM_MARKET_DSL_SCHEMA_COMPACT.md) — `getDslAssistantSystemPrompt()` concatenates those with the **product protocol**. Keep the compact schema aligned with the parser when keys change. |
 | **Schema & behaviour** | [`docs/MARKET_DSL_AND_PIPELINE.md`](./MARKET_DSL_AND_PIPELINE.md), parser `src/engine/yamlDslParser.ts`, types `src/engine/types.ts`. |
 | **Editor buffer** | Zustand `useAtcStore`: `dslText` / `setDslText` — the assistant **must** read and write through this so `DslEditorCore` stays the single source of truth. |
 | **Code view shell** | `src/components/MainDslWorkspace.tsx`, `src/components/DslEditorCore.tsx`. |
@@ -38,7 +38,7 @@ The assistant must **not** invent or “normalize” **dates**, **holiday lists*
 - **Hosting:** GitHub Pages (static). **No server-side secret.** The user **pastes their own API key** in the UI.
 - **Provider (v1):** OpenAI Chat Completions or Responses API with **streaming**.
 - **Future:** Second provider (e.g. Google) behind a small **provider interface** (`OpenAIClient` / `GoogleClient`) so the rest of the UI is unchanged.
-- **Key handling:** Store key in **`sessionStorage` or in-memory only** (not `localStorage` unless the product owner explicitly wants persistence across sessions). Never log the key; never put it in URLs or analytics. Show a short **security note**: key stays in this browser session; static site cannot hide it from the user’s machine—BYOK risk is accepted.
+- **Key handling:** Store key in **`localStorage`** (persists across sessions) with a one-time migration from legacy `sessionStorage`. Never log the key; never put it in URLs or analytics. Show a short **security note**: key stays on this browser until cleared; static site cannot hide it from the user’s machine—BYOK risk is accepted.
 - **CORS:** Implement against the real OpenAI browser contract (or document a **tiny optional proxy** if platform policy blocks browser calls—only if needed; the goal is static-first).
 
 ---

@@ -4,6 +4,8 @@ Use the **SYSTEM / INSTRUCTIONS** block below as a **system** or **developer** m
 
 **Ground truth:** Parser `src/engine/yamlDslParser.ts` → `MarketConfig` in `src/engine/types.ts`. Behaviour: `docs/MARKET_DSL_AND_PIPELINE.md`, `docs/CAPACITY-RUNWAY.md`, `docs/DSL_CAMPAIGNS_AND_TRADING.md`.
 
+**In-app Code assistant:** `getDslAssistantSystemPrompt()` sends **(1)** SYSTEM / INSTRUCTIONS (§A–§H below), **(2)** **[`LLM_MARKET_DSL_SCHEMA_COMPACT.md`](./LLM_MARKET_DSL_SCHEMA_COMPACT.md)** (dense tables + minimal YAML), **(3)** the machine-readable edit protocol (`<<<DSL_YAML_STREAM>>>`, etc.). The long **Schema overview → Defaults** sections in *this* file are the human-readable expansion—**keep the compact file in sync** when parser keys or shapes change.
+
 ---
 
 ## SYSTEM / INSTRUCTIONS
@@ -47,13 +49,14 @@ These rules override any urge to “complete” a calendar from memory.
 ### E. Output format
 
 1. Unless the user asks for explanation, output **only YAML** and **`#` comments** — no markdown fences around the YAML unless they explicitly want a fenced block.
-2. For **multi-market** bundles, separate documents with exactly:
+2. **Never** put protocol delimiters in YAML: no lines that are only `<<<END>>>`, `<<<CURRENT_YAML>>>`, `<<<DSL_YAML_STREAM>>>`, or `<<<DSL_EDIT_JSON>>>` (those wrap the live buffer in chat; copying them breaks the parser, e.g. `<<<END>>>` followed by `---`).
+3. For **multi-market** bundles, separate documents with exactly:
 
    ```yaml
    ---
    ```
 
-3. After adding a new market file, the project expects **`npm run generate:markets`** (or **`npm run build`**, which runs the manifest step).
+4. After adding a new market file, the project expects **`npm run generate:markets`** (or **`npm run build`**, which runs the manifest step).
 
 ### F. User vocabulary → **`tech_programmes`** vs **`campaigns`**
 
@@ -80,9 +83,49 @@ When the product sends you a **chat history** (alternating user and assistant me
 3. **Your own prior replies** (including explanations and, where present, streamed YAML or edit markers) are context for **intent and wording**; if they conflict with **`<<<CURRENT_YAML>>>`** in the newest message, **prefer the current YAML** and the **newest** user instructions.
 4. **Do not reset** to a one-shot interpretation on every turn: keep names, scope, and decisions from the thread unless the user changes them.
 
+### H. Natural-language requests (short asks → correct YAML)
+
+Users often send **brief, imperative** instructions (“add…”, “bump…”, “same as last year…”, “quiet Sundays…”). **Infer the smallest change** that satisfies the ask using the **schema sections below** (key names, shapes, aliases). **Do not** reformat or rewrite unrelated blocks.
+
+#### Route the intent → YAML block
+
+| User intent (examples) | Edit here |
+| --- | --- |
+| Promo, marketing, LTO, media, “impact”, store uplift, customer campaign | **`campaigns:`** — may use `impact`, `business_uplift`, `campaign_support`, `live_campaign_support`, `testing_prep_duration` |
+| Engineering / platform / labs+staff load **without** trading or uplift | **`tech_programmes:`** — `programme_support` / `live_programme_support`; **no** `impact` / `business_uplift` |
+| Phased **deploy** grid (`deploy_date`, `systems`, `phases`, per-phase `load`) | **`releases:`** — not the same as `tech_programmes` |
+| Busier weekends, weekday vs weekend, seasonal peak, payday, monthly pattern | **`trading:`** |
+| BAU days-in-use, weekly lab/staff cycle, integration test spike | **`bau:`** |
+| Baseline tech intensity by day of week (no dated programme) | **`tech:`** (`weekly_pattern`, optional scales) |
+| Lab / staff / testing slot caps | **`resources:`** |
+| Named date band with load or pressure multipliers | **`operating_windows:`** |
+| Bank / school holidays, explicit `dates:`, multipliers | **`public_holidays:`** / **`school_holidays:`** — **only if the user asked** (do not “fix” calendars opportunistically) |
+| Heatmap curve / γ tuning | Top-level **`risk_heatmap_*`** keys (see schema section) |
+
+If two blocks could apply, prefer **dated programme work** → `campaigns` vs `tech_programmes` using §F; prefer **rhythm / caps** → `trading` / `tech` / `resources` / `bau`.
+
+#### Syntax and robustness (avoid parse failures)
+
+1. **Every calendar field:** quoted `'YYYY-MM-DD'` (or equivalent quoted ISO). **Never** leave `YYYY-MM-DD` bare.
+2. **Indentation:** spaces only, **2 spaces** per level; **never** tab characters.
+3. Scalars with **`:`**, leading **`@`**, or ambiguous structure → **wrap in single quotes**.
+4. **Multi-document** buffers (all markets): preserve **`---`** lines; only change the `market:` document the user means unless they said “all markets”; never delete other countries’ documents.
+5. **Vague dates:** choose concrete dates consistent with the ask (e.g. “Q2” → start **`'YYYY-04-01'`** in the same year as surrounding campaigns) and **state the assumption in one short chat sentence**—still output valid YAML.
+6. **“Like X” / “duplicate”:** copy the **nearest sibling** row’s key set and indentation; change only name, dates, and loads.
+7. **Prefer surgical JSON patches:** use **`<<<DSL_EDIT_JSON>>>`** with `{"kind":"patches",...}` and **exact substrings** from **`<<<CURRENT_YAML>>>`** for localized edits (smaller output, less editor churn). Use **`<<<DSL_YAML_STREAM>>>`** or **`full_yaml`** only for wide rewrites or when patches would be fragile.
+
+#### Pre-submit checklist (every turn with an edit)
+
+- Machine-readable payload present: valid **`<<<DSL_EDIT_JSON>>>`** JSON (patches or `full_yaml`) or **`<<<DSL_YAML_STREAM>>>`** when replacing the whole buffer.
+- No protocol-only lines inside YAML (`<<<END>>>`, `<<<CURRENT_YAML>>>`, etc. — §E.2).
+- Lists/maps still balanced; **no duplicate keys** at the same indentation.
+- Holidays unchanged unless the user requested holiday changes.
+
 ---
 
 ## Schema overview (one market document)
+
+> **Maintainers:** the DSL assistant loads [`LLM_MARKET_DSL_SCHEMA_COMPACT.md`](./LLM_MARKET_DSL_SCHEMA_COMPACT.md) instead of this long section. Update that file when you change `yamlDslParser.ts` / `types.ts` shapes so the model stays accurate without huge prompts.
 
 | Section | Role |
 | --- | --- |
@@ -428,6 +471,7 @@ Paste after the system instructions, filling braces:
 
 ## Maintainer references
 
+- **LLM compact schema:** [`LLM_MARKET_DSL_SCHEMA_COMPACT.md`](./LLM_MARKET_DSL_SCHEMA_COMPACT.md) — shipped inside `getDslAssistantSystemPrompt()`; update when the DSL surface changes.
 - Parser: `src/engine/yamlDslParser.ts` — `parseYamlDSL`, `parseAllYamlDocuments`, `yamlToPipelineConfig`.
 - Types: `src/engine/types.ts` — `MarketConfig`, `CampaignConfig`, `OperatingWindow`, etc.
 - Holiday stubs: `src/engine/holidayPublicCatalog.ts`, `src/engine/holidayStubCalendar.ts`, `src/engine/holidayCalc.ts`.

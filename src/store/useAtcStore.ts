@@ -47,6 +47,7 @@ import {
   type HeatmapRenderStyle,
 } from '@/lib/riskHeatmapColors';
 import { syncRiskHeatmapVisualFromConfigs } from '@/lib/heatmapVisualFromConfigs';
+import type { TechWorkloadScope } from '@/lib/runwayViewMetrics';
 import { getAtcDsl, setAtcDsl, setStored, getStored } from '@/lib/storage';
 
 /** Debounce writes to `atc_dsl` while dragging the heatmap γ slider. */
@@ -57,6 +58,9 @@ let atcDslTechRhythmPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Debounce writes to `atc_dsl` while editing `trading.monthly_pattern`. */
 let atcDslTradingMonthlyPersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Increments so the YAML editor can react to each new scroll-to-edit request. */
+let nextDslEditorRevealId = 1;
 
 function countParsedMarkets(dsl: string): number {
   try {
@@ -109,6 +113,17 @@ type AtcState = {
   /** When true, Monaco YAML editor is read-only (DSL assistant is streaming or applying). Not persisted. */
   dslAssistantEditorLock: boolean;
   setDslAssistantEditorLock: (v: boolean) => void;
+  /**
+   * Ephemeral: Code view scrolls to this UTF-16 offset range after DSL assistant applies patches (see requestDslEditorReveal).
+   * Not persisted.
+   */
+  dslEditorRevealRequest: { id: number; start: number; end: number } | null;
+  requestDslEditorReveal: (start: number, end: number) => void;
+  /**
+   * Technology lens only: heatmap + slot selection use total tech load, BAU surface only, or project surfaces only.
+   */
+  techWorkloadScope: TechWorkloadScope;
+  setTechWorkloadScope: (v: TechWorkloadScope) => void;
   setCountry: (c: string, options?: SetCountryOptions) => void;
   setViewMode: (v: ViewModeId) => void;
   setTheme: (t: 'light' | 'dark') => void;
@@ -175,8 +190,15 @@ export const useAtcStore = create<AtcState>()(
       discoMode: false,
       runwayReturnPicker: null,
       dslAssistantEditorLock: false,
+      dslEditorRevealRequest: null,
+      techWorkloadScope: 'all',
 
       setDslAssistantEditorLock: (v) => set({ dslAssistantEditorLock: v }),
+      requestDslEditorReveal: (start, end) => {
+        const id = nextDslEditorRevealId++;
+        set({ dslEditorRevealRequest: { id, start, end } });
+      },
+      setTechWorkloadScope: (v) => set({ techWorkloadScope: v }),
 
       setCountry: (c, options?: SetCountryOptions) => {
         const nextRunwayReturnPicker =
@@ -492,8 +514,8 @@ export const useAtcStore = create<AtcState>()(
     }),
     {
       name: STORAGE_KEYS.capacity_atc,
-      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. */
-      version: 3,
+      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. v4: tech workload scope. */
+      version: 4,
       migrate: (persistedState, fromVersion) => {
         let ps = { ...(persistedState ?? {}) } as Record<string, unknown>;
         if (fromVersion < 1) {
@@ -513,6 +535,12 @@ export const useAtcStore = create<AtcState>()(
           ps = {
             ...ps,
             heatmapRenderStyle: 'spectrum',
+          };
+        }
+        if (fromVersion < 4) {
+          ps = {
+            ...ps,
+            techWorkloadScope: 'all',
           };
         }
         return ps;
@@ -559,6 +587,9 @@ export const useAtcStore = create<AtcState>()(
         );
         const theme: 'light' | 'dark' =
           base.theme === 'light' || base.theme === 'dark' ? base.theme : current.theme;
+        const tw = base.techWorkloadScope;
+        const techWorkloadScope: TechWorkloadScope =
+          tw === 'bau' || tw === 'project' || tw === 'all' ? tw : 'all';
         return {
           ...rest,
           country,
@@ -568,6 +599,7 @@ export const useAtcStore = create<AtcState>()(
           heatmapRenderStyle,
           heatmapMonoColor,
           theme,
+          techWorkloadScope,
         };
       },
       partialize: (s) => ({
@@ -580,6 +612,7 @@ export const useAtcStore = create<AtcState>()(
         runwaySvgHeatmap: s.runwaySvgHeatmap,
         heatmapRenderStyle: s.heatmapRenderStyle,
         heatmapMonoColor: s.heatmapMonoColor,
+        techWorkloadScope: s.techWorkloadScope,
       }),
     }
   )

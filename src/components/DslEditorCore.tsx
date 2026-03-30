@@ -1,9 +1,10 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as monaco from 'monaco-editor';
+import type { editor } from 'monaco-editor';
 import Editor, { type BeforeMount, type Monaco, type OnMount } from '@monaco-editor/react';
 import {
   ALargeSmall,
-  BookOpen,
   ListOrdered,
   Map,
   Play,
@@ -87,8 +88,6 @@ type DslEditorCoreProps = {
   showApplyButton?: boolean;
   /** `studio` = gradient chrome, status bar, stronger frame (main Code view). */
   editorChrome?: DslEditorChrome;
-  /** When set, studio toolbar shows a syntax reference control (e.g. open dialog). */
-  onSyntaxReference?: () => void;
 };
 
 export function DslEditorCore({
@@ -100,7 +99,6 @@ export function DslEditorCore({
   initialFontSize = DSL_EDITOR_FONT_DEFAULT,
   showApplyButton = true,
   editorChrome = 'default',
-  onSyntaxReference,
 }: DslEditorCoreProps) {
   const [fontSize, setFontSize] = useState(initialFontSize);
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on');
@@ -113,6 +111,7 @@ export function DslEditorCore({
   const dslText = useAtcStore((s) => s.dslText);
   const parseError = useAtcStore((s) => s.parseError);
   const dslAssistantEditorLock = useAtcStore((s) => s.dslAssistantEditorLock);
+  const dslEditorRevealRequest = useAtcStore((s) => s.dslEditorRevealRequest);
   const theme = useAtcStore((s) => s.theme);
   const setDslText = useAtcStore((s) => s.setDslText);
   const applyDsl = useAtcStore((s) => s.applyDsl);
@@ -154,11 +153,15 @@ export function DslEditorCore({
 
   const monacoTheme = capacityYamlThemeId(isDark);
 
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const lastRevealIdRef = useRef(0);
+
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     registerCapacityYamlThemes(monaco);
   }, []);
 
   const handleMount = useCallback<OnMount>((editor) => {
+    editorRef.current = editor;
     const sync = () => {
       const p = editor.getPosition();
       if (p) setCursorPos({ line: p.lineNumber, column: p.column });
@@ -166,6 +169,32 @@ export function DslEditorCore({
     sync();
     editor.onDidChangeCursorPosition(sync);
   }, []);
+
+  useEffect(() => {
+    const req = dslEditorRevealRequest;
+    const ed = editorRef.current;
+    if (!req || !ed) return;
+    if (req.id === lastRevealIdRef.current) return;
+    lastRevealIdRef.current = req.id;
+    const model = ed.getModel();
+    if (!model) return;
+    const run = () => {
+      const len = model.getValueLength();
+      if (len === 0) return;
+      const s = Math.max(0, Math.min(req.start, len));
+      const e = Math.max(Math.min(req.end, len), Math.min(s + 1, len));
+      const startPos = model.getPositionAt(s);
+      const endPos = model.getPositionAt(e);
+      const range = new monaco.Range(
+        startPos.lineNumber,
+        startPos.column,
+        endPos.lineNumber,
+        endPos.column
+      );
+      ed.revealRangeInCenter(range, monaco.editor.ScrollType.Smooth);
+    };
+    requestAnimationFrame(() => requestAnimationFrame(run));
+  }, [dslEditorRevealRequest, dslText]);
 
   const handleSaveScenario = () => {
     const id = saveNamedWorkspaceInteractive();
@@ -261,20 +290,6 @@ export function DslEditorCore({
             </span>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-0.5">
-            {studio && onSyntaxReference ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="mr-1 h-7 shrink-0 gap-1 px-2 text-muted-foreground hover:text-foreground"
-                onClick={onSyntaxReference}
-                aria-label="Open DSL syntax reference"
-                title="DSL syntax reference"
-              >
-                <BookOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
-                <span className="hidden text-[10px] font-medium sm:inline">Syntax</span>
-              </Button>
-            ) : null}
             {studio ? (
               <span
                 className="mr-2 hidden font-mono text-[10px] tabular-nums text-muted-foreground sm:inline"
