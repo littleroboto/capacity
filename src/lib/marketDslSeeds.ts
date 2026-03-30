@@ -97,6 +97,7 @@ holidays:
 # ----------------------
 #
 trading:
+  campaign_effect_scale: 2.5
   payday_month_peak_multiplier: 1.12
   monthly_pattern:
     Jan: 0.56
