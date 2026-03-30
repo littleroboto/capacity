@@ -39,3 +39,19 @@ export function emptySurfaceTotals(): Record<PressureSurfaceId, SurfaceLoadSlice
     carryover: emptySurfaceSlice(),
   };
 }
+
+/** Sum readiness + sustain labs/teams/backend/ops/commercial across slices (used for tech subset metrics). */
+export function mergeSurfaceSlices(...slices: SurfaceLoadSlice[]): SurfaceLoadSlice {
+  const out = emptySurfaceSlice();
+  for (const s of slices) {
+    out.lab_readiness += s.lab_readiness;
+    out.lab_sustain += s.lab_sustain;
+    out.team_readiness += s.team_readiness;
+    out.team_sustain += s.team_sustain;
+    out.backend_readiness += s.backend_readiness;
+    out.backend_sustain += s.backend_sustain;
+    out.ops += s.ops;
+    out.commercial += s.commercial;
+  }
+  return out;
+}
