@@ -28,7 +28,7 @@ export type RiskRow = CapacityRow & {
   /** Load-bearing campaign in live window. */
   campaign_in_live: boolean;
   /**
-   * Same lane logic as `tech_pressure` (max of lab, team, ½ backend vs caps) but **not** capped at 1 —
+   * Same lane logic as `tech_pressure` (max of lab, Market IT, ½ backend vs caps) but **not** capped at 1 —
    * used for the Technology heatmap and day summary so overload shows as e.g. 105%.
    */
   tech_demand_ratio: number;

@@ -1,5 +1,6 @@
 import type { PressureSurfaceId } from '@/domain/pressureSurfaces';
 import { emptySurfaceSlice, emptySurfaceTotals, type SurfaceLoadSlice } from '@/domain/pressureSurfaces';
+import { TRADING_MONTH_KEYS } from '@/lib/tradingMonthlyDsl';
 import { campaignLoadBearingPrepLiveForDate } from './campaignPrepLive';
 import { parseDate, type CalendarRow } from './calendar';
 import type { CampaignConfig, MarketConfig, PhaseLoad } from './types';
@@ -332,6 +333,33 @@ export function expandPhases(calendar: CalendarRow[], config: MarketConfig): Exp
           'readiness',
           'bau'
         );
+      }
+    }
+
+    if (tr?.support_weekly_pattern && !stripBauTechBuckets) {
+      const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][weekday];
+      const baseRaw = tr.support_weekly_pattern[dayName];
+      if (baseRaw != null && Number.isFinite(baseRaw)) {
+        const base = Math.min(1, Math.max(0, baseRaw));
+        const monthKey = TRADING_MONTH_KEYS[d.getMonth()]!;
+        const mmRaw = tr.support_monthly_pattern?.[monthKey];
+        const monthMult =
+          mmRaw != null && Number.isFinite(mmRaw) ? Math.min(1, Math.max(0, mmRaw)) : 1;
+        const scale = tr.support_teams_scale ?? 1;
+        const teams = scale * base * monthMult;
+        if (teams > 1e-9) {
+          addLoad(
+            rows,
+            date,
+            market,
+            'TechRhythm',
+            'support_pattern',
+            { labs: 0, teams, backend: 0 },
+            1,
+            'readiness',
+            'bau'
+          );
+        }
       }
     }
 

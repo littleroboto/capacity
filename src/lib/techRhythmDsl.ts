@@ -6,6 +6,9 @@ export type TechWeeklyDayKey = (typeof TECH_WEEKLY_DAY_KEYS)[number];
 
 export const TECH_WEEKLY_PATTERN_DEFAULT_UNIT = 0.5;
 
+/** Default for missing days in `tech.support_weekly_pattern` (additive teams load). */
+export const SUPPORT_WEEKLY_PATTERN_DEFAULT_UNIT = 0;
+
 export function clamp01(n: number): number {
   if (!Number.isFinite(n)) return TECH_WEEKLY_PATTERN_DEFAULT_UNIT;
   return Math.min(1, Math.max(0, n));
@@ -28,6 +31,23 @@ export function fullTechWeeklyPatternFromPartial(
   const out = {} as Record<TechWeeklyDayKey, number>;
   for (const d of TECH_WEEKLY_DAY_KEYS) {
     out[d] = roundTechUnit(coerceTechWeeklyDayValue(partial?.[d]));
+  }
+  return out;
+}
+
+function coerceSupportWeeklyDayValue(v: unknown): number {
+  if (v === undefined || v === null) return SUPPORT_WEEKLY_PATTERN_DEFAULT_UNIT;
+  const p = parseTechRhythmScalar(v);
+  return p != null ? p : SUPPORT_WEEKLY_PATTERN_DEFAULT_UNIT;
+}
+
+/** Full Mon–Sun for support weekly; missing keys → 0 (no baseline support that day). */
+export function fullSupportWeeklyPatternFromPartial(
+  partial?: Record<string, unknown> | undefined
+): Record<TechWeeklyDayKey, number> {
+  const out = {} as Record<TechWeeklyDayKey, number>;
+  for (const d of TECH_WEEKLY_DAY_KEYS) {
+    out[d] = roundTechUnit(coerceSupportWeeklyDayValue(partial?.[d]));
   }
   return out;
 }

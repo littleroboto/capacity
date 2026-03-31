@@ -10,9 +10,9 @@ export const DEFAULT_ORG_FUNCTIONS: OrgFunction[] = [
   },
   {
     id: 'delivery_teams',
-    label: 'Delivery teams',
+    label: 'Market IT',
     bucket: 'teams',
-    description: 'PO / SM / BA capacity (YAML resources.teams sum).',
+    description: 'Market-local IT delivery capacity (YAML resources.teams sum).',
   },
   {
     id: 'platform_backend',

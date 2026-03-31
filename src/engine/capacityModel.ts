@@ -1,3 +1,4 @@
+import { tradingMonthKeyFromIsoDate } from '@/lib/calendarMonthKey';
 import type { AggregatedDay } from './phaseEngine';
 import type { MarketConfig } from './types';
 
@@ -35,7 +36,17 @@ export function computeCapacity(
 ): CapacityRow[] {
   const capByMarket: Record<
     string,
-    { labs: number; testingCapacity?: number; teams: number; backend: number; holidayLabCapacityScale?: number }
+    {
+      labs: number;
+      testingCapacity?: number;
+      teams: number;
+      backend: number;
+      holidayLabCapacityScale?: number;
+      monthlyLabs?: Record<string, number>;
+      monthlyStaff?: Record<string, number>;
+      staffMonthlyAbsolute?: boolean;
+      techAvailable?: Record<string, number>;
+    }
   > = {};
   for (const c of configs) {
     capByMarket[c.market] = {
@@ -44,6 +55,10 @@ export function computeCapacity(
       teams: c.capacity.teams ?? 4,
       backend: c.capacity.backend ?? 1000,
       holidayLabCapacityScale: c.holidayLabCapacityScale,
+      monthlyLabs: c.monthlyLabsCapacityPattern,
+      monthlyStaff: c.monthlyStaffCapacityPattern,
+      staffMonthlyAbsolute: c.staffMonthlyPatternBasis === 'absolute',
+      techAvailable: c.techAvailableCapacityPattern,
     };
   }
 
@@ -71,9 +86,24 @@ export function computeCapacity(
     );
     const scale = 1 + (scaleOnHoliday - 1) * stress;
     const schoolM = Math.min(1.05, Math.max(0.65, schoolLabTeamCapMult(r.market, r.date)));
+    const monthK = tradingMonthKeyFromIsoDate(r.date);
+    const labMonth = cap.monthlyLabs?.[monthK];
+    const staffMonth = cap.monthlyStaff?.[monthK];
+    const availMonth = cap.techAvailable?.[monthK];
+    const labShape = labMonth != null && Number.isFinite(labMonth) ? labMonth : 1;
+    const teamsBase = cap.teams || 4;
+    const staffShape =
+      staffMonth != null && Number.isFinite(staffMonth)
+        ? staffMonth
+        : cap.staffMonthlyAbsolute
+          ? teamsBase
+          : 1;
+    const availShape = availMonth != null && Number.isFinite(availMonth) ? availMonth : 1;
     const labDenom = cap.testingCapacity ?? cap.labs ?? 5;
-    const labsCap = (labDenom || 5) * scale * schoolM;
-    const teamsCap = (cap.teams || 4) * scale * schoolM;
+    const labsCap = (labDenom || 5) * labShape * scale * schoolM * availShape;
+    const teamsCap = cap.staffMonthlyAbsolute
+      ? staffShape * scale * schoolM * availShape
+      : teamsBase * staffShape * scale * schoolM * availShape;
     const backendCap = cap.backend || 1000;
 
     const lab_load_ratio = labsCap > 0 ? Math.max(0, (r.lab_load || 0) / labsCap) : 0;

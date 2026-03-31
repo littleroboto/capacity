@@ -48,12 +48,24 @@ export type SeasonalTradingConfig = {
  * Tech-side weekly shape (menu pipeline, weekend catch-up, Fri-before-Sat prep).
  * `weekly_pattern` values are **0–1** (after YAML parse); legacy named levels are normalised in the parser.
  * Scaled into lab/team readiness load with `labs_scale` / `teams_scale` / `backend_scale`.
+ *
+ * `support_*` adds **Market IT–only** baseline readiness load (e.g. hypercare / BAU support rhythm).
+ * Weekly shape × monthly multiplier (omitted months = 1), same numeric rules as `trading.monthly_pattern`.
  */
 export type TechRhythmConfig = {
   weekly_pattern?: Record<string, number>;
   labs_scale?: number;
   teams_scale?: number;
   backend_scale?: number;
+  /** Expanded `tech.support_weekly_pattern` (0–1 per weekday). */
+  support_weekly_pattern?: Record<string, number>;
+  /**
+   * Optional `tech.support_monthly_pattern` (Jan–Dec, 0–1). Multiplies that day’s support weekly level;
+   * omitted months behave as 1 in the UI patcher.
+   */
+  support_monthly_pattern?: Record<string, number>;
+  /** Scales support teams load; default 1. */
+  support_teams_scale?: number;
 };
 
 /** Optional trading UX knobs (parsed from `trading.*` in YAML). */
@@ -82,6 +94,19 @@ export type MarketConfig = {
   title?: string;
   description?: string;
   capacity: { labs: number; teams: number; backend: number };
+  /**
+   * Optional Jan–Dec multipliers on baseline `resources.labs.capacity` / testing denominator (default 1 each month).
+   */
+  monthlyLabsCapacityPattern?: Record<string, number>;
+  /**
+   * Optional Jan–Dec shape for tech staff. Default is multipliers on {@link MarketConfig.capacity}.`teams` (each month 1 = baseline).
+   * When {@link staffMonthlyPatternBasis} is `absolute`, each value is headcount FTE for that month.
+   */
+  monthlyStaffCapacityPattern?: Record<string, number>;
+  /** When `absolute`, `monthlyStaffCapacityPattern` values are FTE counts, not multipliers on `capacity.teams`. */
+  staffMonthlyPatternBasis?: 'absolute';
+  /** Optional Jan–Dec 0.05–1 share applied to lab+team effective caps after monthly shape + holiday pinch. */
+  techAvailableCapacityPattern?: Record<string, number>;
   /** Nominal parallel test / integration capacity for utilisation denominator (defaults to lab count). */
   testingCapacity?: number;
   /** When holiday stress = 1, lab+team caps scale toward this factor (default from engine tuning, typically 0.5). */
@@ -105,6 +130,11 @@ export type MarketConfig = {
    * omitted months behave as 1 in the UI patcher; absent block → no effect in the engine.
    */
   monthlyTradingPattern?: Record<string, number>;
+  /**
+   * Optional `tech.support_monthly_pattern` (Jan–Dec, 0–1). Multiplies support weekly teams load for that month;
+   * omitted months behave as 1 in the UI patcher.
+   */
+  monthlySupportPattern?: Record<string, number>;
   /** Parsed from `trading.seasonal` for store_pressure only. */
   seasonalTrading?: SeasonalTradingConfig;
   holidays?: Record<string, unknown>;

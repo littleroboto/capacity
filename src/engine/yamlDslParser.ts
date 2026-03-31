@@ -698,11 +698,16 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     schBlock && typeof schBlock === 'object' ? stressFromSchoolHolidayBlock(schBlock as Record<string, unknown>) : undefined
   );
 
+  const resourcesRoot = parsed.resources as Record<string, unknown> | undefined;
+
   return {
     market,
     title: parsed.title ?? market,
     description: parsed.description,
     capacity,
+    monthlyLabsCapacityPattern: mapResourceCapacityMonthlyShape(resourcesRoot, 'labs'),
+    ...mapStaffResourceMonthly(resourcesRoot),
+    techAvailableCapacityPattern: mapTechAvailableCapacityPattern(parsed.tech as Record<string, unknown>),
     testingCapacity,
     holidayLabCapacityScale,
     publicHolidayStaffingMultiplier,
@@ -723,6 +728,7 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     stressCorrelations,
     operatingWindows: mapOperatingWindows(parsed.operating_windows),
     techRhythm: mapTechRhythm(parsed.tech),
+    monthlySupportPattern: mapSupportMonthlyPattern(parsed.tech as Record<string, unknown> | undefined),
     riskHeatmapGamma,
     riskHeatmapGammaTech,
     riskHeatmapGammaBusiness,
@@ -807,6 +813,105 @@ function mapMonthlyTradingPattern(
   return Object.keys(out).length ? out : undefined;
 }
 
+function mapSupportMonthlyPattern(
+  tech: Record<string, unknown> | undefined
+): Record<string, number> | undefined {
+  if (!tech || typeof tech !== 'object') return undefined;
+  const raw = (tech.support_monthly_pattern ?? tech.supportMonthlyPattern) as
+    | Record<string, unknown>
+    | undefined;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const key = String(k).trim();
+    if (!TRADING_MONTH_KEY_SET.has(key)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    out[key] = Math.min(1, Math.max(0, n));
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function mapResourceCapacityMonthlyShape(
+  resources: Record<string, unknown> | undefined,
+  blockKey: 'labs'
+): Record<string, number> | undefined {
+  if (!resources || typeof resources !== 'object') return undefined;
+  const block = resources[blockKey] as Record<string, unknown> | undefined;
+  if (!block || typeof block !== 'object') return undefined;
+  const raw = (block.monthly_pattern ?? block.monthlyPattern ?? block.by_month ?? block.byMonth) as
+    | Record<string, unknown>
+    | undefined;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const key = String(k).trim();
+    if (!TRADING_MONTH_KEY_SET.has(key)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    out[key] = Math.min(5, Math.max(0.1, n));
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function staffMonthlyPatternBasisFromBlock(block: Record<string, unknown> | undefined): 'absolute' | undefined {
+  if (!block || typeof block !== 'object') return undefined;
+  const v = block.monthly_pattern_basis ?? block.monthlyPatternBasis;
+  if (v === 'absolute' || v === true) return 'absolute';
+  return undefined;
+}
+
+function mapStaffResourceMonthly(resources: Record<string, unknown> | undefined): {
+  monthlyStaffCapacityPattern?: Record<string, number>;
+  staffMonthlyPatternBasis?: 'absolute';
+} {
+  if (!resources || typeof resources !== 'object') return {};
+  const block = resources.staff as Record<string, unknown> | undefined;
+  if (!block || typeof block !== 'object') return {};
+  const basis = staffMonthlyPatternBasisFromBlock(block);
+  const raw = (block.monthly_pattern ?? block.monthlyPattern ?? block.by_month ?? block.byMonth) as
+    | Record<string, unknown>
+    | undefined;
+  if (!raw || typeof raw !== 'object') return basis ? { staffMonthlyPatternBasis: basis } : {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const key = String(k).trim();
+    if (!TRADING_MONTH_KEY_SET.has(key)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    if (basis === 'absolute') {
+      out[key] = Math.min(50, Math.max(0, Math.round(n)));
+    } else {
+      out[key] = Math.min(5, Math.max(0.1, n));
+    }
+  }
+  const pattern = Object.keys(out).length ? out : undefined;
+  if (!pattern && !basis) return {};
+  return {
+    ...(pattern ? { monthlyStaffCapacityPattern: pattern } : {}),
+    ...(basis ? { staffMonthlyPatternBasis: basis } : {}),
+  };
+}
+
+function mapTechAvailableCapacityPattern(
+  tech: Record<string, unknown> | undefined
+): Record<string, number> | undefined {
+  if (!tech || typeof tech !== 'object') return undefined;
+  const raw = (tech.available_capacity_pattern ?? tech.availableCapacityPattern) as
+    | Record<string, unknown>
+    | undefined;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const key = String(k).trim();
+    if (!TRADING_MONTH_KEY_SET.has(key)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    out[key] = Math.min(1, Math.max(0.05, n));
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 function mapSeasonalTrading(trading: Record<string, unknown> | undefined): SeasonalTradingConfig | undefined {
   if (!trading || typeof trading !== 'object') return undefined;
   const s = trading.seasonal as Record<string, unknown> | undefined;
@@ -826,17 +931,44 @@ function mapTechRhythm(tech: Record<string, unknown> | undefined): TechRhythmCon
   if (!tech || typeof tech !== 'object') return undefined;
   const wpRaw = (tech.weekly_pattern ?? tech.weeklyPattern) as Record<string, unknown> | undefined;
   const expanded = expandTechWeeklyPattern(wpRaw);
-  if (!expanded || Object.keys(expanded).length === 0) return undefined;
-  const weekly_pattern = expanded;
+  const swRaw = (tech.support_weekly_pattern ?? tech.supportWeeklyPattern) as
+    | Record<string, unknown>
+    | undefined;
+  const supportWeekly = expandTechWeeklyPattern(swRaw);
+  const supportMonthly = mapSupportMonthlyPattern(tech);
+  const sts = Number(tech.support_teams_scale ?? tech.supportTeamsScale);
+
+  if (
+    (!expanded || Object.keys(expanded).length === 0) &&
+    (!supportWeekly || Object.keys(supportWeekly).length === 0)
+  ) {
+    return undefined;
+  }
+
   const ls = Number(tech.labs_scale ?? tech.labsScale);
   const ts = Number(tech.teams_scale ?? tech.teamsScale);
   const bs = Number(tech.backend_scale ?? tech.backendScale);
-  return {
-    weekly_pattern,
-    labs_scale: Number.isFinite(ls) && ls >= 0 ? ls : 2,
-    teams_scale: Number.isFinite(ts) && ts >= 0 ? ts : 1,
-    backend_scale: Number.isFinite(bs) && bs >= 0 ? bs : 0,
-  };
+
+  const out: TechRhythmConfig = {};
+
+  if (expanded && Object.keys(expanded).length > 0) {
+    out.weekly_pattern = expanded;
+    out.labs_scale = Number.isFinite(ls) && ls >= 0 ? ls : 2;
+    out.teams_scale = Number.isFinite(ts) && ts >= 0 ? ts : 1;
+    out.backend_scale = Number.isFinite(bs) && bs >= 0 ? bs : 0;
+  }
+
+  if (supportWeekly && Object.keys(supportWeekly).length > 0) {
+    out.support_weekly_pattern = supportWeekly;
+  }
+  if (supportMonthly && Object.keys(supportMonthly).length > 0) {
+    out.support_monthly_pattern = supportMonthly;
+  }
+  if (Number.isFinite(sts) && sts >= 0) {
+    out.support_teams_scale = sts;
+  }
+
+  return out;
 }
 
 function mapStressCorrelations(raw: Record<string, unknown>): StressCorrelations | undefined {
