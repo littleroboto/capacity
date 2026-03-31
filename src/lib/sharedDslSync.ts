@@ -157,22 +157,28 @@ export async function fetchSharedDslEtag(): Promise<string | null> {
 }
 
 /**
- * After a successful PUT, align `lastKnownEtag` with what HEAD returns so polling and `ifMatch`
- * stay consistent (JSON etag vs header/head() quirks, or missing etag in the response body).
+ * After a successful PUT, set `lastKnownEtag` from the response body when present — that value is
+ * authoritative for the blob we just wrote. An immediate HEAD can still return a stale ETag (CDN /
+ * propagation), and replacing the PUT etag with it would regress `lastKnownEtag` and falsely trip
+ * `cloud_newer` in this same tab. Only HEAD when the JSON body omitted `etag`.
  */
+function etagAfterSuccessfulPut(putEtagRaw: string | undefined, headEtag: string | null): string {
+  const p = typeof putEtagRaw === 'string' && putEtagRaw.trim() ? putEtagRaw.trim() : '';
+  if (p) return p;
+  return headEtag?.trim() ?? '';
+}
+
 async function reconcileEtagAfterSuccessfulPut(body: { etag?: string }): Promise<void> {
-  let next = typeof body.etag === 'string' && body.etag.trim() ? body.etag.trim() : '';
-  try {
-    const headRaw = await fetchSharedDslEtag();
-    if (headRaw != null && headRaw.trim()) {
-      const h = headRaw.trim();
-      if (!next || normalizeEtagForCompare(next) !== normalizeEtagForCompare(h)) {
-        next = h;
-      }
+  const putEtag = typeof body.etag === 'string' && body.etag.trim() ? body.etag.trim() : '';
+  let head: string | null = null;
+  if (!putEtag) {
+    try {
+      head = await fetchSharedDslEtag();
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
   }
+  const next = etagAfterSuccessfulPut(body.etag, head);
   if (next) setSharedDslEtag(next);
 }
 

@@ -18,6 +18,8 @@ import { CloudDownload } from 'lucide-react';
 const POLL_MS = 45_000;
 /** Avoid tight visibilitychange loops (focus / tab switches) re-firing HEAD back-to-back. */
 const VIS_REFRESH_DEBOUNCE_MS = 900;
+/** If etag updates mid-flight (save/pull), re-run stale check instead of bailing with stale UI stuck on. */
+const STALE_CHECK_EPOCH_RETRIES = 4;
 
 /**
  * Shows when the team blob ETag is ahead of our last successful save, or right after a save conflict.
@@ -37,30 +39,33 @@ export function SharedDslStaleBanner() {
 
   const refreshStale = useCallback(async () => {
     if (!isSharedDslEnabled() || document.visibilityState !== 'visible') return;
-    const epochAtStart = getSharedDslStaleCheckEpoch();
     try {
-      const vs = await getSharedDslRemoteVsLocal();
-      if (!mounted.current) return;
-      /** Drop superseded results (pull/save updated etag while this HEAD was in flight). */
-      if (getSharedDslStaleCheckEpoch() !== epochAtStart) return;
-      if (vs.status !== 'cloud_newer') {
-        setStale(false);
+      for (let attempt = 0; attempt < STALE_CHECK_EPOCH_RETRIES; attempt++) {
+        const epochAtStart = getSharedDslStaleCheckEpoch();
+        const vs = await getSharedDslRemoteVsLocal();
+        if (!mounted.current) return;
+        /** Save/pull bumped etag while this HEAD was in flight — retry once with the new baseline. */
+        if (getSharedDslStaleCheckEpoch() !== epochAtStart) continue;
+        if (vs.status !== 'cloud_newer') {
+          setStale(false);
+          return;
+        }
+        /** This window just saved/pulled; ignore transient HEAD races. Other windows stay unmuted and still see stale. */
+        if (isSharedDslRemoteStaleMuted()) {
+          setStale(false);
+          return;
+        }
+        /**
+         * While the user is actively editing (dirty + recent keystrokes), ignore “server newer” from
+         * etag drift or in-flight saves so the toast does not fight autosave.
+         */
+        if (isSharedDslLocallyEdited() && isSharedDslEditingGraceActive()) {
+          setStale(false);
+          return;
+        }
+        setStale(true);
         return;
       }
-      /** This window just saved/pulled; ignore transient HEAD races. Other windows stay unmuted and still see stale. */
-      if (isSharedDslRemoteStaleMuted()) {
-        setStale(false);
-        return;
-      }
-      /**
-       * While the user is actively editing (dirty + recent keystrokes), ignore “server newer” from
-       * etag drift or in-flight saves so the toast does not fight autosave.
-       */
-      if (isSharedDslLocallyEdited() && isSharedDslEditingGraceActive()) {
-        setStale(false);
-        return;
-      }
-      setStale(true);
     } catch {
       /* ignore */
     }
