@@ -19,10 +19,10 @@ Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL**
 
 1. **Parse** — `js-yaml` loads one or more YAML documents → `MarketConfig[]` per market.
 2. **Calendar** — For each market, build daily rows from **quarter start (today’s quarter)** for **`MODEL_MONTHS` (15)** months.
-3. **Phase expansion** — BAU patterns, campaigns, and optional **releases** add per-day **loads** (labs, teams, backend, ops, commercial). Campaign rows can split **readiness** vs **live/support** using `readiness_duration` + `live_support_load`.
+3. **Phase expansion** — BAU patterns, campaigns, and optional **releases** add per-day **loads** (labs, Market IT, backend, ops, commercial). Campaign rows can split **readiness** vs **live/support** using `readiness_duration` + `live_support_load`.
 4. **Aggregate** — Sum loads per `(date, market)`.
 5. **Store & campaign meta** — `trading.weekly_pattern` → **store_pressure**; campaigns → **campaign_risk** / **campaign_presence**; separate **public** vs **school** auto lists → **public_holiday_flag** / **school_holiday_flag**; **holiday_flag** = either (used for capacity scaling & optional combined-risk holiday term).
-6. **Capacity** — Convert loads to utilisations using **labs / teams / backend** capacity; holidays scale lab & team capacity by a fixed **0.5** (50%).
+6. **Capacity** — Convert loads to utilisations using **labs / Market IT / backend** capacity; holidays scale lab & Market IT capacity by a fixed **0.5** (50%).
 7. **Risk** — Combine **tech_pressure**, **store_pressure**, **campaign_risk** into **risk_score** (0–1) and **risk_band** (used for tooltips, band labels, and planning helpers — not the default heatmap cell value).
 8. **Display noise** — Deterministic jitter on **`risk_score`** and **`tech_pressure`** (`src/engine/dataNoise.ts`); **`risk_band`** is recomputed from the noised **`risk_score`**. The **Business** lens is driven mostly by **`store_pressure`** and is **not** given the same jitter.
 9. **UI** — Filter surface by **header country** (or **all markets** side-by-side); build **vertical month stacks** (each month = Mon–Sun weeks); colour cells from **`heatmapCellMetric`** (`src/lib/runwayViewMetrics.ts`) for the active lens (10-step palette after γ + transfer curve).
@@ -85,7 +85,7 @@ resources:
     capacity: 5                # Integer; default 5 if missing
   teams:                       # Optional map of named teams
     pos_team:
-      size: 4                  # Summed for team capacity; default total 4 if no sizes
+      size: 4                  # Summed for Market IT capacity; default total 4 if no sizes
       sme_depth: 2             # Parsed in YAML but NOT used in engine
 
 bau:
@@ -170,7 +170,7 @@ If **both** `weekly_promo` and `weekly_promo_cycle` are present, **both** BAU en
 | `readiness_duration` | Optional positive integer. If set, the first **N** days of the campaign interval use **`load`** for **readiness** (change) work; remaining days use **`live_support_load`** for **live / hypercare / on-call** style scheduling. If omitted, the whole interval is tagged **readiness** (same as before). |
 | `live_support_load` | Optional partial load object (same keys as `load`). Used only after `readiness_duration` days; omitted keys count as **0** for that segment. |
 | `presence_only` | If **true**, does not add phase loads; still counts for **campaign_presence** / **campaign_risk** (use with `operating_windows` to avoid double-counting). |
-| `replaces_bau_tech` | If **true** (alias `replacesBauTech`), on **prep** and **live** days where this campaign adds **labs / teams / backend** (same resolution as the phase engine), **`tech.weekly_pattern`** is skipped and **BAU** loads have those three buckets zeroed (ops/commercial unchanged) so the campaign **replaces** the weekly tech/BAU pipe instead of stacking. Live-only ops/commercial does not strip BAU tech. Default **false**. |
+| `replaces_bau_tech` | If **true** (alias `replacesBauTech`), on **prep** and **live** days where this campaign adds **labs / Market IT / backend** (same resolution as the phase engine), **`tech.weekly_pattern`** is skipped and **BAU** loads have those three buckets zeroed (ops/commercial unchanged) so the campaign **replaces** the weekly tech/BAU pipe instead of stacking. Live-only ops/commercial does not strip BAU tech. Default **false**. |
 
 **Phase engine** adds **commercial_load** (and any **labs** / **teams** / etc. from `load` or `live_support_load`) on each active day. BAU and releases are always tagged **readiness**; campaign days use **readiness** vs **sustain** per the rules above.
 
@@ -185,13 +185,13 @@ If **both** `weekly_promo` and `weekly_promo_cycle` are present, **both** BAU en
 | `auto_public` | If true, append market’s **stub** public holiday date list (`holidayCalc.ts`). |
 | `auto_school` | If true, append that market’s **stub** school-break calendar (`holidayCalc.ts`: AU NSW Eastern, UK England-style, DE NRW-style, FR Zone B–style, CA Ontario-style). |
 
-Auto public dates and auto school dates are kept in **separate** per-market sets. **`public_holiday_flag`** / **`school_holiday_flag`** reflect each; **`holiday_flag`** is true if **either** applies (and drives lab/team capacity scaling).
+Auto public dates and auto school dates are kept in **separate** per-market sets. **`public_holiday_flag`** / **`school_holiday_flag`** reflect each; **`holiday_flag`** is true if **either** applies (and drives lab / Market IT capacity scaling).
 
 #### `stress_correlations` (optional)
 
 | Key | Rule |
 |-----|------|
-| `school_holidays` | When **`school_holiday_flag`** is true for a day, optional multipliers adjust **loads**, **store_pressure**, and **lab/team capacity**. |
+| `school_holidays` | When **`school_holiday_flag`** is true for a day, optional multipliers adjust **loads**, **store_pressure**, and **lab / Market IT capacity**. |
 
 Under `school_holidays`, all keys are optional numbers (defaults = no change when omitted):
 
@@ -257,7 +257,7 @@ If YAML omits **`releases`**, the list is empty.
 ### Capacity (`computeCapacity`)
 
 - **lab_utilisation** = `min(1, lab_load / labsCap)`
-- **team_utilisation** = `min(1, team_load / teamsCap)`
+- **team_utilisation** = `min(1, team_load / teamsCap)` (Market IT lane; YAML `resources.teams` / `capacity.teams`)
 - **backend_pressure** = `min(1, backend_load / backendCap)`
 - **labsCap** = `capacity.labs * (holiday ? holidayCapacityScale : 1) * labTeamCapMult` (**school** `stress_correlations` × each active **`operating_windows.lab_team_capacity_mult`**, e.g. Oktoberfest)
 - **teamsCap** = `capacity.teams * (holiday ? holidayCapacityScale : 1) * labTeamCapMult`

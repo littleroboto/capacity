@@ -16,7 +16,7 @@ Dense reference; full prose + examples live in `docs/LLM_MARKET_DSL_PROMPT.md`. 
 | `holidays` | Cross: `capacity_taper_days`, `lab_capacity_scale` |
 | `stress_correlations` | Legacy; prefer `school_holidays.load_effects` |
 | `trading` | Store demand: `weekly_pattern`, optional `monthly_pattern`, `seasonal`, payday, campaign boosts |
-| `tech` | BAU tech rhythm: `weekly_pattern`, optional `labs_scale`, `teams_scale`, `backend_scale` |
+| `tech` | BAU tech rhythm: `weekly_pattern`, optional scales; optional **`support_weekly_pattern`**, **`support_monthly_pattern`** (Market IT–only additive; monthly omitted = 1), **`support_teams_scale`** (default 1) |
 | `operating_windows` | Named `[start,end]` bands with load / pressure mults + ramps |
 | `releases` | **Deploy** grid: `deploy_date`, `systems`, `phases[]`, `load` — different from `tech_programmes` |
 | `risk_heatmap_gamma`, `risk_heatmap_gamma_tech`, `risk_heatmap_gamma_business`, `risk_heatmap_curve` | Heatmap tuning |
@@ -85,7 +85,7 @@ resources:
 
 ## `tech`
 
-`weekly_pattern` (same day tokens as trading), optional `labs_scale`, `teams_scale`, `backend_scale`.
+`weekly_pattern` (same day tokens as trading), optional `labs_scale`, `teams_scale`, `backend_scale`. Optional **`support_weekly_pattern`** (same expansion as weekly), **`support_monthly_pattern`** (Jan…Dec 0–1, like `trading.monthly_pattern`; omitted months → 1), **`support_teams_scale`** (≥0, default 1). Teams-only additive readiness row in phase engine.
 
 ## `operating_windows` item
 
@@ -109,7 +109,8 @@ resources:
 | Empty live support | prep × `live_support_scale` (~0.45) |
 | Campaign live tech dampening | `live_tech_load_scale` ~0.55 on labs/teams/backend |
 | `tech` scales | labs 2, teams 1, backend 0 |
+| `tech.support_*` | Load only if `support_weekly_pattern` present; monthly omitted → 1; `support_teams_scale` default 1 |
 
 ## CamelCase aliases (often accepted)
 
-`startDate`/`start`, `testingPrepDuration`, `prepBeforeLiveDays`, `campaignSupport`, `liveCampaignSupport`, `daysInUse`, `weeklyCycle`, `labsRequired`, `staffRequired`, `publicHolidays`, `schoolHolidays`, `deployDate`, `offsetDays`, `riskHeatmapGammaTech`, … — prefer **snake_case** in new output.
+`startDate`/`start`, `testingPrepDuration`, `prepBeforeLiveDays`, `campaignSupport`, `liveCampaignSupport`, `daysInUse`, `weeklyCycle`, `labsRequired`, `staffRequired`, `supportWeeklyPattern`, `supportMonthlyPattern`, `supportTeamsScale`, `publicHolidays`, `schoolHolidays`, `deployDate`, `offsetDays`, `riskHeatmapGammaTech`, … — prefer **snake_case** in new output.

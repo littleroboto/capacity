@@ -17,7 +17,7 @@ The GitHub Pages build tracks `main` (see `[.github/workflows/deploy-pages.yml](
 The interface is a **dynamic visual of system pressure**. Colour and summaries encode load and risk in a single glance:
 
 - **Restaurant Activity** — restaurant trading curve (**`store_pressure`**) as the heatmap; combined risk still blends tech and campaigns.
-- **Technology Teams** — labs, field teams, and backend work versus capacity (**tech capacity demand**), including overload when demand exceeds caps.
+- **Technology Teams** — labs, Market IT, and backend work versus capacity (**tech capacity demand**), including overload when demand exceeds caps.
 
 The same **YAML-driven model** powers every market. Parameters are named and scaled **consistently** so you can **compare regions and countries** side by side without reconciling different spreadsheets or definitions.
 

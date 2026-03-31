@@ -48,7 +48,7 @@ Event-sourced surfaces (tagged in `expandPhases`):
 - **coordination** — Reserved (0 today); operating windows still explained in tooltips and scale all surfaces uniformly when they apply load multipliers.
 - **carryover** — Backlog spill from **intrinsic** overload vs nominal cap (`src/planning/carryover.ts`), applied **before** operating-window multipliers. Overload caused only by carry-in does **not** create more carry (avoids feedback runaway). Defaults are mild (12% capture, 0.92 decay, cap ≈1.25× nominal per bucket).
 
-Per-day **tech pressure** per surface uses the same utilisation logic as combined tech (max of lab/team/backend blend) so surfaces are **comparable** but not strictly additive to the headline score.
+Per-day **tech pressure** per surface uses the same utilisation logic as combined tech (max of lab / Market IT / backend blend) so surfaces are **comparable** but not strictly additive to the headline score.
 
 ## 6. Migration from “old app” concepts
 

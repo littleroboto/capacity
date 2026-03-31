@@ -98,7 +98,7 @@ Marks the campaign on the calendar for **presence / risk** purposes **without** 
 
 ### 5.4b `replaces_bau_tech: true`
 
-When **true**, on **prep** and **live** days where this campaign contributes **labs, teams, or backend** (using the same load resolution as phase expansion — including staggered prep and scaled live sustain load), the engine **does not** add **`tech.weekly_pattern`** for that day and **zeros labs/teams/backend** on **BAU** loads (ops/commercial unchanged). Use when campaign work **replaces** the weekly BAU / tech pipe for that period instead of stacking. Days where the live segment only carries **ops / commercial** do **not** strip BAU tech. Default **false** (additive).
+When **true**, on **prep** and **live** days where this campaign contributes **labs, teams, or backend** (using the same load resolution as phase expansion — including staggered prep and scaled live sustain load), the engine **does not** add **`tech.weekly_pattern`** or the **`tech.support_weekly_pattern`** (**`support_pattern`**) teams row for that day and **zeros labs/teams/backend** on **BAU** loads (ops/commercial unchanged). Use when campaign work **replaces** the weekly BAU / tech pipe for that period instead of stacking. Days where the live segment only carries **ops / commercial** do **not** strip BAU tech. Default **false** (additive).
 
 ### 5.5 Staggered functional prep (`stagger_functional_loads`)
 
@@ -122,7 +122,7 @@ Use for **platform / infra** work scheduled like a campaign (patching waves, POS
 - **Loads** — `programme_support` + `live_programme_support` (or `campaign_support` / `live_campaign_support` for the same shape). **`load`** / **`live_support_load`** also parse. Only **labs**, **teams**, and **backend** are kept; **ops** and **commercial** are stripped.
 - **Surfaces** — Prep and live both accrue to the **change** surface (not **campaign**), so they do not feed **`campaign_risk`** or **`campaign_store_boost_*`**.
 - **`live_tech_load_scale`** — Optional; default **1** for tech programmes (full YAML intensity in the live segment), unlike campaigns where the engine defaults to a lighter sustain scale unless you override.
-- **`replaces_bau_tech`** — Same meaning as §5.4b: can suppress **BAU** tech buckets and **`tech.weekly_pattern`** on loaded prep/live days.
+- **`replaces_bau_tech`** — Same meaning as §5.4b: can suppress **BAU** tech buckets, **`tech.weekly_pattern`**, and **`tech.support_weekly_pattern`** on loaded prep/live days.
 
 ---
 
@@ -178,6 +178,7 @@ Authors comparing markets should treat these as **shared platform seasoning**, n
 
 - **`weekly_pattern`** — Same rules as `trading.weekly_pattern` (numeric 0–1 or named levels); drives recurring **tech rhythm** loads (scaled into lab/team readiness).
 - **`labs_scale`**, **`teams_scale`**, **`backend_scale`** — Scale factors for that rhythm (sensible defaults if omitted).
+- **`support_weekly_pattern`**, **`support_monthly_pattern`**, **`support_teams_scale`** — Optional **Market IT–only** additive rhythm (weekly × monthly for that calendar month × scale; omitted months = 1). Same weekly expansion as above; monthly keys Jan–Dec like **`trading.monthly_pattern`**. See [DSL_CAMPAIGNS_AND_TRADING.md](./DSL_CAMPAIGNS_AND_TRADING.md) § Tech rhythm.
 
 ---
 

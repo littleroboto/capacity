@@ -20,7 +20,7 @@ Planning conversations often anchor on **campaigns**—the windows everyone know
 
 For each market you describe, in structured form: **how much capacity you have**, **what repeats every week** (tech and store rhythm), **when campaigns run** and how heavy they are, plus **holidays and special periods** where capacity or load shifts. The engine rolls that forward onto a **day-by-day timeline** and shows a **heatmap runway** (weeks as Mon–Sun, months stacked).
 
-You can switch lenses—for example **technology** (how hard you are pushing lab/team/backend capacity) versus **business** (trading rhythm and campaign-related intensity)—so the same dates can be read from **delivery** and **commercial** angles without pretending they are the same thing.
+You can switch lenses—for example **technology** (how hard you are pushing lab / Market IT / backend capacity) versus **business** (trading rhythm and campaign-related intensity)—so the same dates can be read from **delivery** and **commercial** angles without pretending they are the same thing.
 
 Nothing here is a magic forecast of the future. It is a **transparent “if we believe these assumptions, where does it feel tight?”** view.
 
