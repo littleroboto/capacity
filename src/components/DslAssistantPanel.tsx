@@ -23,12 +23,9 @@ import {
   assistantHasYamlStreamMarker,
   DSL_EDIT_MARKER,
   DSL_YAML_STREAM_MARKER,
-  mapPatchFocusToNormalizedBuffer,
   parseDslEditPayload,
-  patchFocusCharRangeInPatchedText,
   yamlStreamBufferFromAssistantAccumulated,
 } from '@/lib/dslAssistant/editJson';
-import { normalizeAssistantYaml } from '@/lib/dslAssistant/normalizeAssistantYaml';
 import {
   commitProposedEditorBuffer,
   validateProposedEditorBuffer,
@@ -100,7 +97,6 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
   const parseError = useAtcStore((s) => s.parseError);
   const setDslText = useAtcStore((s) => s.setDslText);
   const setDslAssistantEditorLock = useAtcStore((s) => s.setDslAssistantEditorLock);
-  const requestDslEditorReveal = useAtcStore((s) => s.requestDslEditorReveal);
 
   const [apiKey, setApiKey] = useState(readStoredApiKey);
   /** When false and a key exists, the key field + note are hidden (use header “API key” to expand). */
@@ -223,10 +219,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
       const payload = parseDslEditPayload(assistantRaw);
 
       /** Prefer JSON patches → JSON full_yaml → streaming YAML (legacy / full rewrites). */
-      const applyProposed = (
-        proposed: string,
-        opts?: { scrollToNormalizedRange?: { start: number; end: number } | null }
-      ) => {
+      const applyProposed = (proposed: string) => {
         if (docked) {
           setDslText(proposed);
           setStatus('Applying edit…');
@@ -240,10 +233,6 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
           commitProposedEditorBuffer(proposed);
           setStatus('Parse check: OK');
           setStatusDetail(null);
-          const range = opts?.scrollToNormalizedRange;
-          if (range && range.start >= 0) {
-            requestDslEditorReveal(range.start, Math.max(range.end, range.start + 1));
-          }
         } else {
           openPreview(snapshot, proposed);
         }
@@ -252,13 +241,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
       if (payload?.kind === 'patches') {
         const r = applyReplacePatches(snapshot, payload.patches);
         if (r.ok) {
-          const normalized = normalizeAssistantYaml(r.text);
-          const focus = patchFocusCharRangeInPatchedText(snapshot, payload.patches);
-          const mapped =
-            docked && focus ? mapPatchFocusToNormalizedBuffer(r.text, normalized, focus) : null;
-          applyProposed(r.text, {
-            scrollToNormalizedRange: mapped,
-          });
+          applyProposed(r.text);
           return;
         }
         // Fall through to YAML stream or report patch error if nothing else applies.
@@ -290,7 +273,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
         );
       }
     },
-    [docked, openPreview, requestDslEditorReveal, setDslText]
+    [docked, openPreview, setDslText]
   );
 
   const send = useCallback(async () => {

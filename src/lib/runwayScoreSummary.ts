@@ -31,7 +31,7 @@ export function buildDriverSummaryBlocks(
   if (row.campaign_in_live) {
     campBullets.push(
       techLens
-        ? 'Live campaign: engineering sustain load is on (labs/teams/backend). Combined risk elsewhere still reflects store uplift.'
+        ? 'Live campaign: engineering sustain load is on (labs / Market IT / backend). Combined risk elsewhere still reflects store uplift.'
         : 'Live campaign: busier restaurants here when YAML applies a live store boost; pipeline effects are in the store curve.'
     );
   }
@@ -51,7 +51,7 @@ export function buildDriverSummaryBlocks(
   if (row.public_holiday_flag) {
     holBullets.push(
       techLens
-        ? 'Public holiday — staffing and effective lab/team capacity follow holiday rules in the engine.'
+        ? 'Public holiday — staffing and effective lab / Market IT capacity follow holiday rules in the engine.'
         : 'Public holiday — closures and trading pattern follow holiday settings (often lower footfall).'
     );
   }
@@ -84,10 +84,10 @@ export function buildDriverSummaryBlocks(
     }
     const topSurfaces = pressureSurfaceLines
       .slice(0, 3)
-      .map((l) => l.replace(/\s*\(max of lab\/team\/backend blend\)\s*$/, ''));
+      .map((l) => l.replace(/\s*\(max of lab \/ Market IT \/ backend blend\)\s*$/, ''));
     if (topSurfaces.length) resBullets.push(...topSurfaces.map((s) => `Where the work sits: ${s}`));
     if (operatingWindows.length) {
-      resBullets.push('Special windows today can bump lab, team, backend, or store levels.');
+      resBullets.push('Special windows today can bump lab, Market IT, backend, or store levels.');
       resBullets.push(...operatingWindows.slice(0, 3));
     }
     if (bauToday.length) resBullets.push(...bauToday.map((b) => `Routine work: ${b}`));

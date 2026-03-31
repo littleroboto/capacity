@@ -521,7 +521,7 @@ export function RunwayDayDetailsPayloadBody({
 
         {wins.shown.length > 0 && presentation !== 'markdown' ? (
           <>
-            <SectionTitle presentation={presentation}>When teams are staffed</SectionTitle>
+            <SectionTitle presentation={presentation}>When Market IT is staffed</SectionTitle>
             <BulletList items={wins.shown} presentation={presentation} />
             {wins.more > 0 ? (
               <p className="mt-1 text-xs italic text-muted-foreground">+{wins.more} more</p>

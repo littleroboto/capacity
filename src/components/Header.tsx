@@ -5,7 +5,7 @@ import { useCallback, useState } from 'react';
 import { useAtcStore } from '@/store/useAtcStore';
 import { isRunwayAllMarkets } from '@/lib/markets';
 import { Button } from '@/components/ui/button';
-import { Atom, Box, ChevronDown, ChevronUp, GitBranch, Grid2x2, Moon, Sparkles, Sun } from 'lucide-react';
+import { Atom, Bot, Box, ChevronDown, ChevronUp, GitBranch, Grid2x2, Moon, Sparkles, Sun } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 
 export function Header() {
@@ -18,6 +18,9 @@ export function Header() {
   const setRunway3dHeatmap = useAtcStore((s) => s.setRunway3dHeatmap);
   const runwaySvgHeatmap = useAtcStore((s) => s.runwaySvgHeatmap);
   const setRunwaySvgHeatmap = useAtcStore((s) => s.setRunwaySvgHeatmap);
+  const viewMode = useAtcStore((s) => s.viewMode);
+  const dslLlmAssistantEnabled = useAtcStore((s) => s.dslLlmAssistantEnabled);
+  const setDslLlmAssistantEnabled = useAtcStore((s) => s.setDslLlmAssistantEnabled);
   const reduceMotion = useReducedMotion();
   const singleMarketRunway = !isRunwayAllMarkets(country);
   const compareAllMarkets = isRunwayAllMarkets(country);
@@ -30,6 +33,8 @@ export function Header() {
   const swSvg = toyboxSwitchClasses(runwaySvgHeatmap, 'md');
   const swSvgCompact = toyboxSwitchClasses(runwaySvgHeatmap, 'sm');
   const swDisco = toyboxSwitchClasses(discoModePref);
+  const swLlm = toyboxSwitchClasses(dslLlmAssistantEnabled);
+  const swLlmSm = toyboxSwitchClasses(dslLlmAssistantEnabled, 'sm');
 
   const [compact, setCompact] = useState(readHeaderCompact);
 
@@ -127,6 +132,35 @@ export function Header() {
                       className={swSvgCompact.track}
                     >
                       <span className={swSvgCompact.thumb} />
+                    </button>
+                  </div>
+                ) : null}
+                {viewMode === 'code' ? (
+                  <div
+                    className="flex shrink-0 items-center gap-1.5 border-l border-border/60 pl-2"
+                    title="LLM YAML assistant under Code view (Toybox, or add ?llm to URL)"
+                  >
+                    <Bot
+                      className={cn(
+                        'h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-90',
+                        dslLlmAssistantEnabled && 'text-primary'
+                      )}
+                      aria-hidden
+                    />
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={dslLlmAssistantEnabled}
+                      data-state={dslLlmAssistantEnabled ? 'on' : 'off'}
+                      aria-label={
+                        dslLlmAssistantEnabled
+                          ? 'Turn off LLM YAML assistant'
+                          : 'Turn on LLM YAML assistant'
+                      }
+                      onClick={() => setDslLlmAssistantEnabled(!dslLlmAssistantEnabled)}
+                      className={swLlmSm.track}
+                    >
+                      <span className={swLlmSm.thumb} />
                     </button>
                   </div>
                 ) : null}
@@ -331,6 +365,40 @@ export function Header() {
                             Disco twinkle is off while reduced motion is on.
                           </p>
                         ) : null}
+                      </div>
+                    ) : null}
+                    {viewMode === 'code' ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          LLM assist
+                        </span>
+                        <div
+                          className="flex h-9 flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground"
+                          title="OpenAI-powered assistant dock below the Code editor. You can also add ?llm to the URL."
+                        >
+                          <Bot
+                            className={cn(
+                              'h-4 w-4 shrink-0 opacity-90',
+                              dslLlmAssistantEnabled && 'text-primary'
+                            )}
+                            aria-hidden
+                          />
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={dslLlmAssistantEnabled}
+                            data-state={dslLlmAssistantEnabled ? 'on' : 'off'}
+                            aria-label={
+                              dslLlmAssistantEnabled
+                                ? 'Turn off LLM YAML assistant'
+                                : 'Turn on LLM YAML assistant'
+                            }
+                            onClick={() => setDslLlmAssistantEnabled(!dslLlmAssistantEnabled)}
+                            className={swLlm.track}
+                          >
+                            <span className={swLlm.thumb} />
+                          </button>
+                        </div>
                       </div>
                     ) : null}
                   </div>

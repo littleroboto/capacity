@@ -1,22 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  fullTechWeeklyPatternFromPartial,
-  roundTechUnit,
-  TECH_WEEKLY_DAY_KEYS,
-  type TechWeeklyDayKey,
-} from '@/lib/techRhythmDsl';
+import { useCallback, useMemo } from 'react';
 import {
   fullTradingMonthlyPatternFromPartial,
   roundMonthlyUnit,
   TRADING_MONTH_KEYS,
   type TradingMonthKey,
 } from '@/lib/tradingMonthlyDsl';
+import {
+  fullTechWeeklyPatternFromPartial,
+  roundTechUnit,
+  TECH_WEEKLY_DAY_KEYS,
+  type TechWeeklyDayKey,
+} from '@/lib/techRhythmDsl';
 import { gammaFocusMarket, isRunwayAllMarkets } from '@/lib/markets';
-import { cn } from '@/lib/utils';
 import { useAtcStore } from '@/store/useAtcStore';
-import type { TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import type { TradingMonthlyPatternPatch } from '@/lib/dslTradingMonthlyPatch';
+import type { TradingWeeklyPatternPatch } from '@/lib/dslTradingWeeklyPatch';
 import { WeightingLineMiniChart } from '@/components/WeightingLineMiniChart';
+import { PatternUnitField } from '@/components/PatternUnitField';
 import {
   PAYDAY_KNOT_SAMPLE_DATES,
   storePaydayMonthMultiplierFromKnots,
@@ -32,93 +32,12 @@ function roundEarlyMonthExcess(n: number): number {
   return Math.round(Math.min(1, Math.max(0, n)) * 1000) / 1000;
 }
 
-function clampInput01(raw: string): number | null {
-  const n = parseFloat(raw);
-  if (!Number.isFinite(n)) return null;
-  return Math.min(1, Math.max(0, n));
-}
-
-function formatUnitText(n: number, roundUnit: (x: number) => number): string {
-  const r = roundUnit(n);
-  const s = r.toFixed(3).replace(/\.?0+$/, '');
-  return s === '' ? '0' : s;
-}
-
-function UnitField({
-  id,
-  label,
-  value,
-  onCommit,
-  roundUnit,
-  readOnly = false,
-}: {
-  id: string;
-  label: string;
-  value: number;
-  onCommit: (n: number) => void;
-  roundUnit: (x: number) => number;
-  /** When true, value is display-only (syncs from props). */
-  readOnly?: boolean;
-}) {
-  const [text, setText] = useState(() => formatUnitText(value, roundUnit));
-
-  useEffect(() => {
-    setText(formatUnitText(value, roundUnit));
-  }, [value, roundUnit]);
-
-  const commit = () => {
-    if (readOnly) return;
-    const trimmed = text.trim();
-    if (trimmed === '' || trimmed === '.' || trimmed === '-') {
-      setText(formatUnitText(value, roundUnit));
-      return;
-    }
-    const v = clampInput01(trimmed);
-    if (v == null) {
-      setText(formatUnitText(value, roundUnit));
-      return;
-    }
-    const r = roundUnit(v);
-    onCommit(r);
-    setText(formatUnitText(r, roundUnit));
-  };
-
-  return (
-    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <label htmlFor={id} className="text-[9px] font-medium text-muted-foreground">
-        {label}
-      </label>
-      <input
-        id={id}
-        type="text"
-        readOnly={readOnly}
-        aria-readonly={readOnly || undefined}
-        inputMode="decimal"
-        autoComplete="off"
-        spellCheck={false}
-        className={cn(
-          'h-8 w-full min-w-0 rounded border border-border/70 bg-muted/40 px-1.5 font-mono text-[11px] tabular-nums text-foreground shadow-inner dark:bg-muted/55',
-          readOnly && 'cursor-default bg-muted/25 text-muted-foreground'
-        )}
-        value={text}
-        onChange={readOnly ? undefined : (e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-      />
-    </div>
-  );
-}
-
-export function TechWeeklyRhythmPanel() {
+/** Store / trading YAML: `trading.weekly_pattern`, `trading.monthly_pattern`, early-month boost (Restaurant Activity lens). */
+export function RestaurantTradingPatternsPanel() {
   const country = useAtcStore((s) => s.country);
   const configs = useAtcStore((s) => s.configs);
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
-  const setTechWeeklyPattern = useAtcStore((s) => s.setTechWeeklyPattern);
+  const setTradingWeeklyPattern = useAtcStore((s) => s.setTradingWeeklyPattern);
   const setTradingMonthlyPattern = useAtcStore((s) => s.setTradingMonthlyPattern);
   const riskTuning = useAtcStore((s) => s.riskTuning);
   const setRiskTuning = useAtcStore((s) => s.setRiskTuning);
@@ -128,20 +47,21 @@ export function TechWeeklyRhythmPanel() {
     [country, configs, runwayMarketOrder]
   );
 
-  const techPattern = useMemo(() => {
+  const weeklyStorePattern = useMemo(() => {
     const c = configs.find((x) => x.market === focusMarket);
-    return fullTechWeeklyPatternFromPartial(c?.techRhythm?.weekly_pattern);
+    const wp = c?.trading?.weekly_pattern as Record<string, unknown> | undefined;
+    return fullTechWeeklyPatternFromPartial(wp);
   }, [configs, focusMarket]);
+
+  const weeklyStoreSeries = useMemo(
+    () => TECH_WEEKLY_DAY_KEYS.map((d) => roundTechUnit(weeklyStorePattern[d])),
+    [weeklyStorePattern]
+  );
 
   const monthlyPattern = useMemo(() => {
     const c = configs.find((x) => x.market === focusMarket);
     return fullTradingMonthlyPatternFromPartial(c?.monthlyTradingPattern);
   }, [configs, focusMarket]);
-
-  const weeklySeries = useMemo(
-    () => TECH_WEEKLY_DAY_KEYS.map((d) => roundTechUnit(techPattern[d])),
-    [techPattern]
-  );
 
   const monthlySeries = useMemo(
     () => TRADING_MONTH_KEYS.map((m) => roundMonthlyUnit(monthlyPattern[m])),
@@ -158,7 +78,6 @@ export function TechWeeklyRhythmPanel() {
     [paydayKnotsUi]
   );
 
-  /** Tight Y domain so small boosts (e.g. 0.15) use most of the chart height. */
   const earlyMonthYDomain = useMemo((): [number, number] => {
     const maxV = Math.max(...earlyMonthSparkline01, 0);
     if (maxV < 1e-6) return [0, 0.14];
@@ -166,9 +85,9 @@ export function TechWeeklyRhythmPanel() {
     return [0, Math.max(top, 0.07)];
   }, [earlyMonthSparkline01]);
 
-  const patchTechDay = (day: TechWeeklyDayKey, n: number) => {
-    const next: TechWeeklyPatternPatch = { ...techPattern, [day]: roundTechUnit(n) };
-    setTechWeeklyPattern(next);
+  const patchStoreWeekDay = (day: TechWeeklyDayKey, n: number) => {
+    const next: TradingWeeklyPatternPatch = { ...weeklyStorePattern, [day]: roundTechUnit(n) };
+    setTradingWeeklyPattern(next);
   };
 
   const patchMonth = (month: TradingMonthKey, n: number) => {
@@ -188,42 +107,48 @@ export function TechWeeklyRhythmPanel() {
   );
 
   return (
-    <div className="flex min-w-0 flex-col gap-2 border-t border-border/60 pt-3">
+    <div className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-col gap-0.5">
-        <span className="text-[10px] font-medium tracking-wide text-muted-foreground">
-          Daily Business Weightings
+        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          Store week (Mon–Sun)
         </span>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Seven values <strong className="font-medium text-foreground/80">0–1</strong> for Mon–Sun. Writes{' '}
-          <span className="font-mono text-foreground/80">tech.weekly_pattern</span>; named levels in YAML still load.
+          <strong className="font-medium text-foreground/80">Restaurant / in-store</strong> — seven values{' '}
+          <strong className="font-medium text-foreground/80">0–1</strong> for{' '}
+          <span className="font-mono text-foreground/80">trading.weekly_pattern</span>. Multiplied by monthly weights
+          below, then seasonal. Not the same as{' '}
+          <span className="font-mono text-foreground/80">tech.weekly_pattern</span> (Technology lens).
         </p>
         {isRunwayAllMarkets(country) ? (
           <p className="text-[10px] leading-snug text-muted-foreground">
-            LIOM: editing <span className="font-mono text-foreground/80">{focusMarket}</span> (first market in runway
-            order), same as Technology heatmap γ.
+            LIOM: editing <span className="font-mono text-foreground/80">{focusMarket}</span>.
           </p>
         ) : null}
       </div>
 
       <div className="rounded-md border border-border/60 bg-muted/25 px-2 py-2 shadow-inner">
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Daily Business Weightings, 0 to 1 per weekday">
+        <WeightingLineMiniChart
+          values={weeklyStoreSeries}
+          ariaLabel={`Store trading weekly pattern 0 to 1 by weekday for ${focusMarket}`}
+          onPointChange={(i, v) => patchStoreWeekDay(TECH_WEEKLY_DAY_KEYS[i]!, roundTechUnit(v))}
+          pointLabels={TECH_WEEKLY_DAY_KEYS}
+        />
+        <div
+          className="mt-2 flex flex-wrap gap-2"
+          role="group"
+          aria-label="Store trading weekly pattern, 0 to 1 per weekday"
+        >
           {TECH_WEEKLY_DAY_KEYS.map((day) => (
-            <UnitField
+            <PatternUnitField
               key={day}
-              id={`tech-rhythm-${day}`}
+              id={`trading-weekly-${day}`}
               label={day}
-              value={roundTechUnit(techPattern[day])}
+              value={roundTechUnit(weeklyStorePattern[day])}
               roundUnit={roundTechUnit}
-              onCommit={(n) => patchTechDay(day, n)}
+              onCommit={(n) => patchStoreWeekDay(day, n)}
             />
           ))}
         </div>
-        <WeightingLineMiniChart
-          values={weeklySeries}
-          ariaLabel={`Tech weekly rhythm 0 to 1 by weekday for ${focusMarket}`}
-          onPointChange={(i, v) => patchTechDay(TECH_WEEKLY_DAY_KEYS[i]!, roundTechUnit(v))}
-          pointLabels={TECH_WEEKLY_DAY_KEYS}
-        />
         <p className="mt-1 text-[9px] leading-snug text-muted-foreground">
           Drag a point vertically to match the numeric fields (same 0–1 rounding).
         </p>
@@ -248,7 +173,7 @@ export function TechWeeklyRhythmPanel() {
           aria-label="Monthly business weightings, 0 to 1 per calendar month"
         >
           {TRADING_MONTH_KEYS.map((month) => (
-            <UnitField
+            <PatternUnitField
               key={month}
               id={`trading-monthly-${month}`}
               label={month}
@@ -298,7 +223,7 @@ export function TechWeeklyRhythmPanel() {
           aria-label="Early-month boost, excess above 1× at sample weeks W1–W4"
         >
           {([0, 1, 2, 3] as const).map((i) => (
-            <UnitField
+            <PatternUnitField
               key={i}
               id={`early-month-sample-${i}`}
               label={EARLY_MONTH_SAMPLE_LABELS[i]}

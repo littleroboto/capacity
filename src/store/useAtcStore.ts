@@ -39,6 +39,26 @@ import {
   patchDslTradingMonthlyPattern,
   type TradingMonthlyPatternPatch,
 } from '@/lib/dslTradingMonthlyPatch';
+import {
+  patchDslTradingWeeklyPattern,
+  type TradingWeeklyPatternPatch,
+} from '@/lib/dslTradingWeeklyPatch';
+import {
+  patchDslTechSupportMonthlyPattern,
+  patchDslTechSupportWeeklyPattern,
+  type TechSupportMonthlyPatternPatch,
+  type TechSupportWeeklyPatternPatch,
+} from '@/lib/dslTechSupportPatternPatch';
+import {
+  patchDslResourcesLabsMonthlyPattern,
+  patchDslResourcesStaffMonthlyPattern,
+  type ResourceCapacityMonthlyPatternPatch,
+} from '@/lib/dslResourcesCapacityMonthlyPatch';
+import {
+  patchDslTechAvailableCapacityPattern,
+  type TechAvailableCapacityPatternPatch,
+} from '@/lib/dslTechAvailableCapacityPatch';
+import { patchDslHolidayStaffingMultiplier, type HolidayStaffingBlockKind } from '@/lib/dslHolidayStaffingPatch';
 import { patchDslTechWeeklyPattern, type TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
 import {
@@ -48,6 +68,7 @@ import {
 } from '@/lib/riskHeatmapColors';
 import { syncRiskHeatmapVisualFromConfigs } from '@/lib/heatmapVisualFromConfigs';
 import type { TechWorkloadScope } from '@/lib/runwayViewMetrics';
+import type { RunwayQuarter } from '@/lib/runwayDateFilter';
 import { getAtcDsl, setAtcDsl, setStored, getStored } from '@/lib/storage';
 
 /** Debounce writes to `atc_dsl` while dragging the heatmap γ slider. */
@@ -59,8 +80,14 @@ let atcDslTechRhythmPersistTimer: ReturnType<typeof setTimeout> | null = null;
 /** Debounce writes to `atc_dsl` while editing `trading.monthly_pattern`. */
 let atcDslTradingMonthlyPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Increments so the YAML editor can react to each new scroll-to-edit request. */
-let nextDslEditorRevealId = 1;
+/** Debounce writes to `atc_dsl` while editing `trading.weekly_pattern`. */
+let atcDslTradingWeeklyPersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce writes to `atc_dsl` while editing `tech.support_*_pattern`. */
+let atcDslTechSupportPersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce writes while editing tech capacity planning (resources / tech.available / holiday staffing). */
+let atcDslTechCapacityPlanningPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
 function countParsedMarkets(dsl: string): number {
   try {
@@ -101,6 +128,19 @@ type AtcState = {
    * Turn off for HTML cells + colour swoosh / disco twinkle.
    */
   runwaySvgHeatmap: boolean;
+  /**
+   * Code view: show the LLM YAML assistant dock (also enabled when URL has `?llm`). Persisted.
+   */
+  dslLlmAssistantEnabled: boolean;
+  /** Runway heatmap: filter by calendar year; `null` = all years in the model. Persisted. */
+  runwayFilterYear: number | null;
+  /** Runway heatmap: filter by quarter when {@link runwayFilterYear} is set; `null` = full year. Persisted. */
+  runwayFilterQuarter: RunwayQuarter | null;
+  /**
+   * When {@link runwayFilterYear} is set, extend the visible date range through the calendar quarter
+   * after the selected span (e.g. full 2026 + Q1 2027). Persisted.
+   */
+  runwayIncludeFollowingQuarter: boolean;
   /** Runway cell fill: multi-band temperature ramp vs one hue with alpha by intensity. */
   heatmapRenderStyle: HeatmapRenderStyle;
   /** `#rrggbb` when {@link heatmapRenderStyle} is `mono`. */
@@ -114,12 +154,6 @@ type AtcState = {
   dslAssistantEditorLock: boolean;
   setDslAssistantEditorLock: (v: boolean) => void;
   /**
-   * Ephemeral: Code view scrolls to this UTF-16 offset range after DSL assistant applies patches (see requestDslEditorReveal).
-   * Not persisted.
-   */
-  dslEditorRevealRequest: { id: number; start: number; end: number } | null;
-  requestDslEditorReveal: (start: number, end: number) => void;
-  /**
    * Technology lens only: heatmap + slot selection use total tech load, BAU surface only, or project surfaces only.
    */
   techWorkloadScope: TechWorkloadScope;
@@ -130,6 +164,10 @@ type AtcState = {
   setDiscoMode: (v: boolean) => void;
   setRunway3dHeatmap: (v: boolean) => void;
   setRunwaySvgHeatmap: (v: boolean) => void;
+  setDslLlmAssistantEnabled: (v: boolean) => void;
+  setRunwayFilterYear: (y: number | null) => void;
+  setRunwayFilterQuarter: (q: RunwayQuarter | null) => void;
+  setRunwayIncludeFollowingQuarter: (v: boolean) => void;
   setHeatmapRenderStyle: (v: HeatmapRenderStyle) => void;
   setHeatmapMonoColor: (hex: string) => void;
   setDslText: (t: string) => void;
@@ -143,6 +181,16 @@ type AtcState = {
   setTechWeeklyPattern: (pattern: TechWeeklyPatternPatch) => void;
   /** Writes explicit Jan–Dec `trading.monthly_pattern` (0–1) for the focused market and re-runs the pipeline. */
   setTradingMonthlyPattern: (pattern: TradingMonthlyPatternPatch) => void;
+  /** Writes explicit Mon–Sun `trading.weekly_pattern` (0–1) for the focused market and re-runs the pipeline. */
+  setTradingWeeklyPattern: (pattern: TradingWeeklyPatternPatch) => void;
+  /** Writes explicit Mon–Sun `tech.support_weekly_pattern` (0–1) for the focused market. */
+  setTechSupportWeeklyPattern: (pattern: TechSupportWeeklyPatternPatch) => void;
+  /** Writes explicit Jan–Dec `tech.support_monthly_pattern` (0–1) for the focused market. */
+  setTechSupportMonthlyPattern: (pattern: TechSupportMonthlyPatternPatch) => void;
+  setResourcesLabsMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => void;
+  setResourcesStaffMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => void;
+  setTechAvailableCapacityPattern: (pattern: TechAvailableCapacityPatternPatch) => void;
+  setHolidayStaffingMultiplier: (kind: HolidayStaffingBlockKind, value: number) => void;
   applyDsl: (text?: string) => void;
   resetDsl: () => void;
   /** `multiDocFallback`: bundled all-markets YAML when `atc_dsl` is empty (first visit). */
@@ -182,6 +230,10 @@ export const useAtcStore = create<AtcState>()(
       riskHeatmapCurve: 'power',
       runway3dHeatmap: false,
       runwaySvgHeatmap: true,
+      dslLlmAssistantEnabled: false,
+      runwayFilterYear: null,
+      runwayFilterQuarter: null,
+      runwayIncludeFollowingQuarter: false,
       heatmapRenderStyle: 'spectrum',
       heatmapMonoColor: DEFAULT_HEATMAP_MONO_COLOR,
       riskSurface: [],
@@ -190,15 +242,14 @@ export const useAtcStore = create<AtcState>()(
       discoMode: false,
       runwayReturnPicker: null,
       dslAssistantEditorLock: false,
-      dslEditorRevealRequest: null,
       techWorkloadScope: 'all',
 
       setDslAssistantEditorLock: (v) => set({ dslAssistantEditorLock: v }),
-      requestDslEditorReveal: (start, end) => {
-        const id = nextDslEditorRevealId++;
-        set({ dslEditorRevealRequest: { id, start, end } });
+      setTechWorkloadScope: (v) => {
+        const next: TechWorkloadScope =
+          v === 'bau' || v === 'project' || v === 'all' ? v : 'all';
+        set({ techWorkloadScope: next });
       },
-      setTechWorkloadScope: (v) => set({ techWorkloadScope: v }),
 
       setCountry: (c, options?: SetCountryOptions) => {
         const nextRunwayReturnPicker =
@@ -281,6 +332,15 @@ export const useAtcStore = create<AtcState>()(
 
       setRunway3dHeatmap: (v) => set({ runway3dHeatmap: v }),
       setRunwaySvgHeatmap: (v) => set({ runwaySvgHeatmap: v }),
+      setDslLlmAssistantEnabled: (v) => set({ dslLlmAssistantEnabled: v }),
+      setRunwayFilterYear: (y) =>
+        set({
+          runwayFilterYear: y,
+          runwayFilterQuarter: y == null ? null : get().runwayFilterQuarter,
+          runwayIncludeFollowingQuarter: y == null ? false : get().runwayIncludeFollowingQuarter,
+        }),
+      setRunwayFilterQuarter: (q) => set({ runwayFilterQuarter: q }),
+      setRunwayIncludeFollowingQuarter: (v) => set({ runwayIncludeFollowingQuarter: v }),
 
       setHeatmapRenderStyle: (v) => set({ heatmapRenderStyle: v }),
       setHeatmapMonoColor: (hex) => set({ heatmapMonoColor: normalizeHeatmapMonoHex(hex) }),
@@ -387,6 +447,166 @@ export const useAtcStore = create<AtcState>()(
         atcDslTradingMonthlyPersistTimer = setTimeout(() => {
           setAtcDsl(mergeStateToFullMultiDoc(get()));
           atcDslTradingMonthlyPersistTimer = null;
+        }, 450);
+      },
+
+      setTradingWeeklyPattern: (pattern: TradingWeeklyPatternPatch) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslTradingWeeklyPattern(full, market, pattern);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTradingWeeklyPersistTimer != null) clearTimeout(atcDslTradingWeeklyPersistTimer);
+        atcDslTradingWeeklyPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTradingWeeklyPersistTimer = null;
+        }, 450);
+      },
+
+      setTechSupportWeeklyPattern: (pattern: TechSupportWeeklyPatternPatch) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslTechSupportWeeklyPattern(full, market, pattern);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTechSupportPersistTimer != null) clearTimeout(atcDslTechSupportPersistTimer);
+        atcDslTechSupportPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTechSupportPersistTimer = null;
+        }, 450);
+      },
+
+      setTechSupportMonthlyPattern: (pattern: TechSupportMonthlyPatternPatch) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslTechSupportMonthlyPattern(full, market, pattern);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTechSupportPersistTimer != null) clearTimeout(atcDslTechSupportPersistTimer);
+        atcDslTechSupportPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTechSupportPersistTimer = null;
+        }, 450);
+      },
+
+      setResourcesLabsMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslResourcesLabsMonthlyPattern(full, market, pattern);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTechCapacityPlanningPersistTimer != null) clearTimeout(atcDslTechCapacityPlanningPersistTimer);
+        atcDslTechCapacityPlanningPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTechCapacityPlanningPersistTimer = null;
+        }, 450);
+      },
+
+      setResourcesStaffMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const staffBasis =
+          get().configs.find((x) => x.market === market)?.staffMonthlyPatternBasis === 'absolute'
+            ? 'absolute'
+            : 'relative';
+        const nextFull = patchDslResourcesStaffMonthlyPattern(full, market, pattern, {
+          staffBasis,
+        });
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTechCapacityPlanningPersistTimer != null) clearTimeout(atcDslTechCapacityPlanningPersistTimer);
+        atcDslTechCapacityPlanningPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTechCapacityPlanningPersistTimer = null;
+        }, 450);
+      },
+
+      setTechAvailableCapacityPattern: (pattern: TechAvailableCapacityPatternPatch) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslTechAvailableCapacityPattern(full, market, pattern);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTechCapacityPlanningPersistTimer != null) clearTimeout(atcDslTechCapacityPlanningPersistTimer);
+        atcDslTechCapacityPlanningPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTechCapacityPlanningPersistTimer = null;
+        }, 450);
+      },
+
+      setHolidayStaffingMultiplier: (kind: HolidayStaffingBlockKind, value: number) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslHolidayStaffingMultiplier(full, market, kind, value);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTechCapacityPlanningPersistTimer != null) clearTimeout(atcDslTechCapacityPlanningPersistTimer);
+        atcDslTechCapacityPlanningPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTechCapacityPlanningPersistTimer = null;
         }, 450);
       },
 
@@ -514,8 +734,8 @@ export const useAtcStore = create<AtcState>()(
     }),
     {
       name: STORAGE_KEYS.capacity_atc,
-      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. v4: tech workload scope. */
-      version: 4,
+      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. v4: tech workload scope. v5: DSL LLM assistant toybox toggle. v6: runway year/quarter filter. v7: runway + following quarter. */
+      version: 7,
       migrate: (persistedState, fromVersion) => {
         let ps = { ...(persistedState ?? {}) } as Record<string, unknown>;
         if (fromVersion < 1) {
@@ -541,6 +761,25 @@ export const useAtcStore = create<AtcState>()(
           ps = {
             ...ps,
             techWorkloadScope: 'all',
+          };
+        }
+        if (fromVersion < 5) {
+          ps = {
+            ...ps,
+            dslLlmAssistantEnabled: false,
+          };
+        }
+        if (fromVersion < 6) {
+          ps = {
+            ...ps,
+            runwayFilterYear: null,
+            runwayFilterQuarter: null,
+          };
+        }
+        if (fromVersion < 7) {
+          ps = {
+            ...ps,
+            runwayIncludeFollowingQuarter: false,
           };
         }
         return ps;
@@ -590,6 +829,23 @@ export const useAtcStore = create<AtcState>()(
         const tw = base.techWorkloadScope;
         const techWorkloadScope: TechWorkloadScope =
           tw === 'bau' || tw === 'project' || tw === 'all' ? tw : 'all';
+        const dslLlmAssistantEnabled =
+          typeof base.dslLlmAssistantEnabled === 'boolean'
+            ? base.dslLlmAssistantEnabled
+            : current.dslLlmAssistantEnabled;
+        const runwayFilterYear =
+          typeof base.runwayFilterYear === 'number' && Number.isFinite(base.runwayFilterYear)
+            ? base.runwayFilterYear
+            : base.runwayFilterYear === null
+              ? null
+              : current.runwayFilterYear;
+        const rq = base.runwayFilterQuarter;
+        const runwayFilterQuarter: RunwayQuarter | null =
+          rq === 1 || rq === 2 || rq === 3 || rq === 4 ? rq : rq === null ? null : current.runwayFilterQuarter;
+        const runwayIncludeFollowingQuarter =
+          typeof base.runwayIncludeFollowingQuarter === 'boolean'
+            ? base.runwayIncludeFollowingQuarter
+            : current.runwayIncludeFollowingQuarter;
         return {
           ...rest,
           country,
@@ -600,6 +856,10 @@ export const useAtcStore = create<AtcState>()(
           heatmapMonoColor,
           theme,
           techWorkloadScope,
+          dslLlmAssistantEnabled,
+          runwayFilterYear,
+          runwayFilterQuarter,
+          runwayIncludeFollowingQuarter,
         };
       },
       partialize: (s) => ({
@@ -613,6 +873,10 @@ export const useAtcStore = create<AtcState>()(
         heatmapRenderStyle: s.heatmapRenderStyle,
         heatmapMonoColor: s.heatmapMonoColor,
         techWorkloadScope: s.techWorkloadScope,
+        dslLlmAssistantEnabled: s.dslLlmAssistantEnabled,
+        runwayFilterYear: s.runwayFilterYear,
+        runwayFilterQuarter: s.runwayFilterQuarter,
+        runwayIncludeFollowingQuarter: s.runwayIncludeFollowingQuarter,
       }),
     }
   )

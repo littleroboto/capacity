@@ -2,14 +2,14 @@ import { memo, useCallback, useMemo } from 'react';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
-import {
-  heatmapColorForViewMode,
-  HEATMAP_RUNWAY_PAD_FILL,
-  type HeatmapColorOpts,
-} from '@/lib/riskHeatmapColors';
+import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import { layoutCompareMarketColumnSvg } from '@/lib/runwayCompareSvgLayout';
 import type { VerticalYearSection } from '@/lib/calendarQuarterLayout';
-import { heatmapCellMetric, type TechWorkloadScope } from '@/lib/runwayViewMetrics';
+import {
+  heatmapCellMetric,
+  runwayHeatmapCellFillAndDim,
+  type TechWorkloadScope,
+} from '@/lib/runwayViewMetrics';
 
 type RunwayTipAnchor = { clientX: number; clientY: number };
 
@@ -111,8 +111,9 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
         const dateStr = c.cell;
         const row = dateStr ? riskByDate.get(dateStr) : undefined;
         const metric = row ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope) : undefined;
-        const fill = !dateStr ? HEATMAP_RUNWAY_PAD_FILL : heatmapColorForViewMode(viewMode, metric, heatmapOpts);
-        const dimOp = 1;
+        const { fill, dimOpacity: dimOp } = !dateStr
+          ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
+          : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts);
         const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
         const opacity = pastDimmed ? 0.25 * dimOp : dimOp;
         const isToday = typeof dateStr === 'string' && dateStr === todayYmd;

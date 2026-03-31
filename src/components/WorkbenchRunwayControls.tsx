@@ -42,7 +42,12 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
   const reduceMotion = useReducedMotion();
 
   return (
-    <div className="flex shrink-0 flex-col gap-3 rounded-lg border border-border/60 bg-muted/15 p-3">
+    <div
+      className={cn(
+        'flex shrink-0 flex-col gap-3 rounded-lg border border-border/60 bg-muted/15 p-3',
+        'shadow-[0_0_22px_-6px_rgba(37,99,235,0.28)] dark:shadow-[0_0_32px_-8px_rgba(96,165,250,0.22)]'
+      )}
+    >
       <p className="text-[10px] leading-snug text-muted-foreground">
         {compareAllMarkets ? (
           <>
@@ -96,7 +101,7 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
                   value={techWorkloadScope}
                   onValueChange={(v) => setTechWorkloadScope(v as TechWorkloadScope)}
                   aria-labelledby="workbench-tech-load-hint"
-                  className="grid grid-cols-3 gap-px overflow-hidden rounded-md bg-border/40 p-px ring-1 ring-border/35"
+                  className="grid grid-cols-2 gap-px overflow-hidden rounded-md bg-border/40 p-px ring-1 ring-border/35 sm:grid-cols-3"
                 >
                   {TECH_WORKLOAD_OPTIONS.map((opt) => {
                     const on = techWorkloadScope === opt.value;

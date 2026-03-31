@@ -3,8 +3,18 @@ import { emptySurfaceSlice, emptySurfaceTotals, mergeSurfaceSlices } from '@/dom
 import type { RiskRow } from '@/engine/riskModel';
 import { DEFAULT_RISK_TUNING, STORE_PRESSURE_MAX, type RiskModelTuning } from '@/engine/riskModelTuning';
 import type { ViewModeId } from '@/lib/constants';
+import {
+  heatmapColorForViewMode,
+  HEATMAP_RUNWAY_PAD_FILL,
+  type HeatmapColorOpts,
+} from '@/lib/riskHeatmapColors';
 
-/** Technology heatmap: all scheduled tech load, BAU surface only, or non-BAU (programmes, campaigns, coordination, carryover). */
+/**
+ * Technology heatmap slice:
+ * - `all` — max of lab / Market IT / backend demand (default)
+ * - `bau` — BAU planning surface only (same max formula)
+ * - `project` — change / campaign / coordination / carryover surfaces only (no separate “Market IT only” slice)
+ */
 export type TechWorkloadScope = 'all' | 'bau' | 'project';
 
 const TECH_BAU_SURFACES: readonly PressureSurfaceId[] = ['bau'];
@@ -64,11 +74,11 @@ export function technologyFillMetricHeadline(scope: TechWorkloadScope): string {
 export function technologyFillMetricLabel(scope: TechWorkloadScope): string {
   switch (scope) {
     case 'bau':
-      return 'BAU only—routine BAU and weekly tech rhythm; labs, teams, and backend versus capacity';
+      return 'BAU only—routine BAU and weekly tech rhythm; labs, Market IT, and backend versus capacity';
     case 'project':
       return 'Project work only—campaigns, tech programmes, releases, coordination, and carryover versus capacity';
     default:
-      return 'Combined load—scheduled work on labs, field teams, and backend versus each lane’s capacity';
+      return 'Combined load—scheduled work on labs, Market IT, and backend versus each lane’s capacity';
   }
 }
 
@@ -101,6 +111,40 @@ export function heatmapCellMetric(
     default:
       return technologyHeatmapMetric(row, techWorkloadScope);
   }
+}
+
+/** Technology Teams lens + **Project work** scope with no project-surface demand (raw metric ≤ 0). */
+export function techProjectWorkUsesDimmedCellStyle(
+  viewMode: ViewModeId,
+  techWorkloadScope: TechWorkloadScope,
+  metric: number | undefined
+): boolean {
+  return (
+    viewMode === 'combined' &&
+    techWorkloadScope === 'project' &&
+    metric != null &&
+    !Number.isNaN(metric) &&
+    metric <= 0
+  );
+}
+
+const PROJECT_WORK_ZERO_DIM_OPACITY = 0.5;
+
+/**
+ * Runway cell colour + inner dim multiplier. For Project work at **0**, uses pad-style fill and reduced opacity
+ * so zeros read inactive — not the same as the lowest heatmap band after curve/γ.
+ */
+export function runwayHeatmapCellFillAndDim(
+  viewMode: ViewModeId,
+  techWorkloadScope: TechWorkloadScope,
+  metric: number | undefined,
+  opts?: HeatmapColorOpts
+): { fill: string; dimOpacity: number } {
+  const fill = heatmapColorForViewMode(viewMode, metric, opts);
+  if (techProjectWorkUsesDimmedCellStyle(viewMode, techWorkloadScope, metric)) {
+    return { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: PROJECT_WORK_ZERO_DIM_OPACITY };
+  }
+  return { fill, dimOpacity: 1 };
 }
 
 /**

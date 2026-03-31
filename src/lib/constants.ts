@@ -20,7 +20,7 @@ export const VIEW_MODES = [
     /** Short heading above the main runway heatmap. */
     runwayHeatmapTitle: 'Tech capacity demand',
     title:
-      'Tech capacity demand: labs, teams, and backend versus effective capacity. Prep-heavy periods read hotter than live campaign support. γ_tech and transfer curve apply.',
+      'Tech capacity demand: labs, Market IT, and backend versus effective capacity. Prep-heavy periods read hotter than live campaign support. γ_tech and transfer curve apply.',
   },
   {
     id: 'in_store',

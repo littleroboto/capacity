@@ -1,7 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import * as monaco from 'monaco-editor';
-import type { editor } from 'monaco-editor';
+import { useCallback, useMemo, useState } from 'react';
 import Editor, { type BeforeMount, type Monaco, type OnMount } from '@monaco-editor/react';
 import {
   ALargeSmall,
@@ -44,6 +42,9 @@ export function DslSyntaxHelpBody({ className }: { className?: string }) {
       <span className="font-mono text-foreground/80">teams_scale</span>,{' '}
       <span className="font-mono text-foreground/80">trading.monthly_pattern</span> (optional Jan–Dec{' '}
       <strong>0–1</strong> multipliers on weekly store level),{' '}
+      <span className="font-mono text-foreground/80">tech.support_weekly_pattern</span> /{' '}
+      <span className="font-mono text-foreground/80">support_monthly_pattern</span> (optional Market IT–only readiness
+      rhythm; monthly defaults to <strong>1</strong>),{' '}
       <span className="font-mono text-foreground/80">trading.seasonal</span> (annual store wave),{' '}
       <span className="font-mono text-foreground/80">prep_before_live_days</span> +{' '}
       <span className="font-mono text-foreground/80">live_support_load</span> /{' '}
@@ -111,7 +112,6 @@ export function DslEditorCore({
   const dslText = useAtcStore((s) => s.dslText);
   const parseError = useAtcStore((s) => s.parseError);
   const dslAssistantEditorLock = useAtcStore((s) => s.dslAssistantEditorLock);
-  const dslEditorRevealRequest = useAtcStore((s) => s.dslEditorRevealRequest);
   const theme = useAtcStore((s) => s.theme);
   const setDslText = useAtcStore((s) => s.setDslText);
   const applyDsl = useAtcStore((s) => s.applyDsl);
@@ -153,15 +153,11 @@ export function DslEditorCore({
 
   const monacoTheme = capacityYamlThemeId(isDark);
 
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const lastRevealIdRef = useRef(0);
-
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     registerCapacityYamlThemes(monaco);
   }, []);
 
   const handleMount = useCallback<OnMount>((editor) => {
-    editorRef.current = editor;
     const sync = () => {
       const p = editor.getPosition();
       if (p) setCursorPos({ line: p.lineNumber, column: p.column });
@@ -169,32 +165,6 @@ export function DslEditorCore({
     sync();
     editor.onDidChangeCursorPosition(sync);
   }, []);
-
-  useEffect(() => {
-    const req = dslEditorRevealRequest;
-    const ed = editorRef.current;
-    if (!req || !ed) return;
-    if (req.id === lastRevealIdRef.current) return;
-    lastRevealIdRef.current = req.id;
-    const model = ed.getModel();
-    if (!model) return;
-    const run = () => {
-      const len = model.getValueLength();
-      if (len === 0) return;
-      const s = Math.max(0, Math.min(req.start, len));
-      const e = Math.max(Math.min(req.end, len), Math.min(s + 1, len));
-      const startPos = model.getPositionAt(s);
-      const endPos = model.getPositionAt(e);
-      const range = new monaco.Range(
-        startPos.lineNumber,
-        startPos.column,
-        endPos.lineNumber,
-        endPos.column
-      );
-      ed.revealRangeInCenter(range, monaco.editor.ScrollType.Smooth);
-    };
-    requestAnimationFrame(() => requestAnimationFrame(run));
-  }, [dslEditorRevealRequest, dslText]);
 
   const handleSaveScenario = () => {
     const id = saveNamedWorkspaceInteractive();

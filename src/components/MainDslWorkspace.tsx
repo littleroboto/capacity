@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DslAssistantPanel } from '@/components/DslAssistantPanel';
 import { DslEditorCore } from '@/components/DslEditorCore';
 import { cn } from '@/lib/utils';
+import { useAtcStore } from '@/store/useAtcStore';
 import { GripHorizontal } from 'lucide-react';
 
 const DOCK_H_KEY = 'capacity:dsl-dock-px';
@@ -10,6 +11,20 @@ const MIN_DOCK_PX = 160;
 /** Keep at least this much vertical space for the code editor when dragging the assistant up. */
 const MIN_EDITOR_RESIZE_PX = 140;
 const SEPARATOR_HIT_PX = 12;
+
+/** True when the URL query includes `llm` (e.g. `?llm` or `?foo=1&llm`). */
+function subscribeToLocationSearch(cb: () => void): () => void {
+  window.addEventListener('popstate', cb);
+  return () => window.removeEventListener('popstate', cb);
+}
+
+function readLlmQueryEnabled(): boolean {
+  return new URLSearchParams(window.location.search).has('llm');
+}
+
+function useLlmAssistantFromQuery(): boolean {
+  return useSyncExternalStore(subscribeToLocationSearch, readLlmQueryEnabled, () => false);
+}
 
 function readDockHeight(): number {
   try {
@@ -23,6 +38,9 @@ function readDockHeight(): number {
 
 /** Full-width IDE layout: Monaco + resizable assistant dock (single main column). */
 export function MainDslWorkspace() {
+  const llmFromQuery = useLlmAssistantFromQuery();
+  const llmFromToybox = useAtcStore((s) => s.dslLlmAssistantEnabled);
+  const showLlmAssistant = llmFromQuery || llmFromToybox;
   const [dockHeight, setDockHeight] = useState(readDockHeight);
   const [maxDockPx, setMaxDockPx] = useState(560);
   const [dragging, setDragging] = useState(false);
@@ -48,12 +66,13 @@ export function MainDslWorkspace() {
   }, [maxDockPx]);
 
   useEffect(() => {
+    if (!showLlmAssistant) return;
     try {
       sessionStorage.setItem(DOCK_H_KEY, String(Math.round(dockHeight)));
     } catch {
       /* ignore */
     }
-  }, [dockHeight]);
+  }, [dockHeight, showLlmAssistant]);
 
   useEffect(() => {
     if (!dragging) return;
@@ -120,59 +139,63 @@ export function MainDslWorkspace() {
         editorChrome="studio"
       />
 
-      <div
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label="Drag to resize code editor and assistant"
-        aria-valuemin={MIN_DOCK_PX}
-        aria-valuemax={maxDockPx}
-        aria-valuenow={Math.round(dockHeight)}
-        title="Drag to resize · double-click to reset assistant height"
-        className={cn(
-          'group relative z-10 flex shrink-0 cursor-row-resize items-center justify-center border-y border-border/30 bg-muted/20',
-          'min-h-[12px] py-1 transition-[background-color,border-color] duration-150',
-          'hover:border-border/60 hover:bg-muted/45',
-          dragging && 'border-primary/40 bg-primary/10',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background'
-        )}
-        style={{ minHeight: SEPARATOR_HIT_PX }}
-        tabIndex={0}
-        onPointerDown={onPointerDownSeparator}
-        onDoubleClick={onSeparatorDoubleClick}
-        onKeyDown={(e) => {
-          const step = 24;
-          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            setDockHeight((h) =>
-              e.key === 'ArrowUp'
-                ? clampDock(h + step)
-                : clampDock(h - step)
-            );
-          }
-          if (e.key === 'Home') {
-            e.preventDefault();
-            setDockHeight(MIN_DOCK_PX);
-          }
-          if (e.key === 'End') {
-            e.preventDefault();
-            setDockHeight(maxDockPx);
-          }
-        }}
-      >
-        <span className="pointer-events-none flex flex-col items-center gap-0.5 text-muted-foreground">
-          <GripHorizontal className="h-4 w-9 shrink-0 opacity-50 group-hover:opacity-90" strokeWidth={2} aria-hidden />
-          <span className="select-none text-[10px] font-medium uppercase tracking-wider opacity-0 transition-opacity group-hover:opacity-70">
-            Drag
-          </span>
-        </span>
-      </div>
+      {showLlmAssistant ? (
+        <>
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Drag to resize code editor and assistant"
+            aria-valuemin={MIN_DOCK_PX}
+            aria-valuemax={maxDockPx}
+            aria-valuenow={Math.round(dockHeight)}
+            title="Drag to resize · double-click to reset assistant height"
+            className={cn(
+              'group relative z-10 flex shrink-0 cursor-row-resize items-center justify-center border-y border-border/30 bg-muted/20',
+              'min-h-[12px] py-1 transition-[background-color,border-color] duration-150',
+              'hover:border-border/60 hover:bg-muted/45',
+              dragging && 'border-primary/40 bg-primary/10',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+            )}
+            style={{ minHeight: SEPARATOR_HIT_PX }}
+            tabIndex={0}
+            onPointerDown={onPointerDownSeparator}
+            onDoubleClick={onSeparatorDoubleClick}
+            onKeyDown={(e) => {
+              const step = 24;
+              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                setDockHeight((h) =>
+                  e.key === 'ArrowUp'
+                    ? clampDock(h + step)
+                    : clampDock(h - step)
+                );
+              }
+              if (e.key === 'Home') {
+                e.preventDefault();
+                setDockHeight(MIN_DOCK_PX);
+              }
+              if (e.key === 'End') {
+                e.preventDefault();
+                setDockHeight(maxDockPx);
+              }
+            }}
+          >
+            <span className="pointer-events-none flex flex-col items-center gap-0.5 text-muted-foreground">
+              <GripHorizontal className="h-4 w-9 shrink-0 opacity-50 group-hover:opacity-90" strokeWidth={2} aria-hidden />
+              <span className="select-none text-[10px] font-medium uppercase tracking-wider opacity-0 transition-opacity group-hover:opacity-70">
+                Drag
+              </span>
+            </span>
+          </div>
 
-      <div
-        className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-b-2xl border border-t-0 border-border/60 bg-card/40 px-3 pb-3 pt-2.5 shadow-sm dark:border-border/50 dark:bg-zinc-950/40"
-        style={{ height: dockHeight }}
-      >
-        <DslAssistantPanel layout="dock" />
-      </div>
+          <div
+            className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-b-2xl border border-t-0 border-border/60 bg-card/40 px-3 pb-3 pt-2.5 shadow-sm dark:border-border/50 dark:bg-zinc-950/40"
+            style={{ height: dockHeight }}
+          >
+            <DslAssistantPanel layout="dock" />
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

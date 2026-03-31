@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { HeatmapSettingsPanel } from '@/components/HeatmapSettingsPanel';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
 import { RiskModelPanel } from '@/components/RiskModelPanel';
 import { WorkbenchRunwayControls } from '@/components/WorkbenchRunwayControls';
@@ -14,7 +15,7 @@ import {
 import { saveNamedWorkspaceInteractive } from '@/lib/workspaceSnapshot';
 import { isRunwayAllMarkets } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
-import { ChevronLeft, ChevronRight, Database, FileCode2, Save } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, FileCode2, Save, SlidersHorizontal } from 'lucide-react';
 
 type DSLPanelProps = {
   collapsed: boolean;
@@ -24,11 +25,44 @@ type DSLPanelProps = {
 /** Sits in a split layout: runway/heatmap left, controls + workbench right. */
 export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
   const [localDataOpen, setLocalDataOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const parseError = useAtcStore((s) => s.parseError);
   const country = useAtcStore((s) => s.country);
   const setViewMode = useAtcStore((s) => s.setViewMode);
   const viewMode = useAtcStore((s) => s.viewMode);
+  const resetRiskTuning = useAtcStore((s) => s.resetRiskTuning);
   const compareAllMarkets = isRunwayAllMarkets(country);
+
+  const settingsDialog = (
+    <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+      <DialogContent className="max-h-[min(88dvh,720px)] gap-0 overflow-hidden sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Settings</DialogTitle>
+          <DialogDescription className="text-pretty">
+            Heatmap transfer curve, γ, runway palette, and campaign overlay when not in Technology Teams view. Applies
+            to saved snapshots.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="overflow-y-auto px-5 pb-2 pt-1">
+          <HeatmapSettingsPanel showCampaignBoost={viewMode !== 'combined'} />
+        </div>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              resetRiskTuning();
+            }}
+          >
+            Reset tuning
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => setSettingsOpen(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   const localDataDialog = (
     <Dialog open={localDataOpen} onOpenChange={setLocalDataOpen}>
@@ -98,6 +132,17 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           >
             <Database className="h-4 w-4" aria-hidden />
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setSettingsOpen(true)}
+            title="Settings — heatmap curve, γ, campaign, palette"
+            aria-label="Open settings"
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden />
+          </Button>
           {parseError ? (
             <span
               className="h-2 w-2 shrink-0 rounded-full bg-red-500 dark:bg-red-400"
@@ -111,6 +156,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           ) : null}
         </aside>
         {localDataDialog}
+        {settingsDialog}
       </>
     );
   }
@@ -157,7 +203,8 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           {compareAllMarkets ? (
             <p className="text-pretty text-xs leading-relaxed text-muted-foreground">
               <span className="font-medium text-foreground/85">Focus</span> a single market for YAML editing, the DSL
-              assistant, <span className="font-medium text-foreground/85">Code</span> view, and heatmap adjustments.
+              assistant, <span className="font-medium text-foreground/85">Code</span> view, business patterns, and{' '}
+              <span className="font-medium text-foreground/85">Settings</span>.
             </p>
           ) : null}
           <RiskModelPanel />
@@ -181,6 +228,18 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
             variant="outline"
             size="sm"
             className="h-7 gap-1.5 px-2 text-[11px] font-normal leading-none"
+            onClick={() => setSettingsOpen(true)}
+            title="Heatmap curve, γ, campaign boost, palette"
+            aria-label="Open settings — heatmap and display"
+          >
+            <SlidersHorizontal className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+            Settings
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-[11px] font-normal leading-none"
             onClick={() => {
               saveNamedWorkspaceInteractive();
             }}
@@ -193,6 +252,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
         </div>
       </aside>
       {localDataDialog}
+      {settingsDialog}
     </>
   );
 }

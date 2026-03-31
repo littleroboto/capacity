@@ -4,7 +4,7 @@ import type { RiskRow } from '@/engine/riskModel';
 import { normalizedRiskWeights, type RiskModelTuning } from '@/engine/riskModelTuning';
 import type { BauEntry, MarketConfig } from '@/engine/types';
 import type { ViewModeId } from '@/lib/constants';
-import { inStoreHeatmapMetric } from '@/lib/runwayViewMetrics';
+import { inStoreHeatmapMetric, type TechWorkloadScope } from '@/lib/runwayViewMetrics';
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
 import { buildDriverSummaryBlocks, type RunwayDriverBlock } from '@/lib/runwayScoreSummary';
 
@@ -104,11 +104,11 @@ export function activeOperatingWindowSummaries(
     if (!dateInInclusiveWindow(dateStr, w.start, w.end)) continue;
     const bits: string[] = [];
     if (w.lab_load_mult != null && w.lab_load_mult !== 1) bits.push(`lab load ×${w.lab_load_mult}`);
-    if (w.team_load_mult != null && w.team_load_mult !== 1) bits.push(`team load ×${w.team_load_mult}`);
+    if (w.team_load_mult != null && w.team_load_mult !== 1) bits.push(`Market IT load ×${w.team_load_mult}`);
     if (w.backend_load_mult != null && w.backend_load_mult !== 1) bits.push(`backend ×${w.backend_load_mult}`);
     if (w.store_pressure_mult != null && w.store_pressure_mult !== 1) bits.push(`store ×${w.store_pressure_mult}`);
     if (w.lab_team_capacity_mult != null && w.lab_team_capacity_mult !== 1) {
-      bits.push(`lab/team cap ×${w.lab_team_capacity_mult}`);
+      bits.push(`lab / Market IT cap ×${w.lab_team_capacity_mult}`);
     }
     out.push(bits.length ? `${w.name.replace(/_/g, ' ')} · ${bits.join(' · ')}` : w.name.replace(/_/g, ' '));
   }
@@ -165,7 +165,7 @@ export function pressureSurfaceLines(row: RiskRow): string[] {
   const sorted = entries.filter(([, v]) => v >= 0.02).sort((a, b) => b[1] - a[1]);
   return sorted.map(([k, v]) => {
     const label = SURFACE_LABEL[k] ?? k;
-    return `${label}: about ${(v * 100).toFixed(0)}% of the busiest lane (lab, team, or backend)`;
+    return `${label}: about ${(v * 100).toFixed(0)}% of the busiest lane (lab, Market IT, or backend)`;
   });
 }
 
@@ -183,7 +183,7 @@ export function techPressureExplanation(row: RiskRow): string {
     return `Led by lab load (${(lab * 100).toFixed(0)}% of lab capacity${lab > 1.001 ? ' — above full capacity' : ''}).`;
   }
   if (Math.abs(m - team) < eps || team >= backHalf) {
-    return `Led by field / team load (${(team * 100).toFixed(0)}% of team capacity${team > 1.001 ? ' — above full capacity' : ''}).`;
+    return `Led by Market IT load (${(team * 100).toFixed(0)}% of Market IT capacity${team > 1.001 ? ' — above full capacity' : ''}).`;
   }
   return `Backend is the limiting lane (${(backR * 100).toFixed(0)}% of its cap; backend counts at half weight in the headline).`;
 }
@@ -195,7 +195,7 @@ export function techReadinessSustainExplanation(row: RiskRow): string | null {
   if (r < 0.02 && s < 0.02) return null;
   const parts: string[] = [];
   if (r >= 0.02) {
-    parts.push(`readiness / change work ${(r * 100).toFixed(0)}% (of lab/team/backend caps)`);
+    parts.push(`readiness / change work ${(r * 100).toFixed(0)}% (of lab / Market IT / backend caps)`);
   }
   if (s >= 0.02) {
     parts.push(`live / support segment ${(s * 100).toFixed(0)}%`);
@@ -217,7 +217,8 @@ export type RiskBlendTerm = {
 export function buildLensRiskBlendTerms(
   viewMode: ViewModeId,
   row: RiskRow,
-  tuning: RiskModelTuning
+  tuning: RiskModelTuning,
+  _techWorkloadScope: TechWorkloadScope = 'all'
 ): RiskBlendTerm[] {
   if (viewMode === 'combined') {
     const demand = row.tech_demand_ratio ?? row.tech_pressure ?? 0;
@@ -330,6 +331,8 @@ export function buildRunwayTooltipPayload(input: {
   fillMetricLabel: string;
   fillMetricValue: number;
   cellFillHex: string;
+  /** Technology lens workload slice (combined load, BAU, or project surfaces). */
+  techWorkloadScope?: TechWorkloadScope;
 }): RunwayTooltipPayload {
   const {
     dateStr,
@@ -343,6 +346,7 @@ export function buildRunwayTooltipPayload(input: {
     fillMetricLabel,
     fillMetricValue,
     cellFillHex,
+    techWorkloadScope = 'all',
   } = input;
   const activeCampaigns = activeCampaignNames(config, dateStr);
   const activeTechProgrammes = activeTechProgrammeNames(config, dateStr);
@@ -364,7 +368,7 @@ export function buildRunwayTooltipPayload(input: {
     storeTradingLine: storeTradingLineResolved,
     techExplanation,
     techReadinessSustainLine: techReadinessSustainExplanation(row),
-    riskTerms: buildLensRiskBlendTerms(viewMode, row, tuning),
+    riskTerms: buildLensRiskBlendTerms(viewMode, row, tuning, techWorkloadScope),
     riskBand: row.risk_band,
     fillMetricHeadline,
     fillMetricLabel,

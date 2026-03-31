@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { runwayHeatmapTitleForViewMode, type ViewModeId } from '@/lib/constants';
 import {
   heatmapCellMetric,
+  runwayHeatmapCellFillAndDim,
   technologyFillMetricHeadline,
   technologyFillMetricLabel,
   technologyRunwayTitleForWorkloadScope,
@@ -12,13 +13,11 @@ import {
 import { parseDate } from '@/engine/calendar';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
-import {
-  heatmapColorForViewMode,
-  HEATMAP_RUNWAY_PAD_FILL,
-  type HeatmapColorOpts,
-} from '@/lib/riskHeatmapColors';
+import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import { HeatmapLegend } from '@/components/HeatmapLegend';
 import { RunwayFocusSelect } from '@/components/RunwayFocusSelect';
+import { RunwayRangeSelect } from '@/components/RunwayRangeSelect';
+import { enumerateIsoDatesInclusive, runwayPickerLayoutBounds } from '@/lib/runwayDateFilter';
 import { buildRunwayTooltipPayload, type RunwayTipState } from '@/lib/runwayTooltipBreakdown';
 import {
   CALENDAR_MONTH_HEADER_H,
@@ -68,6 +67,7 @@ import { RunwayIsoSkyline } from '@/components/RunwayIsoSkyline';
 import { RunwayCompareSvgColumn } from '@/components/RunwayCompareSvgColumn';
 import { RunwayQuarterGridSvg } from '@/components/RunwayQuarterGridSvg';
 import { CalendarDays, Download, Loader2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 
 /** Default cell size (px) for runway heatmaps (single-market and LIOM compare). */
 export const CELL_PX = 20;
@@ -123,7 +123,14 @@ function RunwayMarketCodeSticker({
     subtitle && subtitle.trim() && subtitle.trim() !== code
       ? `${code} — ${subtitle.trim()}`
       : `Market ${code}`;
-  const base = 'shrink-0 text-sm font-bold tabular-nums tracking-tight text-foreground';
+  const codeClass = 'shrink-0 text-sm font-bold tabular-nums tracking-tight text-foreground';
+  /** Flag SVGs must not inherit `color` from the control (can flatten fills to a gray disc in dark UI). */
+  const label = (
+    <>
+      <span className={codeClass}>{code}</span>
+      <MarketCircleFlag marketId={code} size={20} className="max-sm:scale-95" />
+    </>
+  );
   if (onSelect) {
     const aria = `${tip}. Open single-market runway for ${code}.`;
     return (
@@ -133,20 +140,19 @@ function RunwayMarketCodeSticker({
         aria-label={aria}
         onClick={onSelect}
         className={cn(
-          base,
-          'cursor-pointer rounded-md border border-transparent px-1 py-0.5 -mx-1 -my-0.5',
+          'inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-md border border-transparent px-1 py-0.5 -mx-1 -my-0.5 font-bold tabular-nums tracking-tight',
           'transition-[color,background-color,border-color] duration-150',
-          'hover:border-border/50 hover:bg-accent/50 hover:text-foreground',
+          'hover:border-border/50 hover:bg-accent/50',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
         )}
       >
-        {code}
+        {label}
       </button>
     );
   }
   return (
-    <span title={tip} className={base}>
-      {code}
+    <span title={tip} className="inline-flex shrink-0 items-center gap-2">
+      {label}
     </span>
   );
 }
@@ -905,10 +911,9 @@ function RunwayMonthMiniGrid({
             const metric = row
               ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope)
               : undefined;
-            const fill = !dateStr
-              ? HEATMAP_RUNWAY_PAD_FILL
-              : heatmapColorForViewMode(viewMode, metric, heatmapOpts);
-            const dimOpacity = 1;
+            const { fill, dimOpacity } = !dateStr
+              ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
+              : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts);
             const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
             const shimmerBase = ((secYear % 100) * 500 + mo.monthIndex * 40 + wi * 7 + di) % 900;
             const sweepDelaySec = sweepDelayForCell(sweepMarketOffsetSec, si, sweepMi, wi, di);
@@ -1303,6 +1308,9 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   const runway3dHeatmap = useAtcStore((s) => s.runway3dHeatmap);
   const runwaySvgHeatmapPref = useAtcStore((s) => s.runwaySvgHeatmap);
   const useSvgHeatmap = runwaySvgHeatmapPref && (compareAllMarkets || !runway3dHeatmap);
+  const runwayFilterYear = useAtcStore((s) => s.runwayFilterYear);
+  const runwayFilterQuarter = useAtcStore((s) => s.runwayFilterQuarter);
+  const runwayIncludeFollowingQuarter = useAtcStore((s) => s.runwayIncludeFollowingQuarter);
 
   const [displayedCountry, setDisplayedCountry] = useState(country);
   const [countrySwitchLoading, setCountrySwitchLoading] = useState(false);
@@ -1363,10 +1371,18 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     [configs, singleMarketId]
   );
 
-  const allDatesSorted = useMemo(
-    () => [...new Set(riskSurface.map((r) => r.date))].sort(),
-    [riskSurface]
-  );
+  /** Dates shown in the calendar: full picker span when year is set (every calendar day), else model dates only. */
+  const layoutDatesSorted = useMemo(() => {
+    if (runwayFilterYear != null) {
+      const { start, end } = runwayPickerLayoutBounds(
+        runwayFilterYear,
+        runwayFilterQuarter,
+        runwayIncludeFollowingQuarter
+      );
+      return enumerateIsoDatesInclusive(start, end);
+    }
+    return [...new Set(riskSurface.map((r) => r.date))].sort();
+  }, [riskSurface, runwayFilterYear, runwayFilterQuarter, runwayIncludeFollowingQuarter]);
 
   useLayoutEffect(() => {
     setTip(null);
@@ -1402,7 +1418,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   }, [compareAllMarkets, onSlotSelection]);
 
   const marketsFitKey = useMemo(() => marketsOrdered.join(','), [marketsOrdered]);
-  const compareDatesFitKey = useMemo(() => allDatesSorted.join(','), [allDatesSorted]);
+  const compareDatesFitKey = useMemo(() => layoutDatesSorted.join(','), [layoutDatesSorted]);
 
   useLayoutEffect(() => {
     if (!compareAllMarkets || marketsOrdered.length === 0 || countrySwitchLoading) return;
@@ -1424,7 +1440,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
         w,
         h,
         marketsOrdered.length,
-        allDatesSorted
+        layoutDatesSorted
       );
       setRunwayCellPx((prev) => (prev === next ? prev : next));
     };
@@ -1466,14 +1482,14 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   }, []);
 
   const calendarLayout = useMemo(() => {
-    if (compareAllMarkets) return buildVerticalMonthsRunwayLayout(allDatesSorted, cellPx);
+    if (compareAllMarkets) return buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx);
     if (runway3dHeatmap) {
-      return buildVerticalMonthsRunwayLayout(allDatesSorted, cellPx, {
+      return buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx, {
         rowTowerPx: runway3dRowTowerPx,
       });
     }
-    return buildQuarterGridRunwayLayout(allDatesSorted, cellPx);
-  }, [allDatesSorted, cellPx, compareAllMarkets, runway3dHeatmap, runway3dRowTowerPx]);
+    return buildQuarterGridRunwayLayout(layoutDatesSorted, cellPx);
+  }, [layoutDatesSorted, cellPx, compareAllMarkets, runway3dHeatmap, runway3dRowTowerPx]);
 
   const heatmapOpts: HeatmapColorOpts = useMemo(
     () => ({
@@ -1493,7 +1509,12 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
       const config = configs.find((c) => c.market === market);
       const wd = weekdayShortFromYmd(dateStr);
       const fillMetricValue = heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope);
-      const cellFillHex = heatmapColorForViewMode(viewMode, fillMetricValue, heatmapOpts);
+      const { fill: cellFillHex } = runwayHeatmapCellFillAndDim(
+        viewMode,
+        techWorkloadScope,
+        fillMetricValue,
+        heatmapOpts
+      );
       const payload = buildRunwayTooltipPayload({
         dateStr,
         weekdayShort: wd,
@@ -1506,6 +1527,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
         fillMetricLabel: fillMetricLabelForView(viewMode, techWorkloadScope),
         fillMetricValue,
         cellFillHex,
+        techWorkloadScope,
       });
       return { x: anchor.clientX, y: anchor.clientY, payload };
     },
@@ -1560,13 +1582,13 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
       const cur = tipRef.current;
       if (!cur || !('payload' in cur)) return;
       const { dateStr, market } = cur.payload;
-      const idx = allDatesSorted.indexOf(dateStr);
+      const idx = layoutDatesSorted.indexOf(dateStr);
       if (idx < 0) return;
       const delta = e.key === 'ArrowRight' ? 1 : -1;
       const anchor = { clientX: cur.x, clientY: cur.y };
       let nextIdx = idx + delta;
-      while (nextIdx >= 0 && nextIdx < allDatesSorted.length) {
-        const nextDate = allDatesSorted[nextIdx]!;
+      while (nextIdx >= 0 && nextIdx < layoutDatesSorted.length) {
+        const nextDate = layoutDatesSorted[nextIdx]!;
         const nextTip = buildPayloadTipState(market, nextDate, anchor);
         if (nextTip) {
           e.preventDefault();
@@ -1592,7 +1614,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('pointerdown', onPointerDownCapture, true);
     };
-  }, [tip, dismissTip, allDatesSorted, buildPayloadTipState]);
+  }, [tip, dismissTip, layoutDatesSorted, buildPayloadTipState]);
 
   const todayYmd = formatDateYmd(new Date());
   const gap = RUNWAY_CELL_GAP_PX;
@@ -1623,9 +1645,12 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   if (!countrySwitchLoading && !calendarLayout) {
     return (
       <div className="flex w-full flex-col items-center justify-center gap-2 bg-transparent px-8 py-12 text-center">
-        <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
-          {runwayTitleWithMarket}
-        </h2>
+        <div className="flex flex-row flex-wrap items-center justify-center gap-2.5">
+          <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+            {runwayTitleWithMarket}
+          </h2>
+          {!compareAllMarkets ? <MarketCircleFlag marketId={country} size={26} /> : null}
+        </div>
         <p className="text-sm font-medium text-foreground">No runway data</p>
         <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">
           Apply valid multi-market YAML in the editor.
@@ -1638,11 +1663,14 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     <div className="relative flex w-full shrink-0 flex-col overflow-visible bg-transparent">
       <div
         key={`${viewMode}-${country}`}
-        className="mx-auto w-full max-w-full rounded-xl border border-border/45 bg-card/30 px-4 pb-3 pt-3 shadow-sm backdrop-blur-[2px] dark:bg-card/15 sm:px-5 sm:pb-4 sm:pt-3.5"
+        className="mx-auto w-full max-w-full rounded-xl border border-border/45 bg-card/35 px-4 pb-3 pt-3 shadow-sm dark:bg-card/20 sm:px-5 sm:pb-4 sm:pt-3.5"
       >
         <div className="mb-3 flex flex-col gap-3 sm:mb-4">
           <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between min-[480px]:gap-4">
-            <RunwayFocusSelect className="min-w-0" />
+            <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 gap-y-2">
+              <RunwayFocusSelect className="min-w-0" />
+              <RunwayRangeSelect className="min-w-0" />
+            </div>
             <div
               className="flex shrink-0 flex-wrap items-center justify-center gap-0.5 min-[480px]:justify-end"
               role="toolbar"
@@ -1694,7 +1722,9 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
             </button>
             <button
               type="button"
-              disabled={!calendarLayout || countrySwitchLoading || pngExporting || !riskSurface.length}
+              disabled={
+                !calendarLayout || countrySwitchLoading || pngExporting || !layoutDatesSorted.length
+              }
               onClick={() => void handleDownloadPng()}
               title={pngExporting ? 'Exporting…' : 'Download PNG'}
               aria-label={pngExporting ? 'Exporting runway image' : 'Download runway heatmap as PNG'}
@@ -1708,9 +1738,14 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
             </button>
             </div>
           </div>
-          <h2 className="min-w-0 text-center text-lg font-bold leading-snug tracking-tight text-foreground min-[480px]:text-left sm:text-xl">
-            {runwayTitleWithMarket}
-          </h2>
+          <div className="flex min-w-0 flex-row flex-wrap items-center justify-center gap-2.5 min-[480px]:justify-start">
+            <h2 className="min-w-0 text-center text-lg font-bold leading-snug tracking-tight text-foreground min-[480px]:text-left sm:text-xl">
+              {runwayTitleWithMarket}
+            </h2>
+            {!compareAllMarkets ? (
+              <MarketCircleFlag marketId={country} size={26} className="max-sm:shrink-0" />
+            ) : null}
+          </div>
         </div>
 
         <div className="relative w-full max-w-full">
@@ -1950,10 +1985,10 @@ function RunwayGridBody({
               style={{ gap: CALENDAR_QUARTER_GRID_COL_GAP_PX }}
             >
               <div className="flex shrink-0 flex-col items-end">
-                <div className="invisible mb-1.5 flex h-[32px] items-center justify-center" aria-hidden>
+                <div className="invisible relative z-20 mb-1.5 flex h-[32px] items-center justify-center" aria-hidden>
                   <RunwayMarketCodeSticker code="UK" />
                 </div>
-                <div className="relative shrink-0 overflow-visible bg-transparent" style={{ width: CALENDAR_QUARTER_GUTTER_W }}>
+                <div className="relative z-0 shrink-0 overflow-visible bg-transparent" style={{ width: CALENDAR_QUARTER_GUTTER_W }}>
                   <RunwayCompareQuarterGutter sections={sections} cellPx={cellPx} gap={gap} />
                 </div>
               </div>
@@ -1962,7 +1997,7 @@ function RunwayGridBody({
                 const cfg = configs.find((c) => c.market === m);
                 return (
                   <div key={m} className="flex shrink-0 flex-col items-center">
-                    <div className="mb-1.5 flex h-[32px] items-center justify-center">
+                    <div className="relative z-20 mb-1.5 flex h-[32px] items-center justify-center">
                       <RunwayMarketCodeSticker
                         code={m}
                         subtitle={cfg?.title}
@@ -1972,7 +2007,7 @@ function RunwayGridBody({
                       />
                     </div>
                     <div
-                      className="relative shrink-0 overflow-visible bg-transparent"
+                      className="relative z-0 shrink-0 overflow-visible bg-transparent"
                       style={{
                         width:
                           monthStripW +
