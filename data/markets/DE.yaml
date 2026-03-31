@@ -1,0 +1,383 @@
+# Germany — sample market (KMK-style school pattern, manual holiday lists)
+# Weekday codes mo..sun; dates YYYY-MM-DD.
+
+market: DE
+title: Germany
+risk_heatmap_gamma_tech: 0.35
+risk_heatmap_gamma_business: 0.35
+
+# Capacity — labs, staff (monthly headcount), parallel test slots.
+
+resources:
+  labs:
+    capacity: 6
+  staff:
+    capacity: 4
+    monthly_pattern_basis: absolute
+    monthly_pattern:
+      Jan: 4
+      Feb: 4
+      Mar: 4
+      Apr: 4
+      May: 3
+      Jun: 3
+      Jul: 3
+      Aug: 2
+      Sep: 3
+      Oct: 4
+      Nov: 4
+      Dec: 2
+  testing_capacity: 4
+
+# BAU — baseline weekday workload (labs/staff units per active day).
+
+bau:
+  days_in_use: [mo, tu, we, th, fr, sa, su]
+  weekly_cycle:
+    labs_required: 1
+    staff_required: 1
+    support_days: 0
+
+# IT Support rhythm — Mon–Sun support intensity (0–1).
+
+tech:
+  weekly_pattern:
+    Mon: 0.866
+    Tue: 0.747
+    Wed: 0.342
+    Thu: 0.269
+    Fri: 0.452
+    Sat: 0.229
+    Sun: 0.241
+
+# Marketing campaigns — timing, impact, prep/live support.
+# Synthetic test fixtures: 28-day prep, ~30-day live, 1 lab + 1 Market IT (tech_staff) each.
+# 2027 rows repeat the same seasonal pattern (+1 calendar year on month/day).
+
+campaigns:
+  - name: DE Campaign 1 (Easter)
+    start_date: '2026-04-08'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE Campaign 1 (Easter) (2027)
+    start_date: '2027-04-08'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE Campaign 2 (Summer)
+    start_date: '2026-07-13'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE Campaign 2 (Summer) (2027)
+    start_date: '2027-07-13'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE Campaign 4 (Monopoly) (School holidays)
+    start_date: '2026-08-11'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE Campaign 4 (Summer) (School holidays) (2027)
+    start_date: '2027-08-11'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE Campaign 3 (Advent)
+    start_date: '2026-12-01'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE Campaign 3 (Monopoly) (2027)
+    start_date: '2027-12-01'
+    duration: 42
+    testing_prep_duration: 61
+    impact: very_high
+    business_uplift: 1.3
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+
+# Tech programmes — non-campaign engineering. Two ~60d POS rollouts / year (1 lab + 1 Market IT); 2027 rows repeat the same pattern (+1 calendar year).
+
+tech_programmes:
+  - name: DE POS Deployment H1
+    start_date: '2026-01-06'
+    duration: 60
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE POS Deployment H2
+    start_date: '2026-09-11'
+    duration: 60
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE POS Deployment H1 (2027)
+    start_date: '2027-01-06'
+    duration: 60
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: DE POS Deployment H2 (2027)
+    start_date: '2027-09-11'
+    duration: 60
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 1
+
+# Public holidays — explicit calendar dates (not auto-generated).
+
+public_holidays:
+  auto: false
+  dates:
+    - '2026-01-01'
+    - '2026-04-03'
+    - '2026-04-06'
+    - '2026-05-01'
+    - '2026-05-14'
+    - '2026-05-25'
+    - '2026-10-03'
+    - '2026-12-25'
+    - '2026-12-26'
+    - '2027-01-01'
+  staffing_multiplier: 0.25
+  trading_multiplier: 1.0
+
+# School breaks — explicit dates (Bundesländer differ; sample composite).
+
+school_holidays:
+  auto: false
+  dates:
+    # 2025-04-14 – 2025-04-25 (12 consecutive days)
+    - '2025-04-14'
+    - '2025-04-15'
+    - '2025-04-16'
+    - '2025-04-17'
+    - '2025-04-18'
+    - '2025-04-19'
+    - '2025-04-20'
+    - '2025-04-21'
+    - '2025-04-22'
+    - '2025-04-23'
+    - '2025-04-24'
+    - '2025-04-25'
+    # 2026-02-02 – 2026-02-06 (5 consecutive days)
+    - '2026-02-02'
+    - '2026-02-03'
+    - '2026-02-04'
+    - '2026-02-05'
+    - '2026-02-06'
+    # 2026-03-30 – 2026-04-10 (12 consecutive days)
+    - '2026-03-30'
+    - '2026-03-31'
+    - '2026-04-01'
+    - '2026-04-02'
+    - '2026-04-03'
+    - '2026-04-04'
+    - '2026-04-05'
+    - '2026-04-06'
+    - '2026-04-07'
+    - '2026-04-08'
+    - '2026-04-09'
+    - '2026-04-10'
+    # 2026-07-15 – 2026-08-26 (43 consecutive days)
+    - '2026-07-15'
+    - '2026-07-16'
+    - '2026-07-17'
+    - '2026-07-18'
+    - '2026-07-19'
+    - '2026-07-20'
+    - '2026-07-21'
+    - '2026-07-22'
+    - '2026-07-23'
+    - '2026-07-24'
+    - '2026-07-25'
+    - '2026-07-26'
+    - '2026-07-27'
+    - '2026-07-28'
+    - '2026-07-29'
+    - '2026-07-30'
+    - '2026-07-31'
+    - '2026-08-01'
+    - '2026-08-02'
+    - '2026-08-03'
+    - '2026-08-04'
+    - '2026-08-05'
+    - '2026-08-06'
+    - '2026-08-07'
+    - '2026-08-08'
+    - '2026-08-09'
+    - '2026-08-10'
+    - '2026-08-11'
+    - '2026-08-12'
+    - '2026-08-13'
+    - '2026-08-14'
+    - '2026-08-15'
+    - '2026-08-16'
+    - '2026-08-17'
+    - '2026-08-18'
+    - '2026-08-19'
+    - '2026-08-20'
+    - '2026-08-21'
+    - '2026-08-22'
+    - '2026-08-23'
+    - '2026-08-24'
+    - '2026-08-25'
+    - '2026-08-26'
+    # 2026-10-12 – 2026-10-24 (13 consecutive days)
+    - '2026-10-12'
+    - '2026-10-13'
+    - '2026-10-14'
+    - '2026-10-15'
+    - '2026-10-16'
+    - '2026-10-17'
+    - '2026-10-18'
+    - '2026-10-19'
+    - '2026-10-20'
+    - '2026-10-21'
+    - '2026-10-22'
+    - '2026-10-23'
+    - '2026-10-24'
+    # 2026-12-23 – 2027-01-06 (15 consecutive days)
+    - '2026-12-23'
+    - '2026-12-24'
+    - '2026-12-25'
+    - '2026-12-26'
+    - '2026-12-27'
+    - '2026-12-28'
+    - '2026-12-29'
+    - '2026-12-30'
+    - '2026-12-31'
+    - '2027-01-01'
+    - '2027-01-02'
+    - '2027-01-03'
+    - '2027-01-04'
+    - '2027-01-05'
+    - '2027-01-06'
+    # 2027-02-01 – 2027-02-05 (5 consecutive days)
+    - '2027-02-01'
+    - '2027-02-02'
+    - '2027-02-03'
+    - '2027-02-04'
+    - '2027-02-05'
+  staffing_multiplier: 0.75
+  trading_multiplier: 1.0
+  load_effects:
+    lab_load_mult: 1.0
+    team_load_mult: 1.0
+    backend_load_mult: 1.0
+    ops_activity_mult: 1.0
+    commercial_activity_mult: 1.0
+
+# Holiday capacity shaping — taper and lab ceiling vs public + school calendars above.
+
+holidays:
+  capacity_taper_days: 1
+  lab_capacity_scale: 1.0
+
+# Store / restaurant trading — demand shape (separate from tech supply).
+
+trading:
+  campaign_store_boost_prep: 0
+  campaign_store_boost_live: 0.28
+  payday_month_peak_multiplier: 1.12
+  campaign_effect_scale: 2.5
+  monthly_pattern:
+    Jan: 0.56
+    Feb: 0.58
+    Mar: 0.69
+    Apr: 0.77
+    May: 0.85
+    Jun: 0.91
+    Jul: 0.97
+    Aug: 0.92
+    Sep: 0.84
+    Oct: 0.72
+    Nov: 0.60
+    Dec: 1.0
+  weekly_pattern:
+    Mon: 0.6
+    Tue: 0.7
+    Wed: 0.8
+    Thu: 0.9
+    Fri: 1.0
+    Sat: 1.0
+    Sun: 0.8
+  seasonal:
+    peak_month: 12
+    amplitude: 0.11

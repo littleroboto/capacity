@@ -1,0 +1,51 @@
+{
+  "schema": "capacity.planningBundle.v1",
+  "exportedAt": "2026-03-23T12:00:00.000Z",
+  "scenario": {
+    "id": "DE",
+    "name": "DE",
+    "version": "1",
+    "profile": {
+      "marketId": "DE",
+      "label": "DE"
+    },
+    "functions": [
+      {
+        "id": "lab_engineering",
+        "label": "Lab / engineering",
+        "bucket": "labs",
+        "description": "Build, test, and release engineering capacity (YAML resources.labs)."
+      },
+      {
+        "id": "delivery_teams",
+        "label": "Market IT",
+        "bucket": "teams",
+        "description": "Market-local IT delivery capacity (YAML resources.teams sum)."
+      }
+    ],
+    "recipes": [
+      { "functionId": "lab_engineering", "baseUnits": 5, "complexityMult": 1, "efficiencyMult": 1 },
+      { "functionId": "delivery_teams", "baseUnits": 6, "complexityMult": 1, "efficiencyMult": 1 },
+      { "functionId": "platform_backend", "baseUnits": 1000, "complexityMult": 1, "efficiencyMult": 1 }
+    ],
+    "events": [],
+    "simulation": {
+      "timeGrainDays": 1,
+      "carryOverRate": 0.35,
+      "carryDecayPerDay": 0.86
+    }
+  },
+  "simulationSummary": {
+    "peakRisk": 0.72,
+    "peakRiskDate": "2026-07-20",
+    "highBandDayCount": 42,
+    "overloadArea": 1200,
+    "nominalBreachDayCount": 0,
+    "criticalFunctionBreaches": [
+      { "functionId": "lab_engineering", "dayCount": 0 },
+      { "functionId": "delivery_teams", "dayCount": 0 },
+      { "functionId": "platform_backend", "dayCount": 0 }
+    ]
+  },
+  "dslText": "# Paste full market YAML here or load from public/data/markets/DE.yaml"
+}
