@@ -10,3 +10,4 @@ coverage
 *.log
 .vite
 pnpm-lock.yaml
+.vercel

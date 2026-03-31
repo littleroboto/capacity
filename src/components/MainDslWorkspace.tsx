@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { DslAssistantPanel } from '@/components/DslAssistantPanel';
 import { DslEditorCore } from '@/components/DslEditorCore';
+import { MarketCircleFlag } from '@/components/MarketCircleFlag';
+import { applyCodeTabDocumentEdit, getCodeTabDocumentText } from '@/lib/codeViewMarketTabs';
+import { isRunwayAllMarkets } from '@/lib/markets';
+import { marketIdToCircleFlagCode } from '@/lib/marketCircleFlag';
 import { cn } from '@/lib/utils';
 import { useAtcStore } from '@/store/useAtcStore';
 import { GripHorizontal } from 'lucide-react';
@@ -41,6 +45,47 @@ export function MainDslWorkspace() {
   const llmFromQuery = useLlmAssistantFromQuery();
   const llmFromToybox = useAtcStore((s) => s.dslLlmAssistantEnabled);
   const showLlmAssistant = llmFromQuery || llmFromToybox;
+  const country = useAtcStore((s) => s.country);
+  const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
+  const dslText = useAtcStore((s) => s.dslText);
+  const dslByMarket = useAtcStore((s) => s.dslByMarket);
+  const showMarketTabs = runwayMarketOrder.length > 1;
+  const [codeMarketTab, setCodeMarketTab] = useState<string>(() => runwayMarketOrder[0] ?? 'DE');
+
+  useEffect(() => {
+    if (!runwayMarketOrder.length) return;
+    if (!runwayMarketOrder.includes(codeMarketTab)) {
+      setCodeMarketTab(runwayMarketOrder[0]!);
+    }
+  }, [runwayMarketOrder, codeMarketTab]);
+
+  useEffect(() => {
+    if (!isRunwayAllMarkets(country) && runwayMarketOrder.includes(country)) {
+      setCodeMarketTab(country);
+    }
+  }, [country, runwayMarketOrder]);
+
+  const tabSliceText = useMemo(
+    () => (showMarketTabs ? getCodeTabDocumentText(codeMarketTab) : ''),
+    [showMarketTabs, codeMarketTab, dslText, dslByMarket, country, runwayMarketOrder]
+  );
+
+  const codeMarketTabRef = useRef(codeMarketTab);
+  codeMarketTabRef.current = codeMarketTab;
+
+  const onMarketTabSliceChange = useCallback((v: string) => {
+    applyCodeTabDocumentEdit(codeMarketTabRef.current, v);
+  }, []);
+
+  const marketTabDocument = useMemo(() => {
+    if (!showMarketTabs) return null;
+    return {
+      marketId: codeMarketTab,
+      text: tabSliceText,
+      onTextChange: onMarketTabSliceChange,
+    };
+  }, [showMarketTabs, codeMarketTab, tabSliceText, onMarketTabSliceChange]);
+
   const [dockHeight, setDockHeight] = useState(readDockHeight);
   const [maxDockPx, setMaxDockPx] = useState(560);
   const [dragging, setDragging] = useState(false);
@@ -132,12 +177,62 @@ export function MainDslWorkspace() {
       ref={workspaceRef}
       className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-0"
     >
-      <DslEditorCore
-        className="min-h-[min(12rem,35dvh)] min-w-0 flex-1"
-        initialFontSize={16}
-        showApplyButton={false}
-        editorChrome="studio"
-      />
+      {showMarketTabs ? (
+        <div
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 border-b border-border/50 bg-muted/15 px-2 pt-1.5 dark:bg-muted/10"
+          role="tablist"
+          aria-label="Market YAML documents"
+        >
+          <div className="flex min-h-8 shrink-0 gap-0.5 overflow-x-auto pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {runwayMarketOrder.map((id) => {
+              const selected = id === codeMarketTab;
+              const label = id.slice(0, 2).toUpperCase();
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-label={`${label} market YAML`}
+                  id={`code-tab-${id}`}
+                  tabIndex={selected ? 0 : -1}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors',
+                    selected
+                      ? 'border-violet-500/45 bg-violet-500/12 text-foreground shadow-sm dark:border-violet-400/35 dark:bg-violet-950/50 dark:text-violet-100'
+                      : 'border-transparent bg-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/50 hover:text-foreground'
+                  )}
+                  onClick={() => setCodeMarketTab(id)}
+                >
+                  {marketIdToCircleFlagCode(id) ? (
+                    <MarketCircleFlag marketId={id} size={18} className="ring-border/40" />
+                  ) : (
+                    <span
+                      className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-dashed border-border/45 bg-muted/30 text-[9px] font-bold text-muted-foreground"
+                      aria-hidden
+                    >
+                      {label.charAt(0)}
+                    </span>
+                  )}
+                  <span className="min-w-[1.25rem] tabular-nums">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <DslEditorCore
+            className="min-h-[min(11rem,32dvh)] min-w-0 flex-1 border-0 pt-0 shadow-none"
+            initialFontSize={16}
+            editorChrome="studio"
+            marketTabDocument={marketTabDocument}
+          />
+        </div>
+      ) : (
+        <DslEditorCore
+          className="min-h-[min(12rem,35dvh)] min-w-0 flex-1"
+          initialFontSize={16}
+          editorChrome="studio"
+        />
+      )}
 
       {showLlmAssistant ? (
         <>

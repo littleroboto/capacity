@@ -1,14 +1,11 @@
-# Pushes `dist/` to branch `gh-pages` (reliable; avoids deploy-pages artifact API issues).
+# Optional static mirror only. Primary hosting is Vercel (see README).
+# Manual run: Actions → Deploy to GitHub Pages → Run workflow.
 #
-# After the first green run, set: Repo **Settings → Pages → Build: Deploy from a branch**
-# → Branch **gh-pages** → folder **/ (root)** → Save.
-#
-# Site URL: https://littleroboto.github.io/capacity/  (project Pages)
+# After a green run: Repo **Settings → Pages** → deploy from branch **gh-pages** / root.
+# Note: no serverless API — shared workspace (`/api/shared-dsl`) exists only on Vercel.
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -31,8 +28,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-        env:
-          GITHUB_PAGES: 'true'
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

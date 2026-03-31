@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
 import { SampleDataRibbon } from '@/components/SampleDataRibbon';
+import { SharedDslStaleBanner } from '@/components/SharedDslStaleBanner';
 import { DSLPanel } from '@/components/DSLPanel';
 import { WORKBENCH_SPLIT_HANDLE_PX, WorkbenchSplitHandle } from '@/components/WorkbenchSplitHandle';
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
@@ -10,10 +11,19 @@ import { RunwayGrid, type SlotSelection } from '@/components/RunwayGrid';
 import { looksLikeYamlDsl } from '@/lib/dslGuards';
 import { defaultDslForMarket } from '@/lib/marketDslSeeds';
 import { publicAsset } from '@/lib/publicUrl';
+import { setAtcDsl } from '@/lib/storage';
 import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
 import { fetchRunwayMarketOrder } from '@/lib/runwayManifest';
 import { isRunwayAllMarkets } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
+import { mergeStateToFullMultiDoc, splitToDslByMarket } from '@/lib/multiDocMarketYaml';
+import {
+  fetchSharedDsl,
+  initSharedDslOutboundSync,
+  isSharedDslEnabled,
+  markSharedDslBaseline,
+  setSharedDslEtag,
+} from '@/lib/sharedDslSync';
 
 const DSL_PANEL_COLLAPSED_STORAGE_KEY = 'capacity:dsl-panel-collapsed';
 const DSL_SPLIT_RIGHT_PX_KEY = 'capacity:dsl-split-right-px';
@@ -28,9 +38,6 @@ export default function App() {
   const viewMode = useAtcStore((s) => s.viewMode);
   const country = useAtcStore((s) => s.country);
   const setViewMode = useAtcStore((s) => s.setViewMode);
-  const setDslByMarket = useAtcStore((s) => s.setDslByMarket);
-  const setRunwayMarketOrder = useAtcStore((s) => s.setRunwayMarketOrder);
-  const hydrateFromStorage = useAtcStore((s) => s.hydrateFromStorage);
   const theme = useAtcStore((s) => s.theme);
 
   const [dslPanelCollapsed, setDslPanelCollapsed] = useState(() => {
@@ -119,6 +126,9 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    let stopOutboundSync: (() => void) | undefined;
+    const { setDslByMarket, setRunwayMarketOrder, hydrateFromStorage } = useAtcStore.getState();
+
     (async () => {
       const order = await fetchRunwayMarketOrder();
       const dslByMarket: Record<string, string> = {};
@@ -138,19 +148,48 @@ export default function App() {
         }
       }
       if (cancelled) return;
+
+      let multiDocFallback = mergeMarketsToMultiDocYaml(dslByMarket, order);
+
+      if (isSharedDslEnabled()) {
+        const remote = await fetchSharedDsl();
+        if (cancelled) return;
+        if (remote) {
+          setAtcDsl(null);
+          setSharedDslEtag(remote.etag || null);
+          multiDocFallback = remote.yaml;
+          const split = splitToDslByMarket(remote.yaml);
+          for (const [k, v] of Object.entries(split)) {
+            dslByMarket[k] = v;
+          }
+        }
+      }
+
       setRunwayMarketOrder(order);
       setDslByMarket(dslByMarket);
-      const merged = mergeMarketsToMultiDocYaml(dslByMarket, order);
-      hydrateFromStorage(merged);
+      hydrateFromStorage(multiDocFallback);
+      if (isSharedDslEnabled()) {
+        setAtcDsl(mergeStateToFullMultiDoc(useAtcStore.getState()));
+      }
+      markSharedDslBaseline(mergeStateToFullMultiDoc(useAtcStore.getState()));
+
+      if (!cancelled && isSharedDslEnabled()) {
+        stopOutboundSync = initSharedDslOutboundSync();
+      }
     })();
+
     return () => {
       cancelled = true;
+      stopOutboundSync?.();
     };
-  }, [setDslByMarket, setRunwayMarketOrder, hydrateFromStorage]);
+    // Mount-only bootstrap: never re-run on store reference identity (would tear down autosave).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional single run
+  }, []);
 
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
       <SampleDataRibbon />
+      <SharedDslStaleBanner />
       <Header />
       <main
         className={cn(

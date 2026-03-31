@@ -1,13 +1,14 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type BeforeMount, type Monaco, type OnMount } from '@monaco-editor/react';
 import {
   ALargeSmall,
+  AlertCircle,
+  Check,
   ListOrdered,
   Map,
   Play,
   RotateCcw,
-  Save,
   Sparkles,
   WrapText,
   ZoomIn,
@@ -15,7 +16,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAtcStore } from '@/store/useAtcStore';
-import { saveNamedWorkspaceInteractive } from '@/lib/workspaceSnapshot';
 import {
   capacityYamlThemeId,
   registerCapacityYamlThemes,
@@ -74,13 +74,20 @@ const DSL_EDITOR_FONT_MAX = 22;
 
 export type DslEditorChrome = 'default' | 'studio';
 
+export type DslEditorMarketTabBinding = {
+  /** One `market:` / `country:` document — updates merged workspace on change. */
+  marketId: string;
+  text: string;
+  onTextChange: (value: string) => void;
+};
+
 type DslEditorCoreProps = {
   /** Wrapper around Monaco (extra classes). */
   editorWrapClassName?: string;
   /** Fixed CSS height for the editor (e.g. modal); omit for flex fill. */
   editorFixedHeight?: string;
   description?: 'full' | 'none';
-  /** Extra actions after Save snapshot (e.g. modal Done). */
+  /** Extra actions after editor actions (e.g. modal Done). */
   trailingActions?: ReactNode;
   className?: string;
   /** Monaco font size (px). */
@@ -89,6 +96,10 @@ type DslEditorCoreProps = {
   showApplyButton?: boolean;
   /** `studio` = gradient chrome, status bar, stronger frame (main Code view). */
   editorChrome?: DslEditorChrome;
+  /**
+   * Code view market tabs: bind Monaco to one document; omit to use store `dslText` only.
+   */
+  marketTabDocument?: DslEditorMarketTabBinding | null;
 };
 
 export function DslEditorCore({
@@ -100,6 +111,7 @@ export function DslEditorCore({
   initialFontSize = DSL_EDITOR_FONT_DEFAULT,
   showApplyButton = true,
   editorChrome = 'default',
+  marketTabDocument = null,
 }: DslEditorCoreProps) {
   const [fontSize, setFontSize] = useState(initialFontSize);
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on');
@@ -114,8 +126,41 @@ export function DslEditorCore({
   const dslAssistantEditorLock = useAtcStore((s) => s.dslAssistantEditorLock);
   const theme = useAtcStore((s) => s.theme);
   const setDslText = useAtcStore((s) => s.setDslText);
+
+  const tabOnChangeRef = useRef(marketTabDocument?.onTextChange);
+  tabOnChangeRef.current = marketTabDocument?.onTextChange;
+
+  const editorValue = marketTabDocument?.text ?? dslText;
+  const handleEditorChange = useCallback((v: string | undefined) => {
+    const tabFn = tabOnChangeRef.current;
+    if (tabFn) tabFn(v ?? '');
+    else setDslText(v ?? '');
+  }, [setDslText]);
   const applyDsl = useAtcStore((s) => s.applyDsl);
   const resetDsl = useAtcStore((s) => s.resetDsl);
+
+  const [applyFeedback, setApplyFeedback] = useState<'idle' | 'success' | 'fail'>('idle');
+  const applyFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearApplyFeedbackTimer = useCallback(() => {
+    if (applyFeedbackTimer.current) {
+      clearTimeout(applyFeedbackTimer.current);
+      applyFeedbackTimer.current = null;
+    }
+  }, []);
+
+  const handleApplyClick = useCallback(() => {
+    clearApplyFeedbackTimer();
+    applyDsl();
+    const err = useAtcStore.getState().parseError;
+    setApplyFeedback(err ? 'fail' : 'success');
+    applyFeedbackTimer.current = setTimeout(() => {
+      setApplyFeedback('idle');
+      applyFeedbackTimer.current = null;
+    }, err ? 5000 : 2200);
+  }, [applyDsl, clearApplyFeedbackTimer]);
+
+  useEffect(() => () => clearApplyFeedbackTimer(), [clearApplyFeedbackTimer]);
 
   const editorOptions = useMemo(
     () => ({
@@ -166,13 +211,8 @@ export function DslEditorCore({
     editor.onDidChangeCursorPosition(sync);
   }, []);
 
-  const handleSaveScenario = () => {
-    const id = saveNamedWorkspaceInteractive();
-    if (id) window.alert('Saved to history in this browser. Open Local data to load or export.');
-  };
-
-  const lineCount = dslText.split('\n').length;
-  const charCount = dslText.length;
+  const lineCount = editorValue.split('\n').length;
+  const charCount = editorValue.length;
 
   return (
     <div className={cn('flex min-h-0 flex-1 flex-col gap-2', className)}>
@@ -333,11 +373,12 @@ export function DslEditorCore({
         ) : null}
         <div className="min-h-0 min-w-0 flex-1">
           <Editor
+            key={marketTabDocument ? `dsl-tab-${marketTabDocument.marketId}` : 'dsl-single'}
             height="100%"
             defaultLanguage="yaml"
             theme={monacoTheme}
-            value={dslText}
-            onChange={(v) => setDslText(v ?? '')}
+            value={editorValue}
+            onChange={handleEditorChange}
             options={editorOptions}
             beforeMount={handleBeforeMount as BeforeMount}
             onMount={handleMount}
@@ -377,43 +418,107 @@ export function DslEditorCore({
         </p>
       ) : null}
 
-      <div className="flex shrink-0 flex-wrap items-center gap-1">
-        {showApplyButton ? (
+      <div className="flex shrink-0 flex-col gap-1.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {studio ? (
+            <Button
+              type="button"
+              size="sm"
+              variant={applyFeedback === 'success' ? 'secondary' : 'default'}
+              className={cn(
+                'h-8 gap-1.5 px-3 text-xs font-medium transition-[box-shadow,colors] duration-200',
+                applyFeedback === 'success' &&
+                  'border border-emerald-500/45 bg-emerald-500/10 text-emerald-900 shadow-[0_0_0_1px_rgba(16,185,129,0.25)] dark:text-emerald-100',
+                applyFeedback === 'fail' && 'ring-2 ring-destructive/40 ring-offset-2 ring-offset-background'
+              )}
+              disabled={dslAssistantEditorLock}
+              onClick={handleApplyClick}
+              aria-label="Apply YAML — parse editor and refresh the runway model"
+              title={
+                dslAssistantEditorLock
+                  ? 'Wait for the assistant to finish updating the editor.'
+                  : 'Parse this YAML and refresh the heatmap. Switching to another view also applies.'
+              }
+            >
+              {applyFeedback === 'success' ? (
+                <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} aria-hidden />
+              ) : (
+                <Play className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+              )}
+              {applyFeedback === 'success' ? 'Applied' : 'Apply YAML'}
+            </Button>
+          ) : showApplyButton ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="default"
+              className={cn(
+                'h-7 w-7 shrink-0 gap-0 p-0',
+                applyFeedback === 'success' && 'border border-emerald-500/50 bg-emerald-500/15 text-emerald-800 dark:text-emerald-100',
+                applyFeedback === 'fail' && 'ring-2 ring-destructive/45'
+              )}
+              disabled={dslAssistantEditorLock}
+              onClick={handleApplyClick}
+              aria-label="Apply DSL — re-run the model"
+              title={
+                dslAssistantEditorLock
+                  ? 'Wait for the assistant to finish.'
+                  : applyFeedback === 'success'
+                    ? 'Applied — runway updated'
+                    : 'Apply DSL — re-run the model'
+              }
+            >
+              {applyFeedback === 'success' ? (
+                <Check className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+              ) : (
+                <Play className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+              )}
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
-            variant="default"
-            className="h-7 w-7 shrink-0 gap-0 p-0"
-            onClick={() => applyDsl()}
-            aria-label="Apply DSL — re-run the model"
-            title="Apply DSL — re-run the model"
+            variant="secondary"
+            className={cn('shrink-0 gap-0 p-0', studio ? 'h-8 w-8' : 'h-7 w-7')}
+            onClick={() => resetDsl()}
+            aria-label="Reset DSL to saved defaults"
+            title="Reset DSL"
           >
-            <Play className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
+            <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
           </Button>
+          {applyFeedback === 'success' ? (
+            <span
+              className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
+              role="status"
+              aria-live="polite"
+            >
+              Runway updated from YAML.
+            </span>
+          ) : null}
+          {applyFeedback === 'fail' ? (
+            <span
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive"
+              role="alert"
+              aria-live="assertive"
+            >
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+              Could not apply — fix the error above.
+            </span>
+          ) : null}
+          {trailingActions}
+        </div>
+        {studio ? (
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground/80">Apply YAML</span> updates the model from the editor.
+            Switching away from Code still applies automatically.
+            {dslAssistantEditorLock ? (
+              <>
+                {' '}
+                <span className="text-amber-700/90 dark:text-amber-400/90">Apply is paused while the assistant edits.</span>
+              </>
+            ) : null}
+          </p>
         ) : null}
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          className="h-7 w-7 shrink-0 gap-0 p-0"
-          onClick={() => resetDsl()}
-          aria-label="Reset DSL to saved defaults"
-          title="Reset DSL"
-        >
-          <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-7 w-7 shrink-0 gap-0 p-0"
-          onClick={handleSaveScenario}
-          aria-label="Save workspace snapshot to this browser"
-          title="Save workspace snapshot"
-        >
-          <Save className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden />
-        </Button>
-        {trailingActions}
       </div>
     </div>
   );

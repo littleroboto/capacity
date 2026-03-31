@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { HeatmapSettingsPanel } from '@/components/HeatmapSettingsPanel';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
 import { RiskModelPanel } from '@/components/RiskModelPanel';
@@ -12,10 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { saveNamedWorkspaceInteractive } from '@/lib/workspaceSnapshot';
 import { isRunwayAllMarkets } from '@/lib/markets';
+import { OPEN_WORKSPACE_EVENT } from '@/lib/sharedDslSync';
 import { useAtcStore } from '@/store/useAtcStore';
-import { ChevronLeft, ChevronRight, Database, FileCode2, Save, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, FileCode2, SlidersHorizontal } from 'lucide-react';
 
 type DSLPanelProps = {
   collapsed: boolean;
@@ -26,6 +26,12 @@ type DSLPanelProps = {
 export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
   const [localDataOpen, setLocalDataOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    const open = () => setLocalDataOpen(true);
+    window.addEventListener(OPEN_WORKSPACE_EVENT, open);
+    return () => window.removeEventListener(OPEN_WORKSPACE_EVENT, open);
+  }, []);
   const parseError = useAtcStore((s) => s.parseError);
   const country = useAtcStore((s) => s.country);
   const setViewMode = useAtcStore((s) => s.setViewMode);
@@ -39,8 +45,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="text-pretty">
-            Heatmap transfer curve, γ, runway palette, and campaign overlay when not in Technology Teams view. Applies
-            to saved snapshots.
+            Heatmap transfer curve, γ, runway palette, and campaign overlay when not in Technology Teams view.
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">
@@ -68,14 +73,9 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
     <Dialog open={localDataOpen} onOpenChange={setLocalDataOpen}>
       <DialogContent className="max-h-[min(88dvh,720px)] gap-0 overflow-hidden sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Local data</DialogTitle>
+          <DialogTitle>Workspace</DialogTitle>
           <DialogDescription className="text-pretty">
-            Everything stays in this browser. Use <strong className="font-medium text-foreground">Save snapshot</strong>{' '}
-            (disk icon below) to store DSL, runway order, pressure tuning, view, theme, and related state. The{' '}
-            <strong className="font-medium text-foreground">history</strong> table is newest first — click a row or{' '}
-            <strong className="font-medium text-foreground">Load</strong> to restore.{' '}
-            <strong className="font-medium text-foreground">Export</strong> / <strong className="font-medium text-foreground">import</strong>{' '}
-            JSON backs up or moves the full list.
+            Team YAML on the cloud (when enabled) and reset options for this browser — each section below is separate.
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">
@@ -127,8 +127,8 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
             size="sm"
             className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
             onClick={() => setLocalDataOpen(true)}
-            title="Local data — workspace history, export & import JSON"
-            aria-label="Open local data"
+            title="Workspace — team cloud and reset"
+            aria-label="Open workspace data"
           >
             <Database className="h-4 w-4" aria-hidden />
           </Button>
@@ -217,11 +217,11 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
             size="sm"
             className="h-7 gap-1.5 px-2 text-[11px] font-normal leading-none"
             onClick={() => setLocalDataOpen(true)}
-            title="History table, export & import JSON"
-            aria-label="Open local data — workspace history"
+            title="Team cloud sync and reset"
+            aria-label="Open workspace — cloud and local data"
           >
             <Database className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
-            Local data
+            Workspace
           </Button>
           <Button
             type="button"
@@ -234,20 +234,6 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           >
             <SlidersHorizontal className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
             Settings
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1.5 px-2 text-[11px] font-normal leading-none"
-            onClick={() => {
-              saveNamedWorkspaceInteractive();
-            }}
-            title="Save workspace snapshot (DSL + config) to browser history"
-            aria-label="Save workspace snapshot"
-          >
-            <Save className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
-            Save snapshot
           </Button>
         </div>
       </aside>
