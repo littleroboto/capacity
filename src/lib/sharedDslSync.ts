@@ -36,42 +36,6 @@ export function setSharedDslBearer(token: string | null): void {
 let lastKnownEtag: string | null = null;
 let lastPushedYaml: string | null = null;
 
-/**
- * Incremented whenever `lastKnownEtag` changes so in-flight stale checks can be discarded.
- * Avoids the banner flashing: an old HEAD request may complete after pull/save and wrongly set stale.
- */
-let sharedDslStaleCheckEpoch = 0;
-
-export function getSharedDslStaleCheckEpoch(): number {
-  return sharedDslStaleCheckEpoch;
-}
-
-/**
- * After this window successfully pushes or pulls, ignore brief "cloud newer" HEAD results (races with our own save).
- * Other browser windows never call {@link notifySharedDslLocalAlignedWithServer}, so they still show the banner.
- */
-let remoteStaleMutedUntil = 0;
-
-const LOCAL_ALIGNED_EVENT = 'capacity:shared-dsl-local-aligned';
-
-export function isSharedDslRemoteStaleMuted(): boolean {
-  return Date.now() < remoteStaleMutedUntil;
-}
-
-/** Call when this tab successfully saved to the blob or pulled the latest (updates etag / baseline). */
-export function notifySharedDslLocalAlignedWithServer(): void {
-  remoteStaleMutedUntil = Date.now() + 2000;
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(LOCAL_ALIGNED_EVENT));
-}
-
-export function onSharedDslLocalAligned(fn: () => void): () => void {
-  if (typeof window === 'undefined') return () => {};
-  const w = fn;
-  window.addEventListener(LOCAL_ALIGNED_EVENT, w);
-  return () => window.removeEventListener(LOCAL_ALIGNED_EVENT, w);
-}
-
 /** While true, outbound auto-save ignores store updates (avoids scheduling PUT during cloud pull). */
 let suppressSharedDslOutboundSync = false;
 
@@ -85,26 +49,6 @@ function clearOutboundSyncDebounce(): void {
   }
 }
 
-/** Compare etags from HEAD vs GET/PUT without tripping on quoting differences. */
-function normalizeEtagForCompare(raw: string): string {
-  const s = raw.trim();
-  if (s.length >= 2 && s.startsWith('W/"') && s.endsWith('"')) return s.slice(3, -1);
-  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) return s.slice(1, -1);
-  return s;
-}
-
-/** While the merged YAML differs from the last pushed baseline, extend this deadline on each store update. */
-let editingGraceUntil = 0;
-const EDITING_GRACE_MS = 4500;
-
-export function touchSharedDslEditingGrace(): void {
-  editingGraceUntil = Date.now() + EDITING_GRACE_MS;
-}
-
-export function isSharedDslEditingGraceActive(): boolean {
-  return Date.now() < editingGraceUntil;
-}
-
 export function getSharedDslEtag(): string | null {
   return lastKnownEtag;
 }
@@ -113,7 +57,6 @@ export function setSharedDslEtag(etag: string | null): void {
   const next = etag?.trim() ? etag.trim() : null;
   if (next === lastKnownEtag) return;
   lastKnownEtag = next;
-  sharedDslStaleCheckEpoch++;
 }
 
 /** Call after hydrating from remote or bundle so we do not immediately re-upload the same YAML. */
@@ -129,84 +72,34 @@ export function isSharedDslLocallyEdited(): boolean {
   return full !== lastPushedYaml.trim();
 }
 
-export type SharedDslRemoteVsLocal =
-  | { status: 'no_remote' }
-  | { status: 'in_sync'; remoteEtag: string }
-  | { status: 'cloud_newer'; remoteEtag: string; localEtag: string };
-
 /**
- * HEAD only — etag for stale polling (avoids downloading full YAML on an interval).
- * Falls back to full GET when the API predates HEAD support (405).
+ * After a successful PUT, prefer JSON `etag` (authoritative). If absent, GET once for metadata.
  */
-export async function fetchSharedDslEtag(): Promise<string | null> {
-  if (!isSharedDslEnabled()) return null;
-  try {
-    let res = await fetch(apiUrl(), { method: 'HEAD', cache: 'no-store' });
-    if (res.status === 405) {
-      const remote = await fetchSharedDsl();
-      if (!remote) return null;
-      return remote.etag?.trim() ? remote.etag.trim() : '';
-    }
-    if (res.status === 404) return null;
-    if (!res.ok) return null;
-    const etag = res.headers.get('X-DSL-Etag') ?? res.headers.get('x-dsl-etag');
-    return etag?.trim() ? etag.trim() : '';
-  } catch {
-    return null;
-  }
-}
-
-/**
- * After a successful PUT, set `lastKnownEtag` from the response body when present — that value is
- * authoritative for the blob we just wrote. An immediate HEAD can still return a stale ETag (CDN /
- * propagation), and replacing the PUT etag with it would regress `lastKnownEtag` and falsely trip
- * `cloud_newer` in this same tab. Only HEAD when the JSON body omitted `etag`.
- */
-function etagAfterSuccessfulPut(putEtagRaw: string | undefined, headEtag: string | null): string {
-  const p = typeof putEtagRaw === 'string' && putEtagRaw.trim() ? putEtagRaw.trim() : '';
-  if (p) return p;
-  return headEtag?.trim() ?? '';
-}
-
 async function reconcileEtagAfterSuccessfulPut(body: { etag?: string }): Promise<void> {
   const putEtag = typeof body.etag === 'string' && body.etag.trim() ? body.etag.trim() : '';
-  let head: string | null = null;
-  if (!putEtag) {
+  let next = putEtag;
+  if (!next) {
     try {
-      head = await fetchSharedDslEtag();
+      const got = await fetchSharedDsl();
+      if (got?.etag?.trim()) next = got.etag.trim();
     } catch {
       /* ignore */
     }
   }
-  const next = etagAfterSuccessfulPut(body.etag, head);
   if (next) setSharedDslEtag(next);
-}
-
-/** Compare server ETag to our last known post-save ETag (HEAD + headers only; no auth). */
-export async function getSharedDslRemoteVsLocal(): Promise<SharedDslRemoteVsLocal> {
-  const reRaw = await fetchSharedDslEtag();
-  if (reRaw == null) return { status: 'no_remote' };
-  const re = reRaw.trim();
-  const le = lastKnownEtag?.trim() ?? '';
-  const reN = normalizeEtagForCompare(re);
-  const leN = normalizeEtagForCompare(le);
-  if (!leN) {
-    return { status: 'in_sync', remoteEtag: re };
-  }
-  if (!reN || reN === leN) return { status: 'in_sync', remoteEtag: re };
-  return { status: 'cloud_newer', remoteEtag: re, localEtag: le };
 }
 
 export type PullTeamWorkspaceResult = 'ok' | 'cancelled' | 'no_remote' | 'failed';
 
 /**
- * Pull latest YAML from the server into the store after optional confirm when local edits or server is ahead.
+ * Pull latest YAML from the server. Confirms only if local YAML differs from last pushed baseline
+ * (unsaved local edits would be lost). No remote “stale” / multi-tab toast in POC.
  */
 export async function pullTeamWorkspaceWithUserConfirm(): Promise<PullTeamWorkspaceResult> {
-  const vs = await getSharedDslRemoteVsLocal();
-  if (vs.status === 'no_remote') return 'no_remote';
+  const probe = await fetchSharedDsl();
+  if (!probe) return 'no_remote';
   const dirty = isSharedDslLocallyEdited();
-  if (dirty || vs.status === 'cloud_newer') {
+  if (dirty) {
     const ok = window.confirm(
       'Replace this browser’s workspace with the latest from the team cloud? YAML changes that are not successfully saved to the cloud will be lost.'
     );
@@ -300,7 +193,6 @@ export async function pushCurrentWorkspaceToCloud(): Promise<PutSharedDslResult>
   if (r.ok) {
     lastPushedYaml = full;
     setAtcDsl(full);
-    notifySharedDslLocalAlignedWithServer();
   }
   return r;
 }
@@ -309,7 +201,6 @@ export async function pushCurrentWorkspaceToCloud(): Promise<PutSharedDslResult>
 export async function pullSharedDslToStore(): Promise<boolean> {
   const r = await fetchSharedDsl();
   if (!r) return false;
-  /** Cancel any pending auto-save from before the pull; it would use a stale ifMatch or fight the new baseline. */
   clearOutboundSyncDebounce();
   suppressSharedDslOutboundSync = true;
   try {
@@ -319,25 +210,10 @@ export async function pullSharedDslToStore(): Promise<boolean> {
     const full = mergeStateToFullMultiDoc(useAtcStore.getState()).trim();
     setAtcDsl(full);
     markSharedDslBaseline(full);
-    notifySharedDslLocalAlignedWithServer();
     return true;
   } finally {
     suppressSharedDslOutboundSync = false;
   }
-}
-
-const CONFLICT_EVENT = 'capacity:shared-dsl-conflict';
-
-export function notifySharedDslConflict(): void {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(CONFLICT_EVENT));
-}
-
-export function onSharedDslConflict(fn: () => void): () => void {
-  if (typeof window === 'undefined') return () => {};
-  const w = fn;
-  window.addEventListener(CONFLICT_EVENT, w);
-  return () => window.removeEventListener(CONFLICT_EVENT, w);
 }
 
 /** Debounced upload when the merged multi-doc YAML changes (requires {@link setSharedDslBearer}). */
@@ -349,7 +225,6 @@ export function initSharedDslOutboundSync(): () => void {
     const full = mergeStateToFullMultiDoc(state);
     if (!looksLikeYamlDsl(full)) return;
     if (full === lastPushedYaml) return;
-    touchSharedDslEditingGrace();
     if (!getSharedDslBearer()) return;
 
     if (outboundSyncDebounceTimer) clearTimeout(outboundSyncDebounceTimer);
@@ -361,13 +236,12 @@ export function initSharedDslOutboundSync(): () => void {
       void (async () => {
         const r = await putSharedDsl(latest, lastKnownEtag);
         if (r.conflict) {
-          notifySharedDslConflict();
+          console.warn('[shared-dsl] Save conflict (409): another client saved first. Pull from cloud or merge manually.');
           return;
         }
         if (r.ok) {
           lastPushedYaml = latest;
           setAtcDsl(latest);
-          notifySharedDslLocalAlignedWithServer();
         } else if (r.errorMessage) {
           console.warn('[shared-dsl] Auto-save failed:', r.errorMessage);
         }

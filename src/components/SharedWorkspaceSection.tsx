@@ -6,7 +6,6 @@ import {
   getSharedDslBearer,
   getSharedDslEtag,
   isSharedDslEnabled,
-  notifySharedDslConflict,
   pullTeamWorkspaceWithUserConfirm,
   pushCurrentWorkspaceToCloud,
   setSharedDslBearer,
@@ -48,9 +47,8 @@ export function SharedWorkspaceSection() {
       if (r.conflict) {
         setCloudFeedback({
           kind: 'err',
-          text: 'Someone else saved first — use Pull from cloud (or the banner) to load their copy, then re-apply your edits.',
+          text: 'Someone else saved first — use Pull from cloud to load their copy, then re-apply your edits.',
         });
-        notifySharedDslConflict();
         return;
       }
       setCloudFeedback({ kind: 'err', text: r.errorMessage ?? 'Save failed.' });

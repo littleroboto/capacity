@@ -45,7 +45,7 @@ The visual is **fully driven** by a detailed **YAML schema**: resources, BAU, ca
 - **Repeatable** scenarios — change the file, refresh the story.
 - **Comparable** markets — same fields, same semantics, different numbers and dates.
 
-Authoring help: **[docs/CAPACITY-RUNWAY.md](docs/CAPACITY-RUNWAY.md)** (pipeline and field reference), **[docs/MARKET_DSL_AND_PIPELINE.md](docs/MARKET_DSL_AND_PIPELINE.md)** (DSL and data flow).
+Authoring help: **[docs/CAPACITY-RUNWAY.md](docs/CAPACITY-RUNWAY.md)** (pipeline and field reference), **[docs/MARKET_DSL_AND_PIPELINE.md](docs/MARKET_DSL_AND_PIPELINE.md)** (DSL and data flow). **Current POC scope** (Vercel, Blob, date-scoped runway): **[docs/PRODUCT_BASELINE.md](docs/PRODUCT_BASELINE.md)**.
 
 ---
 
@@ -94,10 +94,10 @@ The app stores **one team workspace** in [Vercel Blob](https://vercel.com/docs/s
 
 #### Versioning and visibility (later)
 
-- **Versioning test data:** The app uses Blob **ETags** and **`ifMatch`** to reduce clobbering. For **named snapshots** or an audit trail, use multiple blob paths or move canonical YAML to **Postgres (Neon)** with rows for `yaml`, `created_at`, `label`, and optional “published”.
-- **Production planning + filtering who sees what:** Add **authentication** (e.g. Clerk), keep blobs **private** and read them **only in serverless** code (no public GET URL), enforce **tenant / role** checks in the API, and use **Deployment Protection** on previews so drafts are not world-readable.
+- **POC today:** Blob **ETags** and **`ifMatch`** on `PUT` still reduce clobbering; there is **no** in-app “server has newer YAML” banner — use **Pull from cloud** in Workspace if another tab saved. **409** on save surfaces in Workspace (manual) or the browser console (auto-save).
+- **Next:** **Named snapshots** or audit trail → Postgres (or multiple blob paths). **Who can read/write** → auth (e.g. Clerk), server-only blob reads, tenant checks, **Deployment Protection** on previews.
 
-The handler is `api/shared-dsl.ts` (optimistic locking via **ETag** / `ifMatch`).
+Handler: `api/shared-dsl.ts`.
 
 ---
 
@@ -109,6 +109,6 @@ The handler is `api/shared-dsl.ts` (optimistic locking via **ETag** / `ifMatch`)
 | `public/data/markets/` | Per-country YAML — the source of truth for the demo markets |
 | `src/`                 | React UI, pipeline wiring, heatmap and summary components   |
 | `api/`                 | Vercel serverless routes (e.g. shared workspace YAML)      |
-| `docs/`                | Deeper technical and handoff documentation                  |
+| `docs/`                | Index: [docs/README.md](docs/README.md); baseline: [docs/PRODUCT_BASELINE.md](docs/PRODUCT_BASELINE.md) |
 
 

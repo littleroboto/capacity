@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
 import { SampleDataRibbon } from '@/components/SampleDataRibbon';
-import { SharedDslStaleBanner } from '@/components/SharedDslStaleBanner';
 import { DSLPanel } from '@/components/DSLPanel';
 import { WORKBENCH_SPLIT_HANDLE_PX, WorkbenchSplitHandle } from '@/components/WorkbenchSplitHandle';
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
@@ -189,7 +188,6 @@ export default function App() {
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
       <SampleDataRibbon />
-      <SharedDslStaleBanner />
       <Header />
       <main
         className={cn(

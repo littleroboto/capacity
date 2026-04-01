@@ -1,0 +1,18 @@
+# Documentation index
+
+Start here after the [root README](../README.md) (run, deploy, Blob env vars).
+
+| Doc | Purpose |
+|-----|--------|
+| [PRODUCT_BASELINE.md](./PRODUCT_BASELINE.md) | **Current POC reality** — Vercel, Blob workspace, date-scoped runway, what is intentionally out of scope. |
+| [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) | Product epics and phased auto-plan hints. |
+| [CAPACITY-RUNWAY.md](./CAPACITY-RUNWAY.md) | Pipeline and field reference for the runway / capacity surface. |
+| [MARKET_DSL_AND_PIPELINE.md](./MARKET_DSL_AND_PIPELINE.md) | DSL shape and data flow into the engine. |
+| [DSL_CAMPAIGNS_AND_TRADING.md](./DSL_CAMPAIGNS_AND_TRADING.md) | Campaigns, trading, and related YAML behaviour. |
+| [PLANNING_ARCHITECTURE.md](./PLANNING_ARCHITECTURE.md) | Planning-oriented architecture notes. |
+| [VP-CAPACITY-RUNWAY-ONE-PAGER.md](./VP-CAPACITY-RUNWAY-ONE-PAGER.md) | Short executive-style product summary. |
+| [LLM_MARKET_DSL_PROMPT.md](./LLM_MARKET_DSL_PROMPT.md) | LLM authoring instructions (full). |
+| [LLM_MARKET_DSL_SCHEMA_COMPACT.md](./LLM_MARKET_DSL_SCHEMA_COMPACT.md) | Compact schema for prompts / assistants. |
+| [HANDOFF_DSL_CODING_ASSISTANT.md](./HANDOFF_DSL_CODING_ASSISTANT.md) | Build notes for a future in-app DSL coding assistant. |
+
+Removed as obsolete (pre-rebaseline): stale-toast handoff, OWM/cal-heatmap implementation plan, one-off review prompt, dated ATC brief plan (superseded by current React/Visx app).

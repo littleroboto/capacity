@@ -46,6 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       const meta = await head(PATHNAME, { token });
       res.setHeader('X-DSL-Etag', meta.etag);
+      res.setHeader('Access-Control-Expose-Headers', 'X-DSL-Etag');
       res.setHeader('Cache-Control', 'no-store');
       res.status(200).end();
     } catch (e) {
@@ -70,6 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const yaml = await streamToText(result.stream);
       res.setHeader('X-DSL-Etag', result.blob.etag);
+      res.setHeader('Access-Control-Expose-Headers', 'X-DSL-Etag');
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
       res.status(200).send(yaml);
