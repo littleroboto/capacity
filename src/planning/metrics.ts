@@ -2,7 +2,7 @@ import { RISK_BANDS } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { SimulationSummary } from '@/domain/types';
 
-/** Derive planning-oriented summary stats from the runway pressure surface (`risk_score` per row). */
+/** Derive planning-oriented summary stats from the runway pressure surface (`planning_blend_01` per row). */
 export function simulationSummaryFromRiskRows(rows: RiskRow[]): SimulationSummary {
   if (rows.length === 0) {
     return {
@@ -25,7 +25,7 @@ export function simulationSummaryFromRiskRows(rows: RiskRow[]): SimulationSummar
   let backendBreachDays = 0;
 
   for (const r of rows) {
-    const rs = r.risk_score ?? 0;
+    const rs = r.planning_blend_01 ?? 0;
     overloadArea += rs;
     if (rs > peakRisk) {
       peakRisk = rs;

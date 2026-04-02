@@ -3,6 +3,7 @@ import { parseRiskHeatmapCurve } from '@/lib/riskHeatmapTransfer';
 import type {
   BauEntry,
   CampaignConfig,
+  DeploymentRiskEvent,
   MarketConfig,
   OperatingWindow,
   PhaseLoad,
@@ -17,6 +18,7 @@ import type {
 import { expandTechWeeklyPattern } from './techWeeklyPattern';
 import { PAYDAY_MONTH_MULTIPLIER_MAX } from './paydayMonthShape';
 import type { EnvelopeKind } from './weighting';
+import type { TradingMonthKey } from '@/lib/tradingMonthlyDsl';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -207,6 +209,9 @@ export type ParsedYaml = {
   risk_heatmap_gamma_business?: number;
   /** Transfer curve id for combined heatmap (optional; default power). */
   risk_heatmap_curve?: string;
+  deployment_risk_events?: unknown[];
+  deployment_risk_month_curve?: Record<string, unknown>;
+  deployment_risk_week_weight?: number;
 };
 
 const EMPTY: ParsedYaml = {
@@ -225,6 +230,9 @@ const EMPTY: ParsedYaml = {
   risk_heatmap_gamma_tech: undefined,
   risk_heatmap_gamma_business: undefined,
   risk_heatmap_curve: undefined,
+  deployment_risk_events: undefined,
+  deployment_risk_month_curve: undefined,
+  deployment_risk_week_weight: undefined,
 };
 
 function normalizeYamlObject(raw: unknown): ParsedYaml {
@@ -284,6 +292,22 @@ function normalizeYamlObject(raw: unknown): ParsedYaml {
       o.risk_heatmap_curve == null || o.risk_heatmap_curve === ''
         ? undefined
         : String(o.risk_heatmap_curve).trim(),
+    deployment_risk_events: Array.isArray(o.deployment_risk_events)
+      ? o.deployment_risk_events
+      : Array.isArray(o.deploymentRiskEvents)
+        ? o.deploymentRiskEvents
+        : undefined,
+    deployment_risk_month_curve:
+      o.deployment_risk_month_curve != null && typeof o.deployment_risk_month_curve === 'object'
+        ? (o.deployment_risk_month_curve as Record<string, unknown>)
+        : o.deploymentRiskMonthCurve != null && typeof o.deploymentRiskMonthCurve === 'object'
+          ? (o.deploymentRiskMonthCurve as Record<string, unknown>)
+          : undefined,
+    deployment_risk_week_weight: (() => {
+      const drw = o.deployment_risk_week_weight ?? o.deploymentRiskWeekWeight;
+      const n = Number(drw);
+      return drw != null && drw !== '' && Number.isFinite(n) ? n : undefined;
+    })(),
   };
 }
 
@@ -655,6 +679,13 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     riskHeatmapGammaBusiness = riskHeatmapGamma;
   }
   const riskHeatmapCurve = parseRiskHeatmapCurve(parsed.risk_heatmap_curve);
+  const deployment_risk_month_curve = mapDeploymentRiskMonthCurve(parsed.deployment_risk_month_curve);
+  const deployment_risk_events = mapDeploymentRiskEvents(parsed.deployment_risk_events);
+  let deployment_risk_week_weight: number | undefined;
+  const drw = parsed.deployment_risk_week_weight;
+  if (drw != null && Number.isFinite(drw)) {
+    deployment_risk_week_weight = Math.min(1, Math.max(0, drw));
+  }
   const hol = parsed.holidays || {};
   const capTaperRaw = hol.capacity_taper_days ?? hol.capacityTaperDays;
   const capTaper = Number(capTaperRaw);
@@ -737,7 +768,46 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     riskHeatmapGammaTech,
     riskHeatmapGammaBusiness,
     riskHeatmapCurve,
+    deployment_risk_month_curve,
+    deployment_risk_week_weight,
+    deployment_risk_events,
   };
+}
+
+function mapDeploymentRiskMonthCurve(
+  raw: Record<string, unknown> | undefined
+): Partial<Record<TradingMonthKey, number>> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out = {} as Partial<Record<TradingMonthKey, number>>;
+  for (const [k, v] of Object.entries(raw)) {
+    const key = String(k).trim();
+    if (!TRADING_MONTH_KEY_SET.has(key)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    out[key as TradingMonthKey] = Math.min(1, Math.max(0, n));
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function mapDeploymentRiskEvents(raw: unknown[] | undefined): DeploymentRiskEvent[] | undefined {
+  if (!raw?.length) return undefined;
+  const out: DeploymentRiskEvent[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const start = coerceYamlDateString(row.start);
+    const end = coerceYamlDateString(row.end ?? row.start);
+    if (!start || !end) continue;
+    const sev = Number(row.severity ?? 0.5);
+    out.push({
+      id: String(row.id ?? 'event'),
+      start,
+      end,
+      severity: Math.min(1, Math.max(0, Number.isFinite(sev) ? sev : 0.5)),
+      kind: row.kind != null ? String(row.kind) : undefined,
+    });
+  }
+  return out.length ? out : undefined;
 }
 
 function parseEnvelope(v: unknown): EnvelopeKind | undefined {

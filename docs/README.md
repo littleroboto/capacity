@@ -6,6 +6,7 @@ Start here after the [root README](../README.md) (run, deploy, Blob env vars).
 |-----|--------|
 | [PRODUCT_BASELINE.md](./PRODUCT_BASELINE.md) | **Current POC reality** — Vercel, Blob workspace, date-scoped runway, what is intentionally out of scope. |
 | [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) | Product epics, **runway auto-plan** (in-app slot finder), and phased engineering roadmap. |
+| [BRIEF_MARKET_RISK_VIEW.md](./BRIEF_MARKET_RISK_VIEW.md) | **Implementation brief** — fourth runway lens (deployment / calendar risk), engine + UI touchpoints vs current code. |
 | [CAPACITY-RUNWAY.md](./CAPACITY-RUNWAY.md) | Pipeline and field reference for the runway / capacity surface. |
 | [MARKET_DSL_AND_PIPELINE.md](./MARKET_DSL_AND_PIPELINE.md) | DSL shape and data flow into the engine. |
 | [DSL_CAMPAIGNS_AND_TRADING.md](./DSL_CAMPAIGNS_AND_TRADING.md) | Campaigns, trading, and related YAML behaviour. |

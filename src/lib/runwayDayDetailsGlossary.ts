@@ -1,19 +1,28 @@
 import type { ViewModeId } from '@/lib/constants';
 
-/** Fill score tooltip — Technology (capacity demand) vs Restaurant Activity (store trading curve). */
+/** Fill score tooltip — Technology (headroom) vs Restaurant vs Market risk. */
 export function glossaryFillScore(mode: ViewModeId): string {
   if (mode === 'combined') {
-    return 'Raw tech-capacity fill behind this heatmap, before colour transfer and gamma. It is the maximum of lab and Market IT load versus effective capacity—uncapped, so values above 1 mean over 100% demand on the tighter of those two lanes. Backend load in YAML is not included in this headline. Store-trading rhythm and early-month visit lift do not feed this number. The large percentage in the tile is this value × 100%.';
+    return 'Tech capacity headroom behind this heatmap (0–1 before colour transfer and gamma): share of lab and Market IT capacity still available versus scheduled work on those lanes (headline excludes backend). The large percentage in the tile is this value × 100%.';
+  }
+  if (mode === 'market_risk') {
+    return 'Deployment / calendar risk (0–1 before colour transfer and gamma): graded fragility from holidays, year-end windows, trading intensity, campaigns, and optional YAML deployment events—not a ban. The tile % is this value × 100%.';
   }
   return 'Modeled restaurant / store trading intensity (0–1 before display tweaks): the store-pressure lane only—calendar rhythm, **early-month lift** (busier starts of the month), seasonal shape, public-holiday trading multiplier, and any YAML **store** boosts during live (or prep if configured). Does not change scheduled tech work. Marketing campaign risk is not blended in separately. The tile % is this value × 100%.';
 }
 
-/** Risk score tooltip — same blended planning score for both lenses; wording clarifies vs heatmap. */
-export function glossaryRiskScore(mode: ViewModeId): string {
+/** Planning blend tooltip — same 0–1 mix for both lenses; wording clarifies vs heatmap. */
+export function glossaryPlanningBlend(mode: ViewModeId): string {
   const base =
-    'Single 0–1 score that blends technology pressure, store/restaurant pressure, campaign risk, and (when enabled) a holiday term, using your risk tuning weights. Drives the Low / Medium / High band and headroom.';
+    'Single 0–1 **planning blend** that mixes technology pressure, store/restaurant pressure, campaign risk, and (when enabled) a holiday term, using your risk tuning weights. Drives the Low / Medium / High band and overall headroom.';
   if (mode === 'combined') {
-    return `${base} Not the same as the Technology fill: the tile is delivery capacity only; risk is the full planning mix.`;
+    return `${base} Not the same as the Technology heatmap tile, which shows tech capacity headroom only.`;
   }
-  return `${base} Restaurant Activity shows store trading intensity only; risk still includes tech delivery and campaign terms, so the two numbers can differ.`;
+  if (mode === 'market_risk') {
+    return `${base} The Market risk heatmap is a separate deployment/calendar score; the band still reflects this full planning mix.`;
+  }
+  return `${base} Restaurant Activity shows store trading intensity only; the blend still includes tech delivery and campaign terms, so the two numbers can differ.`;
 }
+
+/** @deprecated Use {@link glossaryPlanningBlend}. */
+export const glossaryRiskScore = glossaryPlanningBlend;

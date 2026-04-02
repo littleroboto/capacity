@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useReducedMotion } from 'motion/react';
 
 /** LIOM: Technology Teams and Restaurant Activity only (no Code in this control). */
-const RUNWAY_LENS_MODE_IDS: readonly ViewModeId[] = ['combined', 'in_store'];
+const RUNWAY_LENS_MODE_IDS: readonly ViewModeId[] = ['combined', 'in_store', 'market_risk'];
 
 const TECH_WORKLOAD_OPTIONS: { value: TechWorkloadScope; label: string; title: string }[] = [
   {

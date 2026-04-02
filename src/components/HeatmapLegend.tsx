@@ -48,9 +48,16 @@ export function HeatmapLegend({
     return { color, bandFromLow };
   });
 
+  const techHeadroom = viewMode === 'combined';
+  const topLabel = techHeadroom ? 'Tight' : 'High';
+  const bottomLabel = techHeadroom ? 'Room' : 'Low';
   const ariaLabel = monoLegend
-    ? `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} opacity steps (single colour).`
-    : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} colour steps from cool to warm.`;
+    ? techHeadroom
+      ? `Heat map legend: tighter capacity at top, more headroom at bottom, ${legendSteps} opacity steps (single colour).`
+      : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} opacity steps (single colour).`
+    : techHeadroom
+      ? `Heat map legend: tighter capacity at top, more headroom at bottom, ${legendSteps} colour steps.`
+      : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} colour steps from cool to warm.`;
 
   return (
     <div
@@ -64,7 +71,7 @@ export function HeatmapLegend({
         aria-label={ariaLabel}
       >
         <span className="text-left text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-          High
+          {topLabel}
         </span>
         <div className="flex flex-col" style={{ width: cellSizePx, ...stackStyle }}>
           {swatchesHighToLow.map(({ color, bandFromLow }, i) => (
@@ -72,7 +79,7 @@ export function HeatmapLegend({
           ))}
         </div>
         <span className="text-left text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Low
+          {bottomLabel}
         </span>
       </div>
     </div>

@@ -43,7 +43,10 @@ export type RiskRow = CapacityRow & {
   store_pressure: number;
   campaign_risk: number;
   campaign_presence: number;
-  risk_score: number;
+  /** 0–1 blended planning signal (tech + store + campaign + holiday weights). Drives band / headroom; not the Market risk heatmap. */
+  planning_blend_01: number;
+  /** 0–1 deployment / calendar fragility (Market risk lens). */
+  deployment_risk_01: number;
   risk_band: string;
   /** True if public or school holiday (capacity scaling & optional combined-risk holiday term). */
   holiday_flag: boolean;
@@ -52,7 +55,7 @@ export type RiskRow = CapacityRow & {
   campaign_active?: boolean;
   /** Utilisation-style tech pressure (0–1) decomposed by planning surface for explainability. */
   pressure_surfaces?: Record<PressureSurfaceId, number>;
-  /** 1 − combined risk score (same blend as risk_score weights). */
+  /** 1 − {@link planning_blend_01} (planning mix headroom, not tech-only). */
   headroom?: number;
 };
 
@@ -137,12 +140,12 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
     const holiday_flag = Boolean(r.holiday_flag);
     const holiday_n = holiday_flag ? 1 : 0;
 
-    const raw_risk_score =
+    const raw_planning_blend =
       w.tech * tech_pressure +
       w.store * store_pressure +
       w.campaign * campaign_risk +
       w.holiday * holiday_n;
-    const risk_score = Math.min(1, Math.max(0, raw_risk_score));
+    const planning_blend_01 = Math.min(1, Math.max(0, raw_planning_blend));
 
     const pressure_surfaces = {} as Record<PressureSurfaceId, number>;
     for (const sid of PRESSURE_SURFACE_IDS) {
@@ -153,11 +156,11 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
           ) / 100
         : 0;
     }
-    const headroom = Math.round((1 - risk_score) * 100) / 100;
+    const headroom = Math.round((1 - planning_blend_01) * 100) / 100;
 
     let risk_band: string = RISK_BANDS.high.label;
-    if (risk_score <= RISK_BANDS.low.max) risk_band = RISK_BANDS.low.label;
-    else if (risk_score <= RISK_BANDS.medium.max) risk_band = RISK_BANDS.medium.label;
+    if (planning_blend_01 <= RISK_BANDS.low.max) risk_band = RISK_BANDS.low.label;
+    else if (planning_blend_01 <= RISK_BANDS.medium.max) risk_band = RISK_BANDS.medium.label;
 
     return {
       ...r,
@@ -171,7 +174,8 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
       store_pressure: Math.round(store_pressure * 100) / 100,
       campaign_risk: Math.round(campaign_risk * 100) / 100,
       campaign_presence,
-      risk_score: Math.round(risk_score * 100) / 100,
+      planning_blend_01: Math.round(planning_blend_01 * 100) / 100,
+      deployment_risk_01: 0,
       risk_band,
       holiday_flag,
       public_holiday_flag,

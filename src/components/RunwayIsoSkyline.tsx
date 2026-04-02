@@ -182,7 +182,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           const metric = row ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope) : undefined;
           const { fill, dimOpacity } = !dateStr
             ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
-            : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts);
+            : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts, row);
           const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
           const isPad = !dateStr;
           const height01 = transformedHeatmapMetric(viewMode, metric, heatmapOpts);

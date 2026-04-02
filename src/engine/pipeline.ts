@@ -16,6 +16,7 @@ import {
   recomputeAggregatedTotals,
   type AggregatedDay,
 } from './phaseEngine';
+import { computeDeploymentRisk01 } from './deploymentRiskModel';
 import { withOperationalNoise } from './dataNoise';
 import { computeRisk, type RiskRow } from './riskModel';
 import {
@@ -281,7 +282,11 @@ export function runPipeline(
     ...r,
     ...metaByIndex[i]!,
   }));
-  const riskSurface = withOperationalNoise(computeRisk(withStoreCampaign, tuning));
+  const noisy = withOperationalNoise(computeRisk(withStoreCampaign, tuning));
+  const riskSurface = noisy.map((r) => ({
+    ...r,
+    deployment_risk_01: computeDeploymentRisk01(r, configByMarket[r.market], r.date),
+  }));
 
   return { riskSurface, configs };
 }

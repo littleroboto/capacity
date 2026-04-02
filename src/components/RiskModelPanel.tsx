@@ -12,7 +12,7 @@ export function RiskModelPanel() {
   const viewMode = useAtcStore((s) => s.viewMode);
 
   const patternKind = useMemo(() => {
-    if (viewMode === 'in_store') return 'trading' as const;
+    if (viewMode === 'in_store' || viewMode === 'market_risk') return 'trading' as const;
     if (viewMode === 'combined') return 'tech_support' as const;
     return null;
   }, [viewMode]);

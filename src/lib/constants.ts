@@ -18,9 +18,9 @@ export const VIEW_MODES = [
     id: 'combined',
     label: 'Technology Teams',
     /** Short heading above the main runway heatmap. */
-    runwayHeatmapTitle: 'Tech capacity demand',
+    runwayHeatmapTitle: 'Tech capacity headroom',
     title:
-      'Tech capacity demand: labs and Market IT versus effective capacity from scheduled work (headline excludes backend). Store-trading rhythm (including early-in-the-month visit lift) does not change these KPIs or heatmap tiles. Prep-heavy periods read hotter than live campaign support. γ_tech and transfer curve apply.',
+      'Available lab and Market IT capacity (headroom): how much room is left versus scheduled work on those lanes (headline excludes backend). Cooler tiles mean more slack; hotter tiles mean tighter delivery capacity. Store-trading rhythm does not change this heatmap. γ_tech and transfer curve apply to the underlying utilisation before inversion.',
   },
   {
     id: 'in_store',
@@ -28,6 +28,13 @@ export const VIEW_MODES = [
     runwayHeatmapTitle: 'Trading pressure',
     title:
       'Restaurant busyness from the store trading curve: weekly × monthly × seasonal rhythm, early-month lift (more visits when wallets are fuller), holidays, and store-facing campaign boosts in YAML. This lens does not add tech work—see Technology Teams for delivery load. Same 0–1 scale; γ_business and transfer curve apply.',
+  },
+  {
+    id: 'market_risk',
+    label: 'Market risk',
+    runwayHeatmapTitle: 'Deployment / calendar risk',
+    title:
+      'Graded deployment fragility from holidays, year-end windows, trading intensity (consequence if something breaks), light campaign signal, and optional YAML deployment events. Hotter = more fragile—not a ban. Same temperature ramp as Restaurant; γ_business and transfer curve apply unless you add a dedicated γ later.',
   },
   {
     id: 'code',
@@ -49,12 +56,13 @@ export function runwayHeatmapTitleForViewMode(id: ViewModeId): string {
 /** Map persisted / legacy layer ids to runway view modes (`combined` = Technology lens in the UI). */
 export function normalizeViewModeId(raw: string | null): ViewModeId {
   if (!raw) return 'combined';
-  if (raw === 'code') return 'code';
+  if (raw === 'combined' || raw === 'in_store' || raw === 'market_risk' || raw === 'code') {
+    return raw;
+  }
   const legacy: Record<string, ViewModeId> = {
-    combined: 'combined',
     technology: 'combined',
-    in_store: 'in_store',
-    risk_score: 'combined',
+    deployment_risk: 'market_risk',
+    risk_score: 'market_risk',
     tech_pressure: 'combined',
     tech_readiness_pressure: 'combined',
     tech_sustain_pressure: 'combined',

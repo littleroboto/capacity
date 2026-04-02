@@ -15,7 +15,7 @@ export const HOLIDAY_CAPACITY_SCALE = 0.5;
 /**
  * Hard cap for store-trading outputs after early-month boost and campaign amplification (aligned with
  * `campaign_effect_scale` UI clamp). Values above 1 are visible in Business lens / tooltips; combined
- * `risk_score` still clamps to 1.
+ * `planning_blend_01` still clamps to 1.
  */
 export const STORE_PRESSURE_MAX = 2.5;
 

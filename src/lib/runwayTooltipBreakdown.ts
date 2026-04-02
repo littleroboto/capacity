@@ -1,10 +1,16 @@
+import { weekdayDeploymentShape01 } from '@/engine/deploymentRiskModel';
 import { parseDate } from '@/engine/calendar';
 import { getStubPublicHolidayName } from '@/engine/holidayCalc';
 import type { RiskRow } from '@/engine/riskModel';
 import { normalizedRiskWeights, type RiskModelTuning } from '@/engine/riskModelTuning';
 import type { BauEntry, MarketConfig } from '@/engine/types';
 import type { ViewModeId } from '@/lib/constants';
-import { inStoreHeatmapMetric, type TechWorkloadScope } from '@/lib/runwayViewMetrics';
+import {
+  inStoreHeatmapMetric,
+  technologyHeadroomHeatmapMetric,
+  type TechWorkloadScope,
+} from '@/lib/runwayViewMetrics';
+import { STORE_PRESSURE_MAX } from '@/engine/riskModelTuning';
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
 import { buildDriverSummaryBlocks, type RunwayDriverBlock } from '@/lib/runwayScoreSummary';
 
@@ -217,17 +223,29 @@ export function buildLensRiskBlendTerms(
   viewMode: ViewModeId,
   row: RiskRow,
   tuning: RiskModelTuning,
-  _techWorkloadScope: TechWorkloadScope = 'all'
+  techWorkloadScope: TechWorkloadScope = 'all'
 ): RiskBlendTerm[] {
   if (viewMode === 'combined') {
-    const demand = row.tech_demand_ratio ?? row.tech_pressure ?? 0;
+    const headroom = technologyHeadroomHeatmapMetric(row, techWorkloadScope);
     return [
       {
-        key: 'tech',
-        label: 'Tech workload (this heatmap)',
-        factor: demand,
+        key: 'tech_headroom',
+        label: 'Tech capacity headroom (this heatmap)',
+        factor: headroom,
         weight: 1,
-        contribution: Math.min(1, demand),
+        contribution: headroom,
+      },
+    ];
+  }
+  if (viewMode === 'market_risk') {
+    const d = Math.min(1, Math.max(0, row.deployment_risk_01 ?? 0));
+    return [
+      {
+        key: 'deployment',
+        label: 'Deployment / calendar risk (this heatmap)',
+        factor: d,
+        weight: 1,
+        contribution: d,
       },
     ];
   }
@@ -241,6 +259,37 @@ export function buildLensRiskBlendTerms(
       contribution: fill01,
     },
   ];
+}
+
+/** Short natural-language factors behind {@link RiskRow.deployment_risk_01}. */
+export function deploymentRiskExplanation(
+  row: RiskRow,
+  config: MarketConfig | undefined,
+  dateStr: string
+): string {
+  const parts: string[] = [];
+  if (row.public_holiday_flag) parts.push('public holiday');
+  if (row.school_holiday_flag) parts.push('school break');
+  const storeNorm = Math.min(1, Math.max(0, row.store_pressure ?? 0) / STORE_PRESSURE_MAX);
+  if (storeNorm >= 0.12) {
+    parts.push(`busy stores (~${Math.round(storeNorm * 100)}% on the trading curve)`);
+  }
+  const month = Number(dateStr.slice(5, 7));
+  if (month === 11 || month === 12) parts.push('year-end window');
+  if ((row.campaign_risk ?? 0) >= 0.08) parts.push('campaign activity');
+  for (const ev of config?.deployment_risk_events ?? []) {
+    if (dateStr >= ev.start && dateStr <= ev.end) {
+      parts.push(`${ev.id.replace(/_/g, ' ')}${ev.kind ? ` (${ev.kind})` : ''}`);
+    }
+  }
+  const wdShape = weekdayDeploymentShape01(dateStr, config);
+  if (wdShape >= 0.45) {
+    parts.push('heavy trading / tech week segment (incidents matter more than mid-week lulls)');
+  } else if (wdShape >= 0.2) {
+    parts.push('above-average week segment for load rhythm');
+  }
+  if (!parts.length) return 'No strong deployment-risk flags on this day in the model.';
+  return `Active factors: ${parts.join(' · ')}.`;
 }
 
 /** Full combined-risk blend (planning / diagnostics). */
@@ -309,6 +358,8 @@ export type RunwayTooltipPayload = {
   headroomLine: string | null;
   /** Campaigns / holidays / resourcing groupings for the summary panel. */
   driverSummaryBlocks: RunwayDriverBlock[];
+  /** Market risk lens: human-readable factor summary. */
+  deploymentRiskLine: string | null;
 };
 
 export type { RunwayDriverBlock };
@@ -390,5 +441,7 @@ export function buildRunwayTooltipPayload(input: {
       techExplanation,
       pressureLines
     ),
+    deploymentRiskLine:
+      viewMode === 'market_risk' ? deploymentRiskExplanation(row, config, dateStr) : null,
   };
 }

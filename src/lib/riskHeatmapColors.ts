@@ -155,15 +155,20 @@ export function heatmapTransformedMetric01(metric: number | undefined, opts?: He
 }
 
 /**
- * Maps a view’s heatmap metric (already 0–1, Technology or Business) through optional γ into discrete
- * temperature-band colours — **same absolute scale for every view** (no per-runway min–max stretch).
+ * Maps a view’s heatmap metric through optional γ into discrete temperature-band colours.
+ * **Technology** (`combined`) passes **headroom** 0–1; colour uses **stress** = 1 − headroom so
+ * tighter capacity reads hotter (same ramp as other lenses).
  */
 export function heatmapColorForViewMode(
-  _mode: ViewModeId,
+  mode: ViewModeId,
   metric: number | undefined,
   opts?: HeatmapColorOpts
 ): string {
-  const t = heatmapTransformedMetric01(metric, opts);
+  let colorMetric = metric;
+  if (mode === 'combined' && metric != null && !Number.isNaN(metric)) {
+    colorMetric = Math.min(1, Math.max(0, 1 - metric));
+  }
+  const t = heatmapTransformedMetric01(colorMetric, opts);
   if (t == null) return EMPTY_CELL_FILL;
 
   if (opts?.renderStyle === 'mono') {
@@ -196,10 +201,14 @@ export function heatmapLegendSwatchAtBand(bandFromLow: number, opts?: HeatmapCol
  * (for extrusion height, sparklines, etc.) instead of a discrete band colour.
  */
 export function transformedHeatmapMetric(
-  _mode: ViewModeId,
+  mode: ViewModeId,
   metric: number | undefined,
   opts?: HeatmapColorOpts
 ): number {
-  return heatmapTransformedMetric01(metric, opts) ?? 0;
+  let colorMetric = metric;
+  if (mode === 'combined' && metric != null && !Number.isNaN(metric)) {
+    colorMetric = Math.min(1, Math.max(0, 1 - metric));
+  }
+  return heatmapTransformedMetric01(colorMetric, opts) ?? 0;
 }
 

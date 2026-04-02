@@ -267,6 +267,8 @@ function fillMetricHeadlineForView(mode: ViewModeId, techWorkloadScope: TechWork
       return technologyFillMetricHeadline(techWorkloadScope);
     case 'in_store':
       return 'Trading pressure';
+    case 'market_risk':
+      return 'Deployment risk';
     default:
       return 'Pressure';
   }
@@ -278,6 +280,8 @@ function fillMetricLabelForView(mode: ViewModeId, techWorkloadScope: TechWorkloa
       return technologyFillMetricLabel(techWorkloadScope);
     case 'in_store':
       return 'Restaurant trading intensity from the store curve—rhythm, holidays, and store boosts when live (or prep if YAML says so)';
+    case 'market_risk':
+      return 'Calendar and trading-consequence risk (0–1): holidays, year-end lift, store intensity, campaigns, and optional deployment events in YAML.';
     default:
       return 'Metric';
   }
@@ -913,7 +917,7 @@ function RunwayMonthMiniGrid({
               : undefined;
             const { fill, dimOpacity } = !dateStr
               ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
-              : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts);
+              : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts, row);
             const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
             const shimmerBase = ((secYear % 100) * 500 + mo.monthIndex * 40 + wi * 7 + di) % 900;
             const sweepDelaySec = sweepDelayForCell(sweepMarketOffsetSec, si, sweepMi, wi, di);
@@ -1513,7 +1517,8 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
         viewMode,
         techWorkloadScope,
         fillMetricValue,
-        heatmapOpts
+        heatmapOpts,
+        row
       );
       const payload = buildRunwayTooltipPayload({
         dateStr,

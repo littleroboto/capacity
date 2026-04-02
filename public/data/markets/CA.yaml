@@ -364,3 +364,87 @@ trading:
   seasonal:
     peak_month: 7
     amplitude: 0.1
+
+# -----------------------------------------------------------------------------
+# Market risk lens — corporate calendar (illustrative; listed-company style).
+# Month curve: heavier Q3 trading + rising Q4 toward year-end. Overlapping events
+# use max(severity); month lift still adds to holidays, store consequence, etc.
+# -----------------------------------------------------------------------------
+
+deployment_risk_week_weight: 0.26
+
+deployment_risk_month_curve:
+  Jan: 0.03
+  Feb: 0.03
+  Mar: 0.04
+  Apr: 0.05
+  May: 0.06
+  Jun: 0.08
+  Jul: 0.12
+  Aug: 0.14
+  Sep: 0.16
+  Oct: 0.14
+  Nov: 0.20
+  Dec: 0.28
+
+deployment_risk_events:
+  - id: earnings_q1_fy2026
+    start: '2026-05-13'
+    end: '2026-05-15'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q2_fy2026
+    start: '2026-08-11'
+    end: '2026-08-13'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q3_fy2026
+    start: '2026-11-10'
+    end: '2026-11-12'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q4_fy2026
+    start: '2027-02-10'
+    end: '2027-02-12'
+    severity: 0.55
+    kind: earnings
+  - id: earnings_q1_fy2027
+    start: '2027-05-12'
+    end: '2027-05-14'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q2_fy2027
+    start: '2027-08-10'
+    end: '2027-08-12'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q3_fy2027
+    start: '2027-11-09'
+    end: '2027-11-11'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q4_fy2027
+    start: '2028-02-09'
+    end: '2028-02-11'
+    severity: 0.55
+    kind: earnings
+  - id: agm_prep_fy2026
+    start: '2026-10-14'
+    end: '2026-10-20'
+    severity: 0.48
+    kind: agm_prep
+  - id: agm_day_fy2026
+    start: '2026-10-21'
+    end: '2026-10-21'
+    severity: 0.42
+    kind: agm
+  - id: agm_prep_fy2027
+    start: '2027-10-13'
+    end: '2027-10-19'
+    severity: 0.48
+    kind: agm_prep
+  - id: agm_day_fy2027
+    start: '2027-10-20'
+    end: '2027-10-20'
+    severity: 0.42
+    kind: agm

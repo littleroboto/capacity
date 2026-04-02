@@ -1,6 +1,6 @@
 /**
  * Operational capacity calendar engine: timeline, BAU/campaign expansion,
- * holidays, and per-day metrics (including normalised risk_score 0–1).
+ * holidays, and per-day metrics (including normalised planning blend 0–1).
  */
 import { buildCalendar } from './calendar';
 import { runPipelineFromDsl, type PipelineResult } from './pipeline';
@@ -44,7 +44,7 @@ export function describeMetrics(row: RiskRow): {
   tech_sustain_pressure: number;
   store_pressure: number;
   campaign_presence: number;
-  risk_score: number;
+  planning_blend_01: number;
 } {
   return {
     tech_pressure: row.tech_pressure,
@@ -52,7 +52,7 @@ export function describeMetrics(row: RiskRow): {
     tech_sustain_pressure: row.tech_sustain_pressure,
     store_pressure: row.store_pressure,
     campaign_presence: row.campaign_presence,
-    risk_score: row.risk_score,
+    planning_blend_01: row.planning_blend_01,
   };
 }
 

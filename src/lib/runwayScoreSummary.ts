@@ -31,7 +31,7 @@ export function buildDriverSummaryBlocks(
   if (row.campaign_in_live) {
     campBullets.push(
       techLens
-        ? 'Live campaign: engineering sustain load is on (labs / Market IT / backend). Combined risk elsewhere still reflects store uplift.'
+        ? 'Live campaign: engineering sustain load is on (labs / Market IT / backend). Planning blend elsewhere still reflects store uplift.'
         : 'Live campaign: busier restaurants here when YAML applies a live store boost; pipeline effects are in the store curve.'
     );
   }
@@ -65,7 +65,7 @@ export function buildDriverSummaryBlocks(
   if (row.holiday_flag && !isGregorianChristmasDay(row.date)) {
     holBullets.push(
       techLens
-        ? 'Holiday factor is on — can add weight in combined risk; check capacity multipliers.'
+        ? 'Holiday factor is on — can add weight in the planning blend; check capacity multipliers.'
         : 'Holiday period — may already shape the store curve (e.g. closures); not a separate heatmap dial in this lens.'
     );
   }

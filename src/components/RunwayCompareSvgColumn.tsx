@@ -113,7 +113,7 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
         const metric = row ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope) : undefined;
         const { fill, dimOpacity: dimOp } = !dateStr
           ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
-          : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts);
+          : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts, row);
         const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
         const opacity = pastDimmed ? 0.25 * dimOp : dimOp;
         const isToday = typeof dateStr === 'string' && dateStr === todayYmd;

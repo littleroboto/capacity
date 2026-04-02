@@ -54,32 +54,39 @@ export function technologyHeatmapMetricForSurfaces(
 export function technologyRunwayTitleForWorkloadScope(scope: TechWorkloadScope): string {
   switch (scope) {
     case 'bau':
-      return 'BAU only';
+      return 'BAU headroom';
     case 'project':
-      return 'Project work';
+      return 'Project-work headroom';
     default:
-      return 'Combined tech load';
+      return 'Combined tech headroom';
   }
 }
 
 /** Day-details headline for the cell fill % in Technology lens. */
 export function technologyFillMetricHeadline(scope: TechWorkloadScope): string {
-  return technologyRunwayTitleForWorkloadScope(scope);
+  switch (scope) {
+    case 'bau':
+      return 'BAU headroom';
+    case 'project':
+      return 'Project-work headroom';
+    default:
+      return 'Combined tech headroom';
+  }
 }
 
 /** Day-details explainer under the headline for Technology lens. */
 export function technologyFillMetricLabel(scope: TechWorkloadScope): string {
   switch (scope) {
     case 'bau':
-      return 'BAU only—routine BAU and weekly tech rhythm; labs and Market IT versus capacity (headline excludes backend)';
+      return 'Share of lab and Market IT capacity still available for BAU-only scheduled work (0–1; headline excludes backend).';
     case 'project':
-      return 'Project work only—campaigns, tech programmes, releases, coordination, and carryover versus capacity';
+      return 'Share of lab and Market IT capacity still available when only project surfaces count (campaigns, change, coordination, carryover).';
     default:
-      return 'Combined load—scheduled work on labs and Market IT versus each lane’s capacity (headline excludes backend). Store visit rhythm (including early-month lift) is separate; switch to Restaurant Activity to see it.';
+      return 'Share of lab and Market IT capacity still available versus all scheduled work on those lanes (0–1; headline excludes backend). Switch to Restaurant Activity for store trading intensity.';
   }
 }
 
-/** Technology lens: uncapped demand vs caps (can exceed 1); heatmap colour still clamps for the ramp. */
+/** Technology lens: uncapped demand vs caps (can exceed 1). */
 export function technologyHeatmapMetric(row: RiskRow, scope: TechWorkloadScope = 'all'): number {
   if (scope === 'all') {
     const u = row.tech_demand_ratio ?? row.tech_pressure ?? 0;
@@ -89,6 +96,13 @@ export function technologyHeatmapMetric(row: RiskRow, scope: TechWorkloadScope =
     return technologyHeatmapMetricForSurfaces(row, TECH_BAU_SURFACES);
   }
   return technologyHeatmapMetricForSurfaces(row, TECH_PROJECT_SURFACES);
+}
+
+/** Technology heatmap cell: **headroom** 0–1 (1 = empty lanes, 0 = at/above cap on the tighter lane). */
+export function technologyHeadroomHeatmapMetric(row: RiskRow, scope: TechWorkloadScope = 'all'): number {
+  const u = technologyHeatmapMetric(row, scope);
+  const capped = Math.min(1, Math.max(0, u));
+  return Math.min(1, Math.max(0, 1 - capped));
 }
 
 /**
@@ -102,27 +116,25 @@ export function heatmapCellMetric(
 ): number {
   switch (mode) {
     case 'combined':
-      return technologyHeatmapMetric(row, techWorkloadScope);
+      return technologyHeadroomHeatmapMetric(row, techWorkloadScope);
     case 'in_store':
       return inStoreHeatmapMetric(row, tuning);
+    case 'market_risk':
+      return Math.min(1, Math.max(0, row.deployment_risk_01 ?? 0));
     default:
-      return technologyHeatmapMetric(row, techWorkloadScope);
+      return technologyHeadroomHeatmapMetric(row, techWorkloadScope);
   }
 }
 
-/** Technology Teams lens + **Project work** scope with no project-surface demand (raw metric ≤ 0). */
+/** Technology Teams lens + **Project work** scope with no project-surface demand. */
 export function techProjectWorkUsesDimmedCellStyle(
   viewMode: ViewModeId,
   techWorkloadScope: TechWorkloadScope,
-  metric: number | undefined
+  row: RiskRow
 ): boolean {
-  return (
-    viewMode === 'combined' &&
-    techWorkloadScope === 'project' &&
-    metric != null &&
-    !Number.isNaN(metric) &&
-    metric <= 0
-  );
+  if (viewMode !== 'combined' || techWorkloadScope !== 'project') return false;
+  const u = technologyHeatmapMetricForSurfaces(row, TECH_PROJECT_SURFACES);
+  return !Number.isNaN(u) && u <= 0;
 }
 
 const PROJECT_WORK_ZERO_DIM_OPACITY = 0.5;
@@ -135,10 +147,11 @@ export function runwayHeatmapCellFillAndDim(
   viewMode: ViewModeId,
   techWorkloadScope: TechWorkloadScope,
   metric: number | undefined,
-  opts?: HeatmapColorOpts
+  opts?: HeatmapColorOpts,
+  row?: RiskRow
 ): { fill: string; dimOpacity: number } {
   const fill = heatmapColorForViewMode(viewMode, metric, opts);
-  if (techProjectWorkUsesDimmedCellStyle(viewMode, techWorkloadScope, metric)) {
+  if (row && techProjectWorkUsesDimmedCellStyle(viewMode, techWorkloadScope, row)) {
     return { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: PROJECT_WORK_ZERO_DIM_OPACITY };
   }
   return { fill, dimOpacity: 1 };
@@ -149,7 +162,7 @@ export function runwayHeatmapCellFillAndDim(
  * (weekly × monthly × seasonal rhythm, **early-month multiplier** on that rhythm, public-holiday trading
  * multiplier, live campaign **store** boost and prep **store** boost from YAML if any, then operating-window
  * store multipliers). Does **not** affect lab / Market IT / backend loads. Does **not** blend in marketing
- * `campaign_risk` as a separate heatmap lane; that stays in combined `risk_score`.
+ * `campaign_risk` as a separate heatmap lane; it still feeds the planning blend and Market risk.
  */
 export function inStoreHeatmapMetric(
   row: RiskRow,

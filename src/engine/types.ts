@@ -1,4 +1,5 @@
 import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
+import type { TradingMonthKey } from '@/lib/tradingMonthlyDsl';
 import type { EnvelopeKind } from './weighting';
 
 /** Optional multipliers when `school_holiday_flag` is true (loads ↑, effective lab/team cap ↓). */
@@ -15,6 +16,17 @@ export type SchoolHolidayStress = {
 
 export type StressCorrelations = {
   school_holidays?: SchoolHolidayStress;
+};
+
+/** YAML `deployment_risk_events`: corporate or governance windows that add deployment fragility. */
+export type DeploymentRiskEvent = {
+  id: string;
+  start: string;
+  end: string;
+  /** 0–1 severity while the day falls in `[start, end]` (inclusive). */
+  severity: number;
+  /** Optional tag for tooltips only. */
+  kind?: string;
 };
 
 /** Inclusive `start`/`end` dates (`YYYY-MM-DD`); multipliers stack if windows overlap. */
@@ -155,6 +167,18 @@ export type MarketConfig = {
   riskHeatmapGammaBusiness?: number;
   /** Heatmap transfer curve for combined view (`risk_heatmap_curve` in YAML). */
   riskHeatmapCurve?: RiskHeatmapCurveId;
+  /** Optional deployment-risk calendar events (`deployment_risk_events` in YAML). */
+  deployment_risk_events?: DeploymentRiskEvent[];
+  /**
+   * Optional Jan–Dec 0–1 lift added to deployment risk for that calendar month (`deployment_risk_month_curve`).
+   * When a month is omitted, November/December fall back to engine defaults; other months default to 0.
+   */
+  deployment_risk_month_curve?: Partial<Record<TradingMonthKey, number>>;
+  /**
+   * Optional **0–1** multiplier on within-week load shape (trading + tech `weekly_pattern`) in Market risk.
+   * Omit for engine default **0.2**; raise in aggressive trading markets.
+   */
+  deployment_risk_week_weight?: number;
 };
 
 export type BauEntry = {
