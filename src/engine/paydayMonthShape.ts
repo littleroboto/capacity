@@ -1,5 +1,6 @@
 /**
  * Early-month **store-trading** multiplier on top of YAML weekly/monthly rhythm.
+ * Used only for `store_trading_base` / `store_pressure` — does **not** scale tech phase loads or capacity KPIs.
  *
  * Two shapes are supported:
  * - **Legacy** {@link storePaydayMonthMultiplier}: one peak, week-1 plateau, linear fade to 1× by day 21.
@@ -7,6 +8,12 @@
  *   (UI W1–W4), piecewise linear, then fade to 1× by month-end — see pipeline precedence vs YAML.
  */
 import { parseDate } from '@/engine/calendar';
+
+/**
+ * Hard ceiling for early-month multipliers (YAML knots, legacy peak, UI).
+ * **+20% max** lift on YAML-normalised store rhythm (1× baseline → 1.2× at peak week).
+ */
+export const PAYDAY_MONTH_MULTIPLIER_MAX = 1.2 as const;
 
 /** Last day of calendar week 1 (days 1–7). */
 const WEEK1_LAST_DOM = 7;
@@ -25,7 +32,7 @@ export type PaydayKnotTuple = readonly [number, number, number, number];
 
 function clampPaydayMult(n: number): number {
   if (!Number.isFinite(n)) return 1;
-  return Math.min(2, Math.max(1, n));
+  return Math.min(PAYDAY_MONTH_MULTIPLIER_MAX, Math.max(1, n));
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -72,11 +79,11 @@ export function isPaydayKnotTuple(v: unknown): v is PaydayKnotTuple {
 /**
  * Early-month store boost on YAML-derived store rhythm: full **peak** on days **1–7**, linear fade to **1×** by end of
  * **day 21** (through calendar week 3), then flat for the rest of the month.
- * `peakMultiplier` is clamped to **1–2**; **1** = off (no boost).
+ * `peakMultiplier` is clamped to **1–1.2** ({@link PAYDAY_MONTH_MULTIPLIER_MAX}, +20% max); **1** = off (no boost).
  */
 export function storePaydayMonthMultiplier(dateYmd: string, peakMultiplier: number): number {
   if (!Number.isFinite(peakMultiplier) || peakMultiplier <= 1) return 1;
-  const M = Math.min(2, Math.max(1, peakMultiplier));
+  const M = Math.min(PAYDAY_MONTH_MULTIPLIER_MAX, Math.max(1, peakMultiplier));
   const dom = parseDate(dateYmd).getDate();
   if (dom <= WEEK1_LAST_DOM) return M;
   if (dom > TAPER_END_DOM) return 1;

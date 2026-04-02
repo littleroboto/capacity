@@ -165,7 +165,7 @@ export function pressureSurfaceLines(row: RiskRow): string[] {
   const sorted = entries.filter(([, v]) => v >= 0.02).sort((a, b) => b[1] - a[1]);
   return sorted.map(([k, v]) => {
     const label = SURFACE_LABEL[k] ?? k;
-    return `${label}: about ${(v * 100).toFixed(0)}% of the busiest lane (lab, Market IT, or backend)`;
+    return `${label}: about ${(v * 100).toFixed(0)}% of the busier of lab vs Market IT (headline excludes backend)`;
   });
 }
 
@@ -173,19 +173,18 @@ export function techPressureExplanation(row: RiskRow): string {
   const lab = row.lab_load_ratio ?? row.lab_utilisation ?? 0;
   const team = row.team_load_ratio ?? row.team_utilisation ?? 0;
   const backR = row.backend_load_ratio ?? row.backend_pressure ?? 0;
-  const backHalf = backR * 0.5;
-  const m = Math.max(lab, team, backHalf);
+  const m = Math.max(lab, team);
   if (m < 0.02) {
+    if (backR >= 0.02) {
+      return `Lab and Market IT are light; backend is about ${(backR * 100).toFixed(0)}% of its capacity (backend is not part of this heatmap headline).`;
+    }
     return 'Light day for tech — scheduled work is well below capacity.';
   }
   const eps = 0.001;
-  if (Math.abs(m - lab) < eps || (lab >= team && lab >= backHalf)) {
+  if (Math.abs(m - lab) < eps || lab >= team) {
     return `Led by lab load (${(lab * 100).toFixed(0)}% of lab capacity${lab > 1.001 ? ' — above full capacity' : ''}).`;
   }
-  if (Math.abs(m - team) < eps || team >= backHalf) {
-    return `Led by Market IT load (${(team * 100).toFixed(0)}% of Market IT capacity${team > 1.001 ? ' — above full capacity' : ''}).`;
-  }
-  return `Backend is the limiting lane (${(backR * 100).toFixed(0)}% of its cap; backend counts at half weight in the headline).`;
+  return `Led by Market IT load (${(team * 100).toFixed(0)}% of Market IT capacity${team > 1.001 ? ' — above full capacity' : ''}).`;
 }
 
 /** Explains readiness vs live/support sub-scores (same cap as combined tech; not additive to headline tech pressure). */
@@ -195,7 +194,7 @@ export function techReadinessSustainExplanation(row: RiskRow): string | null {
   if (r < 0.02 && s < 0.02) return null;
   const parts: string[] = [];
   if (r >= 0.02) {
-    parts.push(`readiness / change work ${(r * 100).toFixed(0)}% (of lab / Market IT / backend caps)`);
+    parts.push(`readiness / change work ${(r * 100).toFixed(0)}% (of lab / Market IT caps; headline excludes backend)`);
   }
   if (s >= 0.02) {
     parts.push(`live / support segment ${(s * 100).toFixed(0)}%`);

@@ -149,7 +149,9 @@ export function runPipeline(
     const dayRow = agg.find((r) => r.date === date && r.market === market);
     const config = configByMarket[market];
     const rawStore = getStorePressureForDate(date, config);
-    // Early-month store boost: per-market YAML knots override legacy YAML peak; else global tuning knots.
+    // Early-month store boost (below) applies only to store-trading meta — lab/team/backend loads above come
+    // from phase expansion unchanged.
+    // Per-market YAML knots override legacy YAML peak; else global tuning knots.
     const yamlKnots = config?.tradingPressure?.payday_month_knot_multipliers;
     const yamlPeak = config?.tradingPressure?.payday_month_peak_multiplier;
     const tuningKnots = tuning.storePaydayMonthKnotMultipliers;
@@ -159,7 +161,7 @@ export function runPipeline(
         ? storePaydayMonthMultiplier(date, yamlPeak)
         : storePaydayMonthMultiplierFromKnots(date, tuningKnots);
     // Rhythm is already 0–1 from weekly/monthly/seasonal; apply early-month boost *after* that cap so
-    // week-1 lift is visible (peak ≤ paydayMult ≤ 2).
+    // week-1 lift is visible (paydayMult capped at +20% on store rhythm; see paydayMonthShape).
     let store_trading_base = Math.min(
       paydayMult,
       Math.max(0, rawStore * paydayMult)

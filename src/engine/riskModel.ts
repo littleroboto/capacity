@@ -28,7 +28,7 @@ export type RiskRow = CapacityRow & {
   /** Load-bearing campaign in live window. */
   campaign_in_live: boolean;
   /**
-   * Same lane logic as `tech_pressure` (max of lab, Market IT, ½ backend vs caps) but **not** capped at 1 —
+   * Max of **lab** and **Market IT** load ÷ cap (backend excluded from headline). **Not** capped at 1 —
    * used for the Technology heatmap and day summary so overload shows as e.g. 105%.
    */
   tech_demand_ratio: number;
@@ -59,33 +59,26 @@ export type RiskRow = CapacityRow & {
 function componentTechPressure(input: {
   labL: number;
   teamL: number;
-  backL: number;
   labsCap: number;
   teamsCap: number;
-  backCap: number;
 }): number {
   const labU = input.labsCap > 0 ? input.labL / input.labsCap : 0;
   const teamU = input.teamsCap > 0 ? input.teamL / input.teamsCap : 0;
-  const backP = input.backCap > 0 ? Math.min(1, input.backL / input.backCap) : 0;
-  return Math.min(1, Math.max(labU, teamU, backP * 0.5));
+  return Math.min(1, Math.max(labU, teamU));
 }
 
 function techPressureFromSurfaceSlice(
   slice: SurfaceLoadSlice,
   labsCap: number,
-  teamsCap: number,
-  backCap: number
+  teamsCap: number
 ): number {
   const labL = slice.lab_readiness + slice.lab_sustain;
   const teamL = slice.team_readiness + slice.team_sustain;
-  const backL = slice.backend_readiness + slice.backend_sustain;
   return componentTechPressure({
     labL,
     teamL,
-    backL,
     labsCap,
     teamsCap,
-    backCap,
   });
 }
 
@@ -107,34 +100,27 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
   return rows.map((r) => {
     const lab = r.lab_utilisation ?? 0;
     const team = r.team_utilisation ?? 0;
-    const backend = r.backend_pressure ?? 0;
-    const rawTechPressure = Math.min(1, Math.max(lab, team, backend * 0.5));
+    const rawTechPressure = Math.min(1, Math.max(lab, team));
     const tech_pressure = compressTechUtilisation01(rawTechPressure);
     const labR = r.lab_load_ratio ?? lab;
     const teamR = r.team_load_ratio ?? team;
-    const backR = r.backend_load_ratio ?? backend;
-    const tech_demand_ratio = Math.max(0, labR, teamR, backR * 0.5);
+    const tech_demand_ratio = Math.max(0, labR, teamR);
     const labsCap = r.labs_effective_cap ?? 0;
     const teamsCap = r.teams_effective_cap ?? 0;
-    const backCap = r.backend_effective_cap ?? 0;
     const tech_readiness_pressure = compressTechUtilisation01(
       componentTechPressure({
         labL: r.lab_load_readiness ?? 0,
         teamL: r.team_load_readiness ?? 0,
-        backL: r.backend_load_readiness ?? 0,
         labsCap,
         teamsCap,
-        backCap,
       })
     );
     const tech_sustain_pressure = compressTechUtilisation01(
       componentTechPressure({
         labL: r.lab_load_sustain ?? 0,
         teamL: r.team_load_sustain ?? 0,
-        backL: r.backend_load_sustain ?? 0,
         labsCap,
         teamsCap,
-        backCap,
       })
     );
     const store_trading_base = Math.min(
@@ -163,7 +149,7 @@ export function computeRisk(rows: PreRiskRow[], tuning: RiskModelTuning = DEFAUL
       const sl = r.surfaceTotals?.[sid];
       pressure_surfaces[sid] = sl
         ? Math.round(
-            compressTechUtilisation01(techPressureFromSurfaceSlice(sl, labsCap, teamsCap, backCap)) * 100
+            compressTechUtilisation01(techPressureFromSurfaceSlice(sl, labsCap, teamsCap)) * 100
           ) / 100
         : 0;
     }

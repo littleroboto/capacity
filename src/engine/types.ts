@@ -80,10 +80,10 @@ export type TradingPressureKnobs = {
   campaign_store_boost_prep?: number;
   /** Extra fraction on base store pressure during campaign live (non-presence); default 0.28. */
   campaign_store_boost_live?: number;
-  /** Overrides global tuning for early-month store boost (peak week 1, fade to 1× by day 21; ≥1). */
+  /** Overrides global tuning for early-month store boost (peak week 1, fade to 1× by day 21; 1–1.2, +20% max). */
   payday_month_peak_multiplier?: number;
   /**
-   * Optional four knot multipliers (≥1) on DOM 4, 11, 18, 25 — piecewise linear early-month curve; see
+   * Optional four knot multipliers (1–1.2) on DOM 4, 11, 18, 25 — piecewise linear early-month curve; see
    * `storePaydayMonthMultiplierFromKnots`. When set, overrides {@link payday_month_peak_multiplier} for that market.
    */
   payday_month_knot_multipliers?: readonly [number, number, number, number];

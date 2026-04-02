@@ -265,7 +265,8 @@ If YAML omits **`releases`**, the list is empty.
 
 ### Tech pressure & risk (`computeRisk`)
 
-- **tech_pressure** = `min(1, max(lab_utilisation, team_utilisation, backend_pressure * 0.5))`
+- **tech_pressure** = `compress(min(1, max(lab_utilisation, team_utilisation)))` — backend utilisation is **not** included in this headline (combined **risk_score** still uses **tech_pressure** as the tech term)
+- **tech_demand_ratio** = `max(lab_load_ratio, team_load_ratio)` — uncapped; drives Technology heatmap fill when using full combined tech scope
 - **store_pressure** = from trading pattern (already 0–1)
 - **campaign_risk** = from campaigns (0–1)
 - **risk_score** = `0.6 * tech_pressure + 0.3 * store_pressure + 0.1 * campaign_risk` (then rounded to 2 decimals)
@@ -278,7 +279,7 @@ If YAML omits **`releases`**, the list is empty.
 
 ### Heatmap colour (runway cells)
 
-- **Input** = **`heatmapCellMetric(row, viewMode, riskTuning)`** — Technology lens uses **`tech_pressure`** (after noise); Business lens uses **`inStoreHeatmapMetric`** = **`store_pressure` / `STORE_PRESSURE_MAX`** clamped 0–1 (restaurant busyness; **`store_pressure`** is not noise-jittered).
+- **Input** = **`heatmapCellMetric(row, viewMode, riskTuning)`** — Technology lens uses **`tech_demand_ratio`** (max lab vs Market IT; **not** noise-jittered); BAU/project scopes use the same max on merged surfaces. **`tech_pressure`** (after noise) feeds the combined-risk **tech** term only. Business lens uses **`inStoreHeatmapMetric`** = **`store_pressure` / `STORE_PRESSURE_MAX`** clamped 0–1 (restaurant busyness; **`store_pressure`** is not noise-jittered).
 - **index** = `floor(clamp(transformedMetric,0,1) * 9)` into a fixed **10-colour** array (green → red), after per-lens γ and optional **stress cutoff** dimming (UI-only; see `MARKET_DSL_AND_PIPELINE.md`).
 - **`risk_score`** remains the weighted **tech / store / campaign** blend for banding and explanations where the UI shows “combined risk,” not for default cell fill.
 

@@ -104,9 +104,9 @@ Gentle annual wave (`peak_month`, `amplitude`) on store pressure.
 - **Days 8–21**: linear fade from peak down to **1×** (boost mostly gone by **week 3**).
 - **Day 22 onward**: **1×** (no boost).
 
-Uses **day-of-month** bands, not ISO week numbers. The YAML key name is legacy; behaviour is “early-month lift that dies away by week 3,” not pay-cycle alignment.
+Uses **day-of-month** bands, not ISO week numbers. The YAML key name is legacy; behaviour is “early-month lift that dies away by week 3,” not pay-cycle alignment. This path **only** increases modeled **store / restaurant trading pressure**; it does **not** scale YAML tech phase loads, lab capacity demand, or backend work—those stay on the **Technology Teams** heatmap.
 
-The pipeline applies this multiplier **after** the weekly/monthly/seasonal rhythm is already normalised to **0–1**, so the boost can push **`store_trading_base` / `store_pressure` above 1** (hard-capped at **`STORE_PRESSURE_MAX`** / 2.5 after campaign terms in `riskModelTuning.ts`). Combined **`risk_score`** still clamps to **1**.
+The pipeline applies this multiplier **after** the weekly/monthly/seasonal rhythm is already normalised to **0–1**. Peak and knot multipliers are **capped at 1.2** (+**20%** max lift on that rhythm; see `PAYDAY_MONTH_MULTIPLIER_MAX` in `paydayMonthShape.ts`). The boost can still push **`store_trading_base` / `store_pressure` above 1** in combination with campaign terms (hard-capped at **`STORE_PRESSURE_MAX`** / 2.5). Combined **`risk_score`** still clamps to **1**.
 
 **UI:** **Heatmap adjustments** → **Trading Patterns** is shown only in the **Restaurant Activity** lens. It edits **`trading.monthly_pattern`** and early-month store-boost knots (tuning + optional YAML) for the focused market.
 

@@ -81,7 +81,7 @@ resources:
 
 ## `trading`
 
-`weekly_pattern`: `default`, `weekdays`, `weekend`, `Mon`…`Sun` → `low|medium|high|very_high` or 0–1. Optional `monthly_pattern` (Jan…Dec), `seasonal: {peak_month, amplitude}`, `payday_month_peak_multiplier`, `campaign_store_boost_prep`, `campaign_store_boost_live`, `campaign_effect_scale` (0–2.5).
+`weekly_pattern`: `default`, `weekdays`, `weekend`, `Mon`…`Sun` → `low|medium|high|very_high` or 0–1. Optional `monthly_pattern` (Jan…Dec), `seasonal: {peak_month, amplitude}`, `payday_month_peak_multiplier` (1–1.2, +20% max), `payday_month_knot_multipliers` (four values, same cap), `campaign_store_boost_prep`, `campaign_store_boost_live`, `campaign_effect_scale` (0–2.5).
 
 ## `tech`
 

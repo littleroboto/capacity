@@ -15,6 +15,7 @@ import type {
   TradingPressureKnobs,
 } from './types';
 import { expandTechWeeklyPattern } from './techWeeklyPattern';
+import { PAYDAY_MONTH_MULTIPLIER_MAX } from './paydayMonthShape';
 import type { EnvelopeKind } from './weighting';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -325,7 +326,9 @@ function mapTradingPressureKnobs(
   if (Array.isArray(rawKnots) && rawKnots.length === 4) {
     const nums = rawKnots.map((x) => Number(x));
     if (nums.every((n) => Number.isFinite(n))) {
-      paydayKnots = nums.map((n) => Math.min(2, Math.max(1, n))) as [number, number, number, number];
+      paydayKnots = nums.map((n) =>
+        Math.min(PAYDAY_MONTH_MULTIPLIER_MAX, Math.max(1, n))
+      ) as [number, number, number, number];
     }
   }
   if (prep == null && live == null && payday == null && effect == null && paydayKnots == null) return undefined;
@@ -333,7 +336,8 @@ function mapTradingPressureKnobs(
   if (effect != null) out.campaign_effect_scale = Math.min(2.5, Math.max(0, effect));
   if (prep != null) out.campaign_store_boost_prep = Math.min(0.9, prep);
   if (live != null) out.campaign_store_boost_live = Math.min(1.5, live);
-  if (payday != null) out.payday_month_peak_multiplier = Math.min(2, Math.max(1, payday));
+  if (payday != null)
+    out.payday_month_peak_multiplier = Math.min(PAYDAY_MONTH_MULTIPLIER_MAX, Math.max(1, payday));
   if (paydayKnots != null) out.payday_month_knot_multipliers = paydayKnots;
   return Object.keys(out).length ? out : undefined;
 }

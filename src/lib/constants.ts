@@ -20,14 +20,14 @@ export const VIEW_MODES = [
     /** Short heading above the main runway heatmap. */
     runwayHeatmapTitle: 'Tech capacity demand',
     title:
-      'Tech capacity demand: labs, Market IT, and backend versus effective capacity. Prep-heavy periods read hotter than live campaign support. γ_tech and transfer curve apply.',
+      'Tech capacity demand: labs and Market IT versus effective capacity from scheduled work (headline excludes backend). Store-trading rhythm (including early-in-the-month visit lift) does not change these KPIs or heatmap tiles. Prep-heavy periods read hotter than live campaign support. γ_tech and transfer curve apply.',
   },
   {
     id: 'in_store',
     label: 'Restaurant Activity',
     runwayHeatmapTitle: 'Trading pressure',
     title:
-      'Restaurant busyness from the store trading curve: rhythm, holidays, and store-facing campaign boosts in YAML. Marketing prep does not add a separate heatmap bump (see Technology Teams for delivery load). Same 0–1 scale; γ_business and transfer curve apply.',
+      'Restaurant busyness from the store trading curve: weekly × monthly × seasonal rhythm, early-month lift (more visits when wallets are fuller), holidays, and store-facing campaign boosts in YAML. This lens does not add tech work—see Technology Teams for delivery load. Same 0–1 scale; γ_business and transfer curve apply.',
   },
   {
     id: 'code',

@@ -2,7 +2,11 @@
  * Tunable parameters for combined pressure (UI + persisted store as `riskTuning`).
  * Importances are relative — they are normalized to weights that sum to 1.
  */
-import { knotsFromLegacyPeakMultiplier, type PaydayKnotTuple } from '@/engine/paydayMonthShape';
+import {
+  knotsFromLegacyPeakMultiplier,
+  PAYDAY_MONTH_MULTIPLIER_MAX,
+  type PaydayKnotTuple,
+} from '@/engine/paydayMonthShape';
 import { isRunwayAllMarkets } from '@/lib/markets';
 
 /** Lab/team effective capacity on public or school holidays (fixed; not user-tunable). */
@@ -25,12 +29,12 @@ export type RiskModelTuning = {
   holidayCapacityScale: number;
   /**
    * Peak multiplier on YAML-derived `store_pressure` in calendar week 1; fades to 1× by end of week 3 (day 21), then
-   * stays 1×. 1 = off. Typical ~1.15; capped at 2 in the UI/engine.
+   * stays 1×. 1 = off. Default +20% lift (`PAYDAY_MONTH_MULTIPLIER_MAX`); engine caps knots/peak at the same ceiling.
    * Kept in sync with {@link storePaydayMonthKnotMultipliers}[0] for legacy readers / single-knob YAML.
    */
   storePaydayMonthPeakMultiplier: number;
   /**
-   * Independent knot multipliers (1–2) on DOM 4, 11, 18, 25 — global UI curve; see `storePaydayMonthMultiplierFromKnots`.
+   * Independent knot multipliers (1–1.2) on DOM 4, 11, 18, 25 — global UI curve.
    */
   storePaydayMonthKnotMultipliers: PaydayKnotTuple;
   /**
@@ -40,10 +44,10 @@ export type RiskModelTuning = {
   campaignEffectUiMultiplier: number;
 };
 
-/** Legacy UI used 0–100 scaled by this delta to the old peak multiplier (for persisted state). */
-const LEGACY_PAYDAY_RAMP_MAX_DELTA = 0.14;
+/** Legacy UI used 0–100 scaled by this delta to the peak multiplier (for persisted state). */
+const LEGACY_PAYDAY_RAMP_MAX_DELTA = PAYDAY_MONTH_MULTIPLIER_MAX - 1;
 
-const DEFAULT_PAYDAY_PEAK = 1.15;
+const DEFAULT_PAYDAY_PEAK = PAYDAY_MONTH_MULTIPLIER_MAX;
 
 /** Fixed “balanced” mix: Tech · Restaurant · Marketing · Resources (ratios only; normalized in engine). */
 export const DEFAULT_RISK_TUNING: RiskModelTuning = {
@@ -95,12 +99,17 @@ function resolvePaydayPeakMultiplier(
 
 function clampPaydayPeakMultiplier(n: number): number {
   if (!Number.isFinite(n)) return DEFAULT_RISK_TUNING.storePaydayMonthPeakMultiplier;
-  return Math.min(2, Math.max(1, Math.round(n * 1000) / 1000));
+  return Math.min(
+    PAYDAY_MONTH_MULTIPLIER_MAX,
+    Math.max(1, Math.round(n * 1000) / 1000)
+  );
 }
 
 function clampPaydayKnotTuple(k: readonly number[]): PaydayKnotTuple {
   const a = k.map((n) =>
-    !Number.isFinite(n) ? 1 : Math.min(2, Math.max(1, Math.round(n * 1000) / 1000))
+    !Number.isFinite(n)
+      ? 1
+      : Math.min(PAYDAY_MONTH_MULTIPLIER_MAX, Math.max(1, Math.round(n * 1000) / 1000))
   );
   return [a[0]!, a[1]!, a[2]!, a[3]!];
 }

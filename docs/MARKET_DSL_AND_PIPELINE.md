@@ -160,7 +160,7 @@ Public holidays still set `holiday_flag` but use this block only when the day is
 - **`monthly_pattern`** — Optional Jan–Dec scalars multiplying weekly store pressure for that month.
 - **`campaign_effect_scale`** — Per-market **0–2.5** (default **1**). Scales **`campaign_risk`** (Marketing in the Business lens and in **`risk_score`**) and multiplies **`campaign_store_boost_prep`** / **`campaign_store_boost_live`**. **0** removes campaign-driven pressure (phase loads from campaigns are unchanged). The in-app **Campaign scenario overlay** slider multiplies this per market (not persisted in YAML); see [DSL_CAMPAIGNS_AND_TRADING.md](./DSL_CAMPAIGNS_AND_TRADING.md).
 - **`campaign_store_boost_prep`**, **`campaign_store_boost_live`** — Additive uplift on base store pressure while load-bearing campaigns are in prep / live (defaults 0 and 0.28). These are multiplied by **`campaign_effect_scale`** after YAML parse.
-- **`payday_month_peak_multiplier`** — Early-month store boost (week 1 at peak, fades to 1× by day 21); see `paydayMonthShape.ts`.
+- **`payday_month_peak_multiplier`** — Early-month store boost (week 1 at peak, fades to 1× by day 21); **1–1.2** (+20% max). See `paydayMonthShape.ts`.
 - **`seasonal`** — `peak_month` (1–12) and `amplitude` (capped in parser, e.g. ≤ 0.6) define a gentle annual cosine on store pressure so summer vs winter markets differ without hand-editing every day.
 
 ### 9a. Non-YAML store seasoning (fair-comparison note)

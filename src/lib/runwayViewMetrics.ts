@@ -11,7 +11,7 @@ import {
 
 /**
  * Technology heatmap slice:
- * - `all` — max of lab / Market IT / backend demand (default)
+ * - `all` — max of lab / Market IT demand (default; backend loads still in YAML but excluded from headline)
  * - `bau` — BAU planning surface only (same max formula)
  * - `project` — change / campaign / coordination / carryover surfaces only (no separate “Market IT only” slice)
  */
@@ -32,14 +32,11 @@ function techDemandRatioFromMergedLoads(
 ): number {
   const labsCap = row.labs_effective_cap ?? 0;
   const teamsCap = row.teams_effective_cap ?? 0;
-  const backCap = row.backend_effective_cap ?? 0;
   const labL = merged.lab_readiness + merged.lab_sustain;
   const teamL = merged.team_readiness + merged.team_sustain;
-  const backL = merged.backend_readiness + merged.backend_sustain;
   const labR = labsCap > 0 ? labL / labsCap : 0;
   const teamR = teamsCap > 0 ? teamL / teamsCap : 0;
-  const backR = backCap > 0 ? backL / backCap : 0;
-  return Math.max(0, labR, teamR, backR * 0.5);
+  return Math.max(0, labR, teamR);
 }
 
 /** Uncapped tech demand ratio from the union of the given pressure surfaces (same formula as {@link RiskRow.tech_demand_ratio}). */
@@ -74,11 +71,11 @@ export function technologyFillMetricHeadline(scope: TechWorkloadScope): string {
 export function technologyFillMetricLabel(scope: TechWorkloadScope): string {
   switch (scope) {
     case 'bau':
-      return 'BAU only—routine BAU and weekly tech rhythm; labs, Market IT, and backend versus capacity';
+      return 'BAU only—routine BAU and weekly tech rhythm; labs and Market IT versus capacity (headline excludes backend)';
     case 'project':
       return 'Project work only—campaigns, tech programmes, releases, coordination, and carryover versus capacity';
     default:
-      return 'Combined load—scheduled work on labs, Market IT, and backend versus each lane’s capacity';
+      return 'Combined load—scheduled work on labs and Market IT versus each lane’s capacity (headline excludes backend). Store visit rhythm (including early-month lift) is separate; switch to Restaurant Activity to see it.';
   }
 }
 
@@ -149,9 +146,10 @@ export function runwayHeatmapCellFillAndDim(
 
 /**
  * **Business** heatmap: modeled **restaurant / store trading** intensity only — the `store_pressure` lane
- * (weekly × monthly × seasonal rhythm, public-holiday trading multiplier, live campaign **store** boost and
- * prep **store** boost from YAML if any, then operating-window store multipliers). Does **not** blend in
- * marketing `campaign_risk` or a separate holiday dial; those stay in combined risk.
+ * (weekly × monthly × seasonal rhythm, **early-month multiplier** on that rhythm, public-holiday trading
+ * multiplier, live campaign **store** boost and prep **store** boost from YAML if any, then operating-window
+ * store multipliers). Does **not** affect lab / Market IT / backend loads. Does **not** blend in marketing
+ * `campaign_risk` as a separate heatmap lane; that stays in combined `risk_score`.
  */
 export function inStoreHeatmapMetric(
   row: RiskRow,

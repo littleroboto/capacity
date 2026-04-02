@@ -19,17 +19,22 @@ import { WeightingLineMiniChart } from '@/components/WeightingLineMiniChart';
 import { PatternUnitField } from '@/components/PatternUnitField';
 import {
   PAYDAY_KNOT_SAMPLE_DATES,
+  PAYDAY_MONTH_MULTIPLIER_MAX,
   storePaydayMonthMultiplierFromKnots,
 } from '@/engine/paydayMonthShape';
 
 function snapPaydayKnotMultiplier(n: number): number {
-  return Math.min(2, Math.max(1, Math.round(n * 1000) / 1000));
+  return Math.min(
+    PAYDAY_MONTH_MULTIPLIER_MAX,
+    Math.max(1, Math.round(n * 1000) / 1000)
+  );
 }
 
 const EARLY_MONTH_SAMPLE_LABELS = ['W1', 'W2', 'W3', 'W4'] as const;
 
 function roundEarlyMonthExcess(n: number): number {
-  return Math.round(Math.min(1, Math.max(0, n)) * 1000) / 1000;
+  const cap = PAYDAY_MONTH_MULTIPLIER_MAX - 1;
+  return Math.round(Math.min(cap, Math.max(0, n)) * 1000) / 1000;
 }
 
 /** Store / trading YAML: `trading.weekly_pattern`, `trading.monthly_pattern`, early-month boost (Restaurant Activity lens). */
@@ -73,14 +78,14 @@ export function RestaurantTradingPatternsPanel() {
     () =>
       PAYDAY_KNOT_SAMPLE_DATES.map((d) => {
         const m = storePaydayMonthMultiplierFromKnots(d, paydayKnotsUi);
-        return Math.min(1, Math.max(0, m - 1));
+        return Math.min(PAYDAY_MONTH_MULTIPLIER_MAX - 1, Math.max(0, m - 1));
       }),
     [paydayKnotsUi]
   );
 
   const earlyMonthYDomain = useMemo((): [number, number] => {
     const maxV = Math.max(...earlyMonthSparkline01, 0);
-    if (maxV < 1e-6) return [0, 0.14];
+    if (maxV < 1e-6) return [0, Math.min(0.24, PAYDAY_MONTH_MULTIPLIER_MAX - 1 + 0.04)];
     const top = Math.min(1, maxV * 1.32 + 0.03);
     return [0, Math.max(top, 0.07)];
   }, [earlyMonthSparkline01]);
@@ -200,14 +205,15 @@ export function RestaurantTradingPatternsPanel() {
           Early-month store boost
         </span>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Extra <strong className="font-medium text-foreground/80">store-trading</strong> lift in{' '}
+          Models <strong className="font-medium text-foreground/80">busier restaurants early in the month</strong> when
+          customers typically have more to spend—extra multiplier on the YAML store rhythm in{' '}
           <strong className="font-medium text-foreground/80">week 1</strong>, fading to{' '}
           <span className="font-mono text-foreground/80">1×</span> by{' '}
           <strong className="font-medium text-foreground/80">week 3</strong> (day 21). Uses tuning + optional YAML{' '}
           <span className="font-mono text-foreground/80">trading.payday_month_peak_multiplier</span> or{' '}
-          <span className="font-mono text-foreground/80">payday_month_knot_multipliers</span>.{' '}
-          <strong className="font-medium text-foreground/80">Restaurant Activity</strong> heatmap; store is capped at{' '}
-          <span className="font-mono text-foreground/80">1</span> after YAML rhythm.
+          <span className="font-mono text-foreground/80">payday_month_knot_multipliers</span>. Shown on the{' '}
+          <strong className="font-medium text-foreground/80">Restaurant Activity</strong> heatmap only—does{' '}
+          <strong className="font-medium text-foreground/80">not</strong> change lab, Market IT, or backend load.
         </p>
       </div>
 

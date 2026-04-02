@@ -1,6 +1,8 @@
 # Product backlog — epics
 
-Structured for prioritization and for breaking into plans (human or automated). Each epic lists **goal**, **scope hints**, **dependencies**, and **suggested outcomes**.
+Structured for prioritization and for breaking into **engineering plans** (human or agent). Each epic lists **goal**, **scope hints**, **dependencies**, and **suggested outcomes**.
+
+**Naming:** **Runway auto-plan** (epic below) is an **in-app feature**—suggested initiative slots from runway analysis. **Roadmap** at the bottom is **build order** for these epics, not that feature.
 
 ---
 
@@ -98,6 +100,54 @@ Structured for prioritization and for breaking into plans (human or automated). 
 
 ---
 
+## Epic: Runway auto-plan (initiative slot finder)
+
+**Goal:** The user gives the system a **project / initiative type** (and rough shape—duration, prep, constraints). The system uses **runway heatmap analysis, pressure, and resourcing** to propose **where to drop it on the calendar**—not just “find a gap,” but a **suggested slot** that respects how tight tech and business load already are.
+
+**Scope (indicative):**
+
+- **Project taxonomy:** Structured input (type, duration, prep, optional flags)—UI form or natural language that normalizes to that structure.
+- **Per-market tech / capability config:** Each market carries **YAML (or sidecar) describing the tech stack / lanes** the reasoner must respect (what “counts” as competing load, what stacks can run which initiative classes). Intended to be **LLM-legible** so an assistant can apply policy consistently; deterministic rules can ship first.
+- **Analysis inputs:** Existing engine outputs—daily risk, lab/team/backend loads, campaign prep/live windows, holidays, trading pressure—fed as **structured context** (not a screenshot) into scoring +/or LLM.
+- **Output:** **Suggested slot** (date range, market(s), confidence or rationale bullets); optional “alternates” ranked second/third.
+- **Explicit non-goal for v1:** Pure “first empty week” without pressure awareness—that’s a different, weaker feature.
+- **Later input:** **Corporate calendar & deployment risk** (`epic-corporate-calendar-risk`)—Q4 fragility, earnings, shareholder and franchisee events—as hard or soft constraints on slot scoring.
+
+**Dependencies:** **Data model / markets** (stable ids, manifest); runway pipeline outputs already available in-app. **User & org** optional for saving favourite project templates; not required for a read-only suggester POC.
+
+**Outcomes:** PM or planner can request “slot for initiative X” and get a defensible calendar recommendation grounded in current YAML + stack config.
+
+**Tags:** `autoplan`, `slot-finder`, `runway`, `heatmap`, `llm`, `planning`
+
+**Epic id:** `epic-runway-autoplan`
+
+---
+
+## Epic: Corporate calendar & deployment risk windows
+
+**Goal:** Make **business-calendar risk** first-class in planning—not only tech load and store trading, but **when markets are unwilling or extra-vulnerable to big change** because of how the year closes and how external events can derail communications.
+
+**Product narrative (why it matters):**
+
+- **Q4 / year-end:** Trading year closing and figures being finalised raise the cost of mishaps; early in the year, gaps can sometimes be **recovered through more aggressive promotional activity**, but **late Q4** stacks **holiday period**, **higher baseline trade**, and **no runway to recover** if something goes wrong (e.g. tech or ops issues)—a “perfect storm” for deployment risk.
+- **Corporate / market events:** Locals may avoid large deployments ahead of **earnings calls**, **shareholder meetings**, or **franchisee co-op meetings**, where **external events** can derail the narrative regardless of delivery quality—risk is as much **reputational and coordination** as utilisation.
+
+**Scope (indicative):**
+
+- **Capture in model:** Optional DSL or sidecar (per market or segment)—e.g. named **blackout windows**, **elevated-risk bands** (Q4 default curve), or **event types** with dates (earnings, AGM, co-op) that feed **scoring** or **auto-plan** constraints rather than changing tech capacity math directly.
+- **UI:** Surface these windows on the runway (overlay, legend, tooltip lines) and/or feed **Runway auto-plan** so suggested slots **avoid** or **penalise** them explicitly.
+- **Separation of concerns:** Keep **Technology Teams** heatmap as **scheduled work vs capacity**; corporate risk is an **additional lane** or **planning multiplier** on combined risk / slot finder—aligned with the existing split between tech KPIs and store-trading rhythm.
+
+**Dependencies:** **Data model / markets**; **Runway auto-plan** is the natural consumer once windows exist as structured data. Can ship **documentation + YAML convention** before full engine support.
+
+**Outcomes:** Planners can encode “no-go” or “high-caution” periods with a defensible story; slot finder and combined risk can reflect **calendar fragility**, not only utilisation.
+
+**Tags:** `risk`, `calendar`, `q4`, `planning`, `dsl`, `runway`
+
+**Epic id:** `epic-corporate-calendar-risk`
+
+---
+
 ## Epic: In-app chat
 
 **Goal:** **Team communication** inside or beside the workspace (contextual to org/workspace).
@@ -151,17 +201,18 @@ Structured for prioritization and for breaking into plans (human or automated). 
 
 ---
 
-## Auto-plan: suggested phase order
+## Roadmap: suggested implementation phase order
 
-Use this as a default **dependency-aware sequence** when generating implementation plans. Epics in the same phase can sometimes run in parallel if staffed.
+Use this as a default **dependency-aware sequence** when scheduling engineering work. Epics in the same phase can sometimes run in parallel if staffed.
 
 | Phase | Epics | Notes |
 |-------|--------|--------|
 | **1 — Foundation** | Data model (segments/countries), Landing page (lite), Shared workspace polish (optional) | Baseline in [PRODUCT_BASELINE.md](./PRODUCT_BASELINE.md). |
-| **2 — Identity** | User, org, and permissions | Unblocks everything that needs “who.” |
-| **3 — Collab core** | Yjs + PartyKit | After auth story for rooms; can use secret-gated MVP before full JWT. |
-| **4 — History** | Workspace version control | Needs stable YAML export + user ids. |
-| **5 — Comms** | Comments, then Chat (or Comments first if review is higher priority) | Both need identity; comments often smaller than full chat. |
+| **2 — Planning intelligence** | **Runway auto-plan** (slot finder); **Corporate calendar & deployment risk** (optional, feeds constraints / scoring) | Auto-plan uses runway + stack config; corporate windows extend DSL/scoring when ready—see `epic-corporate-calendar-risk`. |
+| **3 — Identity** | User, org, and permissions | Unblocks everything that needs “who.” |
+| **4 — Collab core** | Yjs + PartyKit | After auth story for rooms; can use secret-gated MVP before full JWT. |
+| **5 — History** | Workspace version control | Needs stable YAML export + user ids. |
+| **6 — Comms** | Comments, then Chat (or Comments first if review is higher priority) | Both need identity; comments often smaller than full chat. |
 
 ### Dependency graph (mermaid)
 
@@ -170,12 +221,17 @@ flowchart TD
   A[Segments and countries]
   B[Landing page]
   C[Shared DSL hardening]
+  P[Runway auto-plan slot finder]
+  R[Corporate calendar risk windows]
   D[User org permissions]
   E[Yjs PartyKit]
   F[Version control]
   G[Comments]
   H[Chat]
   A --> C
+  A --> P
+  A --> R
+  R --> P
   D --> E
   D --> F
   D --> G
@@ -186,15 +242,15 @@ flowchart TD
 
 ### Machine-friendly epic ids
 
-Use in issues or plan scripts: `epic-markets`, `epic-landing`, `epic-auth-org`, `epic-partykit-yjs`, `epic-versioning`, `epic-comments`, `epic-chat`, `epic-shared-dsl-hardening`.
+Use in issues or plan scripts: `epic-markets`, `epic-landing`, `epic-runway-autoplan`, `epic-corporate-calendar-risk`, `epic-auth-org`, `epic-partykit-yjs`, `epic-versioning`, `epic-comments`, `epic-chat`, `epic-shared-dsl-hardening`.
 
 ---
 
-## How to “auto-plan” from here
+## How to turn epics into sprint plans
 
-1. Pick a **phase** or **epic id**.
-2. Expand epic into **stories** (vertical slices): e.g. “PartyKit dev server + env wiring,” then “provider + empty Y.Doc,” then “y-monaco on one buffer.”
+1. Pick a **phase** or **epic id** (e.g. `epic-runway-autoplan`).
+2. Expand into **stories** (vertical slices): e.g. “schema for per-market stack config in YAML,” “slot scorer from `RiskRow[]`,” “LLM prompt + structured output for suggestion.”
 3. For each story, list **files likely touched** (search codebase) and **acceptance criteria** (testable).
 4. Run implementation in **one epic at a time** unless dependencies are satisfied.
 
-When you’re ready, name an epic id (e.g. `epic-partykit-yjs`) and ask for a **sprint-sized plan** — we can turn it into a ordered task list against this repo.
+When you’re ready, name an epic id and ask for a **sprint-sized plan** — we can turn it into an ordered task list against this repo.

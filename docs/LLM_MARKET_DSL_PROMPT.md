@@ -359,7 +359,7 @@ trading:
   seasonal:                         # optional
     peak_month: 7
     amplitude: 0.11
-  payday_month_peak_multiplier: 1.12
+  payday_month_peak_multiplier: 1.2
   campaign_store_boost_prep: 0
   campaign_store_boost_live: 0.28
   campaign_effect_scale: 1.0        # clamped 0–2.5; scales campaign business channels

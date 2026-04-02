@@ -355,7 +355,7 @@ holidays:
 trading:
   campaign_store_boost_prep: 0
   campaign_store_boost_live: 0.28
-  payday_month_peak_multiplier: 1.12
+  payday_month_peak_multiplier: 1.2
   campaign_effect_scale: 2.5
   monthly_pattern:
     Jan: 0.56
