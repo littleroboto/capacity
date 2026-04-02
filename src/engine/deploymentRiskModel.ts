@@ -94,6 +94,7 @@ export function weekdayDeploymentShape01(dateStr: string, config: MarketConfig |
  * Graded 0–1 deployment / calendar fragility for the Market risk heatmap.
  * Sum of bounded factors (not a hard ban); store load raises consequence, not trading “busyness” alone.
  * Blackouts add a separate YAML layer; peak-week × campaign and peak-week × store compound on top of linear terms.
+ * {@link MarketConfig.deployment_risk_context_month_curve} adds a second per-month term on top of the primary curve.
  */
 export function computeDeploymentRisk01(
   row: RiskRow,
@@ -111,6 +112,9 @@ export function computeDeploymentRisk01(
     yamlLift != null && Number.isFinite(yamlLift)
       ? Math.min(1, Math.max(0, yamlLift))
       : defaultDeploymentMonthLift(calMonth);
+  const ctxLift = config?.deployment_risk_context_month_curve?.[monthKey];
+  const contextMonth =
+    ctxLift != null && Number.isFinite(ctxLift) ? Math.min(1, Math.max(0, ctxLift)) : 0;
   const camp01 = Math.min(1, Math.max(0, row.campaign_risk ?? 0));
   const camp = camp01 * 0.08;
   let eventMax = 0;
@@ -136,6 +140,7 @@ export function computeDeploymentRisk01(
     sch +
     storeConsequence +
     seasonal +
+    contextMonth +
     camp +
     eventMax +
     blackoutMax +

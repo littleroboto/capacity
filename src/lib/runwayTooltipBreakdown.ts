@@ -11,6 +11,7 @@ import {
   type TechWorkloadScope,
 } from '@/lib/runwayViewMetrics';
 import { STORE_PRESSURE_MAX } from '@/engine/riskModelTuning';
+import { TRADING_MONTH_KEYS } from '@/lib/tradingMonthlyDsl';
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
 import { buildDriverSummaryBlocks, type RunwayDriverBlock } from '@/lib/runwayScoreSummary';
 
@@ -276,6 +277,13 @@ export function deploymentRiskExplanation(
   }
   const month = Number(dateStr.slice(5, 7));
   if (month === 10 || month === 11 || month === 12) parts.push('calendar Q4 ramp (deployment month lift)');
+  if (month >= 1 && month <= 12) {
+    const mk = TRADING_MONTH_KEYS[month - 1];
+    const ctx = mk ? config?.deployment_risk_context_month_curve?.[mk] : undefined;
+    if (ctx != null && ctx >= 0.06) {
+      parts.push(`extra deployment context month lift (~${Math.round(ctx * 100)}%)`);
+    }
+  }
   const camp01 = Math.min(1, Math.max(0, row.campaign_risk ?? 0));
   if (camp01 >= 0.08) parts.push('campaign activity');
   for (const ev of config?.deployment_risk_events ?? []) {

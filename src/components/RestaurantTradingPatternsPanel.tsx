@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import {
+  fullDeploymentRiskContextMonthFromPartial,
   fullTradingMonthlyPatternFromPartial,
   roundMonthlyUnit,
   TRADING_MONTH_KEYS,
@@ -46,6 +47,8 @@ export function RestaurantTradingPatternsPanel() {
   const setTradingMonthlyPattern = useAtcStore((s) => s.setTradingMonthlyPattern);
   const riskTuning = useAtcStore((s) => s.riskTuning);
   const setRiskTuning = useAtcStore((s) => s.setRiskTuning);
+  const viewMode = useAtcStore((s) => s.viewMode);
+  const setDeploymentRiskContextMonthCurve = useAtcStore((s) => s.setDeploymentRiskContextMonthCurve);
 
   const focusMarket = useMemo(
     () => gammaFocusMarket(country, configs, runwayMarketOrder),
@@ -110,6 +113,21 @@ export function RestaurantTradingPatternsPanel() {
     },
     [setRiskTuning]
   );
+
+  const deploymentContextMonthPattern = useMemo(() => {
+    const c = configs.find((x) => x.market === focusMarket);
+    return fullDeploymentRiskContextMonthFromPartial(c?.deployment_risk_context_month_curve);
+  }, [configs, focusMarket]);
+
+  const deploymentContextMonthSeries = useMemo(
+    () => TRADING_MONTH_KEYS.map((m) => roundMonthlyUnit(deploymentContextMonthPattern[m])),
+    [deploymentContextMonthPattern]
+  );
+
+  const patchDeploymentContextMonth = (month: TradingMonthKey, n: number) => {
+    const next = { ...deploymentContextMonthPattern, [month]: roundMonthlyUnit(n) };
+    setDeploymentRiskContextMonthCurve(next);
+  };
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -256,6 +274,55 @@ export function RestaurantTradingPatternsPanel() {
           × — type or drag any point.
         </p>
       </div>
+
+      {viewMode === 'market_risk' ? (
+        <>
+          <div className="flex flex-col gap-0.5 border-t border-border/40 pt-2">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Deployment context (month)
+            </span>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Second <strong className="font-medium text-foreground/80">0–1 Jan–Dec</strong> curve,{' '}
+              <strong className="font-medium text-foreground/80">added</strong> on top of{' '}
+              <span className="font-mono text-foreground/80">deployment_risk_month_curve</span> for the{' '}
+              <strong className="font-medium text-foreground/80">Market risk</strong> heatmap only—e.g. local
+              regulatory windows or operational fragility without rewriting the primary deployment month shape. Default{' '}
+              <span className="font-mono text-foreground/80">0</span> = no effect; all zeros removes this block from YAML.
+            </p>
+          </div>
+
+          <div className="rounded-md border border-border/60 bg-muted/25 px-2 py-2 shadow-inner">
+            <div
+              className="grid grid-cols-4 gap-2 sm:grid-cols-6"
+              role="group"
+              aria-label="Deployment context month curve, 0 to 1 per calendar month"
+            >
+              {TRADING_MONTH_KEYS.map((month) => (
+                <PatternUnitField
+                  key={`deploy-ctx-${month}`}
+                  id={`deployment-context-monthly-${month}`}
+                  label={month}
+                  value={roundMonthlyUnit(deploymentContextMonthPattern[month])}
+                  roundUnit={roundMonthlyUnit}
+                  onCommit={(n) => patchDeploymentContextMonth(month, n)}
+                />
+              ))}
+            </div>
+            <WeightingLineMiniChart
+              values={deploymentContextMonthSeries}
+              ariaLabel={`Deployment context month curve 0 to 1 by month for ${focusMarket}`}
+              height={62}
+              onPointChange={(i, v) =>
+                patchDeploymentContextMonth(TRADING_MONTH_KEYS[i]!, roundMonthlyUnit(v))
+              }
+              pointLabels={TRADING_MONTH_KEYS}
+            />
+            <p className="mt-1 text-[9px] leading-snug text-muted-foreground">
+              Drag a point vertically to match the month fields.
+            </p>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

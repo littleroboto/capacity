@@ -26,6 +26,7 @@ export function RiskModelPanel() {
         <span className="font-medium text-foreground/90">Trading</span>
         {' · '}
         weekly / monthly / early-month
+        {viewMode === 'market_risk' ? ' · deploy. context' : ''}
       </span>
     ) : (
       <span className="text-[11px] text-muted-foreground">

@@ -40,6 +40,10 @@ import {
   type TradingMonthlyPatternPatch,
 } from '@/lib/dslTradingMonthlyPatch';
 import {
+  patchDslDeploymentRiskContextMonthCurve,
+  type DeploymentRiskContextMonthPatch,
+} from '@/lib/dslDeploymentRiskContextMonthPatch';
+import {
   patchDslTradingWeeklyPattern,
   type TradingWeeklyPatternPatch,
 } from '@/lib/dslTradingWeeklyPatch';
@@ -79,6 +83,9 @@ let atcDslTechRhythmPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Debounce writes to `atc_dsl` while editing `trading.monthly_pattern`. */
 let atcDslTradingMonthlyPersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce writes while editing `deployment_risk_context_month_curve`. */
+let atcDslDeploymentRiskContextPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Debounce writes to `atc_dsl` while editing `trading.weekly_pattern`. */
 let atcDslTradingWeeklyPersistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -181,6 +188,8 @@ type AtcState = {
   setTechWeeklyPattern: (pattern: TechWeeklyPatternPatch) => void;
   /** Writes explicit Jan–Dec `trading.monthly_pattern` (0–1) for the focused market and re-runs the pipeline. */
   setTradingMonthlyPattern: (pattern: TradingMonthlyPatternPatch) => void;
+  /** Writes Jan–Dec `deployment_risk_context_month_curve` (0–1, additive Market risk); all-zero removes the YAML block. */
+  setDeploymentRiskContextMonthCurve: (pattern: DeploymentRiskContextMonthPatch) => void;
   /** Writes explicit Mon–Sun `trading.weekly_pattern` (0–1) for the focused market and re-runs the pipeline. */
   setTradingWeeklyPattern: (pattern: TradingWeeklyPatternPatch) => void;
   /** Writes explicit Mon–Sun `tech.support_weekly_pattern` (0–1) for the focused market. */
@@ -447,6 +456,30 @@ export const useAtcStore = create<AtcState>()(
         atcDslTradingMonthlyPersistTimer = setTimeout(() => {
           setAtcDsl(mergeStateToFullMultiDoc(get()));
           atcDslTradingMonthlyPersistTimer = null;
+        }, 450);
+      },
+
+      setDeploymentRiskContextMonthCurve: (pattern: DeploymentRiskContextMonthPatch) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslDeploymentRiskContextMonthCurve(full, market, pattern);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslDeploymentRiskContextPersistTimer != null) {
+          clearTimeout(atcDslDeploymentRiskContextPersistTimer);
+        }
+        atcDslDeploymentRiskContextPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslDeploymentRiskContextPersistTimer = null;
         }, 450);
       },
 

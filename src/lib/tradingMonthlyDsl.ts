@@ -44,3 +44,17 @@ export function fullTradingMonthlyPatternFromPartial(
   }
   return out;
 }
+
+/**
+ * Full Jan–Dec for `deployment_risk_context_month_curve`: missing months → **0** (additive Market risk only).
+ */
+export function fullDeploymentRiskContextMonthFromPartial(
+  partial?: Partial<Record<TradingMonthKey, number>> | undefined
+): Record<TradingMonthKey, number> {
+  const out = {} as Record<TradingMonthKey, number>;
+  for (const m of TRADING_MONTH_KEYS) {
+    const v = partial?.[m];
+    out[m] = v != null && Number.isFinite(v) ? roundMonthlyUnit(v as number) : 0;
+  }
+  return out;
+}

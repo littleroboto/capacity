@@ -213,6 +213,7 @@ export type ParsedYaml = {
   deployment_risk_events?: unknown[];
   deployment_risk_blackouts?: unknown[];
   deployment_risk_month_curve?: Record<string, unknown>;
+  deployment_risk_context_month_curve?: Record<string, unknown>;
   deployment_risk_week_weight?: number;
   deployment_resourcing_strain_weight?: number;
 };
@@ -236,6 +237,7 @@ const EMPTY: ParsedYaml = {
   deployment_risk_events: undefined,
   deployment_risk_blackouts: undefined,
   deployment_risk_month_curve: undefined,
+  deployment_risk_context_month_curve: undefined,
   deployment_risk_week_weight: undefined,
   deployment_resourcing_strain_weight: undefined,
 };
@@ -312,6 +314,14 @@ function normalizeYamlObject(raw: unknown): ParsedYaml {
         ? (o.deployment_risk_month_curve as Record<string, unknown>)
         : o.deploymentRiskMonthCurve != null && typeof o.deploymentRiskMonthCurve === 'object'
           ? (o.deploymentRiskMonthCurve as Record<string, unknown>)
+          : undefined,
+    deployment_risk_context_month_curve:
+      o.deployment_risk_context_month_curve != null &&
+      typeof o.deployment_risk_context_month_curve === 'object'
+        ? (o.deployment_risk_context_month_curve as Record<string, unknown>)
+        : o.deploymentRiskContextMonthCurve != null &&
+            typeof o.deploymentRiskContextMonthCurve === 'object'
+          ? (o.deploymentRiskContextMonthCurve as Record<string, unknown>)
           : undefined,
     deployment_risk_week_weight: (() => {
       const drw = o.deployment_risk_week_weight ?? o.deploymentRiskWeekWeight;
@@ -695,6 +705,9 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
   }
   const riskHeatmapCurve = parseRiskHeatmapCurve(parsed.risk_heatmap_curve);
   const deployment_risk_month_curve = mapDeploymentRiskMonthCurve(parsed.deployment_risk_month_curve);
+  const deployment_risk_context_month_curve = mapDeploymentRiskMonthCurve(
+    parsed.deployment_risk_context_month_curve
+  );
   const deployment_risk_events = mapDeploymentRiskEvents(parsed.deployment_risk_events);
   const deployment_risk_blackouts = mapDeploymentRiskBlackouts(parsed.deployment_risk_blackouts);
   let deployment_risk_week_weight: number | undefined;
@@ -790,6 +803,7 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     riskHeatmapGammaBusiness,
     riskHeatmapCurve,
     deployment_risk_month_curve,
+    deployment_risk_context_month_curve,
     deployment_risk_week_weight,
     deployment_risk_events,
     deployment_risk_blackouts,
