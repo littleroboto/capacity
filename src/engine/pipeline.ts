@@ -285,7 +285,12 @@ export function runPipeline(
   const noisy = withOperationalNoise(computeRisk(withStoreCampaign, tuning));
   const riskSurface = noisy.map((r) => ({
     ...r,
-    deployment_risk_01: computeDeploymentRisk01(r, configByMarket[r.market], r.date),
+    deployment_risk_01: computeDeploymentRisk01(
+      r,
+      configByMarket[r.market],
+      r.date,
+      tuning.marketRiskScales
+    ),
   }));
 
   return { riskSurface, configs };

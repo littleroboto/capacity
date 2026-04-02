@@ -49,7 +49,10 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">
-          <HeatmapSettingsPanel showCampaignBoost={viewMode !== 'combined'} />
+          <HeatmapSettingsPanel
+            showCampaignBoost={viewMode !== 'combined'}
+            showMarketRiskScales={viewMode === 'market_risk'}
+          />
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button

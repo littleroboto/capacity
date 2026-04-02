@@ -1,6 +1,10 @@
 import { parseDate } from '@/engine/calendar';
 import type { RiskRow } from '@/engine/riskModel';
-import { STORE_PRESSURE_MAX } from '@/engine/riskModelTuning';
+import {
+  DEFAULT_MARKET_RISK_SCALES,
+  STORE_PRESSURE_MAX,
+  type MarketRiskComponentScales,
+} from '@/engine/riskModelTuning';
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
 import type { MarketConfig } from '@/engine/types';
 import { TRADING_MONTH_KEYS, type TradingMonthKey } from '@/lib/tradingMonthlyDsl';
@@ -19,6 +23,25 @@ const PEAK_DAY_CAMPAIGN_INTERACTION_WEIGHT = 0.12;
 
 /** Peak week segment × store load (incidents hurt more when trading is already hot). */
 const PEAK_DAY_STORE_INTERACTION_WEIGHT = 0.07;
+
+/** Max contribution (before {@link MarketRiskComponentScales.yearEndWeekRamp}) from the year-end ladder at 31 Dec. */
+export const YEAR_END_RAMP_BASE_WEIGHT = 0.52;
+
+const MS_PER_DAY = 86400000;
+
+/**
+ * **12 weekly steps** from “12 weeks before” calendar **31 Dec** to year-end: each week closer adds one step.
+ * Returns 0 when more than 84 days remain in the year; 1/12 … 1 as you approach 31 Dec (local calendar dates).
+ */
+export function yearEndWeekBlockRamp01(dateStr: string): number {
+  const d = parseDate(dateStr);
+  const y = d.getFullYear();
+  const end = new Date(y, 11, 31);
+  const days = Math.round((end.getTime() - d.getTime()) / MS_PER_DAY);
+  if (days < 0) return 1;
+  if (days > 83) return 0;
+  return (12 - Math.floor(days / 7)) / 12;
+}
 
 function deploymentWeekLoadWeight(config: MarketConfig | undefined): number {
   const w = config?.deployment_risk_week_weight;
@@ -95,11 +118,13 @@ export function weekdayDeploymentShape01(dateStr: string, config: MarketConfig |
  * Sum of bounded factors (not a hard ban); store load raises consequence, not trading “busyness” alone.
  * Blackouts add a separate YAML layer; peak-week × campaign and peak-week × store compound on top of linear terms.
  * {@link MarketConfig.deployment_risk_context_month_curve} adds a second per-month term on top of the primary curve.
+ * {@link MarketRiskComponentScales} scales each group independently (Market risk lens only).
  */
 export function computeDeploymentRisk01(
   row: RiskRow,
   config: MarketConfig | undefined,
-  dateStr: string
+  dateStr: string,
+  scales: MarketRiskComponentScales = DEFAULT_MARKET_RISK_SCALES
 ): number {
   const pub = row.public_holiday_flag ? 0.22 : 0;
   const sch = row.school_holiday_flag ? 0.15 : 0;
@@ -135,18 +160,20 @@ export function computeDeploymentRisk01(
   const peakStoreDay = PEAK_DAY_STORE_INTERACTION_WEIGHT * weekdayShape * storeNorm;
   const techP = Math.min(1, Math.max(0, row.tech_pressure ?? 0));
   const resourcingStrain = deploymentResourcingStrainWeight(config) * techP;
+  const yearEndShape = yearEndWeekBlockRamp01(dateStr);
+  const yearEndRamp = YEAR_END_RAMP_BASE_WEIGHT * yearEndShape;
   const raw =
-    pub +
-    sch +
-    storeConsequence +
-    seasonal +
-    contextMonth +
-    camp +
-    eventMax +
-    blackoutMax +
-    weekdayLoad +
-    peakCampaign +
-    peakStoreDay +
-    resourcingStrain;
+    (pub + sch) * scales.holidays +
+    storeConsequence * scales.storeConsequence +
+    seasonal * scales.primaryMonthCurve +
+    contextMonth * scales.contextMonthCurve +
+    yearEndRamp * scales.yearEndWeekRamp +
+    camp * scales.campaignLinear +
+    eventMax * scales.events +
+    blackoutMax * scales.blackouts +
+    weekdayLoad * scales.withinWeekLoad +
+    peakCampaign * scales.campaignPeakInteraction +
+    peakStoreDay * scales.storePeakInteraction +
+    resourcingStrain * scales.resourcingStrain;
   return Math.min(1, Math.max(0, Math.round(raw * 1000) / 1000));
 }

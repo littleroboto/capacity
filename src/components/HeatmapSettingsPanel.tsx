@@ -9,6 +9,10 @@ import {
 import { HEATMAP_MONO_COLOR_PRESETS } from '@/lib/riskHeatmapColors';
 import { isRunwayAllMarkets } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
+import {
+  DEFAULT_MARKET_RISK_SCALES,
+  type MarketRiskComponentScales,
+} from '@/engine/riskModelTuning';
 import { cn } from '@/lib/utils';
 import { Palette } from 'lucide-react';
 
@@ -19,6 +23,33 @@ const GAMMA_UI_STEP = 0.1;
 const CAMPAIGN_UI_MIN = 0;
 const CAMPAIGN_UI_MAX = 2.5;
 const CAMPAIGN_UI_STEP = 0.05;
+
+const MR_SCALE_MAX = 4;
+const MR_SCALE_STEP = 0.05;
+
+const MARKET_RISK_SCALE_ROWS: {
+  key: keyof MarketRiskComponentScales;
+  label: string;
+  hint?: string;
+}[] = [
+  { key: 'yearEndWeekRamp', label: 'Year-end weekly ramp', hint: '12 steps to 31 Dec (base weight in engine)' },
+  { key: 'primaryMonthCurve', label: 'Primary deployment month curve', hint: 'deployment_risk_month_curve + defaults' },
+  { key: 'contextMonthCurve', label: 'Context month curve', hint: 'deployment_risk_context_month_curve' },
+  { key: 'holidays', label: 'Public + school holidays' },
+  { key: 'storeConsequence', label: 'Store consequence' },
+  { key: 'withinWeekLoad', label: 'Within-week load shape' },
+  { key: 'storePeakInteraction', label: 'Busy week × store hot' },
+  { key: 'campaignLinear', label: 'Campaign (linear term)', hint: 'Independent of Campaign Boost slider' },
+  { key: 'campaignPeakInteraction', label: 'Campaign × busy week' },
+  { key: 'events', label: 'Deployment events' },
+  { key: 'blackouts', label: 'Blackouts' },
+  { key: 'resourcingStrain', label: 'Tech / resourcing strain' },
+];
+
+function snapMarketRiskScale(n: number): number {
+  const s = Math.round(n / MR_SCALE_STEP) * MR_SCALE_STEP;
+  return Math.min(MR_SCALE_MAX, Math.max(0, Math.round(s * 100) / 100));
+}
 
 function snapCampaignUiMultiplier(n: number): number {
   const s = Math.round(n / CAMPAIGN_UI_STEP) * CAMPAIGN_UI_STEP;
@@ -93,10 +124,12 @@ function CurveTransferSparkline({
 type HeatmapSettingsPanelProps = {
   /** When false, Campaign Boost row is omitted (Technology Teams lens). */
   showCampaignBoost: boolean;
+  /** Market risk lens: per-component scalers for deployment_risk_01 only. */
+  showMarketRiskScales?: boolean;
 };
 
 /** Transfer curve, γ, optional campaign overlay, heatmap palette — for Settings dialog. */
-export function HeatmapSettingsPanel({ showCampaignBoost }: HeatmapSettingsPanelProps) {
+export function HeatmapSettingsPanel({ showCampaignBoost, showMarketRiskScales }: HeatmapSettingsPanelProps) {
   const riskTuning = useAtcStore((s) => s.riskTuning);
   const riskHeatmapGamma = useAtcStore((s) => s.riskHeatmapGamma);
   const riskHeatmapCurve = useAtcStore((s) => s.riskHeatmapCurve);
@@ -235,6 +268,66 @@ export function HeatmapSettingsPanel({ showCampaignBoost }: HeatmapSettingsPanel
           </div>
         ) : null}
       </div>
+
+      {showMarketRiskScales ? (
+        <div className="space-y-3 border-t border-border/60 pt-4">
+          <div>
+            <p className="text-xs font-semibold text-foreground">Market risk component scales</p>
+            <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+              Multiply each piece of the deployment-risk sum (0–4×). Does <strong className="font-medium text-foreground/90">not</strong>{' '}
+              change the global <span className="font-mono text-foreground/80">Campaign Boost</span> slider above—use{' '}
+              <span className="font-mono text-foreground/80">Campaign (linear)</span> /{' '}
+              <span className="font-mono text-foreground/80">Campaign × busy week</span> here to tune Market risk only.
+            </p>
+            <button
+              type="button"
+              className="mt-2 text-[10px] font-medium text-primary underline-offset-2 hover:underline"
+              onClick={() =>
+                setRiskTuning({ marketRiskScales: { ...DEFAULT_MARKET_RISK_SCALES } })
+              }
+            >
+              Reset all to 1×
+            </button>
+          </div>
+          <div className="max-h-[min(22rem,50vh)] space-y-2.5 overflow-y-auto pr-1">
+            {MARKET_RISK_SCALE_ROWS.map(({ key, label, hint }) => {
+              const v = snapMarketRiskScale(riskTuning.marketRiskScales[key]);
+              return (
+                <div key={key} className={TUNING_CONTROL_GRID}>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-[11px] font-medium leading-tight text-foreground">{label}</span>
+                    {hint ? (
+                      <span className="text-[9px] leading-snug text-muted-foreground">{hint}</span>
+                    ) : null}
+                  </div>
+                  <div className="flex h-9 items-center">
+                    <input
+                      type="range"
+                      min={0}
+                      max={MR_SCALE_MAX}
+                      step={MR_SCALE_STEP}
+                      value={v}
+                      aria-label={`${label} scale`}
+                      onChange={(e) =>
+                        setRiskTuning({
+                          marketRiskScales: {
+                            ...riskTuning.marketRiskScales,
+                            [key]: Number(e.target.value),
+                          },
+                        })
+                      }
+                      className={TUNING_RANGE}
+                    />
+                  </div>
+                  <div className={TUNING_VALUE_BOX}>
+                    <span className="text-sm font-bold tabular-nums text-foreground">{v.toFixed(2)}×</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="border-t border-border/60 pt-1">
         <div className="rounded-lg border border-border/50 bg-background/70 p-3.5 shadow-sm ring-1 ring-border/20 dark:bg-background/25">

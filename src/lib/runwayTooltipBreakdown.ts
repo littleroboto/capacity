@@ -1,4 +1,4 @@
-import { weekdayDeploymentShape01 } from '@/engine/deploymentRiskModel';
+import { weekdayDeploymentShape01, yearEndWeekBlockRamp01 } from '@/engine/deploymentRiskModel';
 import { parseDate } from '@/engine/calendar';
 import { getStubPublicHolidayName } from '@/engine/holidayCalc';
 import type { RiskRow } from '@/engine/riskModel';
@@ -277,6 +277,12 @@ export function deploymentRiskExplanation(
   }
   const month = Number(dateStr.slice(5, 7));
   if (month === 10 || month === 11 || month === 12) parts.push('calendar Q4 ramp (deployment month lift)');
+  const yEnd = yearEndWeekBlockRamp01(dateStr);
+  if (yEnd >= 1 / 12 + 1e-6) {
+    parts.push(
+      `year-end weekly ramp (${Math.round(yEnd * 12)} / 12 steps to 31 Dec in the model)`
+    );
+  }
   if (month >= 1 && month <= 12) {
     const mk = TRADING_MONTH_KEYS[month - 1];
     const ctx = mk ? config?.deployment_risk_context_month_curve?.[mk] : undefined;

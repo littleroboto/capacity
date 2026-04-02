@@ -19,6 +19,44 @@ export const HOLIDAY_CAPACITY_SCALE = 0.5;
  */
 export const STORE_PRESSURE_MAX = 2.5;
 
+/**
+ * Per-component multipliers for the **Market risk** heatmap only (`deployment_risk_01`).
+ * Does not affect Restaurant Activity, Technology lens, or global campaign/store pipeline—only how those
+ * signals are weighted inside the deployment-risk sum. Default **1** = engine base weights; raise/lower independently.
+ */
+export type MarketRiskComponentScales = {
+  holidays: number;
+  storeConsequence: number;
+  primaryMonthCurve: number;
+  contextMonthCurve: number;
+  /** Scales the 12 weekly steps approaching calendar 31 Dec (`yearEndWeekBlockRamp01` in deployment model). */
+  yearEndWeekRamp: number;
+  /** Linear `campaign_risk` term in deployment risk (leave at 1 to match global campaign behaviour elsewhere). */
+  campaignLinear: number;
+  /** Peak-week × campaign interaction in deployment risk. */
+  campaignPeakInteraction: number;
+  events: number;
+  blackouts: number;
+  withinWeekLoad: number;
+  storePeakInteraction: number;
+  resourcingStrain: number;
+};
+
+export const DEFAULT_MARKET_RISK_SCALES: MarketRiskComponentScales = {
+  holidays: 1,
+  storeConsequence: 1,
+  primaryMonthCurve: 1,
+  contextMonthCurve: 1,
+  yearEndWeekRamp: 1,
+  campaignLinear: 1,
+  campaignPeakInteraction: 1,
+  events: 1,
+  blackouts: 1,
+  withinWeekLoad: 1,
+  storePeakInteraction: 1,
+  resourcingStrain: 1,
+};
+
 export type RiskModelTuning = {
   importanceTech: number;
   importanceStore: number;
@@ -42,6 +80,8 @@ export type RiskModelTuning = {
    * store boosts during campaigns. 1 = match DSL; 0 = no campaign pressure from those channels.
    */
   campaignEffectUiMultiplier: number;
+  /** Independent scalers for Market risk deployment sum; see {@link MarketRiskComponentScales}. */
+  marketRiskScales: MarketRiskComponentScales;
 };
 
 /** Legacy UI used 0–100 scaled by this delta to the peak multiplier (for persisted state). */
@@ -59,6 +99,7 @@ export const DEFAULT_RISK_TUNING: RiskModelTuning = {
   storePaydayMonthPeakMultiplier: DEFAULT_PAYDAY_PEAK,
   storePaydayMonthKnotMultipliers: knotsFromLegacyPeakMultiplier(DEFAULT_PAYDAY_PEAK),
   campaignEffectUiMultiplier: 1,
+  marketRiskScales: { ...DEFAULT_MARKET_RISK_SCALES },
 };
 
 /**
@@ -120,6 +161,41 @@ function clampCampaignEffectUiMultiplier(n: number): number {
   return Math.min(2.5, Math.max(0, Math.round(s * 100) / 100));
 }
 
+const MARKET_RISK_SCALE_MAX = 4;
+
+function clampOneMarketRiskScale(n: number, fallback: number): number {
+  if (!Number.isFinite(n)) return fallback;
+  const s = Math.round(n / 0.05) * 0.05;
+  return Math.min(MARKET_RISK_SCALE_MAX, Math.max(0, Math.round(s * 100) / 100));
+}
+
+export function clampMarketRiskScales(
+  partial?: Partial<MarketRiskComponentScales> | undefined
+): MarketRiskComponentScales {
+  const d = DEFAULT_MARKET_RISK_SCALES;
+  const p = partial ?? {};
+  return {
+    holidays: clampOneMarketRiskScale(p.holidays ?? d.holidays, d.holidays),
+    storeConsequence: clampOneMarketRiskScale(p.storeConsequence ?? d.storeConsequence, d.storeConsequence),
+    primaryMonthCurve: clampOneMarketRiskScale(p.primaryMonthCurve ?? d.primaryMonthCurve, d.primaryMonthCurve),
+    contextMonthCurve: clampOneMarketRiskScale(p.contextMonthCurve ?? d.contextMonthCurve, d.contextMonthCurve),
+    yearEndWeekRamp: clampOneMarketRiskScale(p.yearEndWeekRamp ?? d.yearEndWeekRamp, d.yearEndWeekRamp),
+    campaignLinear: clampOneMarketRiskScale(p.campaignLinear ?? d.campaignLinear, d.campaignLinear),
+    campaignPeakInteraction: clampOneMarketRiskScale(
+      p.campaignPeakInteraction ?? d.campaignPeakInteraction,
+      d.campaignPeakInteraction
+    ),
+    events: clampOneMarketRiskScale(p.events ?? d.events, d.events),
+    blackouts: clampOneMarketRiskScale(p.blackouts ?? d.blackouts, d.blackouts),
+    withinWeekLoad: clampOneMarketRiskScale(p.withinWeekLoad ?? d.withinWeekLoad, d.withinWeekLoad),
+    storePeakInteraction: clampOneMarketRiskScale(
+      p.storePeakInteraction ?? d.storePeakInteraction,
+      d.storePeakInteraction
+    ),
+    resourcingStrain: clampOneMarketRiskScale(p.resourcingStrain ?? d.resourcingStrain, d.resourcingStrain),
+  };
+}
+
 function buildRiskTuning(m: Partial<RiskModelTuning> & { storePaydayMonthRamp?: number }): RiskModelTuning {
   const merged = { ...DEFAULT_RISK_TUNING, ...m };
   const clampI = (n: number) => Math.min(100, Math.max(0, Math.round(n * 100) / 100));
@@ -134,6 +210,7 @@ function buildRiskTuning(m: Partial<RiskModelTuning> & { storePaydayMonthRamp?: 
     storePaydayMonthKnotMultipliers: knots,
     storePaydayMonthPeakMultiplier: peak,
     campaignEffectUiMultiplier: clampCampaignEffectUiMultiplier(merged.campaignEffectUiMultiplier),
+    marketRiskScales: clampMarketRiskScales(merged.marketRiskScales),
   };
 }
 
@@ -155,7 +232,11 @@ export function riskTuningFromPersisted(
     : knotsFromLegacyPeakMultiplier(
         clampPaydayPeakMultiplier(resolvePaydayPeakMultiplier(mergedBase))
       );
-  return buildRiskTuning({ ...mergedBase, storePaydayMonthKnotMultipliers: knots, storePaydayMonthPeakMultiplier: knots[0]! });
+  return buildRiskTuning({
+    ...mergedBase,
+    storePaydayMonthKnotMultipliers: knots,
+    storePaydayMonthPeakMultiplier: knots[0]!,
+  });
 }
 
 /**
@@ -178,11 +259,17 @@ export function applyRiskTuningPatch(
     const peakResolved = clampPaydayPeakMultiplier(resolvePaydayPeakMultiplier({ ...prev, ...patch }));
     knots = knotsFromLegacyPeakMultiplier(peakResolved);
   }
+  const nextMarketRiskScales =
+    patch.marketRiskScales != null
+      ? clampMarketRiskScales({ ...prev.marketRiskScales, ...patch.marketRiskScales })
+      : undefined;
+
   return buildRiskTuning({
     ...prev,
     ...patch,
     storePaydayMonthKnotMultipliers: knots,
     storePaydayMonthPeakMultiplier: knots[0]!,
+    ...(nextMarketRiskScales != null ? { marketRiskScales: nextMarketRiskScales } : {}),
   });
 }
 
