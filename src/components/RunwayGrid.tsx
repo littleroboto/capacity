@@ -281,7 +281,7 @@ function fillMetricLabelForView(mode: ViewModeId, techWorkloadScope: TechWorkloa
     case 'in_store':
       return 'Restaurant trading intensity from the store curve—rhythm, holidays, and store boosts when live (or prep if YAML says so)';
     case 'market_risk':
-      return 'Calendar and trading-consequence risk (0–1): holidays, year-end lift, store intensity, campaigns, and optional deployment events in YAML.';
+      return 'Calendar and trading-consequence risk (0–1): holidays, Q4 month ramp, store intensity, campaigns, and optional deployment events in YAML.';
     default:
       return 'Metric';
   }

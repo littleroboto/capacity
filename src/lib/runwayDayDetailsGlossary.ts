@@ -6,7 +6,7 @@ export function glossaryFillScore(mode: ViewModeId): string {
     return 'Tech capacity headroom behind this heatmap (0–1 before colour transfer and gamma): share of lab and Market IT capacity still available versus scheduled work on those lanes (headline excludes backend). The large percentage in the tile is this value × 100%.';
   }
   if (mode === 'market_risk') {
-    return 'Deployment / calendar risk (0–1 before colour transfer and gamma): graded fragility from holidays, year-end windows, trading intensity, campaigns, and optional YAML deployment events—not a ban. The tile % is this value × 100%.';
+    return 'Deployment / calendar risk (0–1 before colour transfer and gamma): graded fragility from holidays, Q4 ramp in the month curve, trading intensity, campaigns, and optional YAML deployment events—not a ban. The tile % is this value × 100%.';
   }
   return 'Modeled restaurant / store trading intensity (0–1 before display tweaks): the store-pressure lane only—calendar rhythm, **early-month lift** (busier starts of the month), seasonal shape, public-holiday trading multiplier, and any YAML **store** boosts during live (or prep if configured). Does not change scheduled tech work. Marketing campaign risk is not blended in separately. The tile % is this value × 100%.';
 }

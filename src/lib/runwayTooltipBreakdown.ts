@@ -275,7 +275,7 @@ export function deploymentRiskExplanation(
     parts.push(`busy stores (~${Math.round(storeNorm * 100)}% on the trading curve)`);
   }
   const month = Number(dateStr.slice(5, 7));
-  if (month === 11 || month === 12) parts.push('year-end window');
+  if (month === 10 || month === 11 || month === 12) parts.push('calendar Q4 ramp (deployment month lift)');
   const camp01 = Math.min(1, Math.max(0, row.campaign_risk ?? 0));
   if (camp01 >= 0.08) parts.push('campaign activity');
   for (const ev of config?.deployment_risk_events ?? []) {

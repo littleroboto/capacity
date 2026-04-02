@@ -401,9 +401,9 @@ deployment_risk_month_curve:
   Jul: 0.12
   Aug: 0.14
   Sep: 0.16
-  Oct: 0.14
-  Nov: 0.20
-  Dec: 0.28
+  Oct: 0.18
+  Nov: 0.24
+  Dec: 0.32
 
 deployment_risk_events:
   - id: earnings_q1_fy2026

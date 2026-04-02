@@ -41,8 +41,11 @@ function tradingMonthKeyFromYmd(dateStr: string): TradingMonthKey {
   return TRADING_MONTH_KEYS[Math.min(12, Math.max(1, m)) - 1]!;
 }
 
-/** When YAML omits a month, keep a light year-end default for Nov/Dec only. */
+/**
+ * When YAML omits a month, calendar **Q4** ramps up (Oct → Nov → Dec), not a single December step.
+ */
 function defaultDeploymentMonthLift(calendarMonth1to12: number): number {
+  if (calendarMonth1to12 === 10) return 0.07;
   if (calendarMonth1to12 === 11) return 0.12;
   if (calendarMonth1to12 === 12) return 0.18;
   return 0;

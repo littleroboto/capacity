@@ -188,7 +188,7 @@ export type MarketConfig = {
   deployment_risk_blackouts?: DeploymentRiskBlackout[];
   /**
    * Optional Jan–Dec 0–1 lift added to deployment risk for that calendar month (`deployment_risk_month_curve`).
-   * When a month is omitted, November/December fall back to engine defaults; other months default to 0.
+   * When a month is omitted, October–December fall back to engine Q4 ramp defaults; other months default to 0.
    */
   deployment_risk_month_curve?: Partial<Record<TradingMonthKey, number>>;
   /**
