@@ -488,3 +488,17 @@ deployment_risk_events:
     end: '2027-10-20'
     severity: 0.42
     kind: agm
+
+deployment_risk_blackouts:
+  - id: year_end_change_blackout_fy2026
+    start: '2026-12-15'
+    end: '2027-01-15'
+    severity: 0.42
+    public_reason: 'Change freeze / low resourcing window'
+    operational_note: 'Peak Q4 trading — lock-in month; thin bench if issues land'
+  - id: year_end_change_blackout_fy2027
+    start: '2027-12-15'
+    end: '2028-01-15'
+    severity: 0.42
+    public_reason: 'Change freeze / low resourcing window'
+    operational_note: 'Peak Q4 trading — lock-in month; thin bench if issues land'

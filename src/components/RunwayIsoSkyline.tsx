@@ -94,6 +94,35 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
     [chronologyAll]
   );
 
+  /** Center of each calendar month along the ground plane (between Sun–Sat for a mid-week row). */
+  const monthGroundLabels = useMemo(() => {
+    if (!chronologyAll.length || !weeks.length) return [];
+    const gp = (wi: number, di: number) => {
+      const { ax, ay } = isoCellTopLeft(wi, di, stepX, stepY);
+      return { x: ax - minX, y: ay - minY + L.canvasH };
+    };
+    return chronologyAll.map((g, i) => {
+      const next = chronologyAll[i + 1];
+      const endWi = next ? next.weekIndex : weeks.length;
+      const span = Math.max(1, endWi - g.weekIndex);
+      const midWi = Math.min(g.weekIndex + Math.floor(span / 2), weeks.length - 1);
+      const a = gp(midWi, 0);
+      const b = gp(midWi, 6);
+      const x = (a.x + b.x) / 2;
+      const y = Math.max(a.y, b.y) + 10;
+      const primary =
+        (g.quarterLabel ? `${g.quarterLabel} · ` : '') +
+        g.monthLabel +
+        (g.yearLabel ? ` ${g.yearLabel}` : '');
+      return {
+        key: `${g.weekIndex}-${g.monthLabel}`,
+        x,
+        y,
+        primary,
+      };
+    });
+  }, [chronologyAll, weeks.length, minX, minY, stepX, stepY, L.canvasH]);
+
   const cells = useMemo(() => {
     const out: { wi: number; di: number; cell: RunwayCalendarCellValue; depth: number }[] = [];
     for (let wi = 0; wi < weeks.length; wi++) {
@@ -219,6 +248,29 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
             </g>
           );
         })}
+        {monthGroundLabels.length > 0 && (
+          <g className="pointer-events-none select-none" aria-hidden>
+            {monthGroundLabels.map((m) => (
+              <text
+                key={m.key}
+                x={m.x}
+                y={m.y}
+                textAnchor="middle"
+                dominantBaseline="hanging"
+                className="fill-muted-foreground stroke-background"
+                strokeWidth={4}
+                paintOrder="stroke fill"
+                style={{
+                  fontSize: 8.75,
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {m.primary}
+              </text>
+            ))}
+          </g>
+        )}
       </svg>
     </div>
   );

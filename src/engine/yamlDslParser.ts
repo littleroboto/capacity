@@ -3,6 +3,7 @@ import { parseRiskHeatmapCurve } from '@/lib/riskHeatmapTransfer';
 import type {
   BauEntry,
   CampaignConfig,
+  DeploymentRiskBlackout,
   DeploymentRiskEvent,
   MarketConfig,
   OperatingWindow,
@@ -210,8 +211,10 @@ export type ParsedYaml = {
   /** Transfer curve id for combined heatmap (optional; default power). */
   risk_heatmap_curve?: string;
   deployment_risk_events?: unknown[];
+  deployment_risk_blackouts?: unknown[];
   deployment_risk_month_curve?: Record<string, unknown>;
   deployment_risk_week_weight?: number;
+  deployment_resourcing_strain_weight?: number;
 };
 
 const EMPTY: ParsedYaml = {
@@ -231,8 +234,10 @@ const EMPTY: ParsedYaml = {
   risk_heatmap_gamma_business: undefined,
   risk_heatmap_curve: undefined,
   deployment_risk_events: undefined,
+  deployment_risk_blackouts: undefined,
   deployment_risk_month_curve: undefined,
   deployment_risk_week_weight: undefined,
+  deployment_resourcing_strain_weight: undefined,
 };
 
 function normalizeYamlObject(raw: unknown): ParsedYaml {
@@ -297,6 +302,11 @@ function normalizeYamlObject(raw: unknown): ParsedYaml {
       : Array.isArray(o.deploymentRiskEvents)
         ? o.deploymentRiskEvents
         : undefined,
+    deployment_risk_blackouts: Array.isArray(o.deployment_risk_blackouts)
+      ? o.deployment_risk_blackouts
+      : Array.isArray(o.deploymentRiskBlackouts)
+        ? o.deploymentRiskBlackouts
+        : undefined,
     deployment_risk_month_curve:
       o.deployment_risk_month_curve != null && typeof o.deployment_risk_month_curve === 'object'
         ? (o.deployment_risk_month_curve as Record<string, unknown>)
@@ -307,6 +317,11 @@ function normalizeYamlObject(raw: unknown): ParsedYaml {
       const drw = o.deployment_risk_week_weight ?? o.deploymentRiskWeekWeight;
       const n = Number(drw);
       return drw != null && drw !== '' && Number.isFinite(n) ? n : undefined;
+    })(),
+    deployment_resourcing_strain_weight: (() => {
+      const w = o.deployment_resourcing_strain_weight ?? o.deploymentResourcingStrainWeight;
+      const n = Number(w);
+      return w != null && w !== '' && Number.isFinite(n) ? n : undefined;
     })(),
   };
 }
@@ -681,10 +696,16 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
   const riskHeatmapCurve = parseRiskHeatmapCurve(parsed.risk_heatmap_curve);
   const deployment_risk_month_curve = mapDeploymentRiskMonthCurve(parsed.deployment_risk_month_curve);
   const deployment_risk_events = mapDeploymentRiskEvents(parsed.deployment_risk_events);
+  const deployment_risk_blackouts = mapDeploymentRiskBlackouts(parsed.deployment_risk_blackouts);
   let deployment_risk_week_weight: number | undefined;
   const drw = parsed.deployment_risk_week_weight;
   if (drw != null && Number.isFinite(drw)) {
     deployment_risk_week_weight = Math.min(1, Math.max(0, drw));
+  }
+  let deployment_resourcing_strain_weight: number | undefined;
+  const dsw = parsed.deployment_resourcing_strain_weight;
+  if (dsw != null && Number.isFinite(dsw)) {
+    deployment_resourcing_strain_weight = Math.min(1, Math.max(0, dsw));
   }
   const hol = parsed.holidays || {};
   const capTaperRaw = hol.capacity_taper_days ?? hol.capacityTaperDays;
@@ -771,6 +792,8 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     deployment_risk_month_curve,
     deployment_risk_week_weight,
     deployment_risk_events,
+    deployment_risk_blackouts,
+    deployment_resourcing_strain_weight,
   };
 }
 
@@ -805,6 +828,30 @@ function mapDeploymentRiskEvents(raw: unknown[] | undefined): DeploymentRiskEven
       end,
       severity: Math.min(1, Math.max(0, Number.isFinite(sev) ? sev : 0.5)),
       kind: row.kind != null ? String(row.kind) : undefined,
+    });
+  }
+  return out.length ? out : undefined;
+}
+
+function mapDeploymentRiskBlackouts(raw: unknown[] | undefined): DeploymentRiskBlackout[] | undefined {
+  if (!raw?.length) return undefined;
+  const out: DeploymentRiskBlackout[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const start = coerceYamlDateString(row.start);
+    const end = coerceYamlDateString(row.end ?? row.start);
+    if (!start || !end) continue;
+    const sev = Number(row.severity ?? 0.4);
+    const pr = row.public_reason ?? row.publicReason;
+    const on = row.operational_note ?? row.operationalNote;
+    out.push({
+      id: String(row.id ?? 'blackout'),
+      start,
+      end,
+      severity: Math.min(1, Math.max(0, Number.isFinite(sev) ? sev : 0.4)),
+      public_reason: pr != null && String(pr).trim() ? String(pr).trim() : undefined,
+      operational_note: on != null && String(on).trim() ? String(on).trim() : undefined,
     });
   }
   return out.length ? out : undefined;

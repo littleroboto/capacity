@@ -11,12 +11,29 @@ const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 /** Applied when YAML omits {@link MarketConfig.deployment_risk_week_weight}. */
 export const DEFAULT_DEPLOYMENT_WEEK_LOAD_WEIGHT = 0.2;
 
+/** Tech-pressure add-on when YAML omits {@link MarketConfig.deployment_resourcing_strain_weight}. */
+export const DEFAULT_DEPLOYMENT_RESOURCING_STRAIN_WEIGHT = 0.05;
+
+/** Peak week segment × campaign_risk (Saturdays in big campaigns, etc.). */
+const PEAK_DAY_CAMPAIGN_INTERACTION_WEIGHT = 0.12;
+
+/** Peak week segment × store load (incidents hurt more when trading is already hot). */
+const PEAK_DAY_STORE_INTERACTION_WEIGHT = 0.07;
+
 function deploymentWeekLoadWeight(config: MarketConfig | undefined): number {
   const w = config?.deployment_risk_week_weight;
   if (w != null && Number.isFinite(w)) {
     return Math.min(1, Math.max(0, w));
   }
   return DEFAULT_DEPLOYMENT_WEEK_LOAD_WEIGHT;
+}
+
+function deploymentResourcingStrainWeight(config: MarketConfig | undefined): number {
+  const w = config?.deployment_resourcing_strain_weight;
+  if (w != null && Number.isFinite(w)) {
+    return Math.min(1, Math.max(0, w));
+  }
+  return DEFAULT_DEPLOYMENT_RESOURCING_STRAIN_WEIGHT;
 }
 
 function tradingMonthKeyFromYmd(dateStr: string): TradingMonthKey {
@@ -73,6 +90,7 @@ export function weekdayDeploymentShape01(dateStr: string, config: MarketConfig |
 /**
  * Graded 0–1 deployment / calendar fragility for the Market risk heatmap.
  * Sum of bounded factors (not a hard ban); store load raises consequence, not trading “busyness” alone.
+ * Blackouts add a separate YAML layer; peak-week × campaign and peak-week × store compound on top of linear terms.
  */
 export function computeDeploymentRisk01(
   row: RiskRow,
@@ -90,15 +108,37 @@ export function computeDeploymentRisk01(
     yamlLift != null && Number.isFinite(yamlLift)
       ? Math.min(1, Math.max(0, yamlLift))
       : defaultDeploymentMonthLift(calMonth);
-  const camp = Math.min(1, Math.max(0, row.campaign_risk ?? 0)) * 0.08;
+  const camp01 = Math.min(1, Math.max(0, row.campaign_risk ?? 0));
+  const camp = camp01 * 0.08;
   let eventMax = 0;
   for (const ev of config?.deployment_risk_events ?? []) {
     if (dateStr >= ev.start && dateStr <= ev.end) {
       eventMax = Math.max(eventMax, Math.min(1, Math.max(0, ev.severity)));
     }
   }
+  let blackoutMax = 0;
+  for (const b of config?.deployment_risk_blackouts ?? []) {
+    if (dateStr >= b.start && dateStr <= b.end) {
+      blackoutMax = Math.max(blackoutMax, Math.min(1, Math.max(0, b.severity)));
+    }
+  }
   const weekdayShape = weekdayDeploymentShape01(dateStr, config);
   const weekdayLoad = deploymentWeekLoadWeight(config) * weekdayShape;
-  const raw = pub + sch + storeConsequence + seasonal + camp + eventMax + weekdayLoad;
+  const peakCampaign = PEAK_DAY_CAMPAIGN_INTERACTION_WEIGHT * weekdayShape * camp01;
+  const peakStoreDay = PEAK_DAY_STORE_INTERACTION_WEIGHT * weekdayShape * storeNorm;
+  const techP = Math.min(1, Math.max(0, row.tech_pressure ?? 0));
+  const resourcingStrain = deploymentResourcingStrainWeight(config) * techP;
+  const raw =
+    pub +
+    sch +
+    storeConsequence +
+    seasonal +
+    camp +
+    eventMax +
+    blackoutMax +
+    weekdayLoad +
+    peakCampaign +
+    peakStoreDay +
+    resourcingStrain;
   return Math.min(1, Math.max(0, Math.round(raw * 1000) / 1000));
 }

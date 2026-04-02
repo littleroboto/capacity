@@ -1301,6 +1301,8 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   }: ${compareAllMarkets ? RUNWAY_ALL_MARKETS_LABEL : country}`;
   const riskTuning = useAtcStore((s) => s.riskTuning);
   const riskHeatmapGamma = useAtcStore((s) => s.riskHeatmapGamma);
+  const riskHeatmapGammaTech = useAtcStore((s) => s.riskHeatmapGammaTech);
+  const riskHeatmapGammaBusiness = useAtcStore((s) => s.riskHeatmapGammaBusiness);
   const riskHeatmapCurve = useAtcStore((s) => s.riskHeatmapCurve);
   const heatmapRenderStyle = useAtcStore((s) => s.heatmapRenderStyle);
   const heatmapMonoColor = useAtcStore((s) => s.heatmapMonoColor);
@@ -1495,14 +1497,21 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     return buildQuarterGridRunwayLayout(layoutDatesSorted, cellPx);
   }, [layoutDatesSorted, cellPx, compareAllMarkets, runway3dHeatmap, runway3dRowTowerPx]);
 
+  const heatmapRiskGamma =
+    viewMode === 'combined'
+      ? riskHeatmapGammaTech
+      : viewMode === 'in_store' || viewMode === 'market_risk'
+        ? riskHeatmapGammaBusiness
+        : riskHeatmapGamma;
+
   const heatmapOpts: HeatmapColorOpts = useMemo(
     () => ({
       riskHeatmapCurve,
-      riskHeatmapGamma,
+      riskHeatmapGamma: heatmapRiskGamma,
       renderStyle: heatmapRenderStyle,
       monoColor: heatmapMonoColor,
     }),
-    [riskHeatmapCurve, riskHeatmapGamma, heatmapRenderStyle, heatmapMonoColor]
+    [riskHeatmapCurve, heatmapRiskGamma, heatmapRenderStyle, heatmapMonoColor]
   );
 
   const buildPayloadTipState = useCallback(

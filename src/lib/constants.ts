@@ -34,7 +34,7 @@ export const VIEW_MODES = [
     label: 'Market risk',
     runwayHeatmapTitle: 'Deployment / calendar risk',
     title:
-      'Graded deployment fragility from holidays, year-end windows, trading intensity (consequence if something breaks), light campaign signal, and optional YAML deployment events. Hotter = more fragile—not a ban. Same temperature ramp as Restaurant; γ_business and transfer curve apply unless you add a dedicated γ later.',
+      'Graded deployment fragility from holidays, optional blackout windows (often “resourcing” but overlapping peak trading), trading intensity, campaign × peak-week compounding, tech bench strain, and YAML events. Hotter = more fragile—not a ban. γ_business and transfer curve apply when set separately from Technology Teams.',
   },
   {
     id: 'code',

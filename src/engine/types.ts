@@ -29,6 +29,21 @@ export type DeploymentRiskEvent = {
   kind?: string;
 };
 
+/**
+ * YAML `deployment_risk_blackouts`: change freezes / “resourcing” windows (often overlapping peak trading).
+ * Same date rules as events; tooltips prefer {@link public_reason} when set.
+ */
+export type DeploymentRiskBlackout = {
+  id: string;
+  start: string;
+  end: string;
+  severity: number;
+  /** Stated reason (e.g. change freeze / low resourcing). */
+  public_reason?: string;
+  /** Operational context for planners (e.g. Q4 lock-in); not shown as the primary label. */
+  operational_note?: string;
+};
+
 /** Inclusive `start`/`end` dates (`YYYY-MM-DD`); multipliers stack if windows overlap. */
 export type OperatingWindow = {
   name: string;
@@ -169,6 +184,8 @@ export type MarketConfig = {
   riskHeatmapCurve?: RiskHeatmapCurveId;
   /** Optional deployment-risk calendar events (`deployment_risk_events` in YAML). */
   deployment_risk_events?: DeploymentRiskEvent[];
+  /** Optional change-freeze / blackout windows (`deployment_risk_blackouts` in YAML). */
+  deployment_risk_blackouts?: DeploymentRiskBlackout[];
   /**
    * Optional Jan–Dec 0–1 lift added to deployment risk for that calendar month (`deployment_risk_month_curve`).
    * When a month is omitted, November/December fall back to engine defaults; other months default to 0.
@@ -179,6 +196,11 @@ export type MarketConfig = {
    * Omit for engine default **0.2**; raise in aggressive trading markets.
    */
   deployment_risk_week_weight?: number;
+  /**
+   * Scales the add-on from tech utilisation pressure (0–1 on each risk row) in deployment risk.
+   * Omit for engine default **0.05**.
+   */
+  deployment_resourcing_strain_weight?: number;
 };
 
 export type BauEntry = {

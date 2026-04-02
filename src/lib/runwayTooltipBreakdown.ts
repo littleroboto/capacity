@@ -276,10 +276,22 @@ export function deploymentRiskExplanation(
   }
   const month = Number(dateStr.slice(5, 7));
   if (month === 11 || month === 12) parts.push('year-end window');
-  if ((row.campaign_risk ?? 0) >= 0.08) parts.push('campaign activity');
+  const camp01 = Math.min(1, Math.max(0, row.campaign_risk ?? 0));
+  if (camp01 >= 0.08) parts.push('campaign activity');
   for (const ev of config?.deployment_risk_events ?? []) {
     if (dateStr >= ev.start && dateStr <= ev.end) {
       parts.push(`${ev.id.replace(/_/g, ' ')}${ev.kind ? ` (${ev.kind})` : ''}`);
+    }
+  }
+  for (const b of config?.deployment_risk_blackouts ?? []) {
+    if (dateStr >= b.start && dateStr <= b.end) {
+      if (b.public_reason) {
+        parts.push(
+          b.operational_note ? `${b.public_reason} — ${b.operational_note}` : b.public_reason
+        );
+      } else {
+        parts.push(`blackout: ${b.id.replace(/_/g, ' ')}`);
+      }
     }
   }
   const wdShape = weekdayDeploymentShape01(dateStr, config);
@@ -287,6 +299,13 @@ export function deploymentRiskExplanation(
     parts.push('heavy trading / tech week segment (incidents matter more than mid-week lulls)');
   } else if (wdShape >= 0.2) {
     parts.push('above-average week segment for load rhythm');
+  }
+  if (wdShape >= 0.32 && camp01 >= 0.08) {
+    parts.push('peak week segment × campaign (model compounds these)');
+  }
+  const techP = Math.min(1, Math.max(0, row.tech_pressure ?? 0));
+  if (techP >= 0.38) {
+    parts.push('high engineering load (resourcing strain on deployment)');
   }
   if (!parts.length) return 'No strong deployment-risk flags on this day in the model.';
   return `Active factors: ${parts.join(' · ')}.`;
