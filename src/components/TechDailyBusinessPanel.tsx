@@ -11,7 +11,7 @@ import type { TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import { WeightingLineMiniChart } from '@/components/WeightingLineMiniChart';
 import { PatternUnitField } from '@/components/PatternUnitField';
 
-/** Support week shape UI: `tech.weekly_pattern` (labs + Market IT + backend BAU rhythm Mon–Sun). */
+/** Support week shape UI: Market IT `weekday_intensity` Mon–Sun (YAML; internal `techRhythm.weekly_pattern`). */
 export function TechDailyBusinessPanel() {
   const country = useAtcStore((s) => s.country);
   const configs = useAtcStore((s) => s.configs);

@@ -15,5 +15,6 @@ Start here after the [root README](../README.md) (run, deploy, Blob env vars).
 | [LLM_MARKET_DSL_PROMPT.md](./LLM_MARKET_DSL_PROMPT.md) | LLM authoring instructions (full). |
 | [LLM_MARKET_DSL_SCHEMA_COMPACT.md](./LLM_MARKET_DSL_SCHEMA_COMPACT.md) | Compact schema for prompts / assistants. |
 | [HANDOFF_DSL_CODING_ASSISTANT.md](./HANDOFF_DSL_CODING_ASSISTANT.md) | Build notes for a future in-app DSL coding assistant. |
+| [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md) | **Engineering handoff** — identity, protected `/api/shared-dsl`, roles; next step for enterprise-grade tenancy. |
 
 Removed as obsolete (pre-rebaseline): stale-toast handoff, OWM/cal-heatmap implementation plan, one-off review prompt, dated ATC brief plan (superseded by current React/Visx app).

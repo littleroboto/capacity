@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
@@ -12,7 +12,13 @@ import {
   type SkylineChronologyGroup,
   type VerticalYearSection,
 } from '@/lib/calendarQuarterLayout';
-import { computeSkylineBounds, isoCellTopLeft, isoGridSteps } from '@/lib/runwayIsoSkylineLayout';
+import {
+  computeSkylineBounds,
+  isoCellTopLeft,
+  isoGridSteps,
+  isoWiForLayoutLi,
+  SKYLINE_MONTH_ISO_GAP_STEPS,
+} from '@/lib/runwayIsoSkylineLayout';
 import {
   IsoColumnAtOrigin,
   calHeightFromMetric,
@@ -77,71 +83,166 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
   dimPastDays,
   openDayDetailsFromCell,
 }: RunwayIsoSkylineProps) {
-  const { stepX, stepY } = useMemo(() => isoGridSteps(cellPx, gap), [cellPx, gap]);
+  /** Earliest model dates sit nearest (front); latest recede — reverse chronological week order for layout. */
+  const layoutWeeks = useMemo(() => [...weeks].reverse(), [weeks]);
+  const nWeeks = layoutWeeks.length;
 
-  const bounds = useMemo(
-    () => computeSkylineBounds(weeks, cellPx, gap, rowTowerPx),
-    [weeks, cellPx, gap, rowTowerPx]
-  );
-  const { minX, minY, vbW, vbH, L, runwayBandH } = bounds;
+  const { stepX, stepY } = useMemo(() => isoGridSteps(cellPx, gap), [cellPx, gap]);
 
   const chronologyAll = useMemo(
     () => (sections?.length ? skylineChronologyGroups(sections) : []),
     [sections]
   );
+  const monthStartChronWeeks = useMemo(
+    () => chronologyAll.map((g) => g.weekIndex).filter((w) => w > 0),
+    [chronologyAll]
+  );
+
+  const monthPack = useMemo(
+    () => ({ monthGapSteps: SKYLINE_MONTH_ISO_GAP_STEPS, monthStartChronWeeks }),
+    [monthStartChronWeeks]
+  );
+
+  const bounds = useMemo(
+    () => computeSkylineBounds(layoutWeeks, cellPx, gap, rowTowerPx, monthPack),
+    [layoutWeeks, cellPx, gap, rowTowerPx, monthPack]
+  );
+  const { minX, minY, vbW, vbH, L, runwayBandH } = bounds;
+
+  /** Chronological flat index → layout week index (after reverse). */
+  const chronToLayoutWi = (chronWeekIndex: number) => nWeeks - 1 - chronWeekIndex;
+
   const chronologyMajor = useMemo(
     () => chronologyAll.filter(isMajorChronologyMarker),
     [chronologyAll]
   );
 
-  /** Center of each calendar month along the ground plane (between Sun–Sat for a mid-week row). */
-  const monthGroundLabels = useMemo(() => {
-    if (!chronologyAll.length || !weeks.length) return [];
-    const gp = (wi: number, di: number) => {
-      const { ax, ay } = isoCellTopLeft(wi, di, stepX, stepY);
+  const layoutToIsoWi = (layoutLi: number) =>
+    isoWiForLayoutLi(layoutLi, nWeeks, SKYLINE_MONTH_ISO_GAP_STEPS, monthStartChronWeeks);
+
+  const groundPoint = useCallback(
+    (layoutLi: number, di: number) => {
+      const isoW = isoWiForLayoutLi(layoutLi, nWeeks, SKYLINE_MONTH_ISO_GAP_STEPS, monthStartChronWeeks);
+      const { ax, ay } = isoCellTopLeft(isoW, di, stepX, stepY);
       return { x: ax - minX, y: ay - minY + L.canvasH };
-    };
-    return chronologyAll.map((g, i) => {
-      const next = chronologyAll[i + 1];
-      const endWi = next ? next.weekIndex : weeks.length;
-      const span = Math.max(1, endWi - g.weekIndex);
-      const midWi = Math.min(g.weekIndex + Math.floor(span / 2), weeks.length - 1);
-      const a = gp(midWi, 0);
-      const b = gp(midWi, 6);
-      const x = (a.x + b.x) / 2;
-      const y = Math.max(a.y, b.y) + 10;
-      const primary =
-        (g.quarterLabel ? `${g.quarterLabel} · ` : '') +
-        g.monthLabel +
-        (g.yearLabel ? ` ${g.yearLabel}` : '');
-      return {
-        key: `${g.weekIndex}-${g.monthLabel}`,
-        x,
-        y,
-        primary,
-      };
-    });
-  }, [chronologyAll, weeks.length, minX, minY, stepX, stepY, L.canvasH]);
+    },
+    [nWeeks, monthStartChronWeeks, stepX, stepY, minX, minY, L.canvasH]
+  );
+
+  /* ── Iso ground-plane date labels (right edge) ─────────────────────── */
+
+  const nCols = layoutWeeks[0]?.length ?? 7;
+  const maxDi = nCols - 1;
+  const halfCell = cellPx / 2;
+
+  const isoLen = Math.sqrt(stepX * stepX + stepY * stepY);
+  const uDx = stepX / isoLen;
+  const uDy = stepY / isoLen;
+
+  const BASELINE_FRAC = 0.35;
+
+  const moMatrix = (tx: number, ty: number, fs: number) => {
+    const off = BASELINE_FRAC * fs;
+    const tx2 = tx + uDy * off;
+    const ty2 = ty + uDx * off;
+    return `matrix(${uDx.toFixed(4)}, ${(-uDy).toFixed(4)}, ${uDx.toFixed(4)}, ${uDy.toFixed(4)}, ${tx2.toFixed(2)}, ${ty2.toFixed(2)})`;
+  };
+
+  const MONTH_3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+  const ROW_GAP = 1.8;
+
+  const rightEdgeMidPos = (chronW0: number, chronW1: number, di: number) => {
+    const li0 = Math.max(0, Math.min(nWeeks - 1, nWeeks - 1 - chronW0));
+    const li1 = Math.max(0, Math.min(nWeeks - 1, nWeeks - 1 - chronW1));
+    const isoMid = (layoutToIsoWi(li0) + layoutToIsoWi(li1)) / 2;
+    const { ax, ay } = isoCellTopLeft(isoMid, di, stepX, stepY);
+    return { tx: ax + halfCell - minX, ty: ay - minY + L.canvasH };
+  };
+
+  type DateLabel = { key: string; tx: number; ty: number; text: string };
+
+  const monthRow = useMemo(() => {
+    if (chronologyAll.length === 0) return [];
+    const di = maxDi + 0.8;
+    const out: DateLabel[] = [];
+    for (let i = 0; i < chronologyAll.length; i++) {
+      const g = chronologyAll[i]!;
+      const w0 = g.weekIndex;
+      const w1 = i + 1 < chronologyAll.length ? chronologyAll[i + 1]!.weekIndex - 1 : nWeeks - 1;
+      if (w1 < w0) continue;
+      const { tx, ty } = rightEdgeMidPos(w0, w1, di);
+      out.push({ key: `mo-${g.sectionYear}-${g.monthIndex}`, tx, ty, text: MONTH_3[g.monthIndex] ?? '' });
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chronologyAll, nWeeks, monthStartChronWeeks, minX, minY, L, stepX, stepY, maxDi, cellPx]);
+
+  const quarterRow = useMemo(() => {
+    if (chronologyAll.length === 0) return [];
+    const di = maxDi + 0.8 + ROW_GAP;
+    const out: DateLabel[] = [];
+    let i = 0;
+    while (i < chronologyAll.length) {
+      const g = chronologyAll[i]!;
+      if (!g.quarterLabel) { i++; continue; }
+      const qStart = g.weekIndex;
+      let qEnd = nWeeks - 1;
+      for (let j = i + 1; j < chronologyAll.length; j++) {
+        if (chronologyAll[j]!.quarterLabel) { qEnd = chronologyAll[j]!.weekIndex - 1; break; }
+      }
+      const { tx, ty } = rightEdgeMidPos(qStart, qEnd, di);
+      out.push({ key: `q-${g.sectionYear}-${g.quarterLabel}`, tx, ty, text: g.quarterLabel });
+      i++;
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chronologyAll, nWeeks, monthStartChronWeeks, minX, minY, L, stepX, stepY, maxDi, cellPx]);
+
+  const yearRow = useMemo(() => {
+    if (chronologyAll.length === 0) return [];
+    const di = maxDi + 0.8 + ROW_GAP * 2;
+    const out: DateLabel[] = [];
+    let i = 0;
+    while (i < chronologyAll.length) {
+      const g = chronologyAll[i]!;
+      if (!g.yearLabel) { i++; continue; }
+      const yStart = g.weekIndex;
+      let yEnd = nWeeks - 1;
+      for (let j = i + 1; j < chronologyAll.length; j++) {
+        if (chronologyAll[j]!.yearLabel) { yEnd = chronologyAll[j]!.weekIndex - 1; break; }
+      }
+      const { tx, ty } = rightEdgeMidPos(yStart, yEnd, di);
+      out.push({ key: `yr-${g.sectionYear}`, tx, ty, text: g.yearLabel });
+      i++;
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chronologyAll, nWeeks, monthStartChronWeeks, minX, minY, L, stepX, stepY, maxDi, cellPx]);
+
+  const moFs = Math.max(8, stepX * 1.5);
+  const qFs = Math.max(10, stepX * 1.9);
+  const yrFs = Math.max(9, stepX * 1.7);
+
+  const labelPadRight = stepX * 3 + 20;
+  const labelPadBottom = stepY * 3 + 20;
+  const adjVbW = vbW + labelPadRight;
+  const adjVbH = vbH + labelPadBottom;
 
   const cells = useMemo(() => {
-    const out: { wi: number; di: number; cell: RunwayCalendarCellValue; depth: number }[] = [];
-    for (let wi = 0; wi < weeks.length; wi++) {
-      const week = weeks[wi]!;
+    const out: { li: number; di: number; cell: RunwayCalendarCellValue; depth: number }[] = [];
+    for (let li = 0; li < layoutWeeks.length; li++) {
+      const week = layoutWeeks[li]!;
+      const isoW = isoWiForLayoutLi(li, nWeeks, SKYLINE_MONTH_ISO_GAP_STEPS, monthStartChronWeeks);
       for (let di = 0; di < week.length; di++) {
         const cell = week[di]!;
-        out.push({ wi, di, cell, depth: wi + di });
+        out.push({ li, di, cell, depth: isoW + di });
       }
     }
     out.sort((a, b) => a.depth - b.depth);
     return out;
-  }, [weeks]);
+  }, [layoutWeeks, nWeeks, monthStartChronWeeks]);
 
   const stubH = Math.max(2.5, L.dyy * 0.55);
-
-  const groundPoint = (wi: number, di: number) => {
-    const { ax, ay } = isoCellTopLeft(wi, di, stepX, stepY);
-    return { x: ax - minX, y: ay - minY + L.canvasH };
-  };
 
   return (
     <div
@@ -149,11 +250,11 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
       data-runway-iso-skyline
     >
       <svg
-        viewBox={`0 0 ${vbW} ${vbH}`}
+        viewBox={`0 0 ${adjVbW} ${adjVbH}`}
         width="100%"
         height="100%"
         className="block h-full min-h-0 w-full flex-1 overflow-visible text-foreground"
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="xMidYMin meet"
         aria-label="Isometric pressure skyline"
       >
         {chronologyMajor.length > 0 && (
@@ -161,9 +262,10 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
             {chronologyMajor.map((g) => {
               const style = chronologyLineStyleMajor(g);
               if (!style) return null;
-              const wi = g.weekIndex;
-              const a = groundPoint(wi - 1, 6);
-              const b = groundPoint(wi, 0);
+              const cPrev = g.weekIndex - 1;
+              const cCurr = g.weekIndex;
+              const a = groundPoint(chronToLayoutWi(cPrev), 6);
+              const b = groundPoint(chronToLayoutWi(cCurr), 0);
               return (
                 <line
                   key={`chrono-line-${g.weekIndex}`}
@@ -179,8 +281,8 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
             })}
           </g>
         )}
-        {cells.map(({ wi, di, cell }) => {
-          const { ax, ay } = isoCellTopLeft(wi, di, stepX, stepY);
+        {cells.map(({ li, di, cell }) => {
+          const { ax, ay } = isoCellTopLeft(layoutToIsoWi(li), di, stepX, stepY);
           const gx = ax - minX;
           const gy = ay - minY;
 
@@ -189,7 +291,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
             const columnTy = deckAndColumnY(L, calH, runwayBandH);
             return (
               <g
-                key={`${moKey}-${wi}-${di}-empty`}
+                key={`${moKey}-${li}-${di}-empty`}
                 transform={`translate(${gx.toFixed(2)} ${gy.toFixed(2)})`}
                 aria-hidden
               >
@@ -231,7 +333,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
 
           return (
             <g
-              key={`${moKey}-${wi}-${di}`}
+              key={`${moKey}-${li}-${di}`}
               transform={`translate(${gx.toFixed(2)} ${gy.toFixed(2)})`}
               style={{ opacity: gOpacity }}
             >
@@ -248,29 +350,48 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
             </g>
           );
         })}
-        {monthGroundLabels.length > 0 && (
-          <g className="pointer-events-none select-none" aria-hidden>
-            {monthGroundLabels.map((m) => (
-              <text
-                key={m.key}
-                x={m.x}
-                y={m.y}
-                textAnchor="middle"
-                dominantBaseline="hanging"
-                className="fill-muted-foreground stroke-background"
-                strokeWidth={4}
-                paintOrder="stroke fill"
-                style={{
-                  fontSize: 8.75,
-                  fontWeight: 600,
-                  letterSpacing: '0.04em',
-                }}
-              >
-                {m.primary}
-              </text>
-            ))}
-          </g>
-        )}
+        {/* Date labels — iso ground plane, right edge: months → quarters → years */}
+        <g className="pointer-events-none" aria-hidden>
+          {monthRow.map(({ key, tx, ty, text }) => (
+            <text
+              key={key}
+              x={0}
+              y={0}
+              textAnchor="middle"
+              transform={moMatrix(tx, ty, moFs)}
+              className="fill-muted-foreground font-medium tabular-nums tracking-tight"
+              fontSize={moFs}
+            >
+              {text}
+            </text>
+          ))}
+          {quarterRow.map(({ key, tx, ty, text }) => (
+            <text
+              key={key}
+              x={0}
+              y={0}
+              textAnchor="middle"
+              transform={moMatrix(tx, ty, qFs)}
+              className="fill-muted-foreground font-bold tabular-nums tracking-tight"
+              fontSize={qFs}
+            >
+              {text}
+            </text>
+          ))}
+          {yearRow.map(({ key, tx, ty, text }) => (
+            <text
+              key={key}
+              x={0}
+              y={0}
+              textAnchor="middle"
+              transform={moMatrix(tx, ty, yrFs)}
+              className="fill-muted-foreground font-semibold tabular-nums tracking-tight"
+              fontSize={yrFs}
+            >
+              {text}
+            </text>
+          ))}
+        </g>
       </svg>
     </div>
   );

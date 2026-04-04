@@ -28,12 +28,10 @@ function minimalDsl(country: string): string {
 # and store rhythm. Edit values to match your organisation.
 
 #
-# Identity and heat-map contrast
-# --------------------------------
+# Identity
+# --------
 #
 market: ${country || 'DE'}
-risk_heatmap_gamma_tech: 0.35
-risk_heatmap_gamma_business: 0.35
 
 #
 # Capacity — labs, people, test slots
@@ -93,8 +91,8 @@ holidays:
   lab_capacity_scale: 1.0
 
 #
-# Store trading rhythm
-# ----------------------
+# Default restaurant / in-store busyness (per market)
+# weekly_pattern × monthly_pattern × seasonal; payday_* = early-month boost on that rhythm.
 #
 trading:
   campaign_effect_scale: 2.5

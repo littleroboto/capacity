@@ -1,16 +1,24 @@
 /**
- * Shared multi-document workspace YAML (Vercel Blob + team write secret).
- * Configure: BLOB_READ_WRITE_TOKEN, CAPACITY_SHARED_DSL_SECRET (same value users enter in the app).
+ * Shared multi-document workspace YAML (Vercel Blob).
+ *
+ * Env:
+ * - `BLOB_READ_WRITE_TOKEN` — required
+ * - `CLERK_SECRET_KEY` — when set, GET/HEAD require a valid Clerk session JWT; PUT accepts JWT or legacy secret
+ * - `CAPACITY_SHARED_DSL_SECRET` — legacy write secret (optional if only Clerk JWT used for PUT)
+ * - `CAPACITY_CLERK_AUTHORIZED_PARTIES` — optional comma-separated origins for `verifyToken` (recommended in production)
+ * - `CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE` — when `1` and `CLERK_SECRET_KEY` is set, PUT rejects legacy shared secret (JWT only)
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { BlobNotFoundError, BlobPreconditionFailedError, get, head, put } from '@vercel/blob';
+import {
+  authenticateSharedDslBearer,
+  bearerFromAuthorizationHeader,
+  clerkSecretKeyConfigured,
+  legacySharedDslWriteDisabled,
+} from './lib/clerkAuthSharedDsl';
 
 const PATHNAME = 'capacity-shared/workspace.yaml';
 
-/**
- * Must match the Blob store type. Default `private` (Vercel’s usual default for new stores).
- * Set `CAPACITY_BLOB_ACCESS=public` only if the store is explicitly public.
- */
 function blobStoreAccess(): 'public' | 'private' {
   const v = process.env.CAPACITY_BLOB_ACCESS?.trim().toLowerCase();
   return v === 'public' ? 'public' : 'private';
@@ -35,6 +43,46 @@ async function streamToText(stream: ReadableStream<Uint8Array>): Promise<string>
   return new TextDecoder('utf-8').decode(out);
 }
 
+async function requireReadAuth(req: VercelRequest, res: VercelResponse): Promise<boolean> {
+  if (!clerkSecretKeyConfigured()) return true;
+  const bearer = bearerFromAuthorizationHeader(req.headers.authorization);
+  const p = await authenticateSharedDslBearer(bearer, 'read');
+  if (p.kind === 'clerk') return true;
+  res.status(401).json({
+    error: 'unauthorized',
+    message: 'Sign in is required to load the team workspace. Ensure CLERK_SECRET_KEY is set on the server and you are signed in.',
+  });
+  return false;
+}
+
+async function requireWriteAuth(req: VercelRequest, res: VercelResponse): Promise<boolean> {
+  const bearer = bearerFromAuthorizationHeader(req.headers.authorization);
+  const p = await authenticateSharedDslBearer(bearer, 'write');
+
+  if (clerkSecretKeyConfigured()) {
+    if (p.kind === 'clerk' || p.kind === 'legacy') return true;
+    res.status(401).json({
+      error: 'unauthorized',
+      message:
+        p.kind === 'none'
+          ? legacySharedDslWriteDisabled()
+            ? 'Sign in and send a Clerk session JWT. Legacy team write secret is disabled on this deployment.'
+            : 'Send a Clerk session token (signed in) or the team write secret in Authorization: Bearer.'
+          : 'Invalid credentials.',
+    });
+    return false;
+  }
+
+  if (p.kind === 'legacy') return true;
+  const secret = process.env.CAPACITY_SHARED_DSL_SECRET?.trim();
+  if (!secret) {
+    res.status(503).json({ error: 'Writes are not configured (CAPACITY_SHARED_DSL_SECRET or CLERK_SECRET_KEY).' });
+    return false;
+  }
+  res.status(401).json({ error: 'unauthorized' });
+  return false;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
@@ -43,6 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'HEAD') {
+    if (!(await requireReadAuth(req, res))) return;
     try {
       const meta = await head(PATHNAME, { token });
       res.setHeader('X-DSL-Etag', meta.etag);
@@ -61,8 +110,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'GET') {
+    if (!(await requireReadAuth(req, res))) return;
     try {
-      // Must match store access: use `private` for private Blob stores (Vercel default for many new stores).
       const access = blobStoreAccess();
       const result = await get(PATHNAME, { access, token, useCache: false });
       if (!result || result.statusCode !== 200 || !result.stream) {
@@ -83,16 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'PUT') {
-    const secret = process.env.CAPACITY_SHARED_DSL_SECRET;
-    if (!secret) {
-      res.status(503).json({ error: 'Writes are not configured (CAPACITY_SHARED_DSL_SECRET).' });
-      return;
-    }
-    const auth = req.headers.authorization;
-    if (auth !== `Bearer ${secret}`) {
-      res.status(401).json({ error: 'unauthorized' });
-      return;
-    }
+    if (!(await requireWriteAuth(req, res))) return;
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const yaml = typeof body?.yaml === 'string' ? body.yaml : '';

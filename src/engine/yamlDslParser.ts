@@ -166,7 +166,39 @@ function stripNonTechPhaseLoad(pl: PhaseLoad): PhaseLoad {
 }
 
 /**
- * Expand `trading.weekly_pattern` the same way as `tech.weekly_pattern`: per-day **0–1** numbers after parse,
+ * Optional blocks under `bau:` that describe **routine Market IT / support intensity by weekday** (same fields as
+ * legacy top-level `tech:`). Aliases merge **in this order** (later keys override earlier): `restaurant_it_rhythm`,
+ * `bau_technology_support`, `market_it_support`, `market_it_weekly_load` (canonical for live demos / docs).
+ */
+const BAU_MARKET_IT_RHYTHM_KEYS = [
+  'restaurant_it_rhythm',
+  'bau_technology_support',
+  'market_it_support',
+  'market_it_weekly_load',
+] as const;
+
+function extractBauMarketItRhythm(bau: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!bau || typeof bau !== 'object') return undefined;
+  let merged: Record<string, unknown> = {};
+  for (const key of BAU_MARKET_IT_RHYTHM_KEYS) {
+    const v = bau[key];
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      merged = { ...merged, ...(v as Record<string, unknown>) };
+    }
+  }
+  return Object.keys(merged).length ? merged : undefined;
+}
+
+/** Legacy `tech:` overrides nested `bau.*` keys when both set (existing market files keep identical behaviour). */
+function mergedTechSection(parsed: ParsedYaml): Record<string, unknown> {
+  const fromBau = extractBauMarketItRhythm(parsed.bau);
+  const top = parsed.tech && typeof parsed.tech === 'object' ? parsed.tech : {};
+  if (!fromBau) return top;
+  return { ...fromBau, ...top };
+}
+
+/**
+ * Expand `trading.weekly_pattern` the same way as Market IT `weekday_intensity` (legacy `weekly_pattern`): per-day **0–1** after parse,
  * or named levels (`low` / `medium` / `high` / `very_high`). Supports `default`, `weekdays`, `weekend`, and `Mon`…`Sun`.
  */
 function expandTradingWeeklyPattern(trading: Record<string, unknown> | undefined): Record<string, unknown> {
@@ -649,7 +681,13 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
       if (raw == null || raw === '' || !Number.isFinite(n) || n < 0) return def;
       return Math.floor(n);
     };
-    const buRaw = row.business_uplift ?? row.businessUplift;
+    const buRaw =
+      row.business_uplift ??
+      row.businessUplift ??
+      row.trading_emphasis ??
+      row.tradingEmphasis ??
+      row.store_trading_weight ??
+      row.storeTradingWeight;
     const buNum = Number(buRaw);
     const businessUplift =
       buRaw != null && buRaw !== '' && Number.isFinite(buNum) && buNum >= 0
@@ -734,6 +772,7 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
       ? Math.min(1, Math.max(0.12, holScaleN))
       : undefined;
   const tradingPressure = mapTradingPressureKnobs(parsed.trading as Record<string, unknown> | undefined);
+  const techEffective = mergedTechSection(parsed);
 
   const pubBlock = parsed.public_holidays;
   let publicHolidayStaffingMultiplier: number | undefined;
@@ -776,7 +815,7 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     capacity,
     monthlyLabsCapacityPattern: mapResourceCapacityMonthlyShape(resourcesRoot, 'labs'),
     ...mapStaffResourceMonthly(resourcesRoot),
-    techAvailableCapacityPattern: mapTechAvailableCapacityPattern(parsed.tech as Record<string, unknown>),
+    techAvailableCapacityPattern: mapTechAvailableCapacityPattern(techEffective),
     testingCapacity,
     holidayLabCapacityScale,
     publicHolidayStaffingMultiplier,
@@ -796,8 +835,8 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     holidayCapacityTaperDays,
     stressCorrelations,
     operatingWindows: mapOperatingWindows(parsed.operating_windows),
-    techRhythm: mapTechRhythm(parsed.tech),
-    monthlySupportPattern: mapSupportMonthlyPattern(parsed.tech as Record<string, unknown> | undefined),
+    techRhythm: mapTechRhythm(techEffective),
+    monthlySupportPattern: mapSupportMonthlyPattern(techEffective),
     riskHeatmapGamma,
     riskHeatmapGammaTech,
     riskHeatmapGammaBusiness,
@@ -952,9 +991,10 @@ function mapSupportMonthlyPattern(
   tech: Record<string, unknown> | undefined
 ): Record<string, number> | undefined {
   if (!tech || typeof tech !== 'object') return undefined;
-  const raw = (tech.support_monthly_pattern ?? tech.supportMonthlyPattern) as
-    | Record<string, unknown>
-    | undefined;
+  const raw = (tech.extra_support_months ??
+    tech.extraSupportMonths ??
+    tech.support_monthly_pattern ??
+    tech.supportMonthlyPattern) as Record<string, unknown> | undefined;
   if (!raw || typeof raw !== 'object') return undefined;
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(raw)) {
@@ -1032,9 +1072,10 @@ function mapTechAvailableCapacityPattern(
   tech: Record<string, unknown> | undefined
 ): Record<string, number> | undefined {
   if (!tech || typeof tech !== 'object') return undefined;
-  const raw = (tech.available_capacity_pattern ?? tech.availableCapacityPattern) as
-    | Record<string, unknown>
-    | undefined;
+  const raw = (tech.monthly_runway_availability ??
+    tech.monthlyRunwayAvailability ??
+    tech.available_capacity_pattern ??
+    tech.availableCapacityPattern) as Record<string, unknown> | undefined;
   if (!raw || typeof raw !== 'object') return undefined;
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(raw)) {
@@ -1064,14 +1105,23 @@ function mapSeasonalTrading(trading: Record<string, unknown> | undefined): Seaso
 
 function mapTechRhythm(tech: Record<string, unknown> | undefined): TechRhythmConfig | undefined {
   if (!tech || typeof tech !== 'object') return undefined;
-  const wpRaw = (tech.weekly_pattern ?? tech.weeklyPattern) as Record<string, unknown> | undefined;
+  const wpRaw = (tech.weekday_intensity ??
+    tech.weekdayIntensity ??
+    tech.weekly_pattern ??
+    tech.weeklyPattern) as Record<string, unknown> | undefined;
   const expanded = expandTechWeeklyPattern(wpRaw);
-  const swRaw = (tech.support_weekly_pattern ?? tech.supportWeeklyPattern) as
-    | Record<string, unknown>
-    | undefined;
+  const swRaw = (tech.extra_support_weekdays ??
+    tech.extraSupportWeekdays ??
+    tech.support_weekly_pattern ??
+    tech.supportWeeklyPattern) as Record<string, unknown> | undefined;
   const supportWeekly = expandTechWeeklyPattern(swRaw);
   const supportMonthly = mapSupportMonthlyPattern(tech);
-  const sts = Number(tech.support_teams_scale ?? tech.supportTeamsScale);
+  const sts = Number(
+    tech.extra_support_teams_scale ??
+      tech.extraSupportTeamsScale ??
+      tech.support_teams_scale ??
+      tech.supportTeamsScale
+  );
 
   if (
     (!expanded || Object.keys(expanded).length === 0) &&
@@ -1080,9 +1130,11 @@ function mapTechRhythm(tech: Record<string, unknown> | undefined): TechRhythmCon
     return undefined;
   }
 
-  const ls = Number(tech.labs_scale ?? tech.labsScale);
-  const ts = Number(tech.teams_scale ?? tech.teamsScale);
-  const bs = Number(tech.backend_scale ?? tech.backendScale);
+  const ls = Number(tech.labs_multiplier ?? tech.labsMultiplier ?? tech.labs_scale ?? tech.labsScale);
+  const ts = Number(tech.teams_multiplier ?? tech.teamsMultiplier ?? tech.teams_scale ?? tech.teamsScale);
+  const bs = Number(
+    tech.backend_multiplier ?? tech.backendMultiplier ?? tech.backend_scale ?? tech.backendScale
+  );
 
   const out: TechRhythmConfig = {};
 

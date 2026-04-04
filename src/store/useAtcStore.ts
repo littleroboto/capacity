@@ -34,7 +34,6 @@ export type SetCountryOptions = {
    */
   returnPickerForBack?: string | null;
 };
-import { patchDslRiskHeatmapVisual } from '@/lib/dslRiskHeatmapPatch';
 import {
   patchDslTradingMonthlyPattern,
   type TradingMonthlyPatternPatch,
@@ -43,6 +42,9 @@ import {
   patchDslDeploymentRiskContextMonthCurve,
   type DeploymentRiskContextMonthPatch,
 } from '@/lib/dslDeploymentRiskContextMonthPatch';
+import {
+  patchDslTradingPaydayKnotMultipliers,
+} from '@/lib/dslTradingPaydayPatch';
 import {
   patchDslTradingWeeklyPattern,
   type TradingWeeklyPatternPatch,
@@ -64,21 +66,18 @@ import {
 } from '@/lib/dslTechAvailableCapacityPatch';
 import { patchDslHolidayStaffingMultiplier, type HolidayStaffingBlockKind } from '@/lib/dslHolidayStaffingPatch';
 import { patchDslTechWeeklyPattern, type TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
-import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
+import type { PaydayKnotTuple } from '@/engine/paydayMonthShape';
+import { parseRiskHeatmapCurve, type RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
 import {
   DEFAULT_HEATMAP_MONO_COLOR,
   normalizeHeatmapMonoHex,
   type HeatmapRenderStyle,
 } from '@/lib/riskHeatmapColors';
-import { syncRiskHeatmapVisualFromConfigs } from '@/lib/heatmapVisualFromConfigs';
 import type { TechWorkloadScope } from '@/lib/runwayViewMetrics';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
 import { getAtcDsl, setAtcDsl, setStored, getStored } from '@/lib/storage';
 
-/** Debounce writes to `atc_dsl` while dragging the heatmap γ slider. */
-let atcDslGammaPersistTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Debounce writes to `atc_dsl` while painting `tech.weekly_pattern`. */
+/** Debounce writes to `atc_dsl` while painting Market IT `weekday_intensity` (YAML; legacy `weekly_pattern`). */
 let atcDslTechRhythmPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Debounce writes to `atc_dsl` while editing `trading.monthly_pattern`. */
@@ -90,7 +89,10 @@ let atcDslDeploymentRiskContextPersistTimer: ReturnType<typeof setTimeout> | nul
 /** Debounce writes to `atc_dsl` while editing `trading.weekly_pattern`. */
 let atcDslTradingWeeklyPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Debounce writes to `atc_dsl` while editing `tech.support_*_pattern`. */
+/** Debounce writes to `atc_dsl` while editing `trading.payday_month_knot_multipliers`. */
+let atcDslTradingPaydayPersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounce writes to `atc_dsl` while editing `extra_support_*` (YAML; legacy `support_*_pattern`). */
 let atcDslTechSupportPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Debounce writes while editing tech capacity planning (resources / tech.available / holiday staffing). */
@@ -114,12 +116,26 @@ type AtcState = {
   dslText: string;
   dslByMarket: Record<string, string>;
   riskTuning: RiskModelTuning;
-  /** Panel slider + legacy YAML: Technology lens γ. */
+  /** Combined γ (Technology Teams / Code); kept in sync with tech/business when using the shared slider. */
   riskHeatmapGamma: number;
   riskHeatmapGammaTech: number;
   riskHeatmapGammaBusiness: number;
-  /** Pressure heatmap transfer (`risk_heatmap_curve` in YAML; `power` = default / legacy). */
+  /** Pressure heatmap transfer for Technology Teams + Code view (persisted locally, not written to market YAML). */
   riskHeatmapCurve: RiskHeatmapCurveId;
+  /**
+   * Second stage: `transfer(t)^p` for p≥1 after curve+γ; Technology Teams (combined) lens only; persisted.
+   */
+  riskHeatmapTailPower: number;
+  /**
+   * Market risk lens only: transfer curve / γ / tail power (local UI; not YAML; does not affect other lenses).
+   */
+  marketRiskHeatmapCurve: RiskHeatmapCurveId;
+  marketRiskHeatmapGamma: number;
+  marketRiskHeatmapTailPower: number;
+  /**
+   * Linear add/subtract on 0–1 Market risk heatmap pressure before transfer; not YAML.
+   */
+  riskHeatmapBusinessPressureOffset: number;
   riskSurface: RiskRow[];
   configs: MarketConfig[];
   parseError: string | null;
@@ -184,7 +200,12 @@ type AtcState = {
   resetRiskTuning: () => void;
   setRiskHeatmapGamma: (gamma: number) => void;
   setRiskHeatmapCurve: (curve: RiskHeatmapCurveId) => void;
-  /** Writes explicit Mon–Sun `tech.weekly_pattern` for the focused market and re-runs the pipeline. */
+  setRiskHeatmapTailPower: (power: number) => void;
+  setMarketRiskHeatmapCurve: (curve: RiskHeatmapCurveId) => void;
+  setMarketRiskHeatmapGamma: (gamma: number) => void;
+  setMarketRiskHeatmapTailPower: (power: number) => void;
+  setRiskHeatmapBusinessPressureOffset: (delta: number) => void;
+  /** Writes explicit Mon–Sun `weekday_intensity` (bundled YAML) for the focused market and re-runs the pipeline. */
   setTechWeeklyPattern: (pattern: TechWeeklyPatternPatch) => void;
   /** Writes explicit Jan–Dec `trading.monthly_pattern` (0–1) for the focused market and re-runs the pipeline. */
   setTradingMonthlyPattern: (pattern: TradingMonthlyPatternPatch) => void;
@@ -192,9 +213,11 @@ type AtcState = {
   setDeploymentRiskContextMonthCurve: (pattern: DeploymentRiskContextMonthPatch) => void;
   /** Writes explicit Mon–Sun `trading.weekly_pattern` (0–1) for the focused market and re-runs the pipeline. */
   setTradingWeeklyPattern: (pattern: TradingWeeklyPatternPatch) => void;
-  /** Writes explicit Mon–Sun `tech.support_weekly_pattern` (0–1) for the focused market. */
+  /** Writes `trading.payday_month_knot_multipliers` for the focused market (removes peak key); re-runs the pipeline. */
+  setTradingPaydayKnotMultipliers: (knots: PaydayKnotTuple) => void;
+  /** Writes explicit Mon–Sun `extra_support_weekdays` (0–1) for the focused market. */
   setTechSupportWeeklyPattern: (pattern: TechSupportWeeklyPatternPatch) => void;
-  /** Writes explicit Jan–Dec `tech.support_monthly_pattern` (0–1) for the focused market. */
+  /** Writes explicit Jan–Dec `extra_support_months` (0–1) for the focused market. */
   setTechSupportMonthlyPattern: (pattern: TechSupportMonthlyPatternPatch) => void;
   setResourcesLabsMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => void;
   setResourcesStaffMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => void;
@@ -209,13 +232,12 @@ type AtcState = {
 function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) => void) {
   const full = mergeStateToFullMultiDoc(get());
   if (!full.trim() || !looksLikeYamlDsl(full)) return;
-  const { riskTuning, country, runwayMarketOrder } = get();
+  const { riskTuning, country } = get();
   const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, country));
   set({
     riskSurface: r.riskSurface,
     configs: r.configs,
     parseError: r.parseError ?? null,
-    ...syncRiskHeatmapVisualFromConfigs(r.configs, country, runwayMarketOrder),
   });
 }
 
@@ -237,6 +259,11 @@ export const useAtcStore = create<AtcState>()(
       riskHeatmapGammaTech: 1,
       riskHeatmapGammaBusiness: 1,
       riskHeatmapCurve: 'power',
+      riskHeatmapTailPower: 1,
+      marketRiskHeatmapCurve: 'power',
+      marketRiskHeatmapGamma: 1,
+      marketRiskHeatmapTailPower: 1,
+      riskHeatmapBusinessPressureOffset: 0,
       runway3dHeatmap: false,
       runwaySvgHeatmap: true,
       dslLlmAssistantEnabled: false,
@@ -297,7 +324,6 @@ export const useAtcStore = create<AtcState>()(
             riskSurface: r.riskSurface,
             configs: r.configs,
             parseError: r.parseError ?? null,
-            ...syncRiskHeatmapVisualFromConfigs(r.configs, c, get().runwayMarketOrder),
           });
           return;
         }
@@ -318,7 +344,6 @@ export const useAtcStore = create<AtcState>()(
           riskSurface: r.riskSurface,
           configs: r.configs,
           parseError: r.parseError ?? null,
-          ...syncRiskHeatmapVisualFromConfigs(r.configs, c, get().runwayMarketOrder),
         });
       },
 
@@ -373,46 +398,35 @@ export const useAtcStore = create<AtcState>()(
 
       setRiskHeatmapGamma: (gamma) => {
         const g = Math.min(3, Math.max(0.35, Math.round(gamma * 100) / 100));
-        const state = get();
-        const { country, configs, riskHeatmapCurve } = state;
-        const market = gammaFocusMarket(country, configs);
-        const full = mergeStateToFullMultiDoc(state);
-        const nextFull = patchDslRiskHeatmapVisual(full, market, { gamma: g, curve: riskHeatmapCurve });
-        const split = splitToDslByMarket(nextFull);
-        const dslByMarket = { ...state.dslByMarket, ...split };
-        let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
-          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
-        }
-        set({ riskHeatmapGamma: g, riskHeatmapGammaTech: g, riskHeatmapGammaBusiness: g, dslText, dslByMarket });
-        if (atcDslGammaPersistTimer != null) clearTimeout(atcDslGammaPersistTimer);
-        atcDslGammaPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslGammaPersistTimer = null;
-        }, 450);
+        set({ riskHeatmapGamma: g, riskHeatmapGammaTech: g, riskHeatmapGammaBusiness: g });
       },
 
       setRiskHeatmapCurve: (curve) => {
-        const state = get();
-        const { country, configs, riskHeatmapGamma } = state;
-        const market = gammaFocusMarket(country, configs);
-        const full = mergeStateToFullMultiDoc(state);
-        const nextFull = patchDslRiskHeatmapVisual(full, market, {
-          gamma: riskHeatmapGamma,
-          curve,
-        });
-        const split = splitToDslByMarket(nextFull);
-        const dslByMarket = { ...state.dslByMarket, ...split };
-        let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
-          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
-        }
-        set({ riskHeatmapCurve: curve, dslText, dslByMarket });
-        if (atcDslGammaPersistTimer != null) clearTimeout(atcDslGammaPersistTimer);
-        atcDslGammaPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslGammaPersistTimer = null;
-        }, 450);
+        set({ riskHeatmapCurve: curve });
+      },
+
+      setRiskHeatmapTailPower: (power) => {
+        const p = Math.min(2.75, Math.max(1, Math.round(power * 100) / 100));
+        set({ riskHeatmapTailPower: p });
+      },
+
+      setMarketRiskHeatmapCurve: (curve) => {
+        set({ marketRiskHeatmapCurve: curve });
+      },
+
+      setMarketRiskHeatmapGamma: (gamma) => {
+        const g = Math.min(3, Math.max(0.35, Math.round(gamma * 100) / 100));
+        set({ marketRiskHeatmapGamma: g });
+      },
+
+      setMarketRiskHeatmapTailPower: (power) => {
+        const p = Math.min(2.75, Math.max(1, Math.round(power * 100) / 100));
+        set({ marketRiskHeatmapTailPower: p });
+      },
+
+      setRiskHeatmapBusinessPressureOffset: (delta) => {
+        const d = Math.min(0.5, Math.max(-0.5, Math.round(delta * 100) / 100));
+        set({ riskHeatmapBusinessPressureOffset: d });
       },
 
       setTechWeeklyPattern: (pattern) => {
@@ -502,6 +516,28 @@ export const useAtcStore = create<AtcState>()(
         atcDslTradingWeeklyPersistTimer = setTimeout(() => {
           setAtcDsl(mergeStateToFullMultiDoc(get()));
           atcDslTradingWeeklyPersistTimer = null;
+        }, 450);
+      },
+
+      setTradingPaydayKnotMultipliers: (knots: PaydayKnotTuple) => {
+        const state = get();
+        const { country, configs, runwayMarketOrder } = state;
+        const market = gammaFocusMarket(country, configs, runwayMarketOrder);
+        const full = mergeStateToFullMultiDoc(state);
+        if (!full.trim() || !looksLikeYamlDsl(full)) return;
+        const nextFull = patchDslTradingPaydayKnotMultipliers(full, market, knots);
+        const split = splitToDslByMarket(nextFull);
+        const dslByMarket = { ...state.dslByMarket, ...split };
+        let dslText = nextFull;
+        if (!isRunwayAllMarkets(country)) {
+          dslText = extractMarketDocument(nextFull, country) ?? nextFull;
+        }
+        set({ dslText, dslByMarket });
+        rerunPipeline(get, set);
+        if (atcDslTradingPaydayPersistTimer != null) clearTimeout(atcDslTradingPaydayPersistTimer);
+        atcDslTradingPaydayPersistTimer = setTimeout(() => {
+          setAtcDsl(mergeStateToFullMultiDoc(get()));
+          atcDslTradingPaydayPersistTimer = null;
         }, 450);
       },
 
@@ -647,7 +683,8 @@ export const useAtcStore = create<AtcState>()(
         const dsl = (text ?? get().dslText).trim();
         if (!looksLikeYamlDsl(dsl)) {
           set({
-            parseError: 'Editor content looks like HTML or a page bundle, not YAML. Use Reset or paste a valid DSL.',
+            parseError:
+              'Editor content is not valid workspace YAML (e.g. HTML, a JS/TS source file like api/shared-dsl.ts, or a bad cloud pull). Reset the workspace or paste real market DSL. If the team Blob has the wrong file, re-save valid YAML from the editor.',
           });
           return;
         }
@@ -678,7 +715,6 @@ export const useAtcStore = create<AtcState>()(
           riskSurface: r.riskSurface,
           configs: r.configs,
           parseError: r.parseError ?? null,
-          ...syncRiskHeatmapVisualFromConfigs(r.configs, co, get().runwayMarketOrder),
         });
       },
 
@@ -705,7 +741,6 @@ export const useAtcStore = create<AtcState>()(
           riskSurface: r.riskSurface,
           configs: r.configs,
           parseError: r.parseError ?? null,
-          ...syncRiskHeatmapVisualFromConfigs(r.configs, country, get().runwayMarketOrder),
         });
       },
 
@@ -759,7 +794,6 @@ export const useAtcStore = create<AtcState>()(
           riskSurface: r.riskSurface,
           configs: r.configs,
           parseError: r.parseError ?? null,
-          ...syncRiskHeatmapVisualFromConfigs(r.configs, country, get().runwayMarketOrder),
         });
         const th = get().theme;
         document.documentElement.classList.toggle('dark', th === 'dark');
@@ -767,8 +801,8 @@ export const useAtcStore = create<AtcState>()(
     }),
     {
       name: STORAGE_KEYS.capacity_atc,
-      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. v4: tech workload scope. v5: DSL LLM assistant toybox toggle. v6: runway year/quarter filter. v7: runway + following quarter. */
-      version: 7,
+      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. v4: tech workload scope. v5: DSL LLM assistant toybox toggle. v6: runway year/quarter filter. v7: runway + following quarter. v8: heatmap tail power. v9: business heatmap pressure offset. v10: market-risk-only heatmap transfer state. */
+      version: 10,
       migrate: (persistedState, fromVersion) => {
         let ps = { ...(persistedState ?? {}) } as Record<string, unknown>;
         if (fromVersion < 1) {
@@ -813,6 +847,39 @@ export const useAtcStore = create<AtcState>()(
           ps = {
             ...ps,
             runwayIncludeFollowingQuarter: false,
+          };
+        }
+        if (fromVersion < 8) {
+          ps = {
+            ...ps,
+            riskHeatmapTailPower: 1,
+          };
+        }
+        if (fromVersion < 9) {
+          ps = {
+            ...ps,
+            riskHeatmapBusinessPressureOffset: 0,
+          };
+        }
+        if (fromVersion < 10) {
+          const curveRaw = ps.riskHeatmapCurve;
+          const gammaBiz =
+            typeof ps.riskHeatmapGammaBusiness === 'number' && Number.isFinite(ps.riskHeatmapGammaBusiness)
+              ? ps.riskHeatmapGammaBusiness
+              : typeof ps.riskHeatmapGamma === 'number' && Number.isFinite(ps.riskHeatmapGamma)
+                ? ps.riskHeatmapGamma
+                : 1;
+          const g = Math.min(3, Math.max(0.35, Math.round(gammaBiz * 100) / 100));
+          const tail =
+            typeof ps.riskHeatmapTailPower === 'number' && Number.isFinite(ps.riskHeatmapTailPower)
+              ? ps.riskHeatmapTailPower
+              : 1;
+          const tp = Math.min(2.75, Math.max(1, Math.round(tail * 100) / 100));
+          ps = {
+            ...ps,
+            marketRiskHeatmapCurve: parseRiskHeatmapCurve(curveRaw),
+            marketRiskHeatmapGamma: g,
+            marketRiskHeatmapTailPower: tp,
           };
         }
         return ps;
@@ -879,6 +946,45 @@ export const useAtcStore = create<AtcState>()(
           typeof base.runwayIncludeFollowingQuarter === 'boolean'
             ? base.runwayIncludeFollowingQuarter
             : current.runwayIncludeFollowingQuarter;
+        const rtp = base.riskHeatmapTailPower;
+        const riskHeatmapTailPower =
+          typeof rtp === 'number' && Number.isFinite(rtp) && rtp >= 1
+            ? Math.min(2.75, Math.max(1, Math.round(rtp * 100) / 100))
+            : current.riskHeatmapTailPower;
+        const rbo = base.riskHeatmapBusinessPressureOffset;
+        const riskHeatmapBusinessPressureOffset =
+          typeof rbo === 'number' && Number.isFinite(rbo)
+            ? Math.min(0.5, Math.max(-0.5, Math.round(rbo * 100) / 100))
+            : current.riskHeatmapBusinessPressureOffset;
+        const marketRiskHeatmapCurve = parseRiskHeatmapCurve(
+          base.marketRiskHeatmapCurve ?? current.marketRiskHeatmapCurve
+        );
+        const mrg = base.marketRiskHeatmapGamma;
+        const marketRiskHeatmapGamma =
+          typeof mrg === 'number' && Number.isFinite(mrg)
+            ? Math.min(3, Math.max(0.35, Math.round(mrg * 100) / 100))
+            : current.marketRiskHeatmapGamma;
+        const mrtp = base.marketRiskHeatmapTailPower;
+        const marketRiskHeatmapTailPower =
+          typeof mrtp === 'number' && Number.isFinite(mrtp) && mrtp >= 1
+            ? Math.min(2.75, Math.max(1, Math.round(mrtp * 100) / 100))
+            : current.marketRiskHeatmapTailPower;
+        const riskHeatmapCurve = parseRiskHeatmapCurve(
+          base.riskHeatmapCurve ?? current.riskHeatmapCurve
+        );
+        const clampGamma = (x: unknown, fallback: number) =>
+          typeof x === 'number' && Number.isFinite(x)
+            ? Math.min(3, Math.max(0.35, Math.round(x * 100) / 100))
+            : fallback;
+        const riskHeatmapGamma = clampGamma(base.riskHeatmapGamma, current.riskHeatmapGamma);
+        const riskHeatmapGammaTech = clampGamma(
+          base.riskHeatmapGammaTech,
+          current.riskHeatmapGammaTech
+        );
+        const riskHeatmapGammaBusiness = clampGamma(
+          base.riskHeatmapGammaBusiness,
+          current.riskHeatmapGammaBusiness
+        );
         return {
           ...rest,
           country,
@@ -893,6 +999,15 @@ export const useAtcStore = create<AtcState>()(
           runwayFilterYear,
           runwayFilterQuarter,
           runwayIncludeFollowingQuarter,
+          riskHeatmapTailPower,
+          riskHeatmapBusinessPressureOffset,
+          marketRiskHeatmapCurve,
+          marketRiskHeatmapGamma,
+          marketRiskHeatmapTailPower,
+          riskHeatmapCurve,
+          riskHeatmapGamma,
+          riskHeatmapGammaTech,
+          riskHeatmapGammaBusiness,
         };
       },
       partialize: (s) => ({
@@ -910,6 +1025,15 @@ export const useAtcStore = create<AtcState>()(
         runwayFilterYear: s.runwayFilterYear,
         runwayFilterQuarter: s.runwayFilterQuarter,
         runwayIncludeFollowingQuarter: s.runwayIncludeFollowingQuarter,
+        riskHeatmapGamma: s.riskHeatmapGamma,
+        riskHeatmapGammaTech: s.riskHeatmapGammaTech,
+        riskHeatmapGammaBusiness: s.riskHeatmapGammaBusiness,
+        riskHeatmapCurve: s.riskHeatmapCurve,
+        riskHeatmapTailPower: s.riskHeatmapTailPower,
+        marketRiskHeatmapCurve: s.marketRiskHeatmapCurve,
+        marketRiskHeatmapGamma: s.marketRiskHeatmapGamma,
+        marketRiskHeatmapTailPower: s.marketRiskHeatmapTailPower,
+        riskHeatmapBusinessPressureOffset: s.riskHeatmapBusinessPressureOffset,
       }),
     }
   )

@@ -8,6 +8,7 @@ Single source of truth for **what this repo ships today**, so older docs (OWM, c
 - **Deployed on Vercel**: static client build + **serverless** routes under `api/` (today: shared workspace YAML only).
 - **Default data**: bundled per-market YAML under `public/data/markets/*.yaml`, driven by the generated manifest (`pnpm` / `npm` **prebuild** runs `scripts/generate-market-manifest.mjs`).
 - **Optional team workspace**: when **`VITE_SHARED_DSL=1`** at build time and Blob + secrets are set on Vercel, the app reads/writes **one** multi-document YAML via **`GET`/`PUT` `/api/shared-dsl`** ([Vercel Blob](https://vercel.com/docs/storage/vercel-blob)). Writes require the shared **`CAPACITY_SHARED_DSL_SECRET`** pasted once per browser session (POC — not multi-user auth).
+- **Optional Clerk sign-in**: when **`VITE_CLERK_PUBLISHABLE_KEY`** is set at build time and **`VITE_AUTH_DISABLED`** is not truthy, the SPA shows Clerk **sign-in before the workbench** ([`@clerk/react`](https://clerk.com/docs)). **Server routes are unchanged** — workspace YAML over HTTP is not yet tied to the session (see [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md)).
 
 ## Runway UI and lenses
 
@@ -40,7 +41,8 @@ Three **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 
 - **Dedicated Risk heatmap lens** (corporate calendar, graded deployment fragility) — design target; not a fourth `VIEW_MODES` entry yet.
 - **Technology heatmap coloured by headroom / available capacity** (vs demand) — product direction; current colouring follows **demand** metrics.
-- User accounts, orgs, SSO; real-time collab (Yjs / PartyKit); version history DB; comments/chat — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md).
+- **Full** user/org model on the **API** (protected `GET`/`PUT` shared DSL, roles, SSO) — partial client gate only today; see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) and [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
+- Real-time collab (Yjs / PartyKit); version history DB; comments/chat — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md).
 - **Runway auto-plan** (slot finder, ghost overlays, 3D viz) — backlog **Phase 2**; intended to build on tech capacity / headroom story once shipped.
 
 ## Code anchors

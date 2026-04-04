@@ -1,12 +1,12 @@
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
 
-/** Canonical day keys for `tech.weekly_pattern` (matches parser / phase engine weekday names). */
+/** Canonical day keys for Market IT weekday maps (`weekday_intensity` in YAML; internal `weekly_pattern`). */
 export const TECH_WEEKLY_DAY_KEYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 export type TechWeeklyDayKey = (typeof TECH_WEEKLY_DAY_KEYS)[number];
 
 export const TECH_WEEKLY_PATTERN_DEFAULT_UNIT = 0.5;
 
-/** Default for missing days in `tech.support_weekly_pattern` (additive teams load). */
+/** Default for missing days in `extra_support_weekdays` (additive teams load). */
 export const SUPPORT_WEEKLY_PATTERN_DEFAULT_UNIT = 0;
 
 export function clamp01(n: number): number {

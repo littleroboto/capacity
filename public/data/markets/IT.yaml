@@ -3,8 +3,6 @@
 
 market: IT
 title: Italy
-risk_heatmap_gamma_tech: 0.35
-risk_heatmap_gamma_business: 0.35
 
 
 
@@ -31,7 +29,8 @@ resources:
       Dec: 2
   testing_capacity: 4
 
-# BAU — baseline weekday workload (labs/staff units per active day).
+# BAU — routine workload + how heavy Market IT / restaurant support is each weekday (0–1).
+# (Not tech_programmes — those are dated change projects.)
 
 bau:
   days_in_use: [mo, tu, we, th, fr, sa, su]
@@ -39,18 +38,15 @@ bau:
     labs_required: 1
     staff_required: 1
     support_days: 0
-
-# Tech engineering rhythm — Mon–Sun support intensity (0–1).
-
-tech:
-  weekly_pattern:
-    Mon: 0.866
-    Tue: 0.747
-    Wed: 0.342
-    Thu: 0.269
-    Fri: 0.452
-    Sat: 0.229
-    Sun: 0.241
+  market_it_weekly_load:
+    weekday_intensity:
+      Mon: 0.866
+      Tue: 0.747
+      Wed: 0.342
+      Thu: 0.269
+      Fri: 0.452
+      Sat: 0.229
+      Sun: 0.241
 
 # Marketing campaigns — timing, impact, prep/live support.
 # Synthetic test fixtures: 28-day prep, ~30-day live, 1 lab + 1 Market IT (tech_staff) each.
@@ -394,27 +390,11 @@ trading:
     peak_month: 8
     amplitude: 0.12
 
-# -----------------------------------------------------------------------------
-# Market risk lens — corporate calendar (illustrative; listed-company style).
-# Month curve: heavier Q3 trading + rising Q4 toward year-end. Overlapping events
-# use max(severity); month lift still adds to holidays, store consequence, etc.
-# -----------------------------------------------------------------------------
+# Market risk lens — dated events / blackouts below; optional deployment_risk_month_curve adds Jan–Dec lift.
 
 deployment_risk_week_weight: 0.23
 
-deployment_risk_month_curve:
-  Jan: 0.03
-  Feb: 0.03
-  Mar: 0.04
-  Apr: 0.05
-  May: 0.06
-  Jun: 0.08
-  Jul: 0.12
-  Aug: 0.14
-  Sep: 0.16
-  Oct: 0.18
-  Nov: 0.24
-  Dec: 0.32
+# deployment_risk_month_curve omitted — engine applies a light Oct–Dec default; add a custom curve in YAML if needed.
 
 deployment_risk_events:
   - id: earnings_q1_fy2026

@@ -22,6 +22,44 @@ export function isoCellTopLeft(wi: number, di: number, stepX: number, stepY: num
   };
 }
 
+/** Extra iso “week” spacing inserted at each new calendar month (first-week indices, chronological). */
+export const SKYLINE_MONTH_ISO_GAP_STEPS = 0.65;
+
+export type SkylineMonthPackOpts = {
+  monthGapSteps: number;
+  /** First week index of each month in chronological order; omit 0 (model start). */
+  monthStartChronWeeks: readonly number[];
+};
+
+function packedChronologicalWi(
+  chronWeekIndex: number,
+  monthGapSteps: number,
+  monthStartChronWeeks: readonly number[]
+): number {
+  let b = 0;
+  for (const s of monthStartChronWeeks) {
+    if (s > 0 && s <= chronWeekIndex) b++;
+  }
+  return chronWeekIndex + monthGapSteps * b;
+}
+
+/**
+ * Maps reversed layout week index (0 = latest chronologically) to iso row index with month gaps.
+ * Contiguous in time except +{@link SkylineMonthPackOpts.monthGapSteps} across month boundaries.
+ */
+export function isoWiForLayoutLi(
+  layoutLi: number,
+  nWeeks: number,
+  monthGapSteps: number,
+  monthStartChronWeeks: readonly number[]
+): number {
+  if (nWeeks < 1) return 0;
+  const cwi = nWeeks - 1 - layoutLi;
+  const packLast = packedChronologicalWi(nWeeks - 1, monthGapSteps, monthStartChronWeeks);
+  const packHere = packedChronologicalWi(cwi, monthGapSteps, monthStartChronWeeks);
+  return packLast - packHere;
+}
+
 export type SkylineBounds = {
   minX: number;
   minY: number;
@@ -32,6 +70,11 @@ export type SkylineBounds = {
   pad: number;
   L: IsoLayoutCore;
   runwayBandH: number;
+  /**
+   * ViewBox Y of the lowest cell ground line (bottom of footprint); month axis should sit just below this,
+   * not at vbH (which includes tall towers + top padding).
+   */
+  groundPlaneMaxYView: number;
 };
 
 const PAD = 14;
@@ -43,16 +86,24 @@ export function computeSkylineBounds(
   weeks: RunwayCalendarCellValue[][],
   cellPx: number,
   gap: number,
-  rowTowerPx: number
+  rowTowerPx: number,
+  monthPack?: SkylineMonthPackOpts | null
 ): SkylineBounds {
   const L = isoLayoutCore(cellPx, rowTowerPx);
   const { stepX, stepY } = isoGridSteps(cellPx, gap);
   const runwayBandH = Math.max(L.dyy * 2.35, 13);
+  const n = weeks.length;
+  const isoWi =
+    monthPack != null
+      ? (layoutLi: number) =>
+          isoWiForLayoutLi(layoutLi, n, monthPack.monthGapSteps, monthPack.monthStartChronWeeks)
+      : (layoutLi: number) => layoutLi;
 
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
+  let maxGroundAbs = -Infinity;
 
   const stubH = Math.max(2.5, L.dyy * 0.55);
   const deckY = L.canvasH - runwayBandH;
@@ -61,7 +112,7 @@ export function computeSkylineBounds(
     const week = weeks[wi]!;
     for (let di = 0; di < week.length; di++) {
       const cell = week[di]!;
-      const { ax, ay } = isoCellTopLeft(wi, di, stepX, stepY);
+      const { ax, ay } = isoCellTopLeft(isoWi(wi), di, stepX, stepY);
       const isPad = cell === null;
       const calH =
         cell === false
@@ -72,11 +123,13 @@ export function computeSkylineBounds(
       const columnTy = deckY - calH - L.dyy * 1.05;
       const topY = ay + columnTy;
       const bottomY = ay + L.canvasH;
+      const groundAbs = ay + L.canvasH;
 
       minX = Math.min(minX, ax, ax + cellPx);
       minY = Math.min(minY, topY, ay);
       maxX = Math.max(maxX, ax + cellPx, ax + 2 * L.dxx);
-      maxY = Math.max(maxY, bottomY, ay + L.canvasH);
+      maxY = Math.max(maxY, bottomY, groundAbs);
+      maxGroundAbs = Math.max(maxGroundAbs, groundAbs);
     }
   }
 
@@ -85,12 +138,20 @@ export function computeSkylineBounds(
     minY = 0;
     maxX = cellPx;
     maxY = L.canvasH;
+    maxGroundAbs = L.canvasH;
   }
+
+  /** Room for month axis under the lattice + iso column “feet” past the slot bottom (see RunwayIsoSkyline). */
+  const SKYLINE_MONTH_AXIS_BAND =
+    Math.max(20, Math.round(cellPx * 0.42)) + Math.round(L.dyy * 0.95);
+  maxY += SKYLINE_MONTH_AXIS_BAND;
 
   minX -= PAD;
   minY -= PAD;
   maxX += PAD;
   maxY += PAD;
+
+  const groundPlaneMaxYView = maxGroundAbs - minY;
 
   return {
     minX,
@@ -102,6 +163,7 @@ export function computeSkylineBounds(
     pad: PAD,
     L,
     runwayBandH,
+    groundPlaneMaxYView,
   };
 }
 
@@ -110,12 +172,13 @@ export function skylineMonthBodyHeightPx(
   weeksLen: number,
   cellPx: number,
   gap: number,
-  rowTowerPx: number
+  rowTowerPx: number,
+  monthPack?: SkylineMonthPackOpts | null
 ): number {
   /** Conservative: assume every slot could be a full-height bar (layout / scroll height). */
   const dummy: RunwayCalendarCellValue[][] = Array.from({ length: weeksLen }, () =>
     Array.from({ length: 7 }, () => '2000-01-01' as RunwayCalendarCellValue)
   );
-  const b = computeSkylineBounds(dummy, cellPx, gap, rowTowerPx);
+  const b = computeSkylineBounds(dummy, cellPx, gap, rowTowerPx, monthPack);
   return b.vbH;
 }

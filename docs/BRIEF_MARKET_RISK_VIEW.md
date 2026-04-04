@@ -35,7 +35,7 @@ Detailed implementation guide derived from the **current codebase** (April 2026)
   - `in_store` → **`inStoreHeatmapMetric`** (`store_pressure / STORE_PRESSURE_MAX`, clamped 0–1)
   - `default` → currently falls through to **technology** (covers `code` when mis-routed; **Code** mode hides the heatmap in **`App.tsx`**).
 - **`runwayHeatmapCellFillAndDim`** uses **`heatmapColorForViewMode`**; **`techProjectWorkUsesDimmedCellStyle`** only applies when **`viewMode === 'combined'`** and project scope + zero metric—**no change** needed for Risk unless you add similar UX.
-- **`RunwayGrid.tsx`** builds **`heatmapOpts`** with **`riskHeatmapCurve`**, **`riskHeatmapGamma`**, render style, mono colour (`~1494–1501`). **Note:** Store has **`riskHeatmapGammaTech`** / **`riskHeatmapGammaBusiness`** (`useAtcStore`, `heatmapVisualFromConfigs.ts`, YAML `risk_heatmap_gamma_*`), but **this grid currently passes a single `riskHeatmapGamma`** for all lenses. For Risk, either **reuse** global gamma or **add `riskHeatmapGammaRisk`** and branch `heatmapOpts` by `viewMode` (mirror pattern you want for Tech vs Business long-term).
+- **`RunwayGrid.tsx`** builds **`heatmapOpts`** with **`riskHeatmapCurve`**, **`riskHeatmapGamma`**, render style, mono colour (`~1494–1501`). **Note:** Store has **`riskHeatmapGammaTech`** / **`riskHeatmapGammaBusiness`** (`useAtcStore`, persisted locally); heatmap γ/curve are **not** read from market YAML. **This grid currently passes a single `riskHeatmapGamma`** for all lenses. For Risk, either **reuse** global gamma or **add `riskHeatmapGammaRisk`** and branch `heatmapOpts` by `viewMode` (mirror pattern you want for Tech vs Business long-term).
 
 ### 2.3 Pipeline → `RiskRow`
 

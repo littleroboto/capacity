@@ -73,29 +73,33 @@ export type SeasonalTradingConfig = {
 
 /**
  * Tech-side weekly shape (menu pipeline, weekend catch-up, Fri-before-Sat prep).
- * `weekly_pattern` values are **0–1** (after YAML parse); legacy named levels are normalised in the parser.
- * Scaled into lab/team readiness load with `labs_scale` / `teams_scale` / `backend_scale`.
+ * Parsed from YAML under `bau.market_it_weekly_load` (or legacy `tech:`). **Canonical YAML keys:**
+ * `weekday_intensity`, `labs_multiplier` / `teams_multiplier` / `backend_multiplier`,
+ * `extra_support_weekdays`, `extra_support_months`, `extra_support_teams_scale`.
+ * Legacy aliases (`weekly_pattern`, `labs_scale`, `support_weekly_pattern`, …) still parse.
+ * Values are **0–1** where applicable; named levels normalise in the parser.
  *
- * `support_*` adds **Market IT–only** baseline readiness load (e.g. hypercare / BAU support rhythm).
- * Weekly shape × monthly multiplier (omitted months = 1), same numeric rules as `trading.monthly_pattern`.
+ * `support_*` fields add **Market IT–only** baseline readiness (weekly × monthly; omitted months = 1).
  */
 export type TechRhythmConfig = {
   weekly_pattern?: Record<string, number>;
   labs_scale?: number;
   teams_scale?: number;
   backend_scale?: number;
-  /** Expanded `tech.support_weekly_pattern` (0–1 per weekday). */
+  /** Expanded extra-support weekdays (YAML `extra_support_weekdays` or legacy `support_weekly_pattern`). */
   support_weekly_pattern?: Record<string, number>;
   /**
-   * Optional `tech.support_monthly_pattern` (Jan–Dec, 0–1). Multiplies that day’s support weekly level;
-   * omitted months behave as 1 in the UI patcher.
+   * Optional Jan–Dec 0–1 multipliers (YAML `extra_support_months` or legacy `support_monthly_pattern`).
    */
   support_monthly_pattern?: Record<string, number>;
-  /** Scales support teams load; default 1. */
+  /** YAML `extra_support_teams_scale` or legacy `support_teams_scale`; default 1. */
   support_teams_scale?: number;
 };
 
-/** Optional trading UX knobs (parsed from `trading.*` in YAML). */
+/**
+ * Optional knobs under `trading:` in YAML — together with `weekly_pattern`, `monthly_pattern`, and `seasonal`,
+ * they define **per-market default restaurant / in-store busyness** (before campaigns and overlays).
+ */
 export type TradingPressureKnobs = {
   /**
    * Per-market temperament: how hard campaigns hit **Business lens / risk blend** channels.
@@ -174,13 +178,13 @@ export type MarketConfig = {
   stressCorrelations?: StressCorrelations;
   operatingWindows?: OperatingWindow[];
   techRhythm?: TechRhythmConfig;
-  /** Legacy single γ; used when tech/business-specific gammas omitted. */
+  /** Legacy optional YAML γ (ignored by the app UI; heatmap γ/curve come from browser storage). */
   riskHeatmapGamma?: number;
-  /** Technology lens heatmap γ (YAML `risk_heatmap_gamma_tech`). */
+  /** Legacy optional YAML γ for tech lens (ignored by the app UI). */
   riskHeatmapGammaTech?: number;
-  /** Business lens heatmap γ (YAML `risk_heatmap_gamma_business`). */
+  /** Legacy optional YAML γ for business lens (ignored by the app UI). */
   riskHeatmapGammaBusiness?: number;
-  /** Heatmap transfer curve for combined view (`risk_heatmap_curve` in YAML). */
+  /** Legacy optional YAML transfer curve id (ignored by the app UI). */
   riskHeatmapCurve?: RiskHeatmapCurveId;
   /** Optional deployment-risk calendar events (`deployment_risk_events` in YAML). */
   deployment_risk_events?: DeploymentRiskEvent[];
@@ -232,7 +236,8 @@ export type CampaignConfig = {
   durationDays: number;
   /**
    * Multiplier on this campaign’s **business / store** signal (`campaign_risk`, prep/live store boosts).
-   * e.g. flagship programme **1**, light promo **0.5**. Default **1** when omitted.
+   * Use it to separate flagship store programmes (e.g. collectibles **1**–**1.3**) from smaller promos (e.g. drinks **0.5**–**0.8**).
+   * Default **1** when omitted. YAML aliases: `business_uplift`, `trading_emphasis`, `store_trading_weight`.
    */
   businessUplift?: number;
   /**
@@ -256,7 +261,7 @@ export type CampaignConfig = {
   /**
    * When **true**, on **prep** and **live** days where this campaign contributes **labs / teams / backend** (after the
    * same resolution as phase expansion — staggered prep slices, scaled live sustain load), recurring
-   * **`tech.weekly_pattern`** is omitted and **BAU** loads have those three buckets zeroed (ops/commercial unchanged)
+   * **`weekday_intensity`** rhythm is omitted and **BAU** loads have those three buckets zeroed (ops/commercial unchanged)
    * so campaign delivery **replaces** the weekly tech/BAU pipe instead of stacking. Default **false** (additive).
    */
   replacesBauTech?: boolean;

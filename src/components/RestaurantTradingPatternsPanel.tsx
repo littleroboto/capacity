@@ -18,11 +18,18 @@ import type { TradingMonthlyPatternPatch } from '@/lib/dslTradingMonthlyPatch';
 import type { TradingWeeklyPatternPatch } from '@/lib/dslTradingWeeklyPatch';
 import { WeightingLineMiniChart } from '@/components/WeightingLineMiniChart';
 import { PatternUnitField } from '@/components/PatternUnitField';
+import { HeatmapBusinessPressureOffsetControls } from '@/components/HeatmapBusinessPressureOffsetControls';
+import { HeatmapTransferControls } from '@/components/HeatmapTransferControls';
+import { MarketRiskMacroControls } from '@/components/MarketRiskMacroControls';
+import { MarketRiskScalesControls } from '@/components/MarketRiskScalesControls';
 import {
+  effectivePaydayKnotTuple,
+  isPaydayKnotTuple,
   PAYDAY_KNOT_SAMPLE_DATES,
   PAYDAY_MONTH_MULTIPLIER_MAX,
   storePaydayMonthMultiplierFromKnots,
 } from '@/engine/paydayMonthShape';
+import { ChevronRight } from 'lucide-react';
 
 function snapPaydayKnotMultiplier(n: number): number {
   return Math.min(
@@ -46,7 +53,7 @@ export function RestaurantTradingPatternsPanel() {
   const setTradingWeeklyPattern = useAtcStore((s) => s.setTradingWeeklyPattern);
   const setTradingMonthlyPattern = useAtcStore((s) => s.setTradingMonthlyPattern);
   const riskTuning = useAtcStore((s) => s.riskTuning);
-  const setRiskTuning = useAtcStore((s) => s.setRiskTuning);
+  const setTradingPaydayKnotMultipliers = useAtcStore((s) => s.setTradingPaydayKnotMultipliers);
   const viewMode = useAtcStore((s) => s.viewMode);
   const setDeploymentRiskContextMonthCurve = useAtcStore((s) => s.setDeploymentRiskContextMonthCurve);
 
@@ -76,7 +83,28 @@ export function RestaurantTradingPatternsPanel() {
     [monthlyPattern]
   );
 
-  const paydayKnotsUi = riskTuning.storePaydayMonthKnotMultipliers;
+  const focusConfig = useMemo(
+    () => configs.find((x) => x.market === focusMarket),
+    [configs, focusMarket]
+  );
+
+  const paydayKnotsUi = useMemo(
+    () =>
+      effectivePaydayKnotTuple(focusConfig?.tradingPressure, riskTuning.storePaydayMonthKnotMultipliers),
+    [focusConfig?.tradingPressure, riskTuning.storePaydayMonthKnotMultipliers]
+  );
+
+  const paydayYamlKind = useMemo(() => {
+    const tp = focusConfig?.tradingPressure;
+    if (tp?.payday_month_knot_multipliers && isPaydayKnotTuple(tp.payday_month_knot_multipliers)) {
+      return 'knots' as const;
+    }
+    if (tp?.payday_month_peak_multiplier != null && Number.isFinite(tp.payday_month_peak_multiplier)) {
+      return 'peak' as const;
+    }
+    return null;
+  }, [focusConfig?.tradingPressure]);
+
   const earlyMonthSparkline01 = useMemo(
     () =>
       PAYDAY_KNOT_SAMPLE_DATES.map((d) => {
@@ -105,13 +133,16 @@ export function RestaurantTradingPatternsPanel() {
 
   const patchEarlyMonthKnot = useCallback(
     (sampleIndex: 0 | 1 | 2 | 3, n: number) => {
-      const knots = useAtcStore.getState().riskTuning.storePaydayMonthKnotMultipliers;
+      const st = useAtcStore.getState();
+      const market = gammaFocusMarket(st.country, st.configs, st.runwayMarketOrder);
+      const c = st.configs.find((x) => x.market === market);
+      const base = effectivePaydayKnotTuple(c?.tradingPressure, st.riskTuning.storePaydayMonthKnotMultipliers);
       const m = snapPaydayKnotMultiplier(1 + roundEarlyMonthExcess(n));
-      const next = [...knots] as [number, number, number, number];
+      const next = [...base] as [number, number, number, number];
       next[sampleIndex] = m;
-      setRiskTuning({ storePaydayMonthKnotMultipliers: next });
+      setTradingPaydayKnotMultipliers(next);
     },
-    [setRiskTuning]
+    [setTradingPaydayKnotMultipliers]
   );
 
   const deploymentContextMonthPattern = useMemo(() => {
@@ -136,11 +167,10 @@ export function RestaurantTradingPatternsPanel() {
           Store week (Mon–Sun)
         </span>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          <strong className="font-medium text-foreground/80">Restaurant / in-store</strong> — seven values{' '}
-          <strong className="font-medium text-foreground/80">0–1</strong> for{' '}
-          <span className="font-mono text-foreground/80">trading.weekly_pattern</span>. Multiplied by monthly weights
-          below, then seasonal. Not the same as{' '}
-          <span className="font-mono text-foreground/80">tech.weekly_pattern</span> (Technology lens).
+          <strong className="font-medium text-foreground/80">Restaurant / in-store</strong> — per-market default
+          busyness: seven <strong className="font-medium text-foreground/80">0–1</strong> values in{' '}
+          <span className="font-mono text-foreground/80">trading.weekly_pattern</span>, multiplied by monthly weights
+          and seasonal. Not <span className="font-mono text-foreground/80">weekday_intensity</span> (Technology lens).
         </p>
         {isRunwayAllMarkets(country) ? (
           <p className="text-[10px] leading-snug text-muted-foreground">
@@ -182,10 +212,10 @@ export function RestaurantTradingPatternsPanel() {
           Monthly Business Weightings
         </span>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Twelve values <strong className="font-medium text-foreground/80">0–1</strong> (Jan–Dec). Each multiplies
-          that month’s in-store pressure from <span className="font-mono text-foreground/80">trading.weekly_pattern</span>{' '}
-          before <span className="font-mono text-foreground/80">trading.seasonal</span>. Default{' '}
-          <span className="font-mono text-foreground/80">1</span> = no change vs weekly level.
+          Per-market <span className="font-mono text-foreground/80">trading.monthly_pattern</span>: twelve{' '}
+          <strong className="font-medium text-foreground/80">0–1</strong> weights (Jan–Dec) on top of the store week,
+          then <span className="font-mono text-foreground/80">trading.seasonal</span>. Omitted months behave as{' '}
+          <span className="font-mono text-foreground/80">1</span>.
         </p>
       </div>
 
@@ -223,16 +253,26 @@ export function RestaurantTradingPatternsPanel() {
           Early-month store boost
         </span>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Models <strong className="font-medium text-foreground/80">busier restaurants early in the month</strong> when
-          customers typically have more to spend—extra multiplier on the YAML store rhythm in{' '}
-          <strong className="font-medium text-foreground/80">week 1</strong>, fading to{' '}
-          <span className="font-mono text-foreground/80">1×</span> by{' '}
-          <strong className="font-medium text-foreground/80">week 3</strong> (day 21). Uses tuning + optional YAML{' '}
-          <span className="font-mono text-foreground/80">trading.payday_month_peak_multiplier</span> or{' '}
-          <span className="font-mono text-foreground/80">payday_month_knot_multipliers</span>. Shown on the{' '}
-          <strong className="font-medium text-foreground/80">Restaurant Activity</strong> heatmap only—does{' '}
-          <strong className="font-medium text-foreground/80">not</strong> change lab, Market IT, or backend load.
+          Per-market early-month multiplier on the store rhythm above (week 1 hot, fade to{' '}
+          <span className="font-mono text-foreground/80">1×</span> by day 21).{' '}
+          <strong className="font-medium text-foreground/80">YAML</strong> can set{' '}
+          <span className="font-mono text-foreground/80">payday_month_peak_multiplier</span> or four-knot{' '}
+          <span className="font-mono text-foreground/80">payday_month_knot_multipliers</span>; edits here write knots for{' '}
+          <span className="font-mono text-foreground/80">{focusMarket}</span> and drop the peak line. If this market has
+          neither, the <strong className="font-medium text-foreground/80">global scenario</strong> knot tuple in Settings
+          / tuning is used until you change a value.
         </p>
+        {paydayYamlKind === null ? (
+          <p className="text-[10px] font-medium text-amber-700/90 dark:text-amber-400/90">
+            No payday fields in YAML for {focusMarket} — showing scenario default (change a knot to save to this
+            market).
+          </p>
+        ) : paydayYamlKind === 'peak' ? (
+          <p className="text-[10px] text-muted-foreground">
+            From YAML <span className="font-mono text-foreground/80">payday_month_peak_multiplier</span> — editing
+            converts to explicit knots.
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-md border border-border/60 bg-muted/25 px-2 py-2 shadow-inner">
@@ -276,7 +316,39 @@ export function RestaurantTradingPatternsPanel() {
       </div>
 
       {viewMode === 'market_risk' ? (
+        <MarketRiskMacroControls className="border-t border-border/40 pt-2" />
+      ) : null}
+
+      {viewMode === 'market_risk' ? (
+        <HeatmapTransferControls
+          idPrefix="patterns"
+          variant="market_risk"
+          className="border-t border-border/40 pt-2"
+        />
+      ) : null}
+
+      {viewMode === 'market_risk' ? (
+        <HeatmapBusinessPressureOffsetControls idPrefix="patterns" className="border-t border-border/40 pt-2" />
+      ) : null}
+
+      {viewMode === 'market_risk' ? (
         <>
+          <details className="group border-t border-border/40 pt-2">
+            <summary className="cursor-pointer select-none list-none text-xs font-semibold text-foreground outline-none [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex items-center gap-1">
+                <ChevronRight
+                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-90"
+                  aria-hidden
+                />
+                Expert — per-component scales
+              </span>
+              <span className="mt-0.5 block text-[10px] font-normal text-muted-foreground">
+                0–4× on each deployment-risk term. Most users only need Market risk shape above.
+              </span>
+            </summary>
+            <MarketRiskScalesControls className="mt-3" compact />
+          </details>
+
           <div className="flex flex-col gap-0.5 border-t border-border/40 pt-2">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Deployment context (month)

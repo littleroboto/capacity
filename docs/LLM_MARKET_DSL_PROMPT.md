@@ -95,14 +95,14 @@ Users often send **brief, imperative** instructions (“add…”, “bump…”
 | Engineering / platform / labs+staff load **without** trading or uplift | **`tech_programmes:`** — `programme_support` / `live_programme_support`; **no** `impact` / `business_uplift` |
 | Phased **deploy** grid (`deploy_date`, `systems`, `phases`, per-phase `load`) | **`releases:`** — not the same as `tech_programmes` |
 | Busier weekends, weekday vs weekend, seasonal peak, payday, monthly pattern | **`trading:`** |
-| BAU days-in-use, weekly lab/staff cycle, integration test spike | **`bau:`** |
-| Baseline tech intensity by day of week (no dated programme) | **`tech:`** (`weekly_pattern`, optional scales; optional **`support_weekly_pattern`** / **`support_monthly_pattern`** for Market IT–only rhythm) |
+| BAU days-in-use, weekly lab/staff cycle, integration test spike, **routine Market IT curve** Mon–Sun | **`bau:`** — put **`weekday_intensity`** (and optional support multipliers) under **`market_it_weekly_load`** (not `tech_programmes`) |
+| Baseline tech intensity by day of week (no dated programme) | Prefer **`bau.market_it_weekly_load`** with keys **`weekday_intensity`**, **`extra_support_*`**, **`labs_multiplier`**, etc. (aliases: `market_it_support`, `bau_technology_support`, `restaurant_it_rhythm`). Legacy **`weekly_pattern`** / top-level **`tech:`** still parse; `tech:` overrides nested keys when both exist. |
 | Lab / staff / testing slot caps | **`resources:`** |
 | Named date band with load or pressure multipliers | **`operating_windows:`** |
 | Bank / school holidays, explicit `dates:`, multipliers | **`public_holidays:`** / **`school_holidays:`** — **only if the user asked** (do not “fix” calendars opportunistically) |
-| Heatmap curve / γ tuning | Top-level **`risk_heatmap_*`** keys (see schema section) |
+| Heatmap curve / γ | **In-app** Settings / Business Patterns — **not** YAML (omit any `risk_heatmap_*` keys) |
 
-If two blocks could apply, prefer **dated programme work** → `campaigns` vs `tech_programmes` using §F; prefer **rhythm / caps** → `trading` / `tech` / `resources` / `bau`.
+If two blocks could apply, prefer **dated programme work** → `campaigns` vs `tech_programmes` using §F; prefer **rhythm / caps** → `trading` / **`bau.market_it_weekly_load`** (or legacy `tech`) / `resources` / rest of `bau`.
 
 #### Syntax and robustness (avoid parse failures)
 
@@ -132,17 +132,16 @@ If two blocks could apply, prefer **dated programme work** → `campaigns` vs `t
 | `market` | Market id (required for real files). |
 | `title`, `description` | Optional display strings. |
 | `resources` | `labs.capacity`, `staff.capacity`; optional `testing_capacity`; legacy `teams` map with `size` summed into team cap. |
-| `bau` | `days_in_use` + `weekly_cycle` + optional `integration_tests`; legacy `weekly_promo` / `weekly_promo_cycle`. |
+| `bau` | `days_in_use` + `weekly_cycle` + optional `integration_tests` + optional **`market_it_weekly_load`** (`weekday_intensity`, `extra_support_*`, `labs_multiplier`, …; legacy `weekly_pattern` / `support_*` still parse); legacy `weekly_promo` / `weekly_promo_cycle`. |
 | `campaigns` | List or map of programmes (prep + live semantics below). |
-| **`tech_programmes`** | **Top-level list** for **non-marketing tech work** (users may say *technology project*, *tech workstream*, *tech initiative*, *platform rollout*, etc. — same YAML). Same **timing** shape as campaigns; **no** `impact` / `business_uplift` / store-trading boost. **Not** `releases`; **not** under `tech:`. |
+| **`tech_programmes`** | **Top-level list** for **non-marketing tech work** (users may say *technology project*, *tech workstream*, *tech initiative*, *platform rollout*, etc. — same YAML). Same **timing** shape as campaigns; **no** `impact` / `business_uplift` / store-trading boost. **Not** `releases`; **not** under `tech:` or `market_it_weekly_load`. |
 | `public_holidays`, `school_holidays` | `auto`, `dates`, `staffing_multiplier`, optional `trading_multiplier`; school may add `load_effects`. |
 | `holidays` | Cross-cutting: `capacity_taper_days`, `lab_capacity_scale`; `auto_public` / `auto_school` can be implied from the `*_holidays` blocks. |
 | `stress_correlations` | Legacy; `school_holidays.*` multipliers merged with `school_holidays.load_effects`. |
 | `trading` | `weekly_pattern`, optional `monthly_pattern`, `seasonal`, `payday_month_peak_multiplier`, campaign store knobs. |
-| `tech` | `weekly_pattern`, optional `labs_scale`, `teams_scale`, `backend_scale`; optional **`support_weekly_pattern`**, **`support_monthly_pattern`** (Jan–Dec multipliers, omitted months = 1), **`support_teams_scale`**. |
+| `tech` | **Legacy** top-level: same fields as **`bau.market_it_weekly_load`** (canonical key names on `bau`; old names still accepted here). Prefer nesting under **`bau`** for new YAML. |
 | `operating_windows` | Named date ranges with optional load/capacity multipliers and ramps. |
 | `releases` | Optional phased deploy loads. |
-| `risk_heatmap_gamma`, `risk_heatmap_gamma_tech`, `risk_heatmap_gamma_business`, `risk_heatmap_curve` | Optional heatmap display tuning. |
 
 ---
 
@@ -180,6 +179,23 @@ bau:
 
 Aliases: `daysInUse`, `weeklyCycle`, `labsRequired`, `staffRequired`, `supportDays`.
 
+**Routine Market IT curve (preferred — reads well aloud in demos):**
+
+```yaml
+bau:
+  days_in_use: [mo, tu, we, th, fr]
+  weekly_cycle:
+    labs_required: 1
+    staff_required: 1
+  market_it_weekly_load:
+    weekday_intensity:
+      Mon: 0.85
+      Tue: 0.75
+      # … Sun
+```
+
+Canonical inner keys: **`weekday_intensity`**, **`labs_multiplier`**, **`teams_multiplier`**, **`backend_multiplier`**, **`extra_support_weekdays`**, **`extra_support_months`**, **`extra_support_teams_scale`**, **`monthly_runway_availability`**. Legacy: `weekly_pattern`, `labs_scale`, `support_*`, `available_capacity_pattern`. Block aliases: `market_it_support`, `bau_technology_support`, `restaurant_it_rhythm`.
+
 **Legacy (still parsed):** `weekly_promo_cycle` / `weekly_promo` with `day`, `labs`, `support_days`.
 
 ---
@@ -207,7 +223,7 @@ Each campaign is a **go-live** (`start_date`), **live window** (`duration` days,
 | `live_tech_load_scale` | Multiplier on **labs/teams/backend only** in live (default ~0.55; set `1` to disable dampening). |
 | `readiness_duration` | **Interval model:** first N days of `[start, start+duration)` use prep `load`; remainder use live load. Omit if using `testing_prep_duration` lead model. |
 | `presence_only` | `true` — calendar/risk only; **no** phase loads (avoid double-count with `operating_windows`). |
-| **`replaces_bau_tech`** | `true` — on prep **and** live days where this campaign contributes **labs/teams/backend**, **`tech.weekly_pattern`** and **`tech.support_weekly_pattern`** rows are skipped and BAU tech buckets zeroed (same resolution as engine). Aliases: `replacesBauTech`, `replace_bau_tech`. |
+| **`replaces_bau_tech`** | `true` — on prep **and** live days where this campaign contributes **labs/teams/backend**, routine Market IT rhythm rows (**`weekday_intensity`** / **`extra_support_weekdays`**) are skipped and BAU tech buckets zeroed. Aliases: `replacesBauTech`, `replace_bau_tech`. |
 | `stagger_functional_loads` | With lead model: split prep by function (tech / commercial / ops windows). |
 | `tech_prep_days_before_live`, `tech_finish_before_live_days`, `marketing_prep_days_before_live`, `supply_prep_days_before_live` | Tune stagger windows (non-negative integers). |
 
@@ -252,7 +268,7 @@ Use this **top-level** key for lab+tech work that should **not** drive restauran
 
 **Natural language:** Whatever the user calls it — *technology project*, *tech workstream*, *tech initiative*, *engineering programme*, *platform work*, *infra change*, *non-BAU tech*, *systems rollout* (in the sense of sustained team load, not the **`releases:`** deploy schema) — map it here as **`tech_programmes:`** list entries with `programme_support` / `live_programme_support` as needed.
 
-**Do not** put these under `tech:` (`tech:` is for **undated** weekly rhythm: main `weekly_pattern` + scales, and optional **support** patterns — not dated programmes). **Do not** use `releases:` unless you mean phased **deploy_date** loads (`systems`, `phases`, `load` map) — a different schema.
+**Do not** put these under `tech:` (`tech:` / **`bau.market_it_weekly_load`** is for **undated** rhythm: **`weekday_intensity`**, multipliers, optional **`extra_support_*`** — not dated programmes). **Do not** use `releases:` unless you mean phased **deploy_date** loads (`systems`, `phases`, `load` map) — a different schema.
 
 ### Timing (same keys as campaigns)
 
@@ -369,30 +385,36 @@ trading:
 
 ---
 
-## `tech`
+## `tech` / `bau.market_it_weekly_load`
 
-**Main rhythm** — labs / teams / backend from one **0–1** weekly shape (same expansion as `trading.weekly_pattern`: `default`, `weekdays`, `weekend`, `Mon`…`Sun`, named levels or numbers).
+**Main rhythm** — **`weekday_intensity`**: one **0–1** weekly shape (same expansion as `trading.weekly_pattern`). Legacy YAML key: `weekly_pattern`.
 
-**Support patterns (optional)** — **Market IT–only** additive readiness: `support_weekly_pattern` × `support_monthly_pattern` for that calendar month × optional `support_teams_scale` (default **1**). Monthly keys **Jan**…**Dec**, each **0–1**; **omitted months = 1** (neutral). See `docs/DSL_CAMPAIGNS_AND_TRADING.md` § Tech rhythm.
+**Support (optional)** — **`extra_support_weekdays`** × **`extra_support_months`** × optional **`extra_support_teams_scale`** (default **1**). Legacy: `support_weekly_pattern`, `support_monthly_pattern`, `support_teams_scale`.
+
+**Prefer under `bau`:**
 
 ```yaml
-tech:
-  weekly_pattern:
-    weekdays: medium
-    Sat: high
-  labs_scale: 2
-  teams_scale: 1
-  backend_scale: 0
-  support_weekly_pattern:        # optional; Market IT–only baseline (e.g. Fri hypercare bump)
-    default: 0
-    Fri: 0.35
-  support_monthly_pattern:       # optional; multiplies that day’s support weekly level
-    Jan: 1
-    Dec: 0.85
-  support_teams_scale: 1         # optional; default 1
+bau:
+  # … days_in_use, weekly_cycle …
+  market_it_weekly_load:
+    weekday_intensity:
+      weekdays: medium
+      Sat: high
+    labs_multiplier: 2
+    teams_multiplier: 1
+    backend_multiplier: 0
+    extra_support_weekdays:
+      default: 0
+      Fri: 0.35
+    extra_support_months:
+      Jan: 1
+      Dec: 0.85
+    extra_support_teams_scale: 1
 ```
 
-Aliases: `supportWeeklyPattern`, `supportMonthlyPattern`, `supportTeamsScale`.
+**Legacy top-level `tech:`** — same semantics; old key names still parse.
+
+Aliases: camelCase for all keys; legacy `supportWeeklyPattern`, etc.
 
 ---
 
@@ -440,16 +462,9 @@ Aliases: `deployDate`, `offsetDays`. Phase **`load`** keys are numeric; omitted 
 
 ---
 
-## Optional top-level heatmap keys
+## Heatmap (do not put in YAML)
 
-```yaml
-risk_heatmap_gamma: 1.1             # legacy single γ; splits to tech/business if those omitted
-risk_heatmap_gamma_tech: 2.5
-risk_heatmap_gamma_business: 2.5
-risk_heatmap_curve: power           # power | linear | smoothstep | sigmoid | log | ease_in_quad | ease_out_quad | piecewise_knee
-```
-
-Aliases: `riskHeatmapGammaTech`, `riskHeatmapGammaBusiness`.
+Curve, γ, and related heatmap controls live **only in the app UI** (persisted per browser). **Do not** emit `risk_heatmap_gamma`, `risk_heatmap_gamma_tech`, `risk_heatmap_gamma_business`, `risk_heatmap_curve`, or camelCase variants in market YAML.
 
 ---
 
@@ -462,8 +477,8 @@ Aliases: `riskHeatmapGammaTech`, `riskHeatmapGammaBusiness`.
 | Campaign prep `commercial` | From **`impact`** mapping or **0.5** |
 | Live segment with empty live support | Prep load × **`live_support_scale`** (~**0.45**) |
 | `live_tech_load_scale` | ~**0.55** on labs/teams/backend in live |
-| `tech.labs_scale` / `teams_scale` / `backend_scale` | **2** / **1** / **0** |
-| `tech.support_*` | No support load until **`support_weekly_pattern`** is set; **`support_monthly_pattern`** omitted months → **1**; **`support_teams_scale`** default **1** |
+| `labs_multiplier` / `teams_multiplier` / `backend_multiplier` (legacy `labs_scale` / …) | **2** / **1** / **0** defaults |
+| `extra_support_*` | No support load until **`extra_support_weekdays`** is set; omitted months → **1**; **`extra_support_teams_scale`** default **1** |
 
 ---
 

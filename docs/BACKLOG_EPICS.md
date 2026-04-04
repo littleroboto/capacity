@@ -60,6 +60,8 @@ Structured for prioritization and for breaking into **engineering plans** (human
 
 **Tags:** `auth`, `foundation`, `multi-tenant`
 
+**Handoff (implementation):** [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md)
+
 ---
 
 ## Epic: Real-time collaborative editing (Yjs + PartyKit)
@@ -201,6 +203,133 @@ Structured for prioritization and for breaking into **engineering plans** (human
 
 ---
 
+## Epic: Runway lens naming & surface consistency
+
+**Goal:** **Control labels, runway headings, and tooltips** use the same vocabulary so execs and planners aren’t reconciling “Technology Teams” vs “tech headroom” or “Market risk” vs “deployment / calendar risk.”
+
+**Scope (indicative):**
+
+- Align `VIEW_MODES` labels with `runwayHeatmapTitle` and glossary copy (`src/lib/constants.ts`, `runwayDayDetailsGlossary`, README / PRODUCT_BASELINE).
+- Short lens names + one-line subtitles where radio space is tight (e.g. Technology capacity / headroom; Deployment & calendar risk).
+- Sweep header, legend, and day-detail strings for the old names; keep legacy `normalizeViewModeId` mappings for persisted keys.
+
+**Dependencies:** None.
+
+**Outcomes:** One clear name per lens everywhere in the UI; docs match shipped strings.
+
+**Tags:** `ux`, `copy`, `runway`
+
+**Epic id:** `epic-runway-lens-naming`
+
+---
+
+## Epic: Heatmap — continuous spectrum (interpolated ramp)
+
+**Goal:** **Differentiate heavy-load days** beyond ten solid bands by interpolating colour along the existing anchor palette (same ten stops, smooth RGB lerp between neighbours).
+
+**Scope (indicative):**
+
+- Use `heatmapColorContinuous` (already in `riskHeatmapColors.ts`) for spectrum cell fills instead of/in addition to `heatmapColorDiscrete`; optional **Settings** toggle: banded vs smooth (default TBD).
+- Update **legend** (`HeatmapLegend`, swatch helpers): gradient strip or ticked ramp so it matches cells; adjust `heatmapLegendSwatchAtBand` / call sites if legend stays discrete for reference only.
+- Keep **mono** mode behaviour; ensure tooltips / export still describe “temperature” scale honestly.
+- Optional later: perceptual lerp (OKLab) if RGB mid-tones feel muddy.
+
+**Dependencies:** None.
+
+**Outcomes:** Finer visual distinction in the red/orange head of the scale; legend truthful to mapping.
+
+**Tags:** `heatmap`, `visual`, `runway`
+
+**Epic id:** `epic-heatmap-continuous-spectrum`
+
+---
+
+## Epic: Day summary & cell detail — information architecture
+
+**Goal:** Clicking a cell yields a **scannable** story: what the **tile colour means** for the active lens first; long KPI / blend copy is **secondary**, not one wall of text.
+
+**Scope (indicative):**
+
+- **Lead block:** one sentence + headline metric (`fillMetricHeadline`, `fillMetricValue`, risk band) per lens; progressive disclosure (“How this is calculated” collapsed or tab).
+- **Shorten repetitive strings** in `runwayTooltipBreakdown.ts` (e.g. `pressureSurfaceLines`, `techReadinessSustainExplanation`) — one shared footnote for “tighter lane; backend excluded” instead of repeating per bullet.
+- **Surface breakdown:** small table or compact rows (`Surface | scheduled | free`) vs four near-duplicate sentences.
+- **Separate** “this heatmap’s paint” from **planning blend / combined risk** so users aren’t confused in one scroll (`RunwayDayDetailsBody`, `RunwayCellTooltip` / side panel).
+- Popover = minimal; side panel = optional depth (existing `presentation` split).
+
+**Dependencies:** None; aligns with lens naming epic for terminology.
+
+**Outcomes:** Faster comprehension; less copy fatigue; easier onboarding.
+
+**Tags:** `ux`, `tooltips`, `runway`, `copy`
+
+**Epic id:** `epic-day-summary-ia`
+
+---
+
+## Epic: Isometric runway (3D) — visual polish & label stability
+
+**Goal:** **Iso skyline / city block** feels as intentional in **light mode** as in dark mode; **month / quarter / year** labels don’t subtly drift with responsive SVG scaling.
+
+**Scope (indicative):**
+
+- **Theme-aware empty / pad styling:** replace fixed `EMPTY_*` RGB in `RunwayIsoHeatCell` with tokens or CSS variables so light backgrounds don’t look like dark-mode leftovers; tune pad cells and strokes for contrast.
+- **Label drift:** review `RunwayIsoSkyline` (`preserveAspectRatio`, expanded viewBox, `moMatrix` text); consider **HTML overlay** axis for month/quarter/year or pixel-snapping / separate SVG band.
+- **Compare-all** path: same treatment in `RunwayIsoCityBlock`.
+- Optional: subtle column outline in light mode for separation.
+
+**Dependencies:** None.
+
+**Outcomes:** Cohesive light/dark iso views; readable chronology axis at common breakpoints.
+
+**Tags:** `visual`, `runway`, `3d`, `a11y-contrast`
+
+**Epic id:** `epic-iso-runway-polish`
+
+---
+
+## Epic: View settings vs scenario data — clarity & presets
+
+**Goal:** Users understand **what travels with the team** (YAML / Blob workspace) vs **what is personal** (browser persistence in `useAtcStore`), and can share **heatmap / filter preferences** without forking markets.
+
+**Scope (indicative):**
+
+- **In-app copy:** short explainer near Workspace / Controls (market YAML vs “my view settings on this device”).
+- **Export / import JSON** for UI-only state: curves, γ, tail power, filters, 3D toggle, heatmap style — separate from YAML export (optional names e.g. “CFO view”).
+- **Later:** optional team-default `ui_state` in Blob or YAML sidecar — only if product wants shared defaults without polluting canonical DSL.
+- Document in PRODUCT_BASELINE / README when shipped.
+
+**Dependencies:** None; complements **Shared workspace hardening** and **User & org** for server-side presets later.
+
+**Outcomes:** Less “why does my heatmap look different?” confusion; shareable view presets.
+
+**Tags:** `ux`, `settings`, `workspace`, `dx`
+
+**Epic id:** `epic-view-settings-presets`
+
+---
+
+## Epic: Enterprise readiness — quality, access, and trust (cross-cutting)
+
+**Goal:** Raise the bar toward **enterprise-standard** delivery without replacing epics above: accessibility, observability, procurement-facing basics, and identity extensions.
+
+**Scope (indicative):**
+
+- **Accessibility:** tabular or textual **alternate** for heatmap summaries; keyboard path for cell selection already partial — extend where gaps remain.
+- **Observability:** client error reporting / RUM for heavy runway views; serverless route health for `api/*`.
+- **Identity extensions (after `epic-auth-org`):** SSO / SAML where provider supports it; SCIM stretch.
+- **Trust:** export bundle includes **engine / schema version** narrative for reproducibility; security FAQ pointers (Blob read path until auth, etc.).
+- **Data lifecycle hooks:** retention / delete story documented for when Postgres + orgs exist (may overlap **Version control**).
+
+**Dependencies:** **User & org** for SSO and tenant delete; some items can start earlier (a11y, client errors).
+
+**Outcomes:** Clearer compliance story; fewer silent failures in production.
+
+**Tags:** `enterprise`, `a11y`, `observability`, `security`
+
+**Epic id:** `epic-enterprise-readiness`
+
+---
+
 ## Roadmap: suggested implementation phase order
 
 Use this as a default **dependency-aware sequence** when scheduling engineering work. Epics in the same phase can sometimes run in parallel if staffed.
@@ -208,11 +337,13 @@ Use this as a default **dependency-aware sequence** when scheduling engineering 
 | Phase | Epics | Notes |
 |-------|--------|--------|
 | **1 — Foundation** | Data model (segments/countries), Landing page (lite), Shared workspace polish (optional) | Baseline in [PRODUCT_BASELINE.md](./PRODUCT_BASELINE.md). |
+| **1b — Runway experience** | **Lens naming**; **Continuous heatmap**; **Day summary IA**; **Iso 3D polish**; **View settings & presets** | Parallel UX/visual work; no hard deps on auth. Ids: `epic-runway-lens-naming`, `epic-heatmap-continuous-spectrum`, `epic-day-summary-ia`, `epic-iso-runway-polish`, `epic-view-settings-presets`. |
 | **2 — Planning intelligence** | **Runway auto-plan** (slot finder); **Corporate calendar & deployment risk** (optional, feeds constraints / scoring) | Auto-plan uses runway + stack config; corporate windows extend DSL/scoring when ready—see `epic-corporate-calendar-risk`. |
 | **3 — Identity** | User, org, and permissions | Unblocks everything that needs “who.” |
 | **4 — Collab core** | Yjs + PartyKit | After auth story for rooms; can use secret-gated MVP before full JWT. |
 | **5 — History** | Workspace version control | Needs stable YAML export + user ids. |
 | **6 — Comms** | Comments, then Chat (or Comments first if review is higher priority) | Both need identity; comments often smaller than full chat. |
+| **7 — Enterprise quality** | **Enterprise readiness** (a11y, observability, SSO extensions, reproducible exports) | Cross-cutting; SSO/tenant hooks after **User & org**. Id: `epic-enterprise-readiness`. |
 
 ### Dependency graph (mermaid)
 
@@ -221,9 +352,15 @@ flowchart TD
   A[Segments and countries]
   B[Landing page]
   C[Shared DSL hardening]
+  U1[Runway lens naming]
+  U2[Continuous heatmap]
+  U3[Day summary IA]
+  U4[Iso runway polish]
+  U5[View settings presets]
   P[Runway auto-plan slot finder]
   R[Corporate calendar risk windows]
   D[User org permissions]
+  Q[Enterprise readiness]
   E[Yjs PartyKit]
   F[Version control]
   G[Comments]
@@ -236,13 +373,15 @@ flowchart TD
   D --> F
   D --> G
   D --> H
+  D --> Q
   E --> F
   C --> E
+  U1 -.-> U3
 ```
 
 ### Machine-friendly epic ids
 
-Use in issues or plan scripts: `epic-markets`, `epic-landing`, `epic-runway-autoplan`, `epic-corporate-calendar-risk`, `epic-auth-org`, `epic-partykit-yjs`, `epic-versioning`, `epic-comments`, `epic-chat`, `epic-shared-dsl-hardening`.
+Use in issues or plan scripts: `epic-markets`, `epic-landing`, `epic-runway-autoplan`, `epic-corporate-calendar-risk`, `epic-auth-org`, `epic-partykit-yjs`, `epic-versioning`, `epic-comments`, `epic-chat`, `epic-shared-dsl-hardening`, `epic-runway-lens-naming`, `epic-heatmap-continuous-spectrum`, `epic-day-summary-ia`, `epic-iso-runway-polish`, `epic-view-settings-presets`, `epic-enterprise-readiness`.
 
 ---
 

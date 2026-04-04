@@ -8,6 +8,7 @@
  *   (UI W1–W4), piecewise linear, then fade to 1× by month-end — see pipeline precedence vs YAML.
  */
 import { parseDate } from '@/engine/calendar';
+import type { TradingPressureKnobs } from '@/engine/types';
 
 /**
  * Hard ceiling for early-month multipliers (YAML knots, legacy peak, UI).
@@ -92,4 +93,19 @@ export function storePaydayMonthMultiplier(dateYmd: string, peakMultiplier: numb
   if (span <= 0) return 1;
   const u = (dom - taperStart) / span;
   return M + u * (1 - M);
+}
+
+/**
+ * Knot tuple shown in the UI / used when editing: per-market YAML wins, then global tuning.
+ * Matches pipeline precedence for early-month store boost.
+ */
+export function effectivePaydayKnotTuple(
+  tradingPressure: TradingPressureKnobs | undefined,
+  tuningKnots: PaydayKnotTuple
+): PaydayKnotTuple {
+  const yamlKnots = tradingPressure?.payday_month_knot_multipliers;
+  if (yamlKnots && isPaydayKnotTuple(yamlKnots)) return yamlKnots;
+  const peak = tradingPressure?.payday_month_peak_multiplier;
+  if (peak != null && Number.isFinite(peak)) return knotsFromLegacyPeakMultiplier(peak);
+  return tuningKnots;
 }

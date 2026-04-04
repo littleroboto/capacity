@@ -25,7 +25,7 @@ const PEAK_DAY_CAMPAIGN_INTERACTION_WEIGHT = 0.12;
 const PEAK_DAY_STORE_INTERACTION_WEIGHT = 0.07;
 
 /** Max contribution (before {@link MarketRiskComponentScales.yearEndWeekRamp}) from the year-end ladder at 31 Dec. */
-export const YEAR_END_RAMP_BASE_WEIGHT = 0.52;
+export const YEAR_END_RAMP_BASE_WEIGHT = 0.32;
 
 const MS_PER_DAY = 86400000;
 
@@ -66,11 +66,12 @@ function tradingMonthKeyFromYmd(dateStr: string): TradingMonthKey {
 
 /**
  * When YAML omits a month, calendar **Q4** ramps up (Oct → Nov → Dec), not a single December step.
+ * Kept moderate so the linear sum does not crowd the top band before normalisation.
  */
 function defaultDeploymentMonthLift(calendarMonth1to12: number): number {
-  if (calendarMonth1to12 === 10) return 0.07;
-  if (calendarMonth1to12 === 11) return 0.12;
-  if (calendarMonth1to12 === 12) return 0.18;
+  if (calendarMonth1to12 === 10) return 0.045;
+  if (calendarMonth1to12 === 11) return 0.08;
+  if (calendarMonth1to12 === 12) return 0.12;
   return 0;
 }
 
@@ -114,10 +115,26 @@ export function weekdayDeploymentShape01(dateStr: string, config: MarketConfig |
 }
 
 /**
+ * Denominator for {@link deploymentRiskFromLinearSum}: higher → softer heatmap (more mid-range spread).
+ * Tuned so typical heavy Q4 / year-end stacks land in upper-mid bands instead of all clipping to 1.
+ */
+export const DEPLOYMENT_RISK_LINEAR_SOFT_DENOM = 0.5;
+
+/**
+ * Maps an unbounded **structural** deployment sum to 0–1 for the heatmap. Monotone in `raw` (same day ordering),
+ * sublinear so many overlapping factors no longer collapse to a flat red plateau at `Math.min(1, raw)`.
+ */
+export function deploymentRiskFromLinearSum(raw: number): number {
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  const v = raw / (raw + DEPLOYMENT_RISK_LINEAR_SOFT_DENOM);
+  return Math.min(1, Math.max(0, Math.round(v * 1000) / 1000));
+}
+
+/**
  * Graded 0–1 deployment / calendar fragility for the Market risk heatmap.
- * Sum of bounded factors (not a hard ban); store load raises consequence, not trading “busyness” alone.
- * Blackouts add a separate YAML layer; peak-week × campaign and peak-week × store compound on top of linear terms.
- * {@link MarketConfig.deployment_risk_context_month_curve} adds a second per-month term on top of the primary curve.
+ * Internally sums bounded factors, then maps through {@link deploymentRiskFromLinearSum} so the runway keeps
+ * dynamic range when many layers (Q4, year-end, stores, shape, …) stack. Store load raises consequence, not
+ * trading “busyness” alone. Blackouts / events add acute spikes on top.
  * {@link MarketRiskComponentScales} scales each group independently (Market risk lens only).
  */
 export function computeDeploymentRisk01(
@@ -126,10 +143,10 @@ export function computeDeploymentRisk01(
   dateStr: string,
   scales: MarketRiskComponentScales = DEFAULT_MARKET_RISK_SCALES
 ): number {
-  const pub = row.public_holiday_flag ? 0.22 : 0;
-  const sch = row.school_holiday_flag ? 0.15 : 0;
+  const pub = row.public_holiday_flag ? 0.17 : 0;
+  const sch = row.school_holiday_flag ? 0.12 : 0;
   const storeNorm = Math.min(1, Math.max(0, row.store_pressure ?? 0) / STORE_PRESSURE_MAX);
-  const storeConsequence = 0.35 * storeNorm;
+  const storeConsequence = 0.26 * storeNorm;
   const calMonth = Number(dateStr.slice(5, 7));
   const monthKey = tradingMonthKeyFromYmd(dateStr);
   const yamlLift = config?.deployment_risk_month_curve?.[monthKey];
@@ -175,5 +192,5 @@ export function computeDeploymentRisk01(
     peakCampaign * scales.campaignPeakInteraction +
     peakStoreDay * scales.storePeakInteraction +
     resourcingStrain * scales.resourcingStrain;
-  return Math.min(1, Math.max(0, Math.round(raw * 1000) / 1000));
+  return deploymentRiskFromLinearSum(raw);
 }

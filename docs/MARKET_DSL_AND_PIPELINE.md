@@ -31,7 +31,7 @@ The result is a per-day **`RiskRow`** series rendered as the runway grid and too
 | `title` / `description` | Optional display strings; `title` defaults to market id. |
 | `releases` | Optional phased deploy loads (`systems` × `phases` × `load`); see [CAPACITY-RUNWAY.md](./CAPACITY-RUNWAY.md). |
 | `resources` | **`labs.capacity`**, **`staff.capacity`** (FTE-style team cap); legacy **`teams.*.size`** still sums to the same cap. |
-| `bau` | Preferred: **`days_in_use`** + **`weekly_cycle`** (`labs_required`, `staff_required`, optional `support_days`) + optional **`integration_tests`**. Legacy `weekly_promo_cycle` / `weekly_promo` still supported. |
+| `bau` | Preferred: **`days_in_use`** + **`weekly_cycle`** (`labs_required`, `staff_required`, optional `support_days`) + optional **`integration_tests`**. Add **`market_it_weekly_load`** (aliases: `market_it_support`, `bau_technology_support`, `restaurant_it_rhythm`) for routine **Market IT** rhythm — canonical keys **`weekday_intensity`**, **`labs_multiplier`** / **`teams_multiplier`** / **`backend_multiplier`**, **`extra_support_weekdays`**, **`extra_support_months`**, **`extra_support_teams_scale`**, **`monthly_runway_availability`**. Legacy `weekly_pattern`, `support_*`, `labs_scale`, `available_capacity_pattern`, and top-level **`tech:`** still parse. Legacy `weekly_promo_cycle` / `weekly_promo` still supported. |
 | `campaigns` | List or map. Preferred keys: **`start_date`**, **`testing_prep_duration`**, **`campaign_support`** (`tech_staff`, `labs_required`, …), **`live_campaign_support`**, **`business_uplift`**. Legacy `start`, `prep_before_live_days`, `load`, `live_support_load` still parse. |
 | `tech_programmes` | Optional list or map. **Same prep/live timing as campaigns** (`start_date`, `duration`, `testing_prep_duration` or `readiness_duration`, `load`, `live_support_load`). Use **`programme_support`** / **`live_programme_support`** (or the same **`campaign_support`** / **`live_campaign_support`** aliases). **Only labs, teams, and backend** are applied — ops/commercial YAML keys are ignored. No **`impact`**, **`business_uplift`**, or **`campaign_risk`** / store boosts. Supports **`replaces_bau_tech`** like campaigns. |
 | `public_holidays` / `school_holidays` | **`staffing_multiplier`** (cap on that holiday type), optional **`trading_multiplier`**, optional **`load_effects`** on school; **`auto: true`** pulls stub lists from the engine, or **`auto: false`** with explicit quoted **`dates:`** (bundled files use the latter — refresh via **`pnpm run sync:market-holidays`** when `holidayStubCalendar` / `holidayPublicCatalog` change). |
@@ -39,9 +39,7 @@ The result is a per-day **`RiskRow`** series rendered as the runway grid and too
 | `stress_correlations` | Legacy school-holiday load multipliers; merged with `school_holidays.load_effects` / `trading_multiplier` when both present. |
 | `operating_windows` | Named calendar windows that scale loads or tighten capacity. |
 | `trading` | Weekly store-trading + optional **monthly_pattern**, seasonal, early-month boost, campaign store boosts. |
-| `tech` | Weekly tech rhythm scaled into lab/team readiness load. |
-| `risk_heatmap_gamma` | Optional exponent on the score before palette mapping (clamped in parser). |
-| `risk_heatmap_curve` | Optional transfer curve id (`power`, `linear`, `sigmoid`, …). |
+| `tech` | **Legacy** top-level block: same fields as **`bau.market_it_weekly_load`** (canonical key names listed under `bau`). If both exist, **`tech:`** wins per key (for overrides). Prefer nesting under **`bau`** when authoring live. |
 
 **Dates:** Prefer quoted strings (`'2026-04-07'`). Some YAML loaders turn unquoted `YYYY-MM-DD` into `Date` objects and break lexicographic comparisons.
 
@@ -66,8 +64,9 @@ Supported shapes (you can combine multiple):
 
 - **`weekly_promo_cycle`** (and alias-style **`weekly_promo`**) — `day` (`Sun`–`Sat`), `labs`, `support_days` (extends the spike across following weekdays).
 - **`integration_tests`** — `day`, `labs`.
+- **`market_it_weekly_load`** (recommended block name) — routine **Market IT / restaurant support** curve: **`weekday_intensity`** (0–1 per weekday, same rules as `trading.weekly_pattern`), optional **`labs_multiplier`**, **`teams_multiplier`**, **`backend_multiplier`**, **`extra_support_weekdays`**, **`extra_support_months`**, **`extra_support_teams_scale`**, **`monthly_runway_availability`**. Legacy YAML keys (`weekly_pattern`, `labs_scale`, `support_*`, `available_capacity_pattern`) still parse. Block aliases: **`market_it_support`**, **`bau_technology_support`**, **`restaurant_it_rhythm`**. **Not** **`tech_programmes`** (dated change projects).
 
-Mapped internally to **`BauEntry`** rows with weekday and a small lab load. BAU contributes to the **bau** surface and baseline lab load.
+Mapped internally to **`BauEntry`** rows with weekday and a small lab load. BAU contributes to the **bau** surface and baseline lab load. The nested IT-rhythm block feeds the same **`techRhythm`** pipeline as legacy top-level **`tech:`**.
 
 ---
 
@@ -98,7 +97,7 @@ Marks the campaign on the calendar for **presence / risk** purposes **without** 
 
 ### 5.4b `replaces_bau_tech: true`
 
-When **true**, on **prep** and **live** days where this campaign contributes **labs, teams, or backend** (using the same load resolution as phase expansion — including staggered prep and scaled live sustain load), the engine **does not** add **`tech.weekly_pattern`** or the **`tech.support_weekly_pattern`** (**`support_pattern`**) teams row for that day and **zeros labs/teams/backend** on **BAU** loads (ops/commercial unchanged). Use when campaign work **replaces** the weekly BAU / tech pipe for that period instead of stacking. Days where the live segment only carries **ops / commercial** do **not** strip BAU tech. Default **false** (additive).
+When **true**, on **prep** and **live** days where this campaign contributes **labs, teams, or backend** (using the same load resolution as phase expansion — including staggered prep and scaled live sustain load), the engine **does not** add the main **`weekday_intensity`** rhythm row or the **`extra_support_weekdays`** (**`support_pattern`**) teams row for that day and **zeros labs/teams/backend** on **BAU** loads (ops/commercial unchanged). Use when campaign work **replaces** the weekly BAU / tech pipe for that period instead of stacking. Days where the live segment only carries **ops / commercial** do **not** strip BAU tech. Default **false** (additive).
 
 ### 5.5 Staggered functional prep (`stagger_functional_loads`)
 
@@ -122,7 +121,7 @@ Use for **platform / infra** work scheduled like a campaign (patching waves, POS
 - **Loads** — `programme_support` + `live_programme_support` (or `campaign_support` / `live_campaign_support` for the same shape). **`load`** / **`live_support_load`** also parse. Only **labs**, **teams**, and **backend** are kept; **ops** and **commercial** are stripped.
 - **Surfaces** — Prep and live both accrue to the **change** surface (not **campaign**), so they do not feed **`campaign_risk`** or **`campaign_store_boost_*`**.
 - **`live_tech_load_scale`** — Optional; default **1** for tech programmes (full YAML intensity in the live segment), unlike campaigns where the engine defaults to a lighter sustain scale unless you override.
-- **`replaces_bau_tech`** — Same meaning as §5.4b: can suppress **BAU** tech buckets, **`tech.weekly_pattern`**, and **`tech.support_weekly_pattern`** on loaded prep/live days.
+- **`replaces_bau_tech`** — Same meaning as §5.4b: can suppress **BAU** tech buckets, **`weekday_intensity`**, and **`extra_support_weekdays`** on loaded prep/live days.
 
 ---
 
@@ -174,20 +173,20 @@ Authors comparing markets should treat these as **shared platform seasoning**, n
 
 ---
 
-## 10. `tech`
+## 10. `tech` (legacy) / `bau.market_it_weekly_load` (preferred)
 
-- **`weekly_pattern`** — Same rules as `trading.weekly_pattern` (numeric 0–1 or named levels); drives recurring **tech rhythm** loads (scaled into lab/team readiness).
-- **`labs_scale`**, **`teams_scale`**, **`backend_scale`** — Scale factors for that rhythm (sensible defaults if omitted).
-- **`support_weekly_pattern`**, **`support_monthly_pattern`**, **`support_teams_scale`** — Optional **Market IT–only** additive rhythm (weekly × monthly for that calendar month × scale; omitted months = 1). Same weekly expansion as above; monthly keys Jan–Dec like **`trading.monthly_pattern`**. See [DSL_CAMPAIGNS_AND_TRADING.md](./DSL_CAMPAIGNS_AND_TRADING.md) § Tech rhythm.
+- **`weekday_intensity`** — Same rules as `trading.weekly_pattern` (numeric 0–1 or named levels); drives recurring **Market IT / BAU tech rhythm** loads. Legacy alias: **`weekly_pattern`**.
+- **`labs_multiplier`**, **`teams_multiplier`**, **`backend_multiplier`** — Scale factors (defaults unchanged). Legacy: **`labs_scale`**, **`teams_scale`**, **`backend_scale`**.
+- **`extra_support_weekdays`**, **`extra_support_months`**, **`extra_support_teams_scale`** — Optional **Market IT–only** additive rhythm (weekly × monthly × scale; omitted months = 1). Legacy: **`support_weekly_pattern`**, **`support_monthly_pattern`**, **`support_teams_scale`**.
+- **`monthly_runway_availability`** — Jan–Dec share of lab+team caps on the runway (see parser). Legacy: **`available_capacity_pattern`**.
+
+**Authoring:** Nest under **`bau.market_it_weekly_load`**. Keep top-level **`tech:`** only for overrides or old files.
 
 ---
 
-## 11. Heatmap tuning
+## 11. Heatmap (visualisation)
 
-- **`risk_heatmap_gamma`** / **`risk_heatmap_gamma_tech`** / **`risk_heatmap_gamma_business`** — Exponent on the **lens metric** before palette mapping (clamped in the parser). Per-lens gammas override the legacy single γ when set.
-- **`risk_heatmap_curve`** — Transfer curve id (`power`, `linear`, `sigmoid`, …); see `RISK_HEATMAP_CURVE_OPTIONS` in `src/lib/riskHeatmapTransfer.ts`.
-
-These affect **visualisation**, not the underlying load math.
+Heatmap transfer (curve, γ, tail power, etc.) is controlled in the **app** (Settings and Business Patterns), not in market YAML. Legacy top-level **`risk_heatmap_*`** keys are **ignored** if still present in old files — remove them when editing.
 
 ---
 

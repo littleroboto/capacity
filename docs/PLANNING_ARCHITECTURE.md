@@ -5,7 +5,7 @@ This document analyses the pre-existing **capacity-atc** app, describes how it e
 ## 1. What existed (strengths to preserve)
 
 - **React + Vite + TypeScript** SPA, static-deploy friendly, Zustand + localStorage for preferences and scenario slots.
-- **YAML multi-document DSL** (`public/data/markets/*.yaml`) describing markets: `resources`, `bau`, `campaigns`, `trading`, `tech`, `holidays`, `stress_correlations`, `operating_windows`, heatmap tuning.
+- **YAML multi-document DSL** (`public/data/markets/*.yaml`) describing markets: `resources`, `bau` (including optional **`market_it_weekly_load`** for routine IT rhythm), `campaigns`, `trading`, legacy top-level `tech` (overrides), `holidays`, `stress_correlations`, `operating_windows`, heatmap tuning.
 - **Clear pipeline**: `yamlDslParser` → `MarketConfig[]` → `expandPhases` / `aggregateByDay` → operating windows & school stress → `computeCapacity` → `computeRisk` → heatmap (`RunwayGrid`).
 - **Phased campaign model**: prep-before-live, readiness vs live/support loads, `presenceOnly` markers.
 - **Explainable tooltips**: campaigns, BAU, operating windows, risk blend terms (`runwayTooltipBreakdown.ts`).
@@ -33,7 +33,7 @@ This document analyses the pre-existing **capacity-atc** app, describes how it e
 | --- | --- |
 | `country` | `MarketProfile.marketId` |
 | `resources.labs.capacity`, `resources.teams.*.size` | `CapacityRecipe.baseUnits` for lab + delivery teams |
-| `bau`, `tech.weekly_pattern` | `PressureEvent` (`bau_rhythm`) + surface **bau** |
+| `bau`, `weekday_intensity` (routine IT rhythm) | `PressureEvent` (`bau_rhythm`) + surface **bau** |
 | `campaigns` (prep / live) | `PressureEvent` (`campaign`) + surfaces **change** (prep/readiness) and **campaign** (live/sustain) |
 | `releases` | `PressureEvent` / surface **change** |
 | `operating_windows`, `stress_correlations` | Multipliers on all surfaces (coordination layer reserved for future explicit split) |

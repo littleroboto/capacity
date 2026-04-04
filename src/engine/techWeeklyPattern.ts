@@ -2,7 +2,7 @@ const WEEKLY_PATTERN_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as
 const WEEKLY_PATTERN_DAY_SET = new Set<string>(WEEKLY_PATTERN_DAYS);
 const WEEKLY_PATTERN_META = new Set(['default', '_default', 'weekdays', 'weekend']);
 
-/** Named levels map to the same numeric scale as legacy `tech.weekly_pattern` strings. */
+/** Named levels map to the same numeric scale as `weekday_intensity` / legacy `weekly_pattern` strings. */
 export const TECH_RHYTHM_NAMED_LEVEL: Record<string, number> = {
   low: 0.25,
   medium: 0.5,
@@ -11,7 +11,7 @@ export const TECH_RHYTHM_NAMED_LEVEL: Record<string, number> = {
 };
 
 /**
- * Parse a single `tech.weekly_pattern` value: finite number clamped to [0, 1], or a named level, or numeric string.
+ * Parse a single weekday map value (e.g. `weekday_intensity` / `weekly_pattern`): number in [0, 1], named level, or numeric string.
  */
 export function parseTechRhythmScalar(v: unknown): number | undefined {
   if (v == null || v === '') return undefined;
@@ -28,7 +28,7 @@ export function parseTechRhythmScalar(v: unknown): number | undefined {
 }
 
 /**
- * Expand compact `tech.weekly_pattern` to per-day numeric [0, 1].
+ * Expand compact weekday map to per-day numeric [0, 1] (trading, Market IT rhythm, extra support).
  * Supports `default` / `weekdays` / `weekend` and explicit Mon–Sun (numbers or named levels).
  */
 export function expandTechWeeklyPattern(

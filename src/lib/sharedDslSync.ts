@@ -1,9 +1,89 @@
-import { looksLikeYamlDsl } from '@/lib/dslGuards';
+import { isClerkConfigured } from '@/lib/clerkConfig';
+import { looksLikeHtmlOrSpaShell, looksLikeYamlDsl } from '@/lib/dslGuards';
 import { mergeStateToFullMultiDoc } from '@/lib/multiDocMarketYaml';
 import { setAtcDsl } from '@/lib/storage';
 import { useAtcStore } from '@/store/useAtcStore';
 
 const SESSION_BEARER_KEY = 'capacity:shared-dsl-bearer';
+
+/** Fired when Clerk token getter or legacy bearer changes (workspace UI should re-check publish readiness). */
+export const SHARED_DSL_AUTH_CHANGED_EVENT = 'capacity:shared-dsl-auth-changed';
+
+let clerkTokenGetter: (() => Promise<string | null>) | null = null;
+
+export function setSharedDslClerkTokenGetter(fn: (() => Promise<string | null>) | null): void {
+  clerkTokenGetter = fn;
+  notifySharedDslAuthChanged();
+}
+
+function notifySharedDslAuthChanged(): void {
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(SHARED_DSL_AUTH_CHANGED_EVENT));
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/** True if cloud save can authenticate: Clerk session (getter set) or legacy bearer saved. */
+export function sharedDslWriteReadySync(): boolean {
+  return Boolean(clerkTokenGetter || getSharedDslBearer()?.trim());
+}
+
+/**
+ * When shared DSL + Clerk sign-in gate are both on, delay the first GET until the session token
+ * getter is registered (see `ClerkSharedDslBridge`) or legacy bearer exists — avoids racing a 401
+ * when `CLERK_SECRET_KEY` protects reads.
+ */
+export function shouldWaitForClerkBeforeSharedDslFetch(): boolean {
+  return isSharedDslEnabled() && isClerkConfigured();
+}
+
+export async function waitForSharedDslFetchAuth(options?: { timeoutMs?: number }): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!shouldWaitForClerkBeforeSharedDslFetch()) return;
+  if (sharedDslWriteReadySync()) return;
+
+  const timeoutMs = options?.timeoutMs ?? 10_000;
+
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(tid);
+      window.removeEventListener(SHARED_DSL_AUTH_CHANGED_EVENT, tryResolve);
+      resolve();
+    };
+    const tryResolve = () => {
+      if (sharedDslWriteReadySync()) finish();
+    };
+    const tid = window.setTimeout(finish, timeoutMs);
+    window.addEventListener(SHARED_DSL_AUTH_CHANGED_EVENT, tryResolve);
+    queueMicrotask(tryResolve);
+  });
+}
+
+/** Whether the last build attached a Clerk JWT, legacy secret, or nothing (open GET if server allows). */
+export type SharedDslAuthSent = 'clerk' | 'legacy' | 'none';
+
+async function buildSharedDslAuth(): Promise<{
+  headers: Record<string, string>;
+  authSent: SharedDslAuthSent;
+}> {
+  if (clerkTokenGetter) {
+    try {
+      const t = await clerkTokenGetter();
+      if (t?.trim()) return { headers: { Authorization: `Bearer ${t.trim()}` }, authSent: 'clerk' };
+    } catch {
+      /* ignore */
+    }
+  }
+  const legacy = getSharedDslBearer();
+  if (legacy?.trim()) return { headers: { Authorization: `Bearer ${legacy.trim()}` }, authSent: 'legacy' };
+  return { headers: {}, authSent: 'none' };
+}
 
 /** Build-time flag: fetch/save workspace YAML via `/api/shared-dsl` (Vercel Blob). */
 export function isSharedDslEnabled(): boolean {
@@ -31,6 +111,7 @@ export function setSharedDslBearer(token: string | null): void {
   } catch {
     /* ignore */
   }
+  notifySharedDslAuthChanged();
 }
 
 let lastKnownEtag: string | null = null;
@@ -119,21 +200,133 @@ export function requestOpenWorkspaceDialog(): void {
 
 export type FetchSharedDslResult = { yaml: string; etag: string };
 
-/** GET current workspace from the server (no auth). Returns null if none or misconfigured. */
-export async function fetchSharedDsl(): Promise<FetchSharedDslResult | null> {
-  if (!isSharedDslEnabled()) return null;
-  try {
-    const res = await fetch(apiUrl(), { method: 'GET', cache: 'no-store' });
-    if (res.status === 404) return null;
-    if (!res.ok) return null;
-    const yaml = await res.text();
-    if (!looksLikeYamlDsl(yaml)) return null;
-    const etag = res.headers.get('X-DSL-Etag') ?? res.headers.get('x-dsl-etag');
-    if (!etag?.trim()) return { yaml: yaml.trim(), etag: '' };
-    return { yaml: yaml.trim(), etag: etag.trim() };
-  } catch {
-    return null;
+export type FetchSharedDslFailReason =
+  | 'unauthorized'
+  | 'not_found'
+  | 'server_error'
+  | 'invalid_yaml'
+  /** Vite dev server returned index.html instead of the Vercel function. */
+  | 'html_spa_fallback'
+  | 'network'
+  | 'disabled';
+
+export type FetchSharedDslDetailed =
+  | { ok: true; yaml: string; etag: string; authSent: SharedDslAuthSent }
+  | {
+      ok: false;
+      authSent: SharedDslAuthSent;
+      reason: FetchSharedDslFailReason;
+      httpStatus?: number;
+      /** First ~120 chars of body when reason is `invalid_yaml` (debug). */
+      bodyPreview?: string;
+    };
+
+/** Human-readable lines for the Workspace “Connection check” panel. */
+export function describeSharedDslProbe(d: FetchSharedDslDetailed): string[] {
+  const authLine =
+    d.authSent === 'clerk'
+      ? 'Request used: Clerk session token (Authorization: Bearer …).'
+      : d.authSent === 'legacy'
+        ? 'Request used: legacy team secret from this browser session.'
+        : 'Request used: no Authorization header (OK only if the server does not require Clerk for GET).';
+
+  if (d.ok) {
+    return [
+      'GET /api/shared-dsl: success.',
+      authLine,
+      d.etag ? `ETag preview: ${d.etag.slice(0, 16)}…` : 'ETag: (empty — unusual but allowed)',
+    ];
   }
+
+  const lines = [authLine];
+
+  switch (d.reason) {
+    case 'disabled':
+      lines.unshift('Cloud sync is off (VITE_SHARED_DSL not enabled in this build).');
+      break;
+    case 'unauthorized':
+      lines.unshift(
+        `GET returned 401. Server expects a valid Clerk JWT when CLERK_SECRET_KEY is set. Check sign-in, Vercel env CLERK_SECRET_KEY (same instance as publishable key), and CAPACITY_CLERK_AUTHORIZED_PARTIES (must include this origin exactly).`
+      );
+      if (d.authSent === 'legacy') {
+        lines.push(
+          'You only sent the legacy team secret. Reads (GET) do not accept that when CLERK_SECRET_KEY is set — sign in so the app sends a Clerk session token, or you are hitting an API that still requires JWT.'
+        );
+      }
+      break;
+    case 'not_found':
+      lines.unshift('GET returned 404 — no Blob file yet (normal until someone saves once).');
+      break;
+    case 'server_error':
+      lines.unshift(`GET failed with HTTP ${d.httpStatus ?? '?'}. Check Vercel function logs.`);
+      break;
+    case 'invalid_yaml':
+      lines.unshift('Response was not valid workspace YAML (wrong body, API source file, or unexpected text).');
+      if (d.bodyPreview) {
+        lines.push(`Body preview: ${d.bodyPreview}${d.bodyPreview.length >= 120 ? '…' : ''}`);
+      }
+      break;
+    case 'html_spa_fallback':
+      lines.unshift(
+        'Response looks like HTML (often the Vite dev shell or `<html>…` without hitting the serverless route). Plain `pnpm dev` does not run `/api/*` — use `vercel dev` with env vars, or test on your Vercel deployment.'
+      );
+      if (d.authSent === 'legacy') {
+        lines.push(
+          'The legacy secret does not fix local API routing; you still need `vercel dev` or a deployed URL for GET /api/shared-dsl.'
+        );
+      }
+      break;
+    case 'network':
+      lines.unshift('Network error talking to /api/shared-dsl.');
+      break;
+    default:
+      lines.unshift('Request failed.');
+  }
+
+  return lines;
+}
+
+/** GET workspace with auth headers when Clerk / legacy bearer is available. */
+export async function fetchSharedDslDetailed(): Promise<FetchSharedDslDetailed> {
+  if (!isSharedDslEnabled()) return { ok: false, authSent: 'none', reason: 'disabled' };
+  let authSent: SharedDslAuthSent = 'none';
+  try {
+    const built = await buildSharedDslAuth();
+    authSent = built.authSent;
+    const res = await fetch(apiUrl(), { method: 'GET', cache: 'no-store', headers: built.headers });
+    if (res.status === 401) return { ok: false, authSent, reason: 'unauthorized', httpStatus: 401 };
+    if (res.status === 404) return { ok: false, authSent, reason: 'not_found', httpStatus: 404 };
+    if (!res.ok) return { ok: false, authSent, reason: 'server_error', httpStatus: res.status };
+
+    const ct = res.headers.get('content-type') ?? '';
+    const yaml = await res.text();
+    if (ct.includes('text/html') || looksLikeHtmlOrSpaShell(yaml)) {
+      return { ok: false, authSent, reason: 'html_spa_fallback', httpStatus: res.status };
+    }
+    if (!looksLikeYamlDsl(yaml)) {
+      const bodyPreview = yaml.replace(/\s+/g, ' ').trim().slice(0, 120);
+      return {
+        ok: false,
+        authSent,
+        reason: 'invalid_yaml',
+        httpStatus: res.status,
+        bodyPreview: bodyPreview || undefined,
+      };
+    }
+
+    const etag = res.headers.get('X-DSL-Etag') ?? res.headers.get('x-dsl-etag');
+    if (!etag?.trim()) return { ok: true, yaml: yaml.trim(), etag: '', authSent };
+    return { ok: true, yaml: yaml.trim(), etag: etag.trim(), authSent };
+  } catch {
+    return { ok: false, authSent, reason: 'network' };
+  }
+}
+
+/** GET current workspace from the server. Returns null if none, misconfigured, unauthorized, or invalid body. */
+export async function fetchSharedDsl(): Promise<FetchSharedDslResult | null> {
+  const d = await fetchSharedDslDetailed();
+  if (d.ok) return { yaml: d.yaml, etag: d.etag };
+  return null;
 }
 
 export type PutSharedDslResult = {
@@ -145,14 +338,20 @@ export type PutSharedDslResult = {
 };
 
 export async function putSharedDsl(yaml: string, ifMatch: string | null): Promise<PutSharedDslResult> {
-  const bearer = getSharedDslBearer();
-  if (!bearer) return { ok: false, errorMessage: 'No write secret — paste the team secret and click Save secret.' };
+  const { headers } = await buildSharedDslAuth();
+  if (!headers.Authorization) {
+    return {
+      ok: false,
+      errorMessage:
+        'Not signed in or no team secret — sign in (Clerk) or paste CAPACITY_SHARED_DSL_SECRET in Workspace.',
+    };
+  }
   try {
     const res = await fetch(apiUrl(), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${bearer}`,
+        ...headers,
       },
       body: JSON.stringify({
         yaml,
@@ -225,7 +424,7 @@ export function initSharedDslOutboundSync(): () => void {
     const full = mergeStateToFullMultiDoc(state);
     if (!looksLikeYamlDsl(full)) return;
     if (full === lastPushedYaml) return;
-    if (!getSharedDslBearer()) return;
+    if (!sharedDslWriteReadySync()) return;
 
     if (outboundSyncDebounceTimer) clearTimeout(outboundSyncDebounceTimer);
     outboundSyncDebounceTimer = setTimeout(() => {

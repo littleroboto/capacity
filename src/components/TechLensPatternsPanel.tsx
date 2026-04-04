@@ -2,7 +2,7 @@ import { TechCapacityPlanningPanel } from '@/components/TechCapacityPlanningPane
 import { TechDailyBusinessPanel } from '@/components/TechDailyBusinessPanel';
 
 /**
- * Technology Teams → Business Patterns: Support Week Shape (`tech.weekly_pattern`) first, then supply/holidays.
+ * Technology Teams → Business Patterns: weekday intensity (`weekday_intensity` in YAML) first, then supply/holidays.
  * Extra Market IT–only support patterns remain YAML-only (same weekly shape would double-count if edited twice).
  */
 export function TechLensPatternsPanel() {

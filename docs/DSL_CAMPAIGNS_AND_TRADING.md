@@ -69,8 +69,8 @@ flowchart TD
 
 When **`true`**, on any **prep** or **live** day where this campaign contributes **labs, Market IT, or backend** (YAML `load.teams`; including stagger slices that include tech in prep, and the resolved sustain load in live — same rules as phase expansion):
 
-- The market’s recurring **`tech.weekly_pattern`** row is **not** added for that day.
-- The market’s recurring **`tech.support_weekly_pattern`** / **`support_pattern`** teams row is **not** added for that day (same `stripBauTechBuckets` gate as weekly tech rhythm).
+- The market’s recurring **`weekday_intensity`** (main tech rhythm) row is **not** added for that day.
+- The market’s recurring **`extra_support_weekdays`** / **`support_pattern`** teams row is **not** added for that day (same `stripBauTechBuckets` gate as weekly tech rhythm).
 - **BAU** rows still run, but **labs / Market IT / backend** are forced to **0** (ops/commercial from BAU unchanged).
 
 So programmes that **run through the same BAU delivery channel** can **replace** the weekly tech baseline for the whole in-flight window instead of stacking. If the **live** segment has no tech buckets (e.g. only ops/commercial hypercare), BAU tech is **not** stripped on those days. Default **`false`** preserves additive behaviour. Aliases: **`replacesBauTech`**, **`replace_bau_tech`**.
@@ -81,7 +81,7 @@ So programmes that **run through the same BAU delivery channel** can **replace**
 
 ### `weekly_pattern`
 
-After YAML parse, the DSL parser expands this the **same way as `tech.weekly_pattern`** (`expandTechWeeklyPattern` in `src/engine/techWeeklyPattern.ts`):
+After YAML parse, the DSL parser expands this the **same way as `weekday_intensity`** / Market IT weekly shape (`expandTechWeeklyPattern` in `src/engine/techWeeklyPattern.ts`):
 
 - Per day (`Sun` … `Sat`): a **number in [0, 1]** or a named level: `low` (0.25), `medium` (0.5), `high` (0.75), `very_high` (1).
 - Compact form: `default`, `weekdays`, `weekend`, then optional per-day overrides.
@@ -112,22 +112,22 @@ The pipeline applies this multiplier **after** the weekly/monthly/seasonal rhyth
 
 ---
 
-## Tech rhythm (`tech`)
+## Tech rhythm (`bau.market_it_weekly_load` or legacy `tech`)
 
-`weekly_pattern` uses the **same numeric / named / compact** rules as trading. `labs_scale`, `teams_scale`, `backend_scale` scale the daily 0–1 base into readiness loads in `src/engine/phaseEngine.ts`.
+**`weekday_intensity`** uses the **same numeric / named / compact** rules as `trading.weekly_pattern`. **`labs_multiplier`**, **`teams_multiplier`**, **`backend_multiplier`** scale the daily 0–1 base into readiness loads in `src/engine/phaseEngine.ts` (legacy YAML: `weekly_pattern`, `labs_scale`, …). **Bundled markets** nest this under **`bau.market_it_weekly_load`**; top-level **`tech:`** still parses and overrides nested keys when both are present.
 
-### Support patterns (`support_weekly_pattern`, `support_monthly_pattern`)
+### Extra support (`extra_support_weekdays`, `extra_support_months`)
 
-Optional **Market IT–only** baseline readiness (e.g. hypercare / standing support rhythm), **additive** to the main `weekly_pattern` row:
+Optional **Market IT–only** baseline readiness, **additive** to **`weekday_intensity`**:
 
-- **`support_weekly_pattern`** — Expanded with **`expandTechWeeklyPattern`** (same rules as `tech.weekly_pattern` / `trading.weekly_pattern`): per weekday **0–1**, or `default` / `weekdays` / `weekend`, or named levels (`low` … `very_high`). Missing days in a sparse map are not expanded unless the compact form fills them.
-- **`support_monthly_pattern`** — Optional **Jan–Dec** scalars (**0–1**), same key names as **`trading.monthly_pattern`**. Per calendar day, the effective support load uses **weekly × monthly** for that month. **Omitted months behave as 1** (no change vs weekly shape) in the in-app patcher / `fullTradingMonthlyPatternFromPartial`-style defaults.
-- **`support_teams_scale`** — Optional non-negative scalar (default **1**); scales the combined **Market IT** load after weekly × monthly.
+- **`extra_support_weekdays`** — Same expansion as **`expandTechWeeklyPattern`** (legacy: `support_weekly_pattern`).
+- **`extra_support_months`** — Optional **Jan–Dec** scalars (**0–1**); **omitted months = 1** (legacy: `support_monthly_pattern`).
+- **`extra_support_teams_scale`** — Scales combined support load (legacy: `support_teams_scale`).
 
 The phase engine adds one extra row: **`TechRhythm` / `support_pattern`** with `{ labs: 0, teams: (support_teams_scale ?? 1) × weekly × monthly, backend: 0 }` (the **`teams`** field is Market IT capacity in the model), classification **readiness** / **bau** (same channel as the main weekly tech rhythm). The **Technology** heatmap and runway tooling pick this up through the normal phase expansion path.
 
-**UI:** Under **Heatmap adjustments**, the **Support Patterns** tab is shown only in the **Technology Teams** lens. It includes **Daily Business Weightings** (**`tech.weekly_pattern`**, Mon–Sun) and support workload (**`tech.support_weekly_pattern`**, **`tech.support_monthly_pattern`**) with matching sparklines for the focused market. All of these edits live under **`tech:`** only — they do **not** change **`trading`** or the Restaurant Activity heatmap. **Technology load** on the runway is **Combined**, **BAU only**, or **Project work** (no separate Market-IT-only slice).
+**UI:** Under **Heatmap adjustments**, the **Support Patterns** tab is shown only in the **Technology Teams** lens. It includes **Daily Business Weightings** (Mon–Sun) and support workload with matching sparklines for the focused market. DSL patches write **`bau.market_it_weekly_load`** when the document uses that shape (else legacy **`tech:`**). They do **not** change **`trading`** or the Restaurant Activity heatmap. **Technology load** on the runway is **Combined**, **BAU only**, or **Project work** (no separate Market-IT-only slice).
 
 **Aliases (parser):** `supportWeeklyPattern`, `supportMonthlyPattern`, `supportTeamsScale`.
 
-A `tech:` document may contain **only** support weekly (no main `weekly_pattern`) if you want purely additive support rhythm; the parser still emits `techRhythm` in that case (`mapTechRhythm` in `yamlDslParser.ts`).
+A `tech:` / `market_it_weekly_load` document may contain **only** **`extra_support_weekdays`** (no **`weekday_intensity`**) for purely additive support rhythm; the parser still emits `techRhythm` (`mapTechRhythm` in `yamlDslParser.ts`).

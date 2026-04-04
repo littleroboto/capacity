@@ -20,7 +20,7 @@ export const VIEW_MODES = [
     /** Short heading above the main runway heatmap. */
     runwayHeatmapTitle: 'Tech capacity headroom',
     title:
-      'Available lab and Market IT capacity (headroom): how much room is left versus scheduled work on those lanes (headline excludes backend). Cooler tiles mean more slack; hotter tiles mean tighter delivery capacity. Store-trading rhythm does not change this heatmap. γ_tech and transfer curve apply to the underlying utilisation before inversion.',
+      'Available lab and Market IT capacity (headroom): how much room is left versus scheduled work on those lanes (headline excludes backend). Cooler tiles mean more slack; hotter tiles mean less team/lab capacity still free. Store-trading rhythm does not change this heatmap. γ_tech and transfer curve shape load on those lanes before headroom and colour mapping.',
   },
   {
     id: 'in_store',

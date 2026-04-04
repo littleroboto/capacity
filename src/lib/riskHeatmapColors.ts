@@ -1,5 +1,6 @@
 import type { ViewModeId } from '@/lib/constants';
 import {
+  applyRiskHeatmapTailPower,
   applyRiskHeatmapTransfer,
   type RiskHeatmapCurveId,
 } from '@/lib/riskHeatmapTransfer';
@@ -8,7 +9,7 @@ import {
  * **10 discrete bands** (low → high): **deep blue → blue-cyan → cyan → green → yellow-green → yellow → soft orange →
  * bright orange → red → deep burgundy red** (weather-style; peak is darker red, not more orange).
  *
- * Cells map **transformed** 0–1 (curve + γ) into equal-width bins via {@link heatmapColorDiscrete}; with a
+ * Cells map **transformed** 0–1 (curve + γ + optional tail power) into equal-width bins via {@link heatmapColorDiscrete}; with a
  * steep power curve (small γ), mid raw scores can land high on that scale — see legend note in UI.
  * {@link heatmapColorContinuous} lerps these anchors for smooth ramps.
  */
@@ -100,8 +101,17 @@ export type HeatmapRenderStyle = 'spectrum' | 'mono';
 export type HeatmapColorOpts = {
   /** Transfer curve id (`power` = score^γ); applied after normalising the lens metric. */
   riskHeatmapCurve?: RiskHeatmapCurveId;
-  /** γ for power/sigmoid/log; stored as `risk_heatmap_gamma`. */
+  /** γ for power/sigmoid/log; persisted in app storage (not market YAML). */
   riskHeatmapGamma?: number;
+  /**
+   * Second power ≥1 after the transfer curve: `clamp01(transfer(t)^p)`. &gt;1 spreads similar high-risk
+   * days across more bands (Settings only; not synced to YAML).
+   */
+  riskHeatmapTailPower?: number;
+  /**
+   * Added to raw 0–1 pressure for the Market risk lens before clamp and transfer (not YAML).
+   */
+  businessHeatmapPressureOffset?: number;
   /** Default spectrum bands; mono uses {@link monoColor} with alpha from transformed 0–1. */
   renderStyle?: HeatmapRenderStyle;
   /** `#rrggbb` for mono mode (invalid values fall back to sky). */
@@ -151,6 +161,7 @@ export function heatmapTransformedMetric01(metric: number | undefined, opts?: He
   const curve = opts?.riskHeatmapCurve ?? 'power';
   const gamma = opts?.riskHeatmapGamma ?? 1;
   v = applyRiskHeatmapTransfer(v, curve, gamma);
+  v = applyRiskHeatmapTailPower(v, opts?.riskHeatmapTailPower ?? 1);
   return Math.min(1, Math.max(0, v));
 }
 
@@ -167,6 +178,10 @@ export function heatmapColorForViewMode(
   let colorMetric = metric;
   if (mode === 'combined' && metric != null && !Number.isNaN(metric)) {
     colorMetric = Math.min(1, Math.max(0, 1 - metric));
+  }
+  if (mode === 'market_risk' && colorMetric != null && !Number.isNaN(colorMetric)) {
+    const d = opts?.businessHeatmapPressureOffset ?? 0;
+    colorMetric = Math.min(1, Math.max(0, colorMetric + d));
   }
   const t = heatmapTransformedMetric01(colorMetric, opts);
   if (t == null) return EMPTY_CELL_FILL;
@@ -208,6 +223,10 @@ export function transformedHeatmapMetric(
   let colorMetric = metric;
   if (mode === 'combined' && metric != null && !Number.isNaN(metric)) {
     colorMetric = Math.min(1, Math.max(0, 1 - metric));
+  }
+  if (mode === 'market_risk' && colorMetric != null && !Number.isNaN(colorMetric)) {
+    const d = opts?.businessHeatmapPressureOffset ?? 0;
+    colorMetric = Math.min(1, Math.max(0, colorMetric + d));
   }
   return heatmapTransformedMetric01(colorMetric, opts) ?? 0;
 }

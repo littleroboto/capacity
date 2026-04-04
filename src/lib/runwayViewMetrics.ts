@@ -106,7 +106,7 @@ export function technologyHeadroomHeatmapMetric(row: RiskRow, scope: TechWorkloa
 }
 
 /**
- * Runway cell value per view: **Technology** = {@link technologyHeatmapMetric}; **Business** = {@link inStoreHeatmapMetric}.
+ * Runway cell value per view: **Technology** = {@link technologyHeadroomHeatmapMetric}; **Business** = {@link inStoreHeatmapMetric}.
  */
 export function heatmapCellMetric(
   row: RiskRow,

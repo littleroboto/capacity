@@ -5,7 +5,10 @@ import {
   formatDateYmd,
   runwayDayStripWidth,
 } from '@/lib/weekRunway';
-import { skylineMonthBodyHeightPx } from '@/lib/runwayIsoSkylineLayout';
+import {
+  SKYLINE_MONTH_ISO_GAP_STEPS,
+  skylineMonthBodyHeightPx,
+} from '@/lib/runwayIsoSkylineLayout';
 
 export const QUARTER_LETTERS = ['JFM', 'AMJ', 'JAS', 'OND'] as const;
 export type QuarterLetters = (typeof QUARTER_LETTERS)[number];
@@ -203,6 +206,10 @@ export type SkylineChronologyGroup = {
   /** Present when month starts a calendar quarter (Jan, Apr, Jul, Oct). */
   quarterLabel?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
   monthLabel: string;
+  /** Parent {@link VerticalYearSection}.year (for e.g. “Jan 2026” on the month axis). */
+  sectionYear: number;
+  /** 0–11 calendar month. */
+  monthIndex: number;
 };
 
 function quarterLabelFromMonthIndex(monthIndex: number): 'Q1' | 'Q2' | 'Q3' | 'Q4' {
@@ -226,6 +233,8 @@ export function skylineChronologyGroups(sections: VerticalYearSection[]): Skylin
         yearLabel,
         quarterLabel,
         monthLabel: mo.labelShort,
+        sectionYear: sec.year,
+        monthIndex: mo.monthIndex,
       });
       weekIndex += mo.weeks.length;
     }
@@ -271,7 +280,17 @@ export function buildVerticalMonthsRunwayLayout(
   if (rowTower > 0) {
     const flatWeeks = flattenRunwayWeeksFromSections(sections);
     const totalWeeks = flatWeeks.length;
-    const bodyH = skylineMonthBodyHeightPx(totalWeeks, cellPx, gap, rowTower);
+    const gapIso = 0;
+    const monthStartChronWeeks = skylineChronologyGroups(sections)
+      .map((g) => g.weekIndex)
+      .filter((w) => w > 0);
+    const monthPack = {
+      monthGapSteps: SKYLINE_MONTH_ISO_GAP_STEPS,
+      monthStartChronWeeks,
+    };
+    const bodyH = skylineMonthBodyHeightPx(totalWeeks, cellPx, gapIso, rowTower, monthPack);
+    const stripWIso = runwayDayStripWidth(cellPx, gapIso, RUNWAY_DAY_COLUMNS);
+    const strideXIso = cellPx + gapIso;
     const strideYPlaced = bodyH / Math.max(1, totalWeeks);
     const x0 = 0;
     const cellY = 0;
@@ -280,7 +299,7 @@ export function buildVerticalMonthsRunwayLayout(
       for (let di = 0; di < RUNWAY_DAY_COLUMNS; di++) {
         placedCells.push({
           dateStr: week[di]!,
-          x: x0 + di * strideX,
+          x: x0 + di * strideXIso,
           y: cellY + wi * strideYPlaced,
           flatIndex: flatIndex++,
         });
@@ -288,7 +307,7 @@ export function buildVerticalMonthsRunwayLayout(
     }
     return {
       sections,
-      contentWidth: stripW,
+      contentWidth: stripWIso,
       contentHeight: bodyH,
       placedCells,
     };

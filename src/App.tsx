@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
-import { SampleDataRibbon } from '@/components/SampleDataRibbon';
+import { ProductionAuthHintBanner } from '@/components/ProductionAuthHintBanner';
 import { DSLPanel } from '@/components/DSLPanel';
 import { WORKBENCH_SPLIT_HANDLE_PX, WorkbenchSplitHandle } from '@/components/WorkbenchSplitHandle';
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
@@ -22,6 +22,7 @@ import {
   isSharedDslEnabled,
   markSharedDslBaseline,
   setSharedDslEtag,
+  waitForSharedDslFetchAuth,
 } from '@/lib/sharedDslSync';
 
 const DSL_PANEL_COLLAPSED_STORAGE_KEY = 'capacity:dsl-panel-collapsed';
@@ -151,6 +152,8 @@ export default function App() {
       let multiDocFallback = mergeMarketsToMultiDocYaml(dslByMarket, order);
 
       if (isSharedDslEnabled()) {
+        await waitForSharedDslFetchAuth();
+        if (cancelled) return;
         const remote = await fetchSharedDsl();
         if (cancelled) return;
         if (remote) {
@@ -187,7 +190,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
-      <SampleDataRibbon />
+      <ProductionAuthHintBanner />
       <Header />
       <main
         className={cn(

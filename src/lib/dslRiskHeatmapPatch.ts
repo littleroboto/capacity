@@ -8,56 +8,32 @@ export type RiskHeatmapVisualPatch = {
   curve: RiskHeatmapCurveId;
 };
 
-/** Insert / update / remove heatmap visual keys on the YAML document for `market`. Preserves comments outside those lines. */
+/** Top-level legacy keys (heatmap is app storage only). */
+const LEGACY_RISK_HEATMAP_LINE =
+  /^\s*risk_heatmap_(?:gamma(?:_tech|_business)?|curve)\s*:\s*.*$/;
+
+/** Remove legacy top-level `risk_heatmap_*` lines from the document for `market`. Heatmap γ/curve are app storage only. */
 export function patchDslRiskHeatmapVisual(
   dslText: string,
   market: string,
-  { gamma, curve }: RiskHeatmapVisualPatch
+  _patch: RiskHeatmapVisualPatch
 ): string {
-  const g = Math.round(Math.min(3, Math.max(0.35, gamma)) * 100) / 100;
   const multi = DOC_SPLIT.test(dslText);
   const parts = multi ? dslText.split(DOC_SPLIT) : [dslText];
-  const out = parts.map((seg) => patchHeatmapInDocSegment(seg, market, g, curve));
+  const out = parts.map((seg) => stripRiskHeatmapLinesInSegment(seg, market));
   return multi ? out.join('\n---\n') : out[0]!;
 }
 
-function patchHeatmapInDocSegment(
-  segment: string,
-  market: string,
-  gamma: number,
-  curve: RiskHeatmapCurveId
-): string {
+function stripRiskHeatmapLinesInSegment(segment: string, market: string): string {
   const id = parseDslMarketId(segment);
   if (!id || id !== market) return segment;
-
-  let s = segment.replace(/\r?\n?^risk_heatmap_gamma:\s*[\d.]+\s*$/m, '');
-  s = s.replace(/\r?\n?^risk_heatmap_gamma_tech:\s*[\d.]+\s*$/m, '');
-  s = s.replace(/\r?\n?^risk_heatmap_gamma_business:\s*[\d.]+\s*$/m, '');
-  s = s.replace(/\r?\n?^risk_heatmap_curve:\s*\S+\s*$/m, '');
-
-  const wantGamma = Math.abs(gamma - 1) >= 0.001;
-  const wantCurve = curve !== 'power';
-  if (!wantGamma && !wantCurve) return s;
-
-  const lines: string[] = [];
-  if (wantGamma) {
-    lines.push(`risk_heatmap_gamma: ${gamma}`);
-    lines.push(`risk_heatmap_gamma_tech: ${gamma}`);
-    lines.push(`risk_heatmap_gamma_business: ${gamma}`);
-  }
-  if (wantCurve) lines.push(`risk_heatmap_curve: ${curve}`);
-  const block = `\n${lines.join('\n')}`;
-
-  const countryOnly = s.replace(/^((?:market|country):\s*\S+)\s*$/m, `$1${block}`);
-  if (countryOnly !== s) return countryOnly;
-
-  const afterCountry = s.replace(/^((?:market|country):\s*\S+)/m, `$1${block}`);
-  if (afterCountry !== s) return afterCountry;
-
-  return s;
+  return segment
+    .split('\n')
+    .filter((line) => !LEGACY_RISK_HEATMAP_LINE.test(line))
+    .join('\n');
 }
 
-/** @deprecated Use `patchDslRiskHeatmapVisual` */
+/** @deprecated Use {@link patchDslRiskHeatmapVisual} (strips legacy YAML only). */
 export function patchDslRiskHeatmapGamma(dslText: string, market: string, gamma: number): string {
   return patchDslRiskHeatmapVisual(dslText, market, { gamma, curve: 'power' });
 }

@@ -1,11 +1,11 @@
 import { STORAGE_KEYS } from '@/lib/constants';
 import { APP_VERSION, GIT_COMMIT_SHORT } from '@/lib/buildMeta';
+import { HeaderClerkUser } from '@/components/HeaderClerkUser';
 import { cn } from '@/lib/utils';
 import { useCallback, useState } from 'react';
 import { useAtcStore } from '@/store/useAtcStore';
-import { isRunwayAllMarkets } from '@/lib/markets';
 import { Button } from '@/components/ui/button';
-import { Atom, Bot, Box, ChevronDown, ChevronUp, GitBranch, Grid2x2, Moon, Sparkles, Sun } from 'lucide-react';
+import { Atom, Bot, ChevronDown, ChevronUp, GitBranch, Moon, Sparkles, Sun } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 
 export function Header() {
@@ -13,25 +13,14 @@ export function Header() {
   const setTheme = useAtcStore((s) => s.setTheme);
   const discoModePref = useAtcStore((s) => s.discoMode);
   const setDiscoMode = useAtcStore((s) => s.setDiscoMode);
-  const country = useAtcStore((s) => s.country);
-  const runway3dHeatmap = useAtcStore((s) => s.runway3dHeatmap);
-  const setRunway3dHeatmap = useAtcStore((s) => s.setRunway3dHeatmap);
-  const runwaySvgHeatmap = useAtcStore((s) => s.runwaySvgHeatmap);
-  const setRunwaySvgHeatmap = useAtcStore((s) => s.setRunwaySvgHeatmap);
   const viewMode = useAtcStore((s) => s.viewMode);
   const dslLlmAssistantEnabled = useAtcStore((s) => s.dslLlmAssistantEnabled);
   const setDslLlmAssistantEnabled = useAtcStore((s) => s.setDslLlmAssistantEnabled);
   const reduceMotion = useReducedMotion();
-  const singleMarketRunway = !isRunwayAllMarkets(country);
-  const compareAllMarkets = isRunwayAllMarkets(country);
   const isDark = theme === 'dark';
-  const showSvgHeatmapControl = singleMarketRunway || compareAllMarkets;
-  /** Toybox holds SVG heatmap + optional 3D / disco; show for compare-all so SVG stays available when flat. */
-  const showToybox = singleMarketRunway || isDark || compareAllMarkets;
+  /** Toybox: disco (dark theme) and LLM assist (code view). Runway SVG toggle lives on the Runway card toolbar (3D runway is off for now). */
+  const showToybox = isDark || viewMode === 'code';
 
-  const sw3d = toyboxSwitchClasses(runway3dHeatmap);
-  const swSvg = toyboxSwitchClasses(runwaySvgHeatmap, 'md');
-  const swSvgCompact = toyboxSwitchClasses(runwaySvgHeatmap, 'sm');
   const swDisco = toyboxSwitchClasses(discoModePref);
   const swLlm = toyboxSwitchClasses(dslLlmAssistantEnabled);
   const swLlmSm = toyboxSwitchClasses(dslLlmAssistantEnabled, 'sm');
@@ -104,37 +93,6 @@ export function Header() {
                     />
                   </button>
                 </div>
-                {showSvgHeatmapControl ? (
-                  <div
-                    className="flex shrink-0 items-center gap-1.5 border-l border-border/60 pl-2"
-                    title={
-                      runway3dHeatmap && singleMarketRunway
-                        ? 'Toybox · 3D uses HTML blocks. Turn 3D off for SVG quarter grid.'
-                        : 'Toybox · SVG runway cells (on by default). Off for HTML, swoosh, disco.'
-                    }
-                  >
-                    <Grid2x2
-                      className={cn(
-                        'h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-90',
-                        runwaySvgHeatmap && 'text-primary'
-                      )}
-                      aria-hidden
-                    />
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={runwaySvgHeatmap}
-                      data-state={runwaySvgHeatmap ? 'on' : 'off'}
-                      aria-label={
-                        runwaySvgHeatmap ? 'Turn off SVG runway heatmap' : 'Turn on SVG runway heatmap'
-                      }
-                      onClick={() => setRunwaySvgHeatmap(!runwaySvgHeatmap)}
-                      className={swSvgCompact.track}
-                    >
-                      <span className={swSvgCompact.thumb} />
-                    </button>
-                  </div>
-                ) : null}
                 {viewMode === 'code' ? (
                   <div
                     className="flex shrink-0 items-center gap-1.5 border-l border-border/60 pl-2"
@@ -166,6 +124,8 @@ export function Header() {
                 ) : null}
               </div>
 
+              <HeaderClerkUser compact />
+
               <Button
                 type="button"
                 variant="ghost"
@@ -175,7 +135,7 @@ export function Header() {
                 aria-expanded={false}
                 aria-controls="header-expanded-panel"
                 aria-label="Expand header details"
-                title="Show full header (theme + toybox)"
+                title="Show full header (theme + optional toybox)"
               >
                 <ChevronDown className="h-4 w-4" aria-hidden />
               </Button>
@@ -193,19 +153,22 @@ export function Header() {
                       </span>
                     </h1>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
-                    onClick={toggleCompact}
-                    aria-expanded
-                    aria-controls="header-expanded-panel"
-                    aria-label="Collapse header to compact bar"
-                    title="Compact header"
-                  >
-                    <ChevronUp className="h-4 w-4" aria-hidden />
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <HeaderClerkUser className="border-0 pl-0" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+                      onClick={toggleCompact}
+                      aria-expanded
+                      aria-controls="header-expanded-panel"
+                      aria-label="Collapse header to compact bar"
+                      title="Compact header"
+                    >
+                      <ChevronUp className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </div>
                 </div>
                 <p
                   className="mt-1 inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums leading-snug text-muted-foreground md:text-[11px]"
@@ -265,73 +228,6 @@ export function Header() {
                     <span className="text-[11px] font-semibold tracking-wide text-foreground/85">Toybox</span>
                   </div>
                   <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
-                    {showSvgHeatmapControl ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                          SVG runway
-                        </span>
-                        <div
-                          className="flex h-9 flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground"
-                          title={
-                            runway3dHeatmap && singleMarketRunway
-                              ? '3D runway uses HTML blocks. Turn 3D off for SVG quarter grid. Compare-all uses this when flat.'
-                              : 'On by default: SVG cells for flat quarter grid and compare-all. Off for HTML, colour swoosh, and disco twinkle.'
-                          }
-                        >
-                          <Grid2x2
-                            className={cn(
-                              'h-4 w-4 shrink-0 opacity-90',
-                              runwaySvgHeatmap && 'text-primary'
-                            )}
-                            aria-hidden
-                          />
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={runwaySvgHeatmap}
-                            data-state={runwaySvgHeatmap ? 'on' : 'off'}
-                            aria-label={
-                              runwaySvgHeatmap ? 'Turn off SVG runway heatmap' : 'Turn on SVG runway heatmap'
-                            }
-                            onClick={() => setRunwaySvgHeatmap(!runwaySvgHeatmap)}
-                            className={swSvg.track}
-                          >
-                            <span className={swSvg.thumb} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                    {singleMarketRunway ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                          3D runway
-                        </span>
-                        <div
-                          className="flex h-9 flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground"
-                          title="Isometric 3D pressure blocks in one vertical column (single market). Compare-all stays flat."
-                        >
-                          <Box
-                            className={cn(
-                              'h-4 w-4 shrink-0 opacity-90',
-                              runway3dHeatmap && 'text-primary'
-                            )}
-                            aria-hidden
-                          />
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={runway3dHeatmap}
-                            data-state={runway3dHeatmap ? 'on' : 'off'}
-                            aria-label={runway3dHeatmap ? 'Turn off 3D runway heatmap' : 'Turn on 3D runway heatmap'}
-                            onClick={() => setRunway3dHeatmap(!runway3dHeatmap)}
-                            title="GitHub-style 3D blocks in a single vertical runway column (one market only)."
-                            className={sw3d.track}
-                          >
-                            <span className={sw3d.thumb} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
                     {isDark ? (
                       <div className="flex flex-col gap-1">
                         <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

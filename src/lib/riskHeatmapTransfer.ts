@@ -45,6 +45,18 @@ function clamp01(x: number): number {
   return Math.min(1, Math.max(0, x));
 }
 
+/**
+ * Second power stage after {@link applyRiskHeatmapTransfer}: values in (0,1) move toward 0 when {@link power} &gt; 1,
+ * so days that all sat in the top colour band spread across orange/red instead of clipping together.
+ * {@link power} = 1 leaves the prior curve unchanged.
+ */
+export function applyRiskHeatmapTailPower(t: number, power: number): number {
+  const u = clamp01(t);
+  const p = Math.min(2.75, Math.max(1, power));
+  if (p <= 1 + 1e-9) return u;
+  return clamp01(Math.pow(u, p));
+}
+
 function normalizedSigmoid(c: number, k: number): number {
   const f = (t: number) => 1 / (1 + Math.exp(-k * (t - 0.5)));
   const y0 = f(0);

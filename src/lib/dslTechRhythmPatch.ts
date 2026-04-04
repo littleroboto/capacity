@@ -1,14 +1,13 @@
 import { parseDslMarketId } from '@/lib/dslMarketLine';
+import {
+  buildTechWeeklyPatternBlockLines,
+  findWeeklyPatternRangeForTarget,
+  resolveTechRhythmYamlTarget,
+} from '@/lib/dslBauMarketItRhythmYaml';
 import { MULTI_DOC_SPLIT } from '@/lib/multiDocMarketYaml';
 import { TECH_WEEKLY_DAY_KEYS, roundTechUnit, type TechWeeklyDayKey } from '@/lib/techRhythmDsl';
 
 export type TechWeeklyPatternPatch = Record<TechWeeklyDayKey, number>;
-
-/** Top-level YAML key at column 0 (starts document section). */
-const TOP_LEVEL_KEY = /^[a-z][a-z0-9_]*:\s*/;
-
-/** Direct child of `tech:` (exactly two spaces + key). */
-const TECH_CHILD_KEY = /^  [a-z][a-z0-9_]*:\s*/;
 
 function formatTechYamlUnit(n: number): string {
   const r = roundTechUnit(n);
@@ -16,71 +15,43 @@ function formatTechYamlUnit(n: number): string {
   return s.replace(/\.?0+$/, '') || '0';
 }
 
-function buildWeeklyPatternLines(pattern: TechWeeklyPatternPatch): string[] {
-  return [
-    '  weekly_pattern:',
-    ...TECH_WEEKLY_DAY_KEYS.map((d) => `    ${d}: ${formatTechYamlUnit(pattern[d]!)}`),
-  ];
-}
-
-function findTechBlockRange(lines: string[]): { techIdx: number; techEnd: number } | null {
-  const techIdx = lines.findIndex((l) => /^tech:\s*$/.test(l));
-  if (techIdx < 0) return null;
-  let techEnd = lines.length;
-  for (let k = techIdx + 1; k < lines.length; k++) {
-    if (TOP_LEVEL_KEY.test(lines[k])) {
-      techEnd = k;
-      break;
-    }
-  }
-  return { techIdx, techEnd };
-}
-
-function findWeeklyPatternInTech(
-  lines: string[],
-  techIdx: number,
-  techEnd: number
-): { wpIdx: number; wpEnd: number; inline: boolean } | null {
-  for (let k = techIdx + 1; k < techEnd; k++) {
-    const l = lines[k]!;
-    if (/^  weekly_pattern:\s*\S/.test(l)) {
-      return { wpIdx: k, wpEnd: k + 1, inline: true };
-    }
-    if (/^  weekly_pattern:\s*$/.test(l)) {
-      let wpEnd = k + 1;
-      while (wpEnd < techEnd) {
-        const m = lines[wpEnd]!;
-        if (TECH_CHILD_KEY.test(m)) break;
-        wpEnd++;
-      }
-      return { wpIdx: k, wpEnd, inline: false };
-    }
-  }
-  return null;
-}
-
 function patchSegment(segment: string, market: string, pattern: TechWeeklyPatternPatch): string {
   const id = parseDslMarketId(segment);
   if (!id || id !== market) return segment;
 
   const lines = segment.split('\n');
-  const blockLines = buildWeeklyPatternLines(pattern);
-  const range = findTechBlockRange(lines);
+  const dayLines = (d: TechWeeklyDayKey) => formatTechYamlUnit(pattern[d]!);
+  const target = resolveTechRhythmYamlTarget(lines);
 
-  if (!range) {
+  if (!target) {
     const ci = lines.findIndex((l) => /^campaigns:\s*/.test(l));
     const insertAt = ci >= 0 ? ci : lines.length;
     const prefix = insertAt > 0 && lines[insertAt - 1]!.trim() !== '' ? [''] : [];
     const suffix = insertAt < lines.length && lines[insertAt]!.trim() !== '' ? [''] : [];
-    lines.splice(insertAt, 0, ...prefix, 'tech:', ...blockLines, ...suffix);
+    const blockLines = [
+      'tech:',
+      '  weekday_intensity:',
+      ...TECH_WEEKLY_DAY_KEYS.map((d) => `    ${d}: ${dayLines(d)}`),
+    ];
+    lines.splice(insertAt, 0, ...prefix, ...blockLines, ...suffix);
     return lines.join('\n');
   }
 
-  const { techIdx, techEnd } = range;
-  const wp = findWeeklyPatternInTech(lines, techIdx, techEnd);
+  const blockLines = buildTechWeeklyPatternBlockLines(dayLines, target);
 
+  if (target.kind === 'bau_mil' && target.milIdx === target.bauEnd) {
+    const prefix = target.bauEnd > 0 && lines[target.bauEnd - 1]!.trim() !== '' ? [''] : [];
+    lines.splice(target.bauEnd, 0, ...prefix, ...blockLines);
+    return lines.join('\n');
+  }
+
+  const wp = findWeeklyPatternRangeForTarget(lines, target);
   if (!wp) {
-    lines.splice(techIdx + 1, 0, ...blockLines);
+    if (target.kind === 'bau_mil') {
+      lines.splice(target.milIdx + 1, 0, ...blockLines);
+    } else {
+      lines.splice(target.techIdx + 1, 0, ...blockLines);
+    }
     return lines.join('\n');
   }
 
@@ -88,7 +59,7 @@ function patchSegment(segment: string, market: string, pattern: TechWeeklyPatter
   return lines.join('\n');
 }
 
-/** Replace `tech.weekly_pattern` in the document for `market` with explicit Mon–Sun numeric keys [0, 1]. */
+/** Replace weekly Market IT rhythm in YAML (`bau.market_it_weekly_load` or legacy `tech:`). */
 export function patchDslTechWeeklyPattern(
   dslText: string,
   market: string,

@@ -57,6 +57,68 @@ export const DEFAULT_MARKET_RISK_SCALES: MarketRiskComponentScales = {
   resourcingStrain: 1,
 };
 
+/**
+ * High-level Market risk multipliers (default **1** = neutral). Each scales a small group inside the deployment-risk
+ * sum on top of {@link MarketRiskComponentScales}. Use for the main UX; expert per-component sliders refine further.
+ */
+export type MarketRiskMacros = {
+  /** Campaign linear + busy-week × campaign terms. */
+  programme: number;
+  /** Weekly ladder approaching calendar 31 Dec (“recovery runway” / year-end fragility). */
+  yearEndRunway: number;
+  /** Public + school holiday flags + tech resourcing strain add-on. */
+  holidaysBench: number;
+  /** Within-week load shape + busy week × store hot days. */
+  tradingSnap: number;
+};
+
+export const DEFAULT_MARKET_RISK_MACROS: MarketRiskMacros = {
+  programme: 1,
+  yearEndRunway: 1,
+  holidaysBench: 1,
+  tradingSnap: 1,
+};
+
+const MARKET_RISK_MACRO_MAX = 2.5;
+
+function clampMacroComponent(n: number, fallback: number): number {
+  if (!Number.isFinite(n)) return fallback;
+  const s = Math.round(n / 0.05) * 0.05;
+  return Math.min(MARKET_RISK_MACRO_MAX, Math.max(0, Math.round(s * 100) / 100));
+}
+
+export function clampMarketRiskMacros(partial?: Partial<MarketRiskMacros> | undefined): MarketRiskMacros {
+  const d = DEFAULT_MARKET_RISK_MACROS;
+  const p = partial ?? {};
+  return {
+    programme: clampMacroComponent(p.programme ?? d.programme, d.programme),
+    yearEndRunway: clampMacroComponent(p.yearEndRunway ?? d.yearEndRunway, d.yearEndRunway),
+    holidaysBench: clampMacroComponent(p.holidaysBench ?? d.holidaysBench, d.holidaysBench),
+    tradingSnap: clampMacroComponent(p.tradingSnap ?? d.tradingSnap, d.tradingSnap),
+  };
+}
+
+/**
+ * Applies macro multipliers to expert {@link MarketRiskComponentScales} (clamped per component to the same 0–4× cap).
+ */
+export function effectiveMarketRiskScales(
+  expert: MarketRiskComponentScales,
+  macros: MarketRiskMacros
+): MarketRiskComponentScales {
+  const x = (base: number, macro: number) =>
+    clampOneMarketRiskScale(base * macro, base);
+  return {
+    ...expert,
+    campaignLinear: x(expert.campaignLinear, macros.programme),
+    campaignPeakInteraction: x(expert.campaignPeakInteraction, macros.programme),
+    yearEndWeekRamp: x(expert.yearEndWeekRamp, macros.yearEndRunway),
+    holidays: x(expert.holidays, macros.holidaysBench),
+    resourcingStrain: x(expert.resourcingStrain, macros.holidaysBench),
+    withinWeekLoad: x(expert.withinWeekLoad, macros.tradingSnap),
+    storePeakInteraction: x(expert.storePeakInteraction, macros.tradingSnap),
+  };
+}
+
 export type RiskModelTuning = {
   importanceTech: number;
   importanceStore: number;
@@ -76,12 +138,15 @@ export type RiskModelTuning = {
    */
   storePaydayMonthKnotMultipliers: PaydayKnotTuple;
   /**
-   * UI multiplier on each market’s effective `campaign_effect_scale` (YAML value or 1). Scales campaign risk and
-   * store boosts during campaigns. 1 = match DSL; 0 = no campaign pressure from those channels.
+   * **Exploration overlay** on each market’s YAML `campaign_effect_scale` (or 1): scales campaign risk and store
+   * boosts everywhere that scale applies. Does **not** replace per-campaign weight — use `business_uplift` (and aliases)
+   * on each campaign row for relative programme size. 1 = YAML-only; 0 = mute campaign pressure from those channels.
    */
   campaignEffectUiMultiplier: number;
   /** Independent scalers for Market risk deployment sum; see {@link MarketRiskComponentScales}. */
   marketRiskScales: MarketRiskComponentScales;
+  /** Coarse Market risk shape knobs; see {@link MarketRiskMacros}. */
+  marketRiskMacros: MarketRiskMacros;
 };
 
 /** Legacy UI used 0–100 scaled by this delta to the peak multiplier (for persisted state). */
@@ -100,6 +165,7 @@ export const DEFAULT_RISK_TUNING: RiskModelTuning = {
   storePaydayMonthKnotMultipliers: knotsFromLegacyPeakMultiplier(DEFAULT_PAYDAY_PEAK),
   campaignEffectUiMultiplier: 1,
   marketRiskScales: { ...DEFAULT_MARKET_RISK_SCALES },
+  marketRiskMacros: { ...DEFAULT_MARKET_RISK_MACROS },
 };
 
 /**
@@ -211,6 +277,7 @@ function buildRiskTuning(m: Partial<RiskModelTuning> & { storePaydayMonthRamp?: 
     storePaydayMonthPeakMultiplier: peak,
     campaignEffectUiMultiplier: clampCampaignEffectUiMultiplier(merged.campaignEffectUiMultiplier),
     marketRiskScales: clampMarketRiskScales(merged.marketRiskScales),
+    marketRiskMacros: clampMarketRiskMacros(merged.marketRiskMacros),
   };
 }
 
@@ -264,12 +331,18 @@ export function applyRiskTuningPatch(
       ? clampMarketRiskScales({ ...prev.marketRiskScales, ...patch.marketRiskScales })
       : undefined;
 
+  const mergedMacros = clampMarketRiskMacros({
+    ...prev.marketRiskMacros,
+    ...(patch.marketRiskMacros ?? {}),
+  });
+
   return buildRiskTuning({
     ...prev,
     ...patch,
     storePaydayMonthKnotMultipliers: knots,
     storePaydayMonthPeakMultiplier: knots[0]!,
     ...(nextMarketRiskScales != null ? { marketRiskScales: nextMarketRiskScales } : {}),
+    marketRiskMacros: mergedMacros,
   });
 }
 

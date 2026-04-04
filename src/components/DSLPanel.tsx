@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DslPanelClerkSignOut } from '@/components/DslPanelClerkSignOut';
 import { HeatmapSettingsPanel } from '@/components/HeatmapSettingsPanel';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
 import { RiskModelPanel } from '@/components/RiskModelPanel';
@@ -45,13 +46,19 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="text-pretty">
-            Heatmap transfer curve, γ, runway palette, and campaign overlay when not in Technology Teams view.
+            Runway palette and campaign overlay; heatmap transfer (curve, γ, high-end power for Technology Teams) appears
+            here for <strong className="font-medium text-foreground">Technology Teams</strong> and{' '}
+            <strong className="font-medium text-foreground">Code</strong>.{' '}
+            <strong className="font-medium text-foreground">Market risk</strong> has its own transfer, pressure offset,
+            and scalers under <strong className="font-medium text-foreground">Business Patterns</strong>.{' '}
+            <strong className="font-medium text-foreground">Restaurant Activity</strong> follows the YAML curve and
+            business γ (no separate high-end power on that lens).
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">
           <HeatmapSettingsPanel
             showCampaignBoost={viewMode !== 'combined'}
-            showMarketRiskScales={viewMode === 'market_risk'}
+            showHeatmapTransferTuning={viewMode !== 'in_store' && viewMode !== 'market_risk'}
           />
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
@@ -135,6 +142,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           >
             <Database className="h-4 w-4" aria-hidden />
           </Button>
+          <DslPanelClerkSignOut collapsed />
           <Button
             type="button"
             variant="ghost"
@@ -226,6 +234,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
             <Database className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
             Workspace
           </Button>
+          <DslPanelClerkSignOut />
           <Button
             type="button"
             variant="outline"

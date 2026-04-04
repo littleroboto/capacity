@@ -24,6 +24,16 @@ GitHub Actions **does not** auto-deploy the site on push; Vercel builds from Git
 
 Until someone saves once, the app uses bundled `public/data/markets/*.yaml`; the first successful upload creates the blob copy everyone then shares.
 
+#### Optional sign-in gate ([Clerk](https://clerk.com))
+
+1. Create a Clerk application and copy the **publishable key**.
+2. Add **`VITE_CLERK_PUBLISHABLE_KEY`** to Vercel (and Preview if needed) and **redeploy** so Vite embeds it.
+3. After deploy, the workbench shows **Clerk sign-in** until the user authenticates. Omit the variable (or set **`VITE_AUTH_DISABLED=1`**) to keep the previous anonymous behaviour.
+
+**If production shows no sign-in:** the most common cause is that **`VITE_CLERK_PUBLISHABLE_KEY` was never set for the Production environment in Vercel**, or you have not **redeployed** since adding it. Vite inlines `VITE_*` only at **build** time; `.env.local` on your laptop does not affect the hosted build. The live app also shows an amber banner when the key is missing.
+
+**API reads:** When **`CLERK_SECRET_KEY`** is set on Vercel, **`GET /api/shared-dsl`** requires a valid Clerk session JWT. Without it, reads follow the legacy open behaviour. See [docs/HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](docs/HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
+
 ---
 
 ## What you’re looking at

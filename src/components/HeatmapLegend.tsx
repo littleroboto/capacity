@@ -49,14 +49,14 @@ export function HeatmapLegend({
   });
 
   const techHeadroom = viewMode === 'combined';
-  const topLabel = techHeadroom ? 'Tight' : 'High';
-  const bottomLabel = techHeadroom ? 'Room' : 'Low';
+  const topLabel = techHeadroom ? 'Less free' : 'High';
+  const bottomLabel = techHeadroom ? 'More free' : 'Low';
   const ariaLabel = monoLegend
     ? techHeadroom
-      ? `Heat map legend: tighter capacity at top, more headroom at bottom, ${legendSteps} opacity steps (single colour).`
+      ? `Heat map legend: less delivery capacity free at top, more at bottom, ${legendSteps} opacity steps (single colour).`
       : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} opacity steps (single colour).`
     : techHeadroom
-      ? `Heat map legend: tighter capacity at top, more headroom at bottom, ${legendSteps} colour steps.`
+      ? `Heat map legend: less delivery capacity free at top, more at bottom, ${legendSteps} colour steps.`
       : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} colour steps from cool to warm.`;
 
   return (

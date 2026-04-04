@@ -33,17 +33,19 @@ export function DslSyntaxHelpBody({ className }: { className?: string }) {
     >
       Multiple documents in one file define the multi-country runway. In{' '}
       <span className="font-mono text-foreground/80">trading.weekly_pattern</span> and{' '}
-      <span className="font-mono text-foreground/80">tech.weekly_pattern</span> (prefer <strong>0–1</strong> numbers;
+      <span className="font-mono text-foreground/80">bau.market_it_weekly_load.weekday_intensity</span> (legacy{' '}
+      <span className="font-mono text-foreground/80">weekly_pattern</span> and top-level{' '}
+      <span className="font-mono text-foreground/80">tech:</span> still parse; prefer <strong>0–1</strong> numbers;
       named levels still work), use{' '}
       <span className="font-mono text-foreground/80">default</span> (or{' '}
       <span className="font-mono text-foreground/80">weekdays</span> /{' '}
       <span className="font-mono text-foreground/80">weekend</span>) plus per-day overrides instead of listing all seven
-      days. Other optional keys: <span className="font-mono text-foreground/80">tech.labs_scale</span> /{' '}
-      <span className="font-mono text-foreground/80">teams_scale</span>,{' '}
+      days. Other optional keys under that BAU block: <span className="font-mono text-foreground/80">labs_multiplier</span> /{' '}
+      <span className="font-mono text-foreground/80">teams_multiplier</span>,{' '}
       <span className="font-mono text-foreground/80">trading.monthly_pattern</span> (optional Jan–Dec{' '}
       <strong>0–1</strong> multipliers on weekly store level),{' '}
-      <span className="font-mono text-foreground/80">tech.support_weekly_pattern</span> /{' '}
-      <span className="font-mono text-foreground/80">support_monthly_pattern</span> (optional Market IT–only readiness
+      <span className="font-mono text-foreground/80">extra_support_weekdays</span> /{' '}
+      <span className="font-mono text-foreground/80">extra_support_months</span> (optional Market IT–only readiness
       rhythm; monthly defaults to <strong>1</strong>),{' '}
       <span className="font-mono text-foreground/80">trading.seasonal</span> (annual store wave),{' '}
       <span className="font-mono text-foreground/80">prep_before_live_days</span> +{' '}

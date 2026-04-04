@@ -172,7 +172,10 @@ export function pressureSurfaceLines(row: RiskRow): string[] {
   const sorted = entries.filter(([, v]) => v >= 0.02).sort((a, b) => b[1] - a[1]);
   return sorted.map(([k, v]) => {
     const label = SURFACE_LABEL[k] ?? k;
-    return `${label}: about ${(v * 100).toFixed(0)}% of the busier of lab vs Market IT (headline excludes backend)`;
+    const used = Math.min(1, Math.max(0, v));
+    const avail = Math.round((1 - used) * 100);
+    const usedPct = Math.round(used * 100);
+    return `${label}: ~${avail}% of the tighter lab / Market IT lane still free for this slice (~${usedPct}% of that lane scheduled; headline excludes backend)`;
   });
 }
 
@@ -183,30 +186,61 @@ export function techPressureExplanation(row: RiskRow): string {
   const m = Math.max(lab, team);
   if (m < 0.02) {
     if (backR >= 0.02) {
-      return `Lab and Market IT are light; backend is about ${(backR * 100).toFixed(0)}% of its capacity (backend is not part of this heatmap headline).`;
+      return `Lab and Market IT have plenty of slack; backend is about ${(backR * 100).toFixed(0)}% of its capacity (backend is not part of this heatmap headline).`;
     }
-    return 'Light day for tech — scheduled work is well below capacity.';
+    return 'Light day for tech — both lab and Market IT lanes have lots of room left.';
   }
+
+  const labAvailPct = Math.round(Math.max(0, (1 - Math.min(1, lab)) * 100));
+  const teamAvailPct = Math.round(Math.max(0, (1 - Math.min(1, team)) * 100));
+  const labOver = lab > 1.001;
+  const teamOver = team > 1.001;
   const eps = 0.001;
-  if (Math.abs(m - lab) < eps || lab >= team) {
-    return `Led by lab load (${(lab * 100).toFixed(0)}% of lab capacity${lab > 1.001 ? ' — above full capacity' : ''}).`;
+
+  if (labOver || teamOver) {
+    const labBit = labOver
+      ? 'lab scheduled above 100% of capacity (no headroom on that lane)'
+      : `lab ~${labAvailPct}% capacity still free`;
+    const teamBit = teamOver
+      ? 'Market IT scheduled above 100% of capacity'
+      : `Market IT ~${teamAvailPct}% still free`;
+    const bind = lab >= team ? 'lab' : 'Market IT';
+    return `The tighter lane is ${bind}. ${labBit}; ${teamBit}.`;
   }
-  return `Led by Market IT load (${(team * 100).toFixed(0)}% of Market IT capacity${team > 1.001 ? ' — above full capacity' : ''}).`;
+
+  if (Math.abs(lab - team) < eps) {
+    return `Lab and Market IT are similar: ~${labAvailPct}% lab capacity free, ~${teamAvailPct}% Market IT free.`;
+  }
+  if (lab >= team) {
+    return `Binding lane is lab: ~${labAvailPct}% of lab capacity still available; Market IT has more slack (~${teamAvailPct}% free).`;
+  }
+  return `Binding lane is Market IT: ~${teamAvailPct}% of Market IT capacity still available; lab has more slack (~${labAvailPct}% free).`;
 }
 
-/** Explains readiness vs live/support sub-scores (same cap as combined tech; not additive to headline tech pressure). */
+/** Explains readiness vs live/support buckets as availability on the tighter lane (not additive to the headline tile). */
 export function techReadinessSustainExplanation(row: RiskRow): string | null {
-  const r = row.tech_readiness_pressure ?? 0;
-  const s = row.tech_sustain_pressure ?? 0;
-  if (r < 0.02 && s < 0.02) return null;
+  const labsCap = row.labs_effective_cap ?? 0;
+  const teamsCap = row.teams_effective_cap ?? 0;
+  const lr = labsCap > 0 ? row.lab_load_readiness / labsCap : 0;
+  const tr = teamsCap > 0 ? row.team_load_readiness / teamsCap : 0;
+  const ls = labsCap > 0 ? row.lab_load_sustain / labsCap : 0;
+  const ts = teamsCap > 0 ? row.team_load_sustain / teamsCap : 0;
+  const readinessU = Math.max(lr, tr);
+  const sustainU = Math.max(ls, ts);
+  if (readinessU < 0.02 && sustainU < 0.02) return null;
+
+  const readinessAvail = Math.round(Math.max(0, (1 - Math.min(1, readinessU)) * 100));
+  const sustainAvail = Math.round(Math.max(0, (1 - Math.min(1, sustainU)) * 100));
   const parts: string[] = [];
-  if (r >= 0.02) {
-    parts.push(`readiness / change work ${(r * 100).toFixed(0)}% (of lab / Market IT caps; headline excludes backend)`);
+  if (readinessU >= 0.02) {
+    parts.push(
+      `readiness / change: ~${readinessAvail}% of the tighter lab / Market IT lane still free (headline excludes backend)`
+    );
   }
-  if (s >= 0.02) {
-    parts.push(`live / support segment ${(s * 100).toFixed(0)}%`);
+  if (sustainU >= 0.02) {
+    parts.push(`live / support: ~${sustainAvail}% still free on that lane`);
   }
-  return `Breakdown: ${parts.join(' · ')}. The main tech number is still total scheduled work compared with those same caps.`;
+  return `Breakdown: ${parts.join(' · ')}. Slices do not sum to the headline — the tile uses all scheduled work together.`;
 }
 
 export type RiskBlendTerm = {
@@ -219,7 +253,7 @@ export type RiskBlendTerm = {
   contribution: number;
 };
 
-/** Tooltip “blend” rows match the active runway lens (Technology = tech utilisation only). */
+/** Tooltip “blend” rows match the active runway lens (Technology = tech headroom / availability). */
 export function buildLensRiskBlendTerms(
   viewMode: ViewModeId,
   row: RiskRow,

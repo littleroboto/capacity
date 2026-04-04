@@ -17,6 +17,7 @@ import {
   type AggregatedDay,
 } from './phaseEngine';
 import { computeDeploymentRisk01 } from './deploymentRiskModel';
+import { effectiveMarketRiskScales } from './riskModelTuning';
 import { withOperationalNoise } from './dataNoise';
 import { computeRisk, type RiskRow } from './riskModel';
 import {
@@ -28,6 +29,7 @@ import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
 import { DEFAULT_RISK_TUNING, STORE_PRESSURE_MAX, type RiskModelTuning } from './riskModelTuning';
 import type { CampaignConfig, MarketConfig } from './types';
 import { TRADING_MONTH_KEYS } from '@/lib/tradingMonthlyDsl';
+import { looksLikeYamlDsl } from '@/lib/dslGuards';
 import { parseAllYamlDocuments } from './yamlDslParser';
 import {
   blendTowardMultiplier,
@@ -289,7 +291,7 @@ export function runPipeline(
       r,
       configByMarket[r.market],
       r.date,
-      tuning.marketRiskScales
+      effectiveMarketRiskScales(tuning.marketRiskScales, tuning.marketRiskMacros)
     ),
   }));
 
@@ -298,6 +300,14 @@ export function runPipeline(
 
 export function runPipelineFromDsl(dslText: string, tuning: RiskModelTuning = DEFAULT_RISK_TUNING): PipelineResult {
   try {
+    if (!looksLikeYamlDsl(dslText)) {
+      return {
+        riskSurface: [],
+        configs: [],
+        parseError:
+          'Content is not workspace YAML (e.g. pasted server/TypeScript, HTML, or a corrupted team Blob). Reset the workspace or fix capacity-shared/workspace.yaml in Blob storage.',
+      };
+    }
     const configs = parseYamlToConfigs(dslText);
     if (configs.length === 0) {
       return { riskSurface: [], configs: [], parseError: 'No valid config' };

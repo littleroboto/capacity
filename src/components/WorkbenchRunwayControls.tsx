@@ -51,8 +51,9 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
       <p className="text-[10px] leading-snug text-muted-foreground">
         {compareAllMarkets ? (
           <>
-            Lens applies to <span className="font-semibold text-foreground/90">all</span> markets. Use{' '}
-            <span className="font-semibold text-foreground/90">Focus</span> for YAML and heatmap controls on one market.
+            Lens applies to <span className="font-semibold text-foreground/90">all</span> markets. Heatmap curve and offset
+            sit in <span className="font-semibold text-foreground/90">Business Patterns</span> below; use{' '}
+            <span className="font-semibold text-foreground/90">Focus</span> for YAML rhythms on one market.
           </>
         ) : (
           <>
