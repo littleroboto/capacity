@@ -1,23 +1,35 @@
 import type { ReactNode } from 'react';
-import { useLayoutEffect } from 'react';
-import { useAuth } from '@clerk/react';
-import { setSharedDslClerkTokenGetter } from '@/lib/sharedDslSync';
+import { useLayoutEffect, useMemo } from 'react';
+import { useAuth, useOrganization } from '@clerk/react';
+import { membershipAllowsSharedDslWrite, parseViteClerkDslWriteRoles } from '@/lib/clerkDslRoles';
+import {
+  setSharedDslClerkOrgWriteAllowed,
+  setSharedDslClerkTokenGetter,
+} from '@/lib/sharedDslSync';
 
 /**
- * Registers Clerk `getToken()` for `/api/shared-dsl` (see Clerk MCP: use-auth — Bearer session token).
- * Must render under `ClerkProvider`. Clears the getter when signed out or still loading.
+ * Registers Clerk `getToken()` for `/api/shared-dsl` and mirrors org write policy when
+ * `VITE_CLERK_DSL_WRITE_ROLES` is set (must match server `CAPACITY_CLERK_DSL_WRITE_ROLES`).
  */
 export function ClerkSharedDslBridge({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { membership } = useOrganization();
+  const writeAllowList = useMemo(() => parseViteClerkDslWriteRoles(), []);
 
   useLayoutEffect(() => {
     if (!isLoaded || !isSignedIn) {
       setSharedDslClerkTokenGetter(null);
+      setSharedDslClerkOrgWriteAllowed(true);
       return;
     }
     setSharedDslClerkTokenGetter(() => getToken());
-    return () => setSharedDslClerkTokenGetter(null);
-  }, [isLoaded, isSignedIn, getToken]);
+    const orgOk = membershipAllowsSharedDslWrite(membership?.role, writeAllowList);
+    setSharedDslClerkOrgWriteAllowed(orgOk);
+    return () => {
+      setSharedDslClerkTokenGetter(null);
+      setSharedDslClerkOrgWriteAllowed(true);
+    };
+  }, [isLoaded, isSignedIn, getToken, membership?.role, writeAllowList]);
 
   return <>{children}</>;
 }

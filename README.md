@@ -34,6 +34,18 @@ Until someone saves once, the app uses bundled `public/data/markets/*.yaml`; the
 
 **API reads:** When **`CLERK_SECRET_KEY`** is set on Vercel, **`GET /api/shared-dsl`** requires a valid Clerk session JWT. Without it, reads follow the legacy open behaviour. See [docs/HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](docs/HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
 
+**Org roles (viewer vs editor)** — do these in order:
+
+1. **Clerk Dashboard** → **Configure** → **Organizations** → enable **Organizations** for this application.
+2. **Clerk Dashboard** → **Organizations** → open your org → **Members** → assign roles. Create or use roles whose **keys** match what you will allow (e.g. `admin`, `member`, `editor`). Users who must **not** save YAML get a role you will **omit** from the env list (e.g. `viewer`).
+3. Open the live app. In the **header**, use the **organization switcher** (to the left of your avatar). **Choose the organization** for this workspace. Saving with role checks **requires** an active org so the session token includes organization role claims.
+4. **Vercel** → your project → **Settings** → **Environment Variables** → **Production**:
+   - `CAPACITY_CLERK_DSL_WRITE_ROLES` = `admin,member,editor` (same tokens Clerk puts in the JWT for those roles; no spaces required).
+5. Add **`VITE_CLERK_DSL_WRITE_ROLES`** = `admin,member,editor` for **Production** (and Preview if you use it).
+6. **Deployments** → **Redeploy** the production deployment so Vite embeds `VITE_*`.
+
+Omit both role env vars to keep **any signed-in user can PUT** (no org role filter).
+
 ---
 
 ## What you’re looking at

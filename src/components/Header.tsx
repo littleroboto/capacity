@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from '@/lib/constants';
 import { APP_VERSION, GIT_COMMIT_SHORT } from '@/lib/buildMeta';
+import { HeaderClerkOrgSwitcher } from '@/components/HeaderClerkOrgSwitcher';
 import { HeaderClerkUser } from '@/components/HeaderClerkUser';
 import { cn } from '@/lib/utils';
 import { useCallback, useState } from 'react';
@@ -124,6 +125,7 @@ export function Header() {
                 ) : null}
               </div>
 
+              <HeaderClerkOrgSwitcher compact />
               <HeaderClerkUser compact />
 
               <Button
@@ -153,7 +155,8 @@ export function Header() {
                       </span>
                     </h1>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="flex min-w-0 shrink-0 items-center gap-1">
+                    <HeaderClerkOrgSwitcher className="border-0 pl-0" />
                     <HeaderClerkUser className="border-0 pl-0" />
                     <Button
                       type="button"

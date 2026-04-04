@@ -1,9 +1,43 @@
 import { verifyToken } from '@clerk/backend';
 
 export type SharedDslPrincipal =
-  | { kind: 'clerk'; userId: string }
+  | { kind: 'clerk'; userId: string; orgRoleNorm: string | null }
   | { kind: 'legacy' }
   | { kind: 'none' };
+
+function normalizeClerkOrgRoleToken(raw: string): string {
+  return raw.trim().toLowerCase().replace(/^org:/, '');
+}
+
+/**
+ * Session token v2: `o.rol` (no `org:` prefix). v1: top-level `org_role` e.g. `org:admin`.
+ * @see https://clerk.com/docs/guides/sessions/session-tokens
+ */
+export function extractOrgRoleNormFromVerifiedJwt(payload: Record<string, unknown>): string | null {
+  const v1 = payload.org_role;
+  if (typeof v1 === 'string' && v1.trim()) return normalizeClerkOrgRoleToken(v1);
+
+  const o = payload.o;
+  if (o && typeof o === 'object' && o !== null && !Array.isArray(o)) {
+    const rol = (o as Record<string, unknown>).rol;
+    if (typeof rol === 'string' && rol.trim()) return normalizeClerkOrgRoleToken(rol);
+  }
+  return null;
+}
+
+/** When non-null, PUT requires JWT org role ∈ list (after normalizing). When null, any signed-in Clerk user may PUT. */
+export function parseClerkDslWriteAllowListFromEnv(raw: string | undefined): string[] | null {
+  const t = raw?.trim();
+  if (!t) return null;
+  const parts = t.split(',').map((s) => normalizeClerkOrgRoleToken(s)).filter(Boolean);
+  return parts.length ? parts : null;
+}
+
+export function clerkJwtAllowedToPutSharedDsl(orgRoleNorm: string | null, allowList: string[] | null): boolean {
+  if (allowList == null) return true;
+  if (!orgRoleNorm) return false;
+  return allowList.includes(orgRoleNorm);
+}
 
 export function clerkSecretKeyConfigured(): boolean {
   return Boolean(process.env.CLERK_SECRET_KEY?.trim());
@@ -40,9 +74,15 @@ export async function authenticateSharedDslBearer(
       const opts: Parameters<typeof verifyToken>[1] = { secretKey: clerkSecret };
       const parties = authorizedParties();
       if (parties?.length) opts.authorizedParties = parties;
-      const payload = await verifyToken(bearer, opts);
+      const payload = (await verifyToken(bearer, opts)) as Record<string, unknown>;
       const sub = typeof payload.sub === 'string' ? payload.sub : null;
-      if (sub) return { kind: 'clerk', userId: sub };
+      if (sub) {
+        return {
+          kind: 'clerk',
+          userId: sub,
+          orgRoleNorm: extractOrgRoleNormFromVerifiedJwt(payload),
+        };
+      }
     } catch {
       /* not a valid Clerk JWT */
     }

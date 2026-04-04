@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
 import { ProductionAuthHintBanner } from '@/components/ProductionAuthHintBanner';
+import { SharedCloudLoadWarningBanner } from '@/components/SharedCloudLoadWarningBanner';
 import { DSLPanel } from '@/components/DSLPanel';
 import { WORKBENCH_SPLIT_HANDLE_PX, WorkbenchSplitHandle } from '@/components/WorkbenchSplitHandle';
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
@@ -17,7 +18,7 @@ import { isRunwayAllMarkets } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import { mergeStateToFullMultiDoc, splitToDslByMarket } from '@/lib/multiDocMarketYaml';
 import {
-  fetchSharedDsl,
+  fetchSharedDslDetailed,
   initSharedDslOutboundSync,
   isSharedDslEnabled,
   markSharedDslBaseline,
@@ -54,6 +55,7 @@ export default function App() {
   const lgUp = useMediaMinWidth(1024);
   const dslPanelLayoutCollapsed = dslPanelCollapsed && lgUp;
   const mainGridRef = useRef<HTMLDivElement>(null);
+  const [cloudLoadWarning, setCloudLoadWarning] = useState<string | null>(null);
 
   const [dslRightWidthPx, setDslRightWidthPx] = useState(() => {
     try {
@@ -154,16 +156,20 @@ export default function App() {
       if (isSharedDslEnabled()) {
         await waitForSharedDslFetchAuth();
         if (cancelled) return;
-        const remote = await fetchSharedDsl();
+        const detail = await fetchSharedDslDetailed();
         if (cancelled) return;
-        if (remote) {
+        if (detail.ok) {
           setAtcDsl(null);
-          setSharedDslEtag(remote.etag || null);
-          multiDocFallback = remote.yaml;
-          const split = splitToDslByMarket(remote.yaml);
+          setSharedDslEtag(detail.etag || null);
+          multiDocFallback = detail.yaml;
+          const split = splitToDslByMarket(detail.yaml);
           for (const [k, v] of Object.entries(split)) {
             dslByMarket[k] = v;
           }
+        } else if (detail.reason === 'unauthorized' && !cancelled) {
+          setCloudLoadWarning(
+            'The team cloud workspace did not authorize this session (HTTP 401). You are viewing bundled market YAML only. Check sign-in, Vercel CLERK_SECRET_KEY, and CAPACITY_CLERK_AUTHORIZED_PARTIES, then reload — or open Workspace below for a connection check.'
+          );
         }
       }
 
@@ -191,6 +197,9 @@ export default function App() {
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
       <ProductionAuthHintBanner />
+      {cloudLoadWarning ? (
+        <SharedCloudLoadWarningBanner message={cloudLoadWarning} onDismiss={() => setCloudLoadWarning(null)} />
+      ) : null}
       <Header />
       <main
         className={cn(

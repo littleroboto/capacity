@@ -7,14 +7,17 @@
  * - `CAPACITY_SHARED_DSL_SECRET` — legacy write secret (optional if only Clerk JWT used for PUT)
  * - `CAPACITY_CLERK_AUTHORIZED_PARTIES` — optional comma-separated origins for `verifyToken` (recommended in production)
  * - `CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE` — when `1` and `CLERK_SECRET_KEY` is set, PUT rejects legacy shared secret (JWT only)
+ * - `CAPACITY_CLERK_DSL_WRITE_ROLES` — optional comma list (e.g. `admin,member,editor`); JWT org role must match after normalizing; unset = any signed-in user may PUT
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { BlobNotFoundError, BlobPreconditionFailedError, get, head, put } from '@vercel/blob';
 import {
   authenticateSharedDslBearer,
   bearerFromAuthorizationHeader,
+  clerkJwtAllowedToPutSharedDsl,
   clerkSecretKeyConfigured,
   legacySharedDslWriteDisabled,
+  parseClerkDslWriteAllowListFromEnv,
 } from './lib/clerkAuthSharedDsl';
 
 const PATHNAME = 'capacity-shared/workspace.yaml';
@@ -60,7 +63,19 @@ async function requireWriteAuth(req: VercelRequest, res: VercelResponse): Promis
   const p = await authenticateSharedDslBearer(bearer, 'write');
 
   if (clerkSecretKeyConfigured()) {
-    if (p.kind === 'clerk' || p.kind === 'legacy') return true;
+    if (p.kind === 'legacy') return true;
+    if (p.kind === 'clerk') {
+      const allow = parseClerkDslWriteAllowListFromEnv(process.env.CAPACITY_CLERK_DSL_WRITE_ROLES);
+      if (!clerkJwtAllowedToPutSharedDsl(p.orgRoleNorm, allow)) {
+        res.status(403).json({
+          error: 'forbidden',
+          message:
+            'Your organization role cannot save the team workspace. Use an active organization in Clerk and a role listed in CAPACITY_CLERK_DSL_WRITE_ROLES (server env), e.g. admin or a custom editor role.',
+        });
+        return false;
+      }
+      return true;
+    }
     res.status(401).json({
       error: 'unauthorized',
       message:

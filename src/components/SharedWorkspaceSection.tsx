@@ -12,6 +12,7 @@ import {
   pushCurrentWorkspaceToCloud,
   setSharedDslBearer,
   SHARED_DSL_AUTH_CHANGED_EVENT,
+  sharedDslCloudPutAllowedSync,
   sharedDslWriteReadySync,
   type FetchSharedDslDetailed,
 } from '@/lib/sharedDslSync';
@@ -151,7 +152,8 @@ export function SharedWorkspaceSection() {
 
   if (!isSharedDslEnabled()) return null;
 
-  const canWrite = sharedDslWriteReadySync();
+  const hasCloudAuth = sharedDslWriteReadySync();
+  const canPutToCloud = sharedDslCloudPutAllowedSync();
   const clerkOn = isClerkConfigured();
 
   const legacySecretFields = (
@@ -177,7 +179,8 @@ export function SharedWorkspaceSection() {
           size="sm"
           variant="secondary"
           className="h-8 shrink-0 text-xs"
-          disabled={cloudBusy}
+          disabled={cloudBusy || !canPutToCloud}
+          title={!canPutToCloud ? 'Your role cannot upload to the team cloud.' : undefined}
           onClick={() => void onSaveSecret()}
         >
           Save secret & upload
@@ -239,19 +242,37 @@ export function SharedWorkspaceSection() {
             size="sm"
             variant="default"
             className="h-8 text-xs"
-            disabled={cloudBusy || !canWrite}
-            title={!canWrite ? 'Sign in (Clerk) or save the team secret first' : undefined}
+            disabled={cloudBusy || !canPutToCloud}
+            title={
+              !hasCloudAuth
+                ? 'Sign in (Clerk) or save the team secret first'
+                : !canPutToCloud
+                  ? 'Your Clerk organization role cannot save (viewer or role not in VITE_CLERK_DSL_WRITE_ROLES).'
+                  : undefined
+            }
             onClick={() => void runSaveToCloud()}
           >
             {cloudBusy ? 'Saving…' : 'Save to cloud now'}
           </Button>
           <p className="text-[11px] text-muted-foreground">
-            {canWrite ? (
-              <span className="font-medium text-foreground/85">Ready to publish</span>
+            {!hasCloudAuth ? (
+              <>
+                <span className="font-medium text-foreground/85">Read-only</span>
+                {' · sign in or add secret above.'}
+              </>
+            ) : !canPutToCloud ? (
+              <>
+                <span className="font-medium text-foreground/85">Cloud read-only</span>
+                {' · your org role cannot PUT; pulls still work. Match '}
+                <code className="rounded bg-muted px-1 font-mono text-[10px]">VITE_CLERK_DSL_WRITE_ROLES</code> with the
+                server allow list.
+              </>
             ) : (
-              <span className="font-medium text-foreground/85">Read-only</span>
+              <>
+                <span className="font-medium text-foreground/85">Ready to publish</span>
+                {' · auto-save ~3s after YAML changes.'}
+              </>
             )}
-            {canWrite ? ' · auto-save ~3s after YAML changes.' : ' · sign in or add secret above.'}
           </p>
         </div>
         {cloudFeedback ? (

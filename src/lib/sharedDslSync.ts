@@ -10,9 +10,18 @@ const SESSION_BEARER_KEY = 'capacity:shared-dsl-bearer';
 export const SHARED_DSL_AUTH_CHANGED_EVENT = 'capacity:shared-dsl-auth-changed';
 
 let clerkTokenGetter: (() => Promise<string | null>) | null = null;
+/** When false, Clerk session is present but org role is not allowed to PUT (see {@link setSharedDslClerkOrgWriteAllowed}). */
+let clerkOrgWriteAllowed = true;
 
 export function setSharedDslClerkTokenGetter(fn: (() => Promise<string | null>) | null): void {
   clerkTokenGetter = fn;
+  if (fn == null) clerkOrgWriteAllowed = true;
+  notifySharedDslAuthChanged();
+}
+
+export function setSharedDslClerkOrgWriteAllowed(allowed: boolean): void {
+  if (clerkOrgWriteAllowed === allowed) return;
+  clerkOrgWriteAllowed = allowed;
   notifySharedDslAuthChanged();
 }
 
@@ -29,6 +38,16 @@ function notifySharedDslAuthChanged(): void {
 /** True if cloud save can authenticate: Clerk session (getter set) or legacy bearer saved. */
 export function sharedDslWriteReadySync(): boolean {
   return Boolean(clerkTokenGetter || getSharedDslBearer()?.trim());
+}
+
+/**
+ * True if outbound PUT to `/api/shared-dsl` should run: has credentials and (for Clerk JWT path) org role allows writes.
+ * Legacy bearer-only path is always allowed here; the server still enforces secrets and role lists.
+ */
+export function sharedDslCloudPutAllowedSync(): boolean {
+  if (!sharedDslWriteReadySync()) return false;
+  if (clerkTokenGetter == null) return true;
+  return clerkOrgWriteAllowed;
 }
 
 /**
@@ -338,6 +357,13 @@ export type PutSharedDslResult = {
 };
 
 export async function putSharedDsl(yaml: string, ifMatch: string | null): Promise<PutSharedDslResult> {
+  if (!sharedDslCloudPutAllowedSync()) {
+    return {
+      ok: false,
+      errorMessage:
+        'Your organization role cannot save the team workspace in this session. Ask an admin for a role listed in VITE_CLERK_DSL_WRITE_ROLES (must match server CAPACITY_CLERK_DSL_WRITE_ROLES).',
+    };
+  }
   const { headers } = await buildSharedDslAuth();
   if (!headers.Authorization) {
     return {
@@ -359,6 +385,16 @@ export async function putSharedDsl(yaml: string, ifMatch: string | null): Promis
       }),
     });
     if (res.status === 409) return { ok: false, conflict: true, errorMessage: 'Someone else saved first (conflict).' };
+    if (res.status === 403) {
+      let msg = 'Save forbidden — your role cannot edit the team workspace.';
+      try {
+        const j = (await res.json()) as { message?: string };
+        if (typeof j.message === 'string' && j.message.trim()) msg = j.message.trim();
+      } catch {
+        /* ignore */
+      }
+      return { ok: false, errorMessage: msg };
+    }
     if (!res.ok) {
       let errorMessage = `Save failed (HTTP ${res.status})`;
       try {
@@ -424,7 +460,7 @@ export function initSharedDslOutboundSync(): () => void {
     const full = mergeStateToFullMultiDoc(state);
     if (!looksLikeYamlDsl(full)) return;
     if (full === lastPushedYaml) return;
-    if (!sharedDslWriteReadySync()) return;
+    if (!sharedDslCloudPutAllowedSync()) return;
 
     if (outboundSyncDebounceTimer) clearTimeout(outboundSyncDebounceTimer);
     outboundSyncDebounceTimer = setTimeout(() => {
