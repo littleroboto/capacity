@@ -337,7 +337,7 @@ Use this as a default **dependency-aware sequence** when scheduling engineering 
 | Phase | Epics | Notes |
 |-------|--------|--------|
 | **1 — Foundation** | Data model (segments/countries), Landing page (lite), Shared workspace polish (optional) | Baseline in [PRODUCT_BASELINE.md](./PRODUCT_BASELINE.md). |
-| **1b — Runway experience** | **Lens naming**; **Continuous heatmap**; **Day summary IA**; **Iso 3D polish**; **View settings & presets** | Parallel UX/visual work; no hard deps on auth. Ids: `epic-runway-lens-naming`, `epic-heatmap-continuous-spectrum`, `epic-day-summary-ia`, `epic-iso-runway-polish`, `epic-view-settings-presets`. |
+| **1b — Runway experience** | **Lens naming**; **Continuous heatmap**; **Day summary IA**; **Iso 3D polish**; **View settings & presets** | Parallel UX/visual work; no hard deps on auth. Ids: `epic-runway-lens-naming`, `epic-heatmap-continuous-spectrum`, `epic-day-summary-ia`, `epic-iso-runway-polish`, `epic-view-settings-presets`. **Agent handoff (naming + day-summary IA):** [HANDOFF_PHASE_1B_RUNWAY_UX.md](./HANDOFF_PHASE_1B_RUNWAY_UX.md). |
 | **2 — Planning intelligence** | **Runway auto-plan** (slot finder); **Corporate calendar & deployment risk** (optional, feeds constraints / scoring) | Auto-plan uses runway + stack config; corporate windows extend DSL/scoring when ready—see `epic-corporate-calendar-risk`. |
 | **3 — Identity** | User, org, and permissions | Unblocks everything that needs “who.” |
 | **4 — Collab core** | Yjs + PartyKit | After auth story for rooms; can use secret-gated MVP before full JWT. |

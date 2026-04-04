@@ -170,6 +170,11 @@ type AtcState = {
   /** `#rrggbb` when {@link heatmapRenderStyle} is `mono`. */
   heatmapMonoColor: string;
   /**
+   * When {@link heatmapRenderStyle} is `spectrum`, use smooth RGB interpolation between palette anchors
+   * instead of 10 solid bands (see `heatmapColorContinuous` in `riskHeatmapColors.ts`).
+   */
+  heatmapSpectrumContinuous: boolean;
+  /**
    * When non-null, workbench shows Back → this picker value (set when opening a single market from
    * LIOM column header). Not persisted.
    */
@@ -197,6 +202,7 @@ type AtcState = {
   setRunwayIncludeFollowingQuarter: (v: boolean) => void;
   setHeatmapRenderStyle: (v: HeatmapRenderStyle) => void;
   setHeatmapMonoColor: (hex: string) => void;
+  setHeatmapSpectrumContinuous: (v: boolean) => void;
   setDslText: (t: string) => void;
   setRunwayMarketOrder: (ids: string[]) => void;
   setDslByMarket: (m: Record<string, string>) => void;
@@ -280,6 +286,7 @@ export const useAtcStore = create<AtcState>()(
       runwayIncludeFollowingQuarter: false,
       heatmapRenderStyle: 'spectrum',
       heatmapMonoColor: DEFAULT_HEATMAP_MONO_COLOR,
+      heatmapSpectrumContinuous: false,
       riskSurface: [],
       configs: [],
       parseError: null,
@@ -392,6 +399,7 @@ export const useAtcStore = create<AtcState>()(
 
       setHeatmapRenderStyle: (v) => set({ heatmapRenderStyle: v }),
       setHeatmapMonoColor: (hex) => set({ heatmapMonoColor: normalizeHeatmapMonoHex(hex) }),
+      setHeatmapSpectrumContinuous: (v) => set({ heatmapSpectrumContinuous: Boolean(v) }),
 
       setDslText: (t) => {
         if (shouldBlockDslMutation(get)) return;
@@ -977,6 +985,10 @@ export const useAtcStore = create<AtcState>()(
           base.heatmapRenderStyle === 'mono' || base.heatmapRenderStyle === 'spectrum'
             ? base.heatmapRenderStyle
             : current.heatmapRenderStyle;
+        const heatmapSpectrumContinuous =
+          typeof base.heatmapSpectrumContinuous === 'boolean'
+            ? base.heatmapSpectrumContinuous
+            : current.heatmapSpectrumContinuous;
         const heatmapMonoColor = normalizeHeatmapMonoHex(
           typeof base.heatmapMonoColor === 'string' ? base.heatmapMonoColor : current.heatmapMonoColor
         );
@@ -1049,6 +1061,7 @@ export const useAtcStore = create<AtcState>()(
           runwaySvgHeatmap,
           heatmapRenderStyle,
           heatmapMonoColor,
+          heatmapSpectrumContinuous,
           theme,
           techWorkloadScope,
           dslLlmAssistantEnabled,
@@ -1076,6 +1089,7 @@ export const useAtcStore = create<AtcState>()(
         runwaySvgHeatmap: s.runwaySvgHeatmap,
         heatmapRenderStyle: s.heatmapRenderStyle,
         heatmapMonoColor: s.heatmapMonoColor,
+        heatmapSpectrumContinuous: s.heatmapSpectrumContinuous,
         techWorkloadScope: s.techWorkloadScope,
         dslLlmAssistantEnabled: s.dslLlmAssistantEnabled,
         runwayFilterYear: s.runwayFilterYear,

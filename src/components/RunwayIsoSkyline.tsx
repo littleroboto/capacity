@@ -3,8 +3,7 @@ import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import type { HeatmapColorOpts } from '@/lib/riskHeatmapColors';
-import { HEATMAP_RUNWAY_PAD_FILL } from '@/lib/riskHeatmapColors';
-import { transformedHeatmapMetric } from '@/lib/riskHeatmapColors';
+import { HEATMAP_RUNWAY_PAD_FILL, transformedHeatmapMetric } from '@/lib/riskHeatmapColors';
 import { heatmapCellMetric, runwayHeatmapCellFillAndDim, type TechWorkloadScope } from '@/lib/runwayViewMetrics';
 import {
   skylineChronologyGroups,
@@ -26,6 +25,7 @@ import {
   EMPTY_LEFT,
   EMPTY_RIGHT,
   EMPTY_TOP,
+  ISO_GROUND_LABEL_TEXT_PROPS,
   isoHandlers,
   type IsoLayoutCore,
 } from '@/components/RunwayIsoHeatCell';
@@ -319,7 +319,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           const height01 = transformedHeatmapMetric(viewMode, metric, heatmapOpts);
           const calH = calHeightFromMetric(height01, rowTowerPx, isPad);
           const columnTy = deckAndColumnY(L, calH, runwayBandH);
-          const base = isPad ? 'rgb(51, 65, 85)' : fill;
+          const base = isPad ? HEATMAP_RUNWAY_PAD_FILL : fill;
           const topC = contribPanelFill(base, 'top');
           const leftC = contribPanelFill(base, 'left');
           const rightC = contribPanelFill(base, 'right');
@@ -361,6 +361,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
               transform={moMatrix(tx, ty, moFs)}
               className="fill-muted-foreground font-medium tabular-nums tracking-tight"
               fontSize={moFs}
+              {...ISO_GROUND_LABEL_TEXT_PROPS}
             >
               {text}
             </text>
@@ -374,6 +375,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
               transform={moMatrix(tx, ty, qFs)}
               className="fill-muted-foreground font-bold tabular-nums tracking-tight"
               fontSize={qFs}
+              {...ISO_GROUND_LABEL_TEXT_PROPS}
             >
               {text}
             </text>
@@ -387,6 +389,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
               transform={moMatrix(tx, ty, yrFs)}
               className="fill-muted-foreground font-semibold tabular-nums tracking-tight"
               fontSize={yrFs}
+              {...ISO_GROUND_LABEL_TEXT_PROPS}
             >
               {text}
             </text>

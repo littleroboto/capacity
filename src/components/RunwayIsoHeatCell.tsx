@@ -175,3 +175,11 @@ export function calHeightFromMetric(height01: number, towerPx: number, isPad: bo
   const span = Math.max(8, towerPx * 0.96);
   return Math.max(3, 3 + height01 * span);
 }
+
+/** Stroke halo so iso ground-plane labels stay readable in light and dark themes. */
+export const ISO_GROUND_LABEL_TEXT_PROPS = {
+  stroke: 'hsl(var(--background))',
+  strokeWidth: 2.75,
+  paintOrder: 'stroke fill' as const,
+  style: { strokeLinejoin: 'round' as const },
+};

@@ -31,6 +31,7 @@ import {
   EMPTY_TOP,
   EMPTY_LEFT,
   EMPTY_RIGHT,
+  ISO_GROUND_LABEL_TEXT_PROPS,
   type IsoLayoutCore,
 } from '@/components/RunwayIsoHeatCell';
 
@@ -392,7 +393,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
           const height01 = transformedHeatmapMetric(viewMode, metric, heatmapOpts);
           const calH = calHeightFromMetric(height01, towerPx, isPad);
           const columnTy = deckAndColumnY(L, calH, runwayBandH);
-          const base = isPad ? 'rgb(51, 65, 85)' : fill;
+          const base = isPad ? HEATMAP_RUNWAY_PAD_FILL : fill;
           const topC = contribPanelFill(base, 'top');
           const leftC = contribPanelFill(base, 'left');
           const rightC = contribPanelFill(base, 'right');
@@ -427,6 +428,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
                 transform={mktMatrix(tx, ty)}
                 className="fill-foreground font-bold tracking-tight"
                 fontSize={mktFs}
+                {...ISO_GROUND_LABEL_TEXT_PROPS}
               >
                 {label}
               </text>
@@ -445,6 +447,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
               transform={moMatrix(tx, ty)}
               className="fill-muted-foreground font-medium tabular-nums tracking-tight"
               fontSize={moFs}
+              {...ISO_GROUND_LABEL_TEXT_PROPS}
             >
               {text}
             </text>
@@ -459,6 +462,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
               transform={moMatrix(tx, ty)}
               className="fill-muted-foreground font-bold tabular-nums tracking-tight"
               fontSize={qFs}
+              {...ISO_GROUND_LABEL_TEXT_PROPS}
             >
               {text}
             </text>
@@ -473,6 +477,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
               transform={moMatrix(tx, ty)}
               className="fill-muted-foreground font-semibold tabular-nums tracking-tight"
               fontSize={yrFs}
+              {...ISO_GROUND_LABEL_TEXT_PROPS}
             >
               {text}
             </text>

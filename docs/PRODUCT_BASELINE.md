@@ -1,6 +1,6 @@
 # Product baseline (April 2026)
 
-Single source of truth for **what this repo ships today**, so older docs (OWM, cal-heatmap, vanilla stack) are not mistaken for current reality. For **roadmap and epics**, see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md).
+Single source of truth for **what this repo ships today**, so older docs (OWM, cal-heatmap, vanilla stack) are not mistaken for current reality. For **roadmap and epics**, see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md). **Runway lens names and heatmap semantics** also have a concise table in [LENS_GLOSSARY.md](./LENS_GLOSSARY.md).
 
 ## What ships
 
@@ -12,15 +12,16 @@ Single source of truth for **what this repo ships today**, so older docs (OWM, c
 
 ## Runway UI and lenses
 
-Three **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
+Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 
 | Mode | Label | What the heatmap shows |
 |------|--------|-------------------------|
-| **`combined`** | Technology Teams | **Tech capacity demand** — max of **lab** and **Market IT** scheduled load vs effective capacity (`tech_demand_ratio` / related); **backend** YAML loads are **not** included in the headline heatmap. Can exceed 100% when overloaded. **Store-trading rhythm (including early-month lift) does not feed this metric**; it is phase/capacity only. Optional workload slice: **Combined** / **BAU only** / **Project work**. |
+| **`combined`** | Technology Teams | **Tech capacity headroom** (0–1): share of lab and Market IT capacity still free versus scheduled work on those lanes (`technologyHeadroomHeatmapMetric` / related); **backend** YAML loads are **not** included in the headline heatmap. Cooler tiles = more slack. **Store-trading rhythm (including early-month lift) does not feed this metric**; it is phase/capacity only. Optional workload slice: **Combined** / **BAU only** / **Project work**. |
 | **`in_store`** | Restaurant Activity | **Trading pressure** — `store_pressure`: weekly × monthly × seasonal rhythm, **early-month multiplier** (capped at **+20%** on normalised store rhythm, YAML/tuning), public-holiday trading multiplier, campaign **store** boosts, operating-window store multipliers. **Does not change tech loads.** |
+| **`market_risk`** | Market risk | **Market risk** score (0–1): deployment and calendar **fragility** from holidays, trading intensity, campaigns × peaks, tech bench strain, optional blackouts/events in YAML (`deployment_risk_01`). Hotter = more fragile context—not a deployment ban. |
 | **`code`** | Code | Full multi-market **YAML** in the editor (Monaco). Switching back to a runway lens re-runs the pipeline from current DSL. |
 
-**Risk score** (`risk_score`) is a **separate blended 0–1 score** (tech + store + campaign + holiday weights from **Heatmap adjustments** tuning). It drives **Low / Medium / High** band and related copy in day details; it is **not** the same number as the **Technology** or **Restaurant** heatmap cell fill. Technology lens tooltips emphasise **tech-only** fill; Restaurant lens emphasises **store-only** fill.
+**Planning blend** (`planning_blend_01` / `risk_score` family) is a **separate 0–1 mix** (tech + store + campaign + holiday weights from **Heatmap adjustments** tuning). It drives **Low / Medium / High** banding and related copy in day details; it is **not** the same number as the **Technology**, **Restaurant**, or **Market risk** heatmap cell fill. Each lens tooltip and day detail separates **this heatmap’s paint** from the **planning blend**.
 
 **Compare runway** (header: all markets / single market) uses the same engine with market columns as today.
 
@@ -39,16 +40,14 @@ Three **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 
 ## Not in this baseline (planned / backlog)
 
-- **Dedicated Risk heatmap lens** (corporate calendar, graded deployment fragility) — design target; not a fourth `VIEW_MODES` entry yet.
-- **Technology heatmap coloured by headroom / available capacity** (vs demand) — product direction; current colouring follows **demand** metrics.
 - **Full** user/org model on the **API** (protected `GET`/`PUT` shared DSL, roles, SSO) — partial client gate only today; see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) and [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
 - Real-time collab (Yjs / PartyKit); version history DB; comments/chat — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md).
-- **Runway auto-plan** (slot finder, ghost overlays, 3D viz) — backlog **Phase 2**; intended to build on tech capacity / headroom story once shipped.
+- **Runway auto-plan** (slot finder, ghost overlays, 3D viz) — backlog **Phase 2**; intended to build on runway lenses once shipped.
 
 ## Code anchors
 
 | Area | Location |
-|------|-----------|
+|------|----------|
 | Shared Blob API | `api/shared-dsl.ts` |
 | Client sync (save / pull / autosave) | `src/lib/sharedDslSync.ts` |
 | Workspace UI | `src/components/SharedWorkspaceSection.tsx` |

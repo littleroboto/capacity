@@ -277,7 +277,7 @@ export function buildLensRiskBlendTerms(
     return [
       {
         key: 'deployment',
-        label: 'Deployment / calendar risk (this heatmap)',
+        label: 'Market risk (this heatmap)',
         factor: d,
         weight: 1,
         contribution: d,
@@ -413,9 +413,11 @@ export type RunwayTooltipPayload = {
   techReadinessSustainLine: string | null;
   riskTerms: RiskBlendTerm[];
   riskBand: string;
-  /** Short card title (e.g. Tech capacity demand / Trading pressure). */
+  /** Short card title (e.g. Combined tech headroom / Trading pressure). */
   fillMetricHeadline: string;
   fillMetricLabel: string;
+  /** One scannable sentence for popover; panel may use {@link fillMetricLabel}. */
+  fillMetricLeadCompact: string;
   fillMetricValue: number;
   /** Heatmap cell fill (hex) for KPI pill background. */
   cellFillHex: string;
@@ -446,6 +448,7 @@ export function buildRunwayTooltipPayload(input: {
   tuning: RiskModelTuning;
   fillMetricHeadline: string;
   fillMetricLabel: string;
+  fillMetricLeadCompact: string;
   fillMetricValue: number;
   cellFillHex: string;
   /** Technology lens workload slice (combined load, BAU, or project surfaces). */
@@ -461,6 +464,7 @@ export function buildRunwayTooltipPayload(input: {
     tuning,
     fillMetricHeadline,
     fillMetricLabel,
+    fillMetricLeadCompact,
     fillMetricValue,
     cellFillHex,
     techWorkloadScope = 'all',
@@ -489,6 +493,7 @@ export function buildRunwayTooltipPayload(input: {
     riskBand: row.risk_band,
     fillMetricHeadline,
     fillMetricLabel,
+    fillMetricLeadCompact,
     fillMetricValue,
     cellFillHex,
     publicHolidayName: row.public_holiday_flag ? getStubPublicHolidayName(market, dateStr) : null,

@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react';
 import { TermWithDefinition } from '@/components/DefinitionInfo';
 import type { RunwayTooltipPayload } from '@/lib/runwayTooltipBreakdown';
-import { glossaryFillScore, glossaryPlanningBlend } from '@/lib/runwayDayDetailsGlossary';
+import {
+  glossaryFillScore,
+  glossaryFillScorePopover,
+  glossaryPlanningBlend,
+  glossaryPlanningBlendPopover,
+} from '@/lib/runwayDayDetailsGlossary';
 import { cn } from '@/lib/utils';
 
 export type DayDetailsPresentation = 'popover' | 'markdown';
@@ -118,9 +123,12 @@ function contributorShortLabel(label: string): string {
 function ContributorsBlock({
   p,
   presentation,
+  embedded = false,
 }: {
   p: RunwayTooltipPayload;
   presentation: DayDetailsPresentation;
+  /** When nested (e.g. inside `<details>`), drop extra top margin. */
+  embedded?: boolean;
 }) {
   const terms = [...p.riskTerms].sort((a, b) => b.contribution - a.contribution);
   const blendSum = terms.reduce((acc, t) => acc + t.contribution, 0);
@@ -135,7 +143,14 @@ function ContributorsBlock({
         {inner}
       </div>
     ) : (
-      <div className="mt-4 rounded-lg border border-border bg-muted/25 px-3 py-3">{inner}</div>
+      <div
+        className={cn(
+          'rounded-lg border border-border bg-muted/25 px-3 py-3',
+          embedded ? 'mt-0' : 'mt-4'
+        )}
+      >
+        {inner}
+      </div>
     );
 
   const title =
@@ -301,7 +316,7 @@ function ContributorsBlock({
           </>
         ) : p.viewMode === 'market_risk' ? (
           <>
-            Band uses the full planning blend; this heatmap is deployment / calendar risk only.
+            Band uses the full planning blend; this heatmap is market risk only.
           </>
         ) : (
           <>
@@ -339,7 +354,7 @@ function LensScoreFootnote({
   if (viewMode === 'market_risk') {
     return (
       <p className={cls}>
-        Tile is deployment / calendar risk.{' '}
+        Tile is the market risk score (deployment/calendar fragility).{' '}
         <span className="font-medium text-foreground">Planning blend</span> is still the wider operational mix used for
         the band.
       </p>
@@ -379,8 +394,14 @@ export function RunwayDayDetailsPayloadBody({
   const primaryTechInline = clampList(p.activeTechProgrammes, 12);
   const wins = clampList(p.operatingWindows, 3);
   const bau = clampList(p.bauToday, 3);
-  const fillGlossary = glossaryFillScore(p.viewMode);
-  const planningGlossary = glossaryPlanningBlend(p.viewMode);
+  const fillGlossary =
+    presentation === 'popover' ? glossaryFillScorePopover(p.viewMode) : glossaryFillScore(p.viewMode);
+  const planningGlossary =
+    presentation === 'popover'
+      ? glossaryPlanningBlendPopover(p.viewMode)
+      : glossaryPlanningBlend(p.viewMode);
+  const fillLeadForPresentation =
+    presentation === 'popover' ? p.fillMetricLeadCompact : p.fillMetricLabel;
 
   const bodyPad = presentation === 'markdown' ? 'px-0 pb-0 pt-1' : 'px-4 pb-4 pt-3';
 
@@ -416,7 +437,7 @@ export function RunwayDayDetailsPayloadBody({
           <p className="mt-4 text-sm text-muted-foreground">
             <strong className="font-semibold text-foreground">{p.riskBand}</strong>
             <span className="mx-2 text-muted-foreground/40">·</span>
-            {p.fillMetricLabel}
+            {fillLeadForPresentation}
           </p>
           <p className="mt-2 font-mono text-sm tabular-nums text-foreground">
             <span className="inline-flex items-center gap-0.5 text-muted-foreground">
@@ -459,20 +480,23 @@ export function RunwayDayDetailsPayloadBody({
           <p className="mt-3 text-[11px] font-medium leading-snug text-muted-foreground">
             <span className="font-semibold text-foreground">{p.riskBand}</span>
             <span className="mx-1.5 text-muted-foreground/50">·</span>
-            {p.fillMetricLabel}
+            {fillLeadForPresentation}
           </p>
           <p className="mt-2 text-[11px] font-mono tabular-nums leading-snug text-foreground">
             <span className="inline-flex items-center gap-0.5 text-muted-foreground">
               <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
             </span>{' '}
             <span className="font-semibold">{heatmapScoreStr}</span>
-            <span className="mx-1.5 text-muted-foreground/45">·</span>
-            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
-              <TermWithDefinition label="Planning blend" definition={planningGlossary} dense />
-            </span>{' '}
-            <span className="font-semibold">{planningBlendStr}</span>
           </p>
           <LensScoreFootnote viewMode={p.viewMode} presentation={presentation} />
+          <div className="mt-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
+            <p className="text-[11px] font-mono tabular-nums leading-snug text-foreground">
+              <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+                <TermWithDefinition label="Planning blend" definition={planningGlossary} dense />
+              </span>{' '}
+              <span className="font-semibold">{planningBlendStr}</span>
+            </p>
+          </div>
         </header>
       )}
 
@@ -534,7 +558,14 @@ export function RunwayDayDetailsPayloadBody({
             </div>
           </>
         ) : (
-          <ContributorsBlock p={p} presentation={presentation} />
+          <details className="mt-2 rounded-md border border-border/70 bg-muted/10 open:shadow-sm">
+            <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-semibold tracking-tight text-foreground hover:bg-muted/30">
+              Heatmap breakdown
+            </summary>
+            <div className="border-t border-border/60 px-1 pb-2 pt-0">
+              <ContributorsBlock p={p} presentation={presentation} embedded />
+            </div>
+          </details>
         )}
 
         {camps.shown.length > 0 && presentation !== 'markdown' ? (

@@ -39,8 +39,10 @@ export function HeatmapSettingsPanel({ showCampaignBoost, showHeatmapTransferTun
   const setRiskTuning = useAtcStore((s) => s.setRiskTuning);
   const heatmapRenderStyle = useAtcStore((s) => s.heatmapRenderStyle);
   const heatmapMonoColor = useAtcStore((s) => s.heatmapMonoColor);
+  const heatmapSpectrumContinuous = useAtcStore((s) => s.heatmapSpectrumContinuous);
   const setHeatmapRenderStyle = useAtcStore((s) => s.setHeatmapRenderStyle);
   const setHeatmapMonoColor = useAtcStore((s) => s.setHeatmapMonoColor);
+  const setHeatmapSpectrumContinuous = useAtcStore((s) => s.setHeatmapSpectrumContinuous);
   const country = useAtcStore((s) => s.country);
   const configs = useAtcStore((s) => s.configs);
 
@@ -233,9 +235,40 @@ export function HeatmapSettingsPanel({ showCampaignBoost, showHeatmapTransferTun
               </div>
             </div>
           ) : (
-            <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
-              Full spectrum ramp. Use single colour for print-friendly or brand-tinted exports.
-            </p>
+            <div className="mt-3 space-y-2">
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                Full spectrum ramp. Use single colour for print-friendly or brand-tinted exports.
+              </p>
+              <div className="inline-flex w-full max-w-full rounded-lg border border-border/60 bg-muted/25 p-1 dark:bg-muted/15">
+                <button
+                  type="button"
+                  onClick={() => setHeatmapSpectrumContinuous(false)}
+                  className={cn(
+                    'min-h-9 flex-1 rounded-md px-2.5 py-2 text-[11px] font-semibold transition-all duration-150',
+                    !heatmapSpectrumContinuous
+                      ? 'bg-background text-foreground shadow-sm ring-1 ring-border/80'
+                      : 'text-muted-foreground hover:bg-background/50 hover:text-foreground'
+                  )}
+                >
+                  10 bands
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHeatmapSpectrumContinuous(true)}
+                  className={cn(
+                    'min-h-9 flex-1 rounded-md px-2.5 py-2 text-[11px] font-semibold transition-all duration-150',
+                    heatmapSpectrumContinuous
+                      ? 'bg-background text-foreground shadow-sm ring-1 ring-border/80'
+                      : 'text-muted-foreground hover:bg-background/50 hover:text-foreground'
+                  )}
+                >
+                  Smooth ramp
+                </button>
+              </div>
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                Smooth ramp interpolates between palette anchors (same transfer curve and γ). Legend matches cells.
+              </p>
+            </div>
           )}
         </div>
       </div>

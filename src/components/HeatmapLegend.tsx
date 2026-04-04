@@ -2,6 +2,7 @@ import type { ViewModeId } from '@/lib/constants';
 import {
   HEATMAP_TEMPERATURE_STEP_COUNT,
   heatmapLegendSwatchAtBand,
+  heatmapSpectrumLegendGradientCss,
   type HeatmapColorOpts,
 } from '@/lib/riskHeatmapColors';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,8 @@ export function HeatmapLegend({
   const stackStyle = { gap: cellGapPx } as const;
   const legendSteps = HEATMAP_TEMPERATURE_STEP_COUNT;
   const monoLegend = heatmapOpts?.renderStyle === 'mono';
+  const continuousSpectrum =
+    !monoLegend && heatmapOpts?.heatmapSpectrumMode === 'continuous';
 
   const swatchesHighToLow = Array.from({ length: legendSteps }, (_, i) => {
     const bandFromLow = legendSteps - 1 - i;
@@ -48,6 +51,9 @@ export function HeatmapLegend({
     return { color, bandFromLow };
   });
 
+  const gradientCss =
+    heatmapOpts && continuousSpectrum ? heatmapSpectrumLegendGradientCss(heatmapOpts) : null;
+
   const techHeadroom = viewMode === 'combined';
   const topLabel = techHeadroom ? 'Less free' : 'High';
   const bottomLabel = techHeadroom ? 'More free' : 'Low';
@@ -55,9 +61,13 @@ export function HeatmapLegend({
     ? techHeadroom
       ? `Heat map legend: less delivery capacity free at top, more at bottom, ${legendSteps} opacity steps (single colour).`
       : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} opacity steps (single colour).`
-    : techHeadroom
-      ? `Heat map legend: less delivery capacity free at top, more at bottom, ${legendSteps} colour steps.`
-      : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} colour steps from cool to warm.`;
+    : continuousSpectrum
+      ? techHeadroom
+        ? 'Heat map legend: less delivery capacity free at top, more at bottom, smooth colour ramp.'
+        : 'Heat map legend: higher pressure at top, lower at bottom, smooth colour ramp.'
+      : techHeadroom
+        ? `Heat map legend: less delivery capacity free at top, more at bottom, ${legendSteps} colour steps.`
+        : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} colour steps from cool to warm.`;
 
   return (
     <div
@@ -73,11 +83,22 @@ export function HeatmapLegend({
         <span className="text-left text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
           {topLabel}
         </span>
-        <div className="flex flex-col" style={{ width: cellSizePx, ...stackStyle }}>
-          {swatchesHighToLow.map(({ color, bandFromLow }, i) => (
-            <LegendSquare key={`${bandFromLow}-${i}`} color={color} cellSizePx={cellSizePx} />
-          ))}
-        </div>
+        {gradientCss ? (
+          <div
+            className={cn('shrink-0 cursor-default', LEGEND_CELL_ROUNDED)}
+            style={{
+              width: cellSizePx,
+              height: cellSizePx * legendSteps + cellGapPx * (legendSteps - 1),
+              backgroundImage: gradientCss,
+            }}
+          />
+        ) : (
+          <div className="flex flex-col" style={{ width: cellSizePx, ...stackStyle }}>
+            {swatchesHighToLow.map(({ color, bandFromLow }, i) => (
+              <LegendSquare key={`${bandFromLow}-${i}`} color={color} cellSizePx={cellSizePx} />
+            ))}
+          </div>
+        )}
         <span className="text-left text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
           {bottomLabel}
         </span>

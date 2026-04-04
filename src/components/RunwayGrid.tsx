@@ -272,7 +272,7 @@ function fillMetricHeadlineForView(mode: ViewModeId, techWorkloadScope: TechWork
     case 'in_store':
       return 'Trading pressure';
     case 'market_risk':
-      return 'Deployment risk';
+      return 'Market risk';
     default:
       return 'Pressure';
   }
@@ -285,9 +285,29 @@ function fillMetricLabelForView(mode: ViewModeId, techWorkloadScope: TechWorkloa
     case 'in_store':
       return 'Restaurant trading intensity from the store curve—rhythm, holidays, and store boosts when live (or prep if YAML says so)';
     case 'market_risk':
-      return 'Calendar and trading-consequence risk (0–1): holidays, Q4 month ramp, store intensity, campaigns, and optional deployment events in YAML.';
+      return 'Market risk score (0–1): deployment and calendar fragility from holidays, Q4 month ramp, store intensity, campaigns, and optional deployment events in YAML.';
     default:
       return 'Metric';
+  }
+}
+
+function fillMetricLeadCompactForView(mode: ViewModeId, techWorkloadScope: TechWorkloadScope): string {
+  switch (mode) {
+    case 'combined':
+      switch (techWorkloadScope) {
+        case 'bau':
+          return 'BAU-only headroom on lab and Market IT (0–1); backend not in this headline.';
+        case 'project':
+          return 'Project-work headroom on lab and Market IT (0–1); backend not in this headline.';
+        default:
+          return 'Combined headroom on lab and Market IT (0–1); backend not in this headline.';
+      }
+    case 'in_store':
+      return 'Store trading intensity from the curve—rhythm, holidays, and store boosts (0–1).';
+    case 'market_risk':
+      return 'Market risk: deployment/calendar fragility in the model (0–1); hotter = more fragile, not a ban.';
+    default:
+      return fillMetricLabelForView(mode, techWorkloadScope);
   }
 }
 
@@ -1315,6 +1335,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   const riskHeatmapCurve = useAtcStore((s) => s.riskHeatmapCurve);
   const heatmapRenderStyle = useAtcStore((s) => s.heatmapRenderStyle);
   const heatmapMonoColor = useAtcStore((s) => s.heatmapMonoColor);
+  const heatmapSpectrumContinuous = useAtcStore((s) => s.heatmapSpectrumContinuous);
   const reduceMotion = useReducedMotion();
   const shimmer = !reduceMotion;
   const theme = useAtcStore((s) => s.theme);
@@ -1523,6 +1544,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   }, [layoutDatesSorted, cellPx, compareAllMarkets, showIso3d, runway3dRowTowerPx]);
 
   const heatmapOpts: HeatmapColorOpts = useMemo(() => {
+    const heatmapSpectrumMode = heatmapSpectrumContinuous ? 'continuous' : 'discrete';
     if (viewMode === 'market_risk') {
       return {
         riskHeatmapCurve: marketRiskHeatmapCurve,
@@ -1531,6 +1553,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
         businessHeatmapPressureOffset: riskHeatmapBusinessPressureOffset,
         renderStyle: heatmapRenderStyle,
         monoColor: heatmapMonoColor,
+        heatmapSpectrumMode,
       };
     }
     const gamma =
@@ -1546,6 +1569,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
       riskHeatmapTailPower: tailPower,
       renderStyle: heatmapRenderStyle,
       monoColor: heatmapMonoColor,
+      heatmapSpectrumMode,
     };
   }, [
     viewMode,
@@ -1560,6 +1584,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     riskHeatmapTailPower,
     heatmapRenderStyle,
     heatmapMonoColor,
+    heatmapSpectrumContinuous,
   ]);
 
   const buildPayloadTipState = useCallback(
@@ -1587,6 +1612,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
         tuning: riskTuning,
         fillMetricHeadline: fillMetricHeadlineForView(viewMode, techWorkloadScope),
         fillMetricLabel: fillMetricLabelForView(viewMode, techWorkloadScope),
+        fillMetricLeadCompact: fillMetricLeadCompactForView(viewMode, techWorkloadScope),
         fillMetricValue,
         cellFillHex,
         techWorkloadScope,

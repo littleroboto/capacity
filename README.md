@@ -11,7 +11,7 @@ Deployment target is **[Vercel](https://vercel.com)** (Vite + serverless `api/` 
 1. Import this repo in Vercel (framework preset: **Vite**).
 2. Production URL: **Project → Deployments → Production** (or your custom domain).
 
-GitHub Actions **does not** auto-deploy the site on push; Vercel builds from Git when the repo is connected there. An optional, **manual** GitHub Pages workflow still exists at [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) if you ever want a static mirror (it does **not** run `api/*`).
+GitHub Actions **does not** auto-deploy the site on push. **Vercel only auto-builds on push if the project is connected to Git** (Vercel dashboard → **Project → Settings → Git**): correct repository, **Production Branch** (usually `main`), and GitHub App access to that repo. If the project was created with **`vercel link`** / CLI-only deploys, connect Git there or deploy manually with **`vercel deploy --prod`** (from a linked directory) after each push. An optional, **manual** GitHub Pages workflow still exists at [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) if you ever want a static mirror (it does **not** run `api/*`).
 
 #### Production with editable shared YAML (one path)
 
@@ -52,8 +52,9 @@ Omit both role env vars to keep **any signed-in user can PUT** (no org role filt
 
 The interface is a **dynamic visual of system pressure**. Colour and summaries encode load and risk in a single glance:
 
-- **Restaurant Activity** — restaurant trading curve (**`store_pressure`**) as the heatmap; combined risk still blends tech and campaigns.
-- **Technology Teams** — labs and Market IT work versus capacity (**tech capacity demand**; headline excludes backend), including overload when demand exceeds caps.
+- **Restaurant Activity** — restaurant trading curve (**`store_pressure`**) as the heatmap; the planning blend still mixes tech and campaigns for banding.
+- **Technology Teams** — lab and Market IT **capacity headroom** (0–1 tile; headline excludes backend); cooler tiles mean more slack versus scheduled work.
+- **Market risk** — deployment/calendar fragility (**`deployment_risk_01`**) as the heatmap; banding still uses the full planning blend.
 
 The same **YAML-driven model** powers every market. Parameters are named and scaled **consistently** so you can **compare regions and countries** side by side without reconciling different spreadsheets or definitions.
 

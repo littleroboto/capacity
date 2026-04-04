@@ -98,6 +98,9 @@ export function heatmapColorContinuous(
 /** `spectrum` = temperature-style multi-band ramp; `mono` = one hue, alpha scales with transformed score. */
 export type HeatmapRenderStyle = 'spectrum' | 'mono';
 
+/** How spectrum maps transformed 0–1 to colour (ignored when {@link HeatmapColorOpts.renderStyle} is `mono`). */
+export type HeatmapSpectrumMode = 'discrete' | 'continuous';
+
 export type HeatmapColorOpts = {
   /** Transfer curve id (`power` = score^γ); applied after normalising the lens metric. */
   riskHeatmapCurve?: RiskHeatmapCurveId;
@@ -114,6 +117,11 @@ export type HeatmapColorOpts = {
   businessHeatmapPressureOffset?: number;
   /** Default spectrum bands; mono uses {@link monoColor} with alpha from transformed 0–1. */
   renderStyle?: HeatmapRenderStyle;
+  /**
+   * Spectrum fill: equal-width bands ({@link heatmapColorDiscrete}) vs smooth RGB lerp ({@link heatmapColorContinuous}).
+   * Default `discrete`.
+   */
+  heatmapSpectrumMode?: HeatmapSpectrumMode;
   /** `#rrggbb` for mono mode (invalid values fall back to sky). */
   monoColor?: string;
 };
@@ -192,7 +200,8 @@ export function heatmapColorForViewMode(
     return hexToRgba(hex, alpha);
   }
 
-  return heatmapColorDiscrete(t);
+  const spectrumMode = opts?.heatmapSpectrumMode ?? 'discrete';
+  return spectrumMode === 'continuous' ? heatmapColorContinuous(t) : heatmapColorDiscrete(t);
 }
 
 /**
@@ -208,7 +217,32 @@ export function heatmapLegendSwatchAtBand(bandFromLow: number, opts?: HeatmapCol
     const hex = normalizeHeatmapMonoHex(opts.monoColor ?? '');
     return hexToRgba(hex, MONO_ALPHA_MIN + tBinCentre * (1 - MONO_ALPHA_MIN));
   }
-  return heatmapColorDiscrete(tBinCentre);
+  const spectrumMode = opts?.heatmapSpectrumMode ?? 'discrete';
+  return spectrumMode === 'continuous'
+    ? heatmapColorContinuous(tBinCentre)
+    : heatmapColorDiscrete(tBinCentre);
+}
+
+/**
+ * CSS `linear-gradient` for the vertical heatmap legend when spectrum is **continuous** (high at top).
+ * Mono mode uses smooth alpha along transformed 0–1.
+ */
+export function heatmapSpectrumLegendGradientCss(opts?: HeatmapColorOpts): string {
+  const steps = 40;
+  const parts: string[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const u = i / steps;
+    const t = 1 - u;
+    const color =
+      opts?.renderStyle === 'mono'
+        ? hexToRgba(
+            normalizeHeatmapMonoHex(opts.monoColor ?? ''),
+            MONO_ALPHA_MIN + t * (1 - MONO_ALPHA_MIN)
+          )
+        : heatmapColorContinuous(t);
+    parts.push(`${color} ${(u * 100).toFixed(2)}%`);
+  }
+  return `linear-gradient(to bottom, ${parts.join(', ')})`;
 }
 
 /**

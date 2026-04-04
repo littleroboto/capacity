@@ -27,21 +27,21 @@ export const VIEW_MODES = [
     label: 'Restaurant Activity',
     runwayHeatmapTitle: 'Trading pressure',
     title:
-      'Restaurant busyness from the store trading curve: weekly × monthly × seasonal rhythm, early-month lift (more visits when wallets are fuller), holidays, and store-facing campaign boosts in YAML. This lens does not add tech work—see Technology Teams for delivery load. Same 0–1 scale; γ_business and transfer curve apply.',
+      'Restaurant busyness from the store trading curve: weekly × monthly × seasonal rhythm, early-month lift (more visits when wallets are fuller), holidays, and store-facing campaign boosts in YAML. This lens does not add tech work—use Technology Teams for delivery load. Same 0–1 scale; γ_business and transfer curve apply.',
   },
   {
     id: 'market_risk',
     label: 'Market risk',
-    runwayHeatmapTitle: 'Deployment / calendar risk',
+    runwayHeatmapTitle: 'Market risk',
     title:
-      'Graded deployment fragility from holidays, optional blackout windows (often “resourcing” but overlapping peak trading), trading intensity, campaign × peak-week compounding, tech bench strain, and YAML events. Hotter = more fragile—not a ban. γ_business and transfer curve apply when set separately from Technology Teams.',
+      'Deployment and calendar fragility (the Market risk score): holidays, optional blackout windows (often “resourcing” but overlapping peak trading), trading intensity, campaign × peak-week compounding, tech bench strain, and YAML events. Hotter = more fragile—not a ban. γ_business and transfer curve apply when set separately from Technology Teams.',
   },
   {
     id: 'code',
     label: 'Code',
     runwayHeatmapTitle: 'Market configuration',
     title:
-      'Full multi-market YAML in the main area. Edits stay local until you switch back to Technology Teams or Restaurant Activity — then the model re-runs and the runway updates.',
+      'Full multi-market YAML in the main area. Edits stay local until you switch back to Technology Teams, Restaurant Activity, or Market risk — then the model re-runs and the runway updates.',
   },
 ] as const;
 
