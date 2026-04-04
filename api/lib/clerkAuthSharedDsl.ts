@@ -1,7 +1,7 @@
 import { verifyToken } from '@clerk/backend';
 
 export type SharedDslPrincipal =
-  | { kind: 'clerk'; userId: string; orgRoleNorm: string | null }
+  | { kind: 'clerk'; userId: string; orgRoleNorm: string | null; jwtPayload: Record<string, unknown> }
   | { kind: 'legacy' }
   | { kind: 'none' };
 
@@ -81,6 +81,7 @@ export async function authenticateSharedDslBearer(
           kind: 'clerk',
           userId: sub,
           orgRoleNorm: extractOrgRoleNormFromVerifiedJwt(payload),
+          jwtPayload: payload,
         };
       }
     } catch {

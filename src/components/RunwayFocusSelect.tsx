@@ -1,3 +1,5 @@
+import { runwayFocusAllowed } from '@/lib/capacityAccess';
+import { useCapacityAccess } from '@/lib/capacityAccessContext';
 import {
   FALLBACK_RUNWAY_MARKET_IDS,
   RUNWAY_ALL_MARKETS_LABEL,
@@ -23,9 +25,11 @@ import {
 import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 import { ChevronLeft } from 'lucide-react';
+import { useEffect } from 'react';
 
 /** LIOM / IOM / single-market picker — nested by segment under the main runway card. */
 export function RunwayFocusSelect({ className }: { className?: string }) {
+  const access = useCapacityAccess();
   const country = useAtcStore((s) => s.country);
   const runwayReturnPicker = useAtcStore((s) => s.runwayReturnPicker);
   const configs = useAtcStore((s) => s.configs);
@@ -33,10 +37,42 @@ export function RunwayFocusSelect({ className }: { className?: string }) {
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
   const ids = runwayMarketOrder.length ? runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
 
-  const liomMarkets = runwaySegmentMarketsOrdered(RUNWAY_LIOM_SEGMENT_MARKET_IDS, ids);
-  const iomMarkets = runwaySegmentMarketsOrdered(RUNWAY_IOM_SEGMENT_MARKET_IDS, ids);
+  const liomMarketsRaw = runwaySegmentMarketsOrdered(RUNWAY_LIOM_SEGMENT_MARKET_IDS, ids);
+  const iomMarketsRaw = runwaySegmentMarketsOrdered(RUNWAY_IOM_SEGMENT_MARKET_IDS, ids);
+  const liomMarkets =
+    access.legacyFullAccess || access.admin
+      ? liomMarketsRaw
+      : liomMarketsRaw.filter((id) => access.allowedMarketIds.includes(id));
+  const iomMarkets =
+    access.legacyFullAccess || access.admin
+      ? iomMarketsRaw
+      : iomMarketsRaw.filter((id) => access.allowedMarketIds.includes(id));
   const grouped = new Set([...liomMarkets, ...iomMarkets]);
-  const otherMarkets = ids.filter((id) => !grouped.has(id));
+  const otherMarketsAll = ids.filter((id) => !grouped.has(id));
+  const otherMarkets =
+    access.legacyFullAccess || access.admin
+      ? otherMarketsAll
+      : otherMarketsAll.filter((id) => access.allowedMarketIds.includes(id));
+
+  const showLiomGroup =
+    (access.legacyFullAccess || access.admin || access.segments.includes('LIOM')) && liomMarkets.length > 0;
+  const showIomGroup =
+    (access.legacyFullAccess || access.admin || access.segments.includes('IOM')) && iomMarkets.length > 0;
+
+  useEffect(() => {
+    if (access.legacyFullAccess || access.admin) return;
+    if (runwayFocusAllowed(access, country, RUNWAY_ALL_MARKETS_VALUE, RUNWAY_IOM_MARKETS_VALUE)) return;
+    const idList = runwayMarketOrder.length ? runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
+    const next = idList.find((id) => access.allowedMarketIds.includes(id));
+    if (next && next !== country) setCountry(next);
+  }, [
+    access.legacyFullAccess,
+    access.admin,
+    access.allowedMarketIds,
+    country,
+    runwayMarketOrder,
+    setCountry,
+  ]);
 
   const labelForMarket = (id: string) => {
     if (id === RUNWAY_ALL_MARKETS_VALUE) return RUNWAY_ALL_MARKETS_LABEL;
@@ -66,27 +102,31 @@ export function RunwayFocusSelect({ className }: { className?: string }) {
             <SelectValue placeholder="Market" />
           </SelectTrigger>
           <SelectContent className="max-h-[min(24rem,var(--radix-select-content-available-height))]">
-            <SelectGroup>
-              <SelectItem value={RUNWAY_ALL_MARKETS_VALUE}>
-                {RUNWAY_ALL_MARKETS_LABEL} (Segment)
-              </SelectItem>
-              {liomMarkets.map((id) => (
-                <SelectItem key={id} value={id} className={marketItemClass}>
-                  {labelForMarket(id)}
+            {showLiomGroup ? (
+              <SelectGroup>
+                <SelectItem value={RUNWAY_ALL_MARKETS_VALUE}>
+                  {RUNWAY_ALL_MARKETS_LABEL} (Segment)
                 </SelectItem>
-              ))}
-            </SelectGroup>
-            <SelectSeparator />
-            <SelectGroup>
-              <SelectItem value={RUNWAY_IOM_MARKETS_VALUE}>
-                {RUNWAY_IOM_MARKETS_LABEL} (Segment)
-              </SelectItem>
-              {iomMarkets.map((id) => (
-                <SelectItem key={id} value={id} className={marketItemClass}>
-                  {labelForMarket(id)}
+                {liomMarkets.map((id) => (
+                  <SelectItem key={id} value={id} className={marketItemClass}>
+                    {labelForMarket(id)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ) : null}
+            {showLiomGroup && showIomGroup ? <SelectSeparator /> : null}
+            {showIomGroup ? (
+              <SelectGroup>
+                <SelectItem value={RUNWAY_IOM_MARKETS_VALUE}>
+                  {RUNWAY_IOM_MARKETS_LABEL} (Segment)
                 </SelectItem>
-              ))}
-            </SelectGroup>
+                {iomMarkets.map((id) => (
+                  <SelectItem key={id} value={id} className={marketItemClass}>
+                    {labelForMarket(id)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ) : null}
             {otherMarkets.length > 0 ? (
               <>
                 <SelectSeparator />

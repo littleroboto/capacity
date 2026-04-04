@@ -8,9 +8,22 @@
  * - `CAPACITY_CLERK_AUTHORIZED_PARTIES` — optional comma-separated origins for `verifyToken` (recommended in production)
  * - `CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE` — when `1` and `CLERK_SECRET_KEY` is set, PUT rejects legacy shared secret (JWT only)
  * - `CAPACITY_CLERK_DSL_WRITE_ROLES` — optional comma list (e.g. `admin,member,editor`); JWT org role must match after normalizing; unset = any signed-in user may PUT
+ * - `CAPACITY_ORG_ADMIN_ROLES` — comma list of Clerk org roles (normalized) that imply workspace admin (see `cap_*` claims in `api/lib/capacityWorkspaceAcl.ts`). Default: `admin`
+ *
+ * Session token claims (optional; set in Clerk → Sessions → Customize session token). When absent, behaviour is unchanged (full workspace, edits if org role allows PUT):
+ * - `cap_admin` — boolean; full markets + edit
+ * - `cap_segs` — string e.g. `LIOM` or `LIOM,IOM` (segment codes from `segments.json`)
+ * - `cap_ed` — boolean; when true with segment scope, user may edit YAML for allowed markets only (PUT merges into full blob)
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { BlobNotFoundError, BlobPreconditionFailedError, get, head, put } from '@vercel/blob';
+import {
+  filterWorkspaceYamlToMarkets,
+  mergePartialWorkspacePut,
+  parseCapacityWorkspaceAccess,
+  parseOrgAdminRolesFromEnv,
+  type CapacityWorkspaceAccess,
+} from './lib/capacityWorkspaceAcl';
 import {
   authenticateSharedDslBearer,
   bearerFromAuthorizationHeader,
@@ -18,6 +31,7 @@ import {
   clerkSecretKeyConfigured,
   legacySharedDslWriteDisabled,
   parseClerkDslWriteAllowListFromEnv,
+  type SharedDslPrincipal,
 } from './lib/clerkAuthSharedDsl';
 
 const PATHNAME = 'capacity-shared/workspace.yaml';
@@ -46,24 +60,42 @@ async function streamToText(stream: ReadableStream<Uint8Array>): Promise<string>
   return new TextDecoder('utf-8').decode(out);
 }
 
-async function requireReadAuth(req: VercelRequest, res: VercelResponse): Promise<boolean> {
-  if (!clerkSecretKeyConfigured()) return true;
+function orgAdminRoles(): string[] {
+  return parseOrgAdminRolesFromEnv(process.env.CAPACITY_ORG_ADMIN_ROLES);
+}
+
+function fullWorkspaceAccess(): CapacityWorkspaceAccess {
+  return parseCapacityWorkspaceAccess({}, null, orgAdminRoles());
+}
+
+type ReadAuthResult = { ok: false } | { ok: true; workspaceAccess: CapacityWorkspaceAccess | null };
+
+async function authorizeRead(req: VercelRequest, res: VercelResponse): Promise<ReadAuthResult> {
+  if (!clerkSecretKeyConfigured()) return { ok: true, workspaceAccess: null };
   const bearer = bearerFromAuthorizationHeader(req.headers.authorization);
   const p = await authenticateSharedDslBearer(bearer, 'read');
-  if (p.kind === 'clerk') return true;
+  if (p.kind === 'clerk') {
+    const workspaceAccess = parseCapacityWorkspaceAccess(p.jwtPayload, p.orgRoleNorm, orgAdminRoles());
+    return { ok: true, workspaceAccess };
+  }
   res.status(401).json({
     error: 'unauthorized',
     message: 'Sign in is required to load the team workspace. Ensure CLERK_SECRET_KEY is set on the server and you are signed in.',
   });
-  return false;
+  return { ok: false };
 }
 
-async function requireWriteAuth(req: VercelRequest, res: VercelResponse): Promise<boolean> {
+type WriteAuthResult =
+  | { ok: false }
+  | { ok: true; principal: SharedDslPrincipal; workspaceAccess: CapacityWorkspaceAccess };
+
+async function authorizeWrite(req: VercelRequest, res: VercelResponse): Promise<WriteAuthResult> {
   const bearer = bearerFromAuthorizationHeader(req.headers.authorization);
   const p = await authenticateSharedDslBearer(bearer, 'write');
+  const full = fullWorkspaceAccess();
 
   if (clerkSecretKeyConfigured()) {
-    if (p.kind === 'legacy') return true;
+    if (p.kind === 'legacy') return { ok: true, principal: p, workspaceAccess: full };
     if (p.kind === 'clerk') {
       const allow = parseClerkDslWriteAllowListFromEnv(process.env.CAPACITY_CLERK_DSL_WRITE_ROLES);
       if (!clerkJwtAllowedToPutSharedDsl(p.orgRoleNorm, allow)) {
@@ -72,9 +104,18 @@ async function requireWriteAuth(req: VercelRequest, res: VercelResponse): Promis
           message:
             'Your organization role cannot save the team workspace. Use an active organization in Clerk and a role listed in CAPACITY_CLERK_DSL_WRITE_ROLES (server env), e.g. admin or a custom editor role.',
         });
-        return false;
+        return { ok: false };
       }
-      return true;
+      const workspaceAccess = parseCapacityWorkspaceAccess(p.jwtPayload, p.orgRoleNorm, orgAdminRoles());
+      if (!workspaceAccess.canEditYaml) {
+        res.status(403).json({
+          error: 'forbidden',
+          message:
+            'This account is a viewer for the team workspace. Only editors (cap_ed) or admins (cap_admin / org admin role) can save YAML.',
+        });
+        return { ok: false };
+      }
+      return { ok: true, principal: p, workspaceAccess };
     }
     res.status(401).json({
       error: 'unauthorized',
@@ -85,17 +126,17 @@ async function requireWriteAuth(req: VercelRequest, res: VercelResponse): Promis
             : 'Send a Clerk session token (signed in) or the team write secret in Authorization: Bearer.'
           : 'Invalid credentials.',
     });
-    return false;
+    return { ok: false };
   }
 
-  if (p.kind === 'legacy') return true;
+  if (p.kind === 'legacy') return { ok: true, principal: p, workspaceAccess: full };
   const secret = process.env.CAPACITY_SHARED_DSL_SECRET?.trim();
   if (!secret) {
     res.status(503).json({ error: 'Writes are not configured (CAPACITY_SHARED_DSL_SECRET or CLERK_SECRET_KEY).' });
-    return false;
+    return { ok: false };
   }
   res.status(401).json({ error: 'unauthorized' });
-  return false;
+  return { ok: false };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -106,7 +147,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'HEAD') {
-    if (!(await requireReadAuth(req, res))) return;
+    const ra = await authorizeRead(req, res);
+    if (!ra.ok) return;
     try {
       const meta = await head(PATHNAME, { token });
       res.setHeader('X-DSL-Etag', meta.etag);
@@ -125,7 +167,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'GET') {
-    if (!(await requireReadAuth(req, res))) return;
+    const ra = await authorizeRead(req, res);
+    if (!ra.ok) return;
     try {
       const access = blobStoreAccess();
       const result = await get(PATHNAME, { access, token, useCache: false });
@@ -133,7 +176,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(404).json({ ok: false, reason: 'no_workspace' });
         return;
       }
-      const yaml = await streamToText(result.stream);
+      let yaml = await streamToText(result.stream);
+      const ws = ra.workspaceAccess;
+      if (ws && !ws.legacyFullAccess && !ws.admin) {
+        yaml = filterWorkspaceYamlToMarkets(yaml, ws.allowedMarketIds);
+      }
       res.setHeader('X-DSL-Etag', result.blob.etag);
       res.setHeader('Access-Control-Expose-Headers', 'X-DSL-Etag');
       res.setHeader('Cache-Control', 'no-store');
@@ -147,20 +194,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'PUT') {
-    if (!(await requireWriteAuth(req, res))) return;
+    const wa = await authorizeWrite(req, res);
+    if (!wa.ok) return;
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const yaml = typeof body?.yaml === 'string' ? body.yaml : '';
+    let yaml = typeof body?.yaml === 'string' ? body.yaml : '';
     if (!yaml.trim()) {
       res.status(400).json({ error: 'yaml required' });
       return;
     }
     const ifMatch = typeof body?.ifMatch === 'string' && body.ifMatch.trim() ? body.ifMatch.trim() : undefined;
 
+    const ws = wa.workspaceAccess;
+    if (
+      wa.principal.kind === 'clerk' &&
+      ws &&
+      !ws.legacyFullAccess &&
+      !ws.admin &&
+      ws.allowedMarketIds.size > 0
+    ) {
+      let current = '';
+      try {
+        const blobAccess = blobStoreAccess();
+        const curResult = await get(PATHNAME, { access: blobAccess, token, useCache: false });
+        if (curResult?.statusCode === 200 && curResult.stream) {
+          current = await streamToText(curResult.stream);
+        }
+      } catch (e) {
+        if (!(e instanceof BlobNotFoundError)) throw e;
+      }
+      yaml = mergePartialWorkspacePut(current, yaml, ws.allowedMarketIds);
+    }
+
     try {
-      const access = blobStoreAccess();
+      const blobAccess = blobStoreAccess();
       const putResult = await put(PATHNAME, yaml, {
-        access,
+        access: blobAccess,
         addRandomSuffix: false,
         allowOverwrite: true,
         contentType: 'text/yaml; charset=utf-8',
@@ -174,9 +243,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(409).json({ error: 'conflict', message: 'Another edit was saved first. Reload the latest workspace.' });
         return;
       }
-      const access = blobStoreAccess();
+      const blobAccess = blobStoreAccess();
       const errMsg = e instanceof Error ? e.message : String(e);
-      console.error('[shared-dsl PUT]', e, { blobAccess: access, pathname: PATHNAME });
+      console.error('[shared-dsl PUT]', e, { blobAccess, pathname: PATHNAME });
       if (errMsg.includes('public access') && errMsg.includes('private store')) {
         res.status(500).json({
           error: 'blob_access_mismatch',

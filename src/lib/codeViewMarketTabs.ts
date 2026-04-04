@@ -22,6 +22,7 @@ export function getCodeTabDocumentText(marketId: string): string {
 
 /** Merge one market’s editor buffer back into `dslText` / `dslByMarket`. */
 export function applyCodeTabDocumentEdit(marketId: string, newDoc: string): void {
+  if (useAtcStore.getState().dslMutationLocked) return;
   useAtcStore.setState((base) => {
     const { country, dslText, dslByMarket, runwayMarketOrder } = base;
     const nextFull = replaceMarketDocument(mergeStateToFullMultiDoc(base), marketId, newDoc);

@@ -12,6 +12,11 @@ interface ImportMetaEnv {
    * Must match server `CAPACITY_CLERK_DSL_WRITE_ROLES`. Unset = UI does not block saves (server may still enforce).
    */
   readonly VITE_CLERK_DSL_WRITE_ROLES?: string;
+  /**
+   * Optional comma-separated Clerk org roles (normalized) that imply workspace admin (match server `CAPACITY_ORG_ADMIN_ROLES`).
+   * Default: `admin`.
+   */
+  readonly VITE_CAPACITY_ORG_ADMIN_ROLES?: string;
 }
 
 declare const __APP_VERSION__: string;

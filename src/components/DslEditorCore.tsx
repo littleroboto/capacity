@@ -126,6 +126,7 @@ export function DslEditorCore({
   const dslText = useAtcStore((s) => s.dslText);
   const parseError = useAtcStore((s) => s.parseError);
   const dslAssistantEditorLock = useAtcStore((s) => s.dslAssistantEditorLock);
+  const dslMutationLocked = useAtcStore((s) => s.dslMutationLocked);
   const theme = useAtcStore((s) => s.theme);
   const setDslText = useAtcStore((s) => s.setDslText);
 
@@ -172,7 +173,7 @@ export function DslEditorCore({
       fontLigatures: true,
       wordWrap,
       lineNumbers,
-      readOnly: dslAssistantEditorLock,
+      readOnly: dslAssistantEditorLock || dslMutationLocked,
       scrollBeyondLastLine: false,
       tabSize: 2,
       automaticLayout: true,
@@ -193,7 +194,7 @@ export function DslEditorCore({
       matchBrackets: 'always' as const,
       unicodeHighlight: { ambiguousCharacters: false, invisibleCharacters: false },
     }),
-    [fontSize, wordWrap, minimapEnabled, lineNumbers, studio, dslAssistantEditorLock]
+    [fontSize, wordWrap, minimapEnabled, lineNumbers, studio, dslAssistantEditorLock, dslMutationLocked]
   );
 
   const isDark = theme === 'dark';

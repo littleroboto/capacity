@@ -4,6 +4,7 @@ import { ClerkProvider } from '@clerk/react';
 import App from './App';
 import { ClerkSharedDslBridge } from '@/components/ClerkSharedDslBridge';
 import { SignInGate } from '@/components/SignInGate';
+import { FullCapacityAccessProvider } from '@/lib/capacityAccessContext';
 import { clerkPublishableKey, isClerkConfigured } from '@/lib/clerkConfig';
 import './index.css';
 
@@ -17,7 +18,9 @@ const appTree = (
         <App />
       </ClerkSharedDslBridge>
     ) : (
-      <App />
+      <FullCapacityAccessProvider>
+        <App />
+      </FullCapacityAccessProvider>
     )}
   </SignInGate>
 );

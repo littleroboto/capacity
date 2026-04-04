@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
 import { ProductionAuthHintBanner } from '@/components/ProductionAuthHintBanner';
@@ -16,6 +16,8 @@ import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
 import { fetchRunwayMarketOrder } from '@/lib/runwayManifest';
 import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
+import { filterManifestOrderForAccess } from '@/lib/capacityAccess';
+import { useCapacityAccess } from '@/lib/capacityAccessContext';
 import { mergeStateToFullMultiDoc, splitToDslByMarket } from '@/lib/multiDocMarketYaml';
 import {
   fetchSharedDslDetailed,
@@ -32,6 +34,12 @@ const MIN_DSL_PANEL_PX = 280;
 const DEFAULT_DSL_PANEL_PX = 520;
 
 export default function App() {
+  const access = useCapacityAccess();
+  const accessBootstrapKey = useMemo(() => {
+    if (access.legacyFullAccess || access.admin) return 'full';
+    return `lim:${[...access.allowedMarketIds].sort().join(',')}`;
+  }, [access.legacyFullAccess, access.admin, access.allowedMarketIds]);
+
   const onSlotSelection = useCallback((_s: SlotSelection | null) => {}, []);
 
   const riskSurface = useAtcStore((s) => s.riskSurface);
@@ -133,8 +141,15 @@ export default function App() {
 
     (async () => {
       const order = await fetchRunwayMarketOrder();
+      let orderEffective =
+        access.legacyFullAccess || access.admin
+          ? order
+          : filterManifestOrderForAccess(order, access);
+      if (!access.legacyFullAccess && !access.admin && orderEffective.length === 0) {
+        orderEffective = order;
+      }
       const dslByMarket: Record<string, string> = {};
-      for (const id of order) {
+      for (const id of orderEffective) {
         try {
           const r = await fetch(publicAsset(`data/markets/${id}.yaml`));
           if (r.ok) {
@@ -151,7 +166,7 @@ export default function App() {
       }
       if (cancelled) return;
 
-      let multiDocFallback = mergeMarketsToMultiDocYaml(dslByMarket, order);
+      let multiDocFallback = mergeMarketsToMultiDocYaml(dslByMarket, orderEffective);
 
       if (isSharedDslEnabled()) {
         await waitForSharedDslFetchAuth();
@@ -173,7 +188,7 @@ export default function App() {
         }
       }
 
-      setRunwayMarketOrder(order);
+      setRunwayMarketOrder(orderEffective);
       setDslByMarket(dslByMarket);
       hydrateFromStorage(multiDocFallback);
       if (isSharedDslEnabled()) {
@@ -190,9 +205,9 @@ export default function App() {
       cancelled = true;
       stopOutboundSync?.();
     };
-    // Mount-only bootstrap: never re-run on store reference identity (would tear down autosave).
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional single run
-  }, []);
+    // Re-run when segment ACL changes (e.g. Clerk session claims loaded).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- access object identity is unstable; key is canonical
+  }, [accessBootstrapKey]);
 
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">

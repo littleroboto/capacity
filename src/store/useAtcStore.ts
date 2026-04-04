@@ -177,6 +177,9 @@ type AtcState = {
   /** When true, Monaco YAML editor is read-only (DSL assistant is streaming or applying). Not persisted. */
   dslAssistantEditorLock: boolean;
   setDslAssistantEditorLock: (v: boolean) => void;
+  /** When true, YAML-backed store actions no-op (cloud viewers). Not persisted. */
+  dslMutationLocked: boolean;
+  setDslMutationLocked: (v: boolean) => void;
   /**
    * Technology lens only: heatmap + slot selection use total tech load, BAU surface only, or project surfaces only.
    */
@@ -230,6 +233,10 @@ type AtcState = {
   hydrateFromStorage: (multiDocFallback?: string) => void;
 };
 
+function shouldBlockDslMutation(get: () => AtcState): boolean {
+  return get().dslMutationLocked;
+}
+
 function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) => void) {
   const full = mergeStateToFullMultiDoc(get());
   if (!full.trim() || !looksLikeYamlDsl(full)) return;
@@ -279,9 +286,11 @@ export const useAtcStore = create<AtcState>()(
       discoMode: false,
       runwayReturnPicker: null,
       dslAssistantEditorLock: false,
+      dslMutationLocked: false,
       techWorkloadScope: 'all',
 
       setDslAssistantEditorLock: (v) => set({ dslAssistantEditorLock: v }),
+      setDslMutationLocked: (v) => set({ dslMutationLocked: Boolean(v) }),
       setTechWorkloadScope: (v) => {
         const next: TechWorkloadScope =
           v === 'bau' || v === 'project' || v === 'all' ? v : 'all';
@@ -384,7 +393,10 @@ export const useAtcStore = create<AtcState>()(
       setHeatmapRenderStyle: (v) => set({ heatmapRenderStyle: v }),
       setHeatmapMonoColor: (hex) => set({ heatmapMonoColor: normalizeHeatmapMonoHex(hex) }),
 
-      setDslText: (t) => set({ dslText: t }),
+      setDslText: (t) => {
+        if (shouldBlockDslMutation(get)) return;
+        set({ dslText: t });
+      },
 
       setRunwayMarketOrder: (ids) => set({ runwayMarketOrder: ids.length ? [...ids] : [...FALLBACK_RUNWAY_MARKET_IDS] }),
 
@@ -435,6 +447,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setTechWeeklyPattern: (pattern) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -457,6 +470,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setTradingMonthlyPattern: (pattern: TradingMonthlyPatternPatch) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -479,6 +493,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setDeploymentRiskContextMonthCurve: (pattern: DeploymentRiskContextMonthPatch) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -503,6 +518,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setTradingWeeklyPattern: (pattern: TradingWeeklyPatternPatch) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -525,6 +541,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setTradingPaydayKnotMultipliers: (knots: PaydayKnotTuple) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -547,6 +564,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setTechSupportWeeklyPattern: (pattern: TechSupportWeeklyPatternPatch) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -569,6 +587,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setTechSupportMonthlyPattern: (pattern: TechSupportMonthlyPatternPatch) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -591,6 +610,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setResourcesLabsMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -613,6 +633,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setResourcesStaffMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -641,6 +662,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setTechAvailableCapacityPattern: (pattern: TechAvailableCapacityPatternPatch) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -663,6 +685,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       setHolidayStaffingMultiplier: (kind: HolidayStaffingBlockKind, value: number) => {
+        if (shouldBlockDslMutation(get)) return;
         const state = get();
         const { country, configs, runwayMarketOrder } = state;
         const market = gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -685,6 +708,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       applyDsl: (text) => {
+        if (shouldBlockDslMutation(get)) return;
         const dsl = (text ?? get().dslText).trim();
         if (!looksLikeYamlDsl(dsl)) {
           set({
@@ -732,6 +756,7 @@ export const useAtcStore = create<AtcState>()(
       },
 
       resetDsl: () => {
+        if (shouldBlockDslMutation(get)) return;
         const { country, dslByMarket, riskTuning, runwayMarketOrder } = get();
         const merged = mergeMarketsToMultiDocYaml(dslByMarket, runwayMarketOrder);
         const fallbackMarket = isRunwayMultiMarketStrip(country)
