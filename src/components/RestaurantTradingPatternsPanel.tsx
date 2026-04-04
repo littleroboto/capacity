@@ -12,7 +12,7 @@ import {
   TECH_WEEKLY_DAY_KEYS,
   type TechWeeklyDayKey,
 } from '@/lib/techRhythmDsl';
-import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
+import { gammaFocusMarket, isRunwayMultiMarketStrip, runwayFocusStripLabel } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import type { TradingMonthlyPatternPatch } from '@/lib/dslTradingMonthlyPatch';
 import type { TradingWeeklyPatternPatch } from '@/lib/dslTradingWeeklyPatch';
@@ -162,6 +162,17 @@ export function RestaurantTradingPatternsPanel() {
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
+      <p className="text-[10px] leading-relaxed text-muted-foreground">
+        <span className="font-medium text-foreground/85">YAML</span> blocks are saved for{' '}
+        <span className="font-mono text-foreground/80">{focusMarket}</span> only.{' '}
+        <span className="font-medium text-foreground/85">Global</span> sections: pressure offset (same Δ on every lens and
+        column), then heatmap curve, γ, and tail power — one persisted set; Market risk also exposes deployment-risk mix
+        and expert scalers. Temperature / mono: gear → Settings.
+        {isRunwayMultiMarketStrip(country) ? (
+          <> Change runway focus to edit another strip market.</>
+        ) : null}
+      </p>
+
       <div className="flex flex-col gap-0.5">
         <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Store week (Mon–Sun)
@@ -174,7 +185,8 @@ export function RestaurantTradingPatternsPanel() {
         </p>
         {isRunwayMultiMarketStrip(country) ? (
           <p className="text-[10px] leading-snug text-muted-foreground">
-            LIOM: editing <span className="font-mono text-foreground/80">{focusMarket}</span>.
+            {runwayFocusStripLabel(country)} compare strip: editing{' '}
+            <span className="font-mono text-foreground/80">{focusMarket}</span>.
           </p>
         ) : null}
       </div>
@@ -259,8 +271,8 @@ export function RestaurantTradingPatternsPanel() {
           <span className="font-mono text-foreground/80">payday_month_peak_multiplier</span> or four-knot{' '}
           <span className="font-mono text-foreground/80">payday_month_knot_multipliers</span>; edits here write knots for{' '}
           <span className="font-mono text-foreground/80">{focusMarket}</span> and drop the peak line. If this market has
-          neither, the <strong className="font-medium text-foreground/80">global scenario</strong> knot tuple in Settings
-          / tuning is used until you change a value.
+          neither, the <strong className="font-medium text-foreground/80">saved tuning fallback</strong> (same knot tuple as
+          Risk tuning / Settings) fills in until you commit a value — then knots are saved to this market only.
         </p>
         {paydayYamlKind === null ? (
           <p className="text-[10px] font-medium text-amber-700/90 dark:text-amber-400/90">
@@ -316,42 +328,10 @@ export function RestaurantTradingPatternsPanel() {
       </div>
 
       {viewMode === 'market_risk' ? (
-        <MarketRiskMacroControls className="border-t border-border/40 pt-2" />
-      ) : null}
-
-      {viewMode === 'market_risk' ? (
-        <HeatmapTransferControls
-          idPrefix="patterns"
-          variant="market_risk"
-          className="border-t border-border/40 pt-2"
-        />
-      ) : null}
-
-      {viewMode === 'market_risk' ? (
-        <HeatmapBusinessPressureOffsetControls idPrefix="patterns" className="border-t border-border/40 pt-2" />
-      ) : null}
-
-      {viewMode === 'market_risk' ? (
         <>
-          <details className="group border-t border-border/40 pt-2">
-            <summary className="cursor-pointer select-none list-none text-xs font-semibold text-foreground outline-none [&::-webkit-details-marker]:hidden">
-              <span className="inline-flex items-center gap-1">
-                <ChevronRight
-                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-90"
-                  aria-hidden
-                />
-                Expert — per-component scales
-              </span>
-              <span className="mt-0.5 block text-[10px] font-normal text-muted-foreground">
-                0–4× on each deployment-risk term. Most users only need Market risk shape above.
-              </span>
-            </summary>
-            <MarketRiskScalesControls className="mt-3" compact />
-          </details>
-
-          <div className="flex flex-col gap-0.5 border-t border-border/40 pt-2">
+          <div className="flex flex-col gap-0.5 border-t border-border/50 pt-3">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Deployment context (month)
+              Deployment context (month) — per market
             </span>
             <p className="text-[11px] leading-snug text-muted-foreground">
               Second <strong className="font-medium text-foreground/80">0–1 Jan–Dec</strong> curve,{' '}
@@ -359,7 +339,8 @@ export function RestaurantTradingPatternsPanel() {
               <span className="font-mono text-foreground/80">deployment_risk_month_curve</span> for the{' '}
               <strong className="font-medium text-foreground/80">Market risk</strong> heatmap only—e.g. local
               regulatory windows or operational fragility without rewriting the primary deployment month shape. Default{' '}
-              <span className="font-mono text-foreground/80">0</span> = no effect; all zeros removes this block from YAML.
+              <span className="font-mono text-foreground/80">0</span> = no effect; all zeros removes this block from YAML for{' '}
+              <span className="font-mono text-foreground/80">{focusMarket}</span>.
             </p>
           </div>
 
@@ -392,6 +373,63 @@ export function RestaurantTradingPatternsPanel() {
             <p className="mt-1 text-[9px] leading-snug text-muted-foreground">
               Drag a point vertically to match the month fields.
             </p>
+          </div>
+        </>
+      ) : null}
+
+      {viewMode === 'in_store' ? (
+        <div className="space-y-2 border-t border-border/50 pt-3">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Global heatmap — pressure offset, then curve, γ, and tail power
+          </span>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Order matches the engine. Δ shifts store-intensity input here; tail{' '}
+            <span className="font-mono text-foreground/80">p</span> is 1× on this lens. Same Δ is shared with Technology and
+            Market risk.
+          </p>
+          <HeatmapBusinessPressureOffsetControls idPrefix="patterns-instore" />
+          <HeatmapTransferControls idPrefix="patterns-instore" className="border-t border-border/40 pt-3" />
+        </div>
+      ) : null}
+
+      {viewMode === 'market_risk' ? (
+        <>
+          <div className="space-y-2 border-t border-border/50 pt-3">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Global market-risk mix — all columns
+            </span>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Adjusts weights inside the deployment-risk sum for <strong className="font-medium text-foreground/80">every</strong>{' '}
+              market at once — not stored in per-market YAML.
+            </p>
+            <MarketRiskMacroControls />
+            <details className="group pt-1">
+              <summary className="cursor-pointer select-none list-none text-xs font-semibold text-foreground outline-none [&::-webkit-details-marker]:hidden">
+                <span className="inline-flex items-center gap-1">
+                  <ChevronRight
+                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-90"
+                    aria-hidden
+                  />
+                  Expert — global per-component scales
+                </span>
+                <span className="mt-0.5 block text-[10px] font-normal text-muted-foreground">
+                  0–4× on each deployment-risk term; applies to all columns.
+                </span>
+              </summary>
+              <MarketRiskScalesControls className="mt-3" compact />
+            </details>
+          </div>
+
+          <div className="space-y-2 border-t border-border/50 pt-3">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Global heatmap — pressure offset, then curve, γ, and tail power
+            </span>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Global Δ on heatmap input first, then transfer — same persisted values as other lenses,{' '}
+              <strong className="font-medium text-foreground/80">all</strong> columns. Palette: gear → Settings.
+            </p>
+            <HeatmapBusinessPressureOffsetControls idPrefix="patterns" />
+            <HeatmapTransferControls idPrefix="patterns" className="border-t border-border/40 pt-3" />
           </div>
         </>
       ) : null}

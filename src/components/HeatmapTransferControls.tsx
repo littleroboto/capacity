@@ -87,41 +87,27 @@ function CurveTransferSparkline({
   );
 }
 
-export type HeatmapTransferVariant = 'settings' | 'market_risk';
-
 export type HeatmapTransferControlsProps = {
   className?: string;
   /** Distinct prefix for form control ids (e.g. `settings` vs `patterns`). */
   idPrefix: string;
-  /** `settings`: persisted curve/γ + tail for Technology Teams; `market_risk`: lens-local transfer only. */
-  variant: HeatmapTransferVariant;
 };
 
 /**
  * Heatmap pressure → colour transfer: curve, γ, and high-end power (t^p).
- * Settings variant applies to Technology Teams and Code view (browser storage); market_risk variant is local to that lens.
+ * One persisted triple for every lens (Technology Teams, Code, Restaurant Activity, Market risk); not per-market YAML.
  */
-export function HeatmapTransferControls({ className, idPrefix, variant }: HeatmapTransferControlsProps) {
-  const riskHeatmapGammaTech = useAtcStore((s) => s.riskHeatmapGamma);
-  const marketRiskHeatmapGamma = useAtcStore((s) => s.marketRiskHeatmapGamma);
-  const riskHeatmapCurveGlobal = useAtcStore((s) => s.riskHeatmapCurve);
-  const marketRiskHeatmapCurve = useAtcStore((s) => s.marketRiskHeatmapCurve);
+export function HeatmapTransferControls({ className, idPrefix }: HeatmapTransferControlsProps) {
+  const riskHeatmapGamma = useAtcStore((s) => s.riskHeatmapGamma);
+  const riskHeatmapCurve = useAtcStore((s) => s.riskHeatmapCurve);
   const setRiskHeatmapGamma = useAtcStore((s) => s.setRiskHeatmapGamma);
-  const setMarketRiskHeatmapGamma = useAtcStore((s) => s.setMarketRiskHeatmapGamma);
   const setRiskHeatmapCurve = useAtcStore((s) => s.setRiskHeatmapCurve);
-  const setMarketRiskHeatmapCurve = useAtcStore((s) => s.setMarketRiskHeatmapCurve);
-  const riskHeatmapTailPowerGlobal = useAtcStore((s) => s.riskHeatmapTailPower);
-  const marketRiskHeatmapTailPower = useAtcStore((s) => s.marketRiskHeatmapTailPower);
+  const riskHeatmapTailPower = useAtcStore((s) => s.riskHeatmapTailPower);
   const setRiskHeatmapTailPower = useAtcStore((s) => s.setRiskHeatmapTailPower);
-  const setMarketRiskHeatmapTailPower = useAtcStore((s) => s.setMarketRiskHeatmapTailPower);
 
-  const isMarketRisk = variant === 'market_risk';
-  const riskHeatmapGamma = isMarketRisk ? marketRiskHeatmapGamma : riskHeatmapGammaTech;
-  const riskHeatmapCurve = isMarketRisk ? marketRiskHeatmapCurve : riskHeatmapCurveGlobal;
-  const riskHeatmapTailPower = isMarketRisk ? marketRiskHeatmapTailPower : riskHeatmapTailPowerGlobal;
-  const onCurveChange = isMarketRisk ? setMarketRiskHeatmapCurve : setRiskHeatmapCurve;
-  const onGammaChange = isMarketRisk ? setMarketRiskHeatmapGamma : setRiskHeatmapGamma;
-  const onTailPowerChange = isMarketRisk ? setMarketRiskHeatmapTailPower : setRiskHeatmapTailPower;
+  const onCurveChange = setRiskHeatmapCurve;
+  const onGammaChange = setRiskHeatmapGamma;
+  const onTailPowerChange = setRiskHeatmapTailPower;
 
   const curveId = `risk-heatmap-curve-${idPrefix}`;
   const gammaId = `risk-heatmap-gamma-${idPrefix}`;
@@ -164,20 +150,12 @@ export function HeatmapTransferControls({ className, idPrefix, variant }: Heatma
       <div className="space-y-1">
         <p className="text-xs font-semibold text-foreground">Heatmap transfer</p>
         <p className="text-[10px] leading-relaxed text-muted-foreground">
-          {isMarketRisk ? (
-            <>
-              <strong className="font-medium text-foreground/90">Market risk lens only.</strong> Curve, γ, and high-end
-              power are stored locally and do not change YAML or other lenses.
-            </>
-          ) : (
-            <>
-              Maps each cell’s pressure score (0–1) into the ramp before palette bands for{' '}
-              <strong className="font-medium text-foreground/90">Technology Teams</strong> and{' '}
-              <strong className="font-medium text-foreground/90">Code</strong>. γ and curve are saved in this browser
-              (not in market YAML); tech and business γ stay aligned from the shared slider. High-end power applies to
-              the Technology Teams lens only.
-            </>
-          )}
+          Maps heatmap input (0–1) through curve + γ + tail, then into palette bands. Runs{' '}
+          <strong className="font-medium text-foreground/90">after</strong> the global pressure offset Δ (above) on every
+          lens. <strong className="font-medium text-foreground/90">One global</strong> curve / γ / tail for every column —
+          browser only, not YAML. γ stays aligned from the shared slider. High-end{' '}
+          <span className="font-mono text-foreground/80">p</span> applies to Technology Teams, Market risk, and Code;
+          Restaurant Activity keeps <span className="font-mono text-foreground/80">p = 1</span> on the runway.
         </p>
       </div>
 

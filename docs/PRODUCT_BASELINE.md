@@ -37,6 +37,7 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 - **Optimistic locking** on the server: Blob **`ifMatch`** / ETag on `PUT` to reduce blind overwrites.
 - **No** in-app “newer copy on server” toast or multi-tab stale banner — multi-tab users rely on **Pull from cloud** in Workspace when they need to align.
 - **409 conflict**: manual save shows an error in Workspace; auto-save logs a **console warning** only.
+- **View settings JSON** (Workspace dialog → **View on this device**): export/import heatmap transfer, γ, palette, runway year/quarter filters, and risk-tuning sliders — **browser-only**, not a substitute for team YAML on the cloud (`src/lib/viewSettingsPreset.ts`).
 
 ## Not in this baseline (planned / backlog)
 
@@ -59,5 +60,6 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 | Combined risk row | `src/engine/riskModel.ts` |
 | DSL parse | `src/engine/yamlDslParser.ts` |
 | App state | `src/store/useAtcStore.ts` |
+| View settings preset (export/import) | `src/lib/viewSettingsPreset.ts`, Workspace → Local data panel |
 
 When docs or epics disagree with this file, **trust this file for “what we run in prod now”** and update epics or deep-dive docs as you extend the product.

@@ -7,8 +7,6 @@ import {
   PAYDAY_MONTH_MULTIPLIER_MAX,
   type PaydayKnotTuple,
 } from '@/engine/paydayMonthShape';
-import { isRunwayMultiMarketStrip } from '@/lib/markets';
-
 /** Lab/team effective capacity on public or school holidays (fixed; not user-tunable). */
 export const HOLIDAY_CAPACITY_SCALE = 0.5;
 
@@ -169,18 +167,14 @@ export const DEFAULT_RISK_TUNING: RiskModelTuning = {
 };
 
 /**
- * LIOM (all markets / compare runway): use max campaign-effect multiplier so columns show full campaign lift.
- * Matches {@link clampCampaignEffectUiMultiplier} upper bound used in the pipeline.
+ * Tuning passed into {@link runPipelineFromDsl}. Compare strips use the same persisted {@link RiskModelTuning} as
+ * single-market views so campaign overlay, payday knots, and market-risk scalers stay globally consistent across columns.
  */
-export const LIOM_CAMPAIGN_EFFECT_UI_MULTIPLIER = 2.5;
-
-/** Tuning passed into {@link runPipelineFromDsl}: boosts campaign scaling on multi-market compare strips. */
 export function riskTuningForPipelineView(
   tuning: RiskModelTuning,
-  pickerCountry: string
+  _pickerCountry: string
 ): RiskModelTuning {
-  if (!isRunwayMultiMarketStrip(pickerCountry)) return tuning;
-  return { ...tuning, campaignEffectUiMultiplier: LIOM_CAMPAIGN_EFFECT_UI_MULTIPLIER };
+  return tuning;
 }
 
 function resolvePaydayPeakMultiplier(

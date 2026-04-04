@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
+import { HeatmapBusinessPressureOffsetControls } from '@/components/HeatmapBusinessPressureOffsetControls';
 import { HeatmapTransferControls } from '@/components/HeatmapTransferControls';
 import { Label } from '@/components/ui/label';
 import { HEATMAP_MONO_COLOR_PRESETS } from '@/lib/riskHeatmapColors';
-import { isRunwayMultiMarketStrip } from '@/lib/markets';
+import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 import { Palette } from 'lucide-react';
@@ -27,8 +29,8 @@ type HeatmapSettingsPanelProps = {
   /** When false, Campaign Boost row is omitted (Technology Teams lens). */
   showCampaignBoost: boolean;
   /**
-   * When false, heatmap transfer is omitted here — e.g. Market risk uses lens-local transfer under Business Patterns;
-   * Restaurant Activity uses the same persisted curve + business γ as Code (no Settings transfer row).
+   * When false, heatmap transfer is omitted here — Restaurant Activity uses Business Patterns for transfer (same global
+   * store as Settings for other lenses).
    */
   showHeatmapTransferTuning: boolean;
 };
@@ -45,10 +47,18 @@ export function HeatmapSettingsPanel({ showCampaignBoost, showHeatmapTransferTun
   const setHeatmapSpectrumContinuous = useAtcStore((s) => s.setHeatmapSpectrumContinuous);
   const country = useAtcStore((s) => s.country);
   const configs = useAtcStore((s) => s.configs);
+  const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
+
+  const campaignYamlMarket = useMemo(
+    () =>
+      isRunwayMultiMarketStrip(country)
+        ? gammaFocusMarket(country, configs, runwayMarketOrder)
+        : country,
+    [country, configs, runwayMarketOrder]
+  );
 
   const yamlCampaignScaleFocused = (() => {
-    if (isRunwayMultiMarketStrip(country)) return null;
-    const c = configs.find((x) => x.market === country);
+    const c = configs.find((x) => x.market === campaignYamlMarket);
     const y = c?.tradingPressure?.campaign_effect_scale;
     const n = y != null && Number.isFinite(y) ? y : 1;
     return Math.min(2.5, Math.max(0, n));
@@ -64,7 +74,13 @@ export function HeatmapSettingsPanel({ showCampaignBoost, showHeatmapTransferTun
     <div className="space-y-6">
       <div className="space-y-4">
         {showHeatmapTransferTuning ? (
-          <HeatmapTransferControls idPrefix="settings" variant="settings" />
+          <div className="space-y-4">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Global heatmap — pressure offset, then curve, γ, and tail power
+            </p>
+            <HeatmapBusinessPressureOffsetControls idPrefix="settings" />
+            <HeatmapTransferControls idPrefix="settings" className="border-t border-border/40 pt-3" />
+          </div>
         ) : null}
 
         {showCampaignBoost ? (
@@ -96,13 +112,17 @@ export function HeatmapSettingsPanel({ showCampaignBoost, showHeatmapTransferTun
                 aria-live="polite"
                 aria-label={
                   effectiveCampaignScale != null
-                    ? `Campaign overlay ${uiCampaignMult.toFixed(2)}×, effective ${effectiveCampaignScale.toFixed(2)}× for ${country}`
+                    ? `Campaign overlay ${uiCampaignMult.toFixed(2)}×, effective ${effectiveCampaignScale.toFixed(2)}× for ${campaignYamlMarket}`
                     : `Campaign overlay ${uiCampaignMult.toFixed(2)}×`
                 }
                 title={
                   effectiveCampaignScale != null && yamlCampaignScaleFocused != null
-                    ? `Effective ${effectiveCampaignScale.toFixed(2)}× (${yamlCampaignScaleFocused.toFixed(2)} YAML × ${uiCampaignMult.toFixed(2)})`
-                    : 'Focus a single market to combine with YAML campaign_effect_scale'
+                    ? `Effective ${effectiveCampaignScale.toFixed(2)}× (${yamlCampaignScaleFocused.toFixed(2)} YAML × ${uiCampaignMult.toFixed(2)})${
+                        isRunwayMultiMarketStrip(country)
+                          ? ` — preview uses runway focus ${campaignYamlMarket}; overlay applies to every column`
+                          : ''
+                      }`
+                    : undefined
                 }
                 className={TUNING_VALUE_BOX}
               >

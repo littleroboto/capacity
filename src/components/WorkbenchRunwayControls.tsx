@@ -7,7 +7,7 @@ import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 import { useReducedMotion } from 'motion/react';
 
-/** LIOM: Technology Teams and Restaurant Activity only (no Code in this control). */
+/** Compare strip: Technology Teams, Restaurant Activity, and Market risk only (no Code in this control). */
 const RUNWAY_LENS_MODE_IDS: readonly ViewModeId[] = ['combined', 'in_store', 'market_risk'];
 
 const TECH_WORKLOAD_OPTIONS: { value: TechWorkloadScope; label: string; title: string }[] = [
@@ -33,7 +33,7 @@ type WorkbenchRunwayControlsProps = {
   compareAllMarkets?: boolean;
 };
 
-/** Heatmap lens — right workbench panel. Market / LIOM **Focus** is above the runway (main column). */
+/** Heatmap lens — right workbench panel. Market / compare-strip **Focus** is above the runway (main column). */
 export function WorkbenchRunwayControls({ compareAllMarkets = false }: WorkbenchRunwayControlsProps) {
   const viewMode = useAtcStore((s) => s.viewMode);
   const setViewMode = useAtcStore((s) => s.setViewMode);
@@ -51,14 +51,14 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
       <p className="text-[10px] leading-snug text-muted-foreground">
         {compareAllMarkets ? (
           <>
-            Lens applies to <span className="font-semibold text-foreground/90">all</span> markets. Heatmap curve and offset
-            sit in <span className="font-semibold text-foreground/90">Business Patterns</span> below; use{' '}
-            <span className="font-semibold text-foreground/90">Focus</span> for YAML rhythms on one market.
+            Lens applies to <span className="font-semibold text-foreground/90">every</span> column.{' '}
+            <span className="font-semibold text-foreground/90">Business Patterns</span> below matches single-market layout
+            (trading, tech rhythm, heatmap transfer for this lens); YAML edits use the focus market shown there.
           </>
         ) : (
           <>
-            Use <span className="font-semibold text-foreground/90">Focus</span> at the top of the runway to choose LIOM or
-            a single market.
+            Use the <span className="font-semibold text-foreground/90">market picker</span> above the runway for one
+            region or a compare strip (e.g. LIOM, IOM).
           </>
         )}
       </p>

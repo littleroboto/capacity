@@ -13,7 +13,7 @@ import {
   roundCapacityShapeUnit,
   type CapacityShapeMonthKey,
 } from '@/lib/capacityShapeMonthlyDsl';
-import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
+import { gammaFocusMarket, isRunwayMultiMarketStrip, runwayFocusStripLabel } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 
 const TUNING_RANGE = 'h-3 w-full min-w-0 cursor-pointer accent-primary';
@@ -152,22 +152,34 @@ export function TechCapacityPlanningPanel() {
     <div className="flex min-w-0 flex-col gap-5">
       <div>
         <h3 className="text-xs font-semibold text-foreground">Supply & holidays</h3>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Lab slots and tech staff by month start from YAML resources. Use the chart or type whole numbers for each
-          month. Combined / BAU / Project filters above are unchanged.
+        <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground/85">Per market (YAML)</span> —{' '}
+          <span className="font-mono text-foreground/80">resources.labs</span>,{' '}
+          <span className="font-mono text-foreground/80">resources.staff</span>, and{' '}
+          <span className="font-mono text-foreground/80">public_holidays</span> /{' '}
+          <span className="font-mono text-foreground/80">school_holidays</span> staffing multipliers are saved only for{' '}
+          <span className="font-mono text-foreground/80">{focusMarket}</span>. Other strip columns keep their own YAML
+          values. Combined / BAU / Project filters above are unchanged.
         </p>
         {isRunwayMultiMarketStrip(country) ? (
-          <p className="mt-1 text-xs text-muted-foreground">
-            Comparing all markets: editing <span className="font-medium text-foreground/85">{focusMarket}</span>.
+          <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground/85">{runwayFocusStripLabel(country)}</span> — change runway focus
+            to edit lab/staff/holiday staffing for another market.
           </p>
         ) : null}
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          Lab slots and tech staff by month start from YAML baselines; use the chart or type whole numbers per month.
+        </p>
       </div>
 
       <section className="rounded-md border border-border/60 bg-muted/25 px-3 py-3 shadow-inner">
-        <h4 className="text-xs font-medium text-foreground">Lab & test slots (per month)</h4>
+        <h4 className="text-xs font-medium text-foreground">
+          Lab & test slots (per month) — <span className="font-mono text-foreground/85">{focusMarket}</span>
+        </h4>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Baseline from YAML: <span className="font-medium tabular-nums text-foreground/90">{labBase}</span> (testing
-          capacity if set, otherwise lab count).
+          Baseline from this market&apos;s YAML:{' '}
+          <span className="font-medium tabular-nums text-foreground/90">{labBase}</span> (testing capacity if set,
+          otherwise lab count).
         </p>
         <WeightingLineMiniChart
           values={labsAbsSeries}
@@ -197,20 +209,20 @@ export function TechCapacityPlanningPanel() {
       </section>
 
       <section className="rounded-md border border-border/60 bg-muted/25 px-3 py-3 shadow-inner">
-        <h4 className="text-xs font-medium text-foreground">Tech staff (per month)</h4>
+        <h4 className="text-xs font-medium text-foreground">
+          Tech staff (per month) — <span className="font-mono text-foreground/85">{focusMarket}</span>
+        </h4>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {staffIsAbs ? (
             <>
-              YAML uses <span className="font-medium text-foreground/90">absolute</span> headcount per month (
-              <span className="font-mono text-foreground/85">monthly_pattern_basis: absolute</span>
-              ). Reference capacity:{' '}
-              <span className="font-medium tabular-nums text-foreground/90">{teamBase}</span> people.
+              This market&apos;s YAML uses <span className="font-medium text-foreground/90">absolute</span> headcount per
+              month (<span className="font-mono text-foreground/85">monthly_pattern_basis: absolute</span>). Reference
+              capacity: <span className="font-medium tabular-nums text-foreground/90">{teamBase}</span> people.
             </>
           ) : (
             <>
-              Baseline from YAML:{' '}
-              <span className="font-medium tabular-nums text-foreground/90">{teamBase}</span> people (staff
-              capacity).
+              Baseline from this market&apos;s YAML:{' '}
+              <span className="font-medium tabular-nums text-foreground/90">{teamBase}</span> people (staff capacity).
             </>
           )}
         </p>
@@ -242,9 +254,12 @@ export function TechCapacityPlanningPanel() {
       </section>
 
       <section className="rounded-md border border-border/60 bg-muted/25 px-3 py-3 shadow-inner">
-        <h4 className="text-xs font-medium text-foreground">Holiday staffing</h4>
+        <h4 className="text-xs font-medium text-foreground">
+          Holiday staffing — <span className="font-mono text-foreground/85">{focusMarket}</span>
+        </h4>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Lab and Market IT ceilings on public or school holiday days (taper still applies from YAML).
+          <span className="font-mono text-foreground/85">staffing_multiplier</span> on this market&apos;s public and
+          school holiday blocks — lab and Market IT ceilings on those days (YAML taper still applies).
         </p>
         <div className="mt-4 space-y-4">
           <div className="space-y-1.5">

@@ -13,7 +13,11 @@ import {
 import { parseDate } from '@/engine/calendar';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
-import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
+import {
+  HEATMAP_RUNWAY_PAD_FILL,
+  type HeatmapColorOpts,
+  type HeatmapSpectrumMode,
+} from '@/lib/riskHeatmapColors';
 import { HeatmapLegend } from '@/components/HeatmapLegend';
 import { RunwayFocusSelect } from '@/components/RunwayFocusSelect';
 import { RunwayRangeSelect } from '@/components/RunwayRangeSelect';
@@ -1328,9 +1332,6 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   const riskHeatmapGammaTech = useAtcStore((s) => s.riskHeatmapGammaTech);
   const riskHeatmapGammaBusiness = useAtcStore((s) => s.riskHeatmapGammaBusiness);
   const riskHeatmapTailPower = useAtcStore((s) => s.riskHeatmapTailPower);
-  const marketRiskHeatmapCurve = useAtcStore((s) => s.marketRiskHeatmapCurve);
-  const marketRiskHeatmapGamma = useAtcStore((s) => s.marketRiskHeatmapGamma);
-  const marketRiskHeatmapTailPower = useAtcStore((s) => s.marketRiskHeatmapTailPower);
   const riskHeatmapBusinessPressureOffset = useAtcStore((s) => s.riskHeatmapBusinessPressureOffset);
   const riskHeatmapCurve = useAtcStore((s) => s.riskHeatmapCurve);
   const heatmapRenderStyle = useAtcStore((s) => s.heatmapRenderStyle);
@@ -1544,38 +1545,29 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   }, [layoutDatesSorted, cellPx, compareAllMarkets, showIso3d, runway3dRowTowerPx]);
 
   const heatmapOpts: HeatmapColorOpts = useMemo(() => {
-    const heatmapSpectrumMode = heatmapSpectrumContinuous ? 'continuous' : 'discrete';
-    if (viewMode === 'market_risk') {
-      return {
-        riskHeatmapCurve: marketRiskHeatmapCurve,
-        riskHeatmapGamma: marketRiskHeatmapGamma,
-        riskHeatmapTailPower: marketRiskHeatmapTailPower,
-        businessHeatmapPressureOffset: riskHeatmapBusinessPressureOffset,
-        renderStyle: heatmapRenderStyle,
-        monoColor: heatmapMonoColor,
-        heatmapSpectrumMode,
-      };
-    }
+    const heatmapSpectrumMode: HeatmapSpectrumMode = heatmapSpectrumContinuous
+      ? 'continuous'
+      : 'discrete';
     const gamma =
       viewMode === 'combined'
         ? riskHeatmapGammaTech
         : viewMode === 'in_store'
           ? riskHeatmapGammaBusiness
-          : riskHeatmapGamma;
+          : viewMode === 'market_risk'
+            ? riskHeatmapGammaTech
+            : riskHeatmapGamma;
     const tailPower = viewMode === 'in_store' ? 1 : riskHeatmapTailPower;
     return {
       riskHeatmapCurve,
       riskHeatmapGamma: gamma,
       riskHeatmapTailPower: tailPower,
+      businessHeatmapPressureOffset: riskHeatmapBusinessPressureOffset,
       renderStyle: heatmapRenderStyle,
       monoColor: heatmapMonoColor,
       heatmapSpectrumMode,
     };
   }, [
     viewMode,
-    marketRiskHeatmapCurve,
-    marketRiskHeatmapGamma,
-    marketRiskHeatmapTailPower,
     riskHeatmapBusinessPressureOffset,
     riskHeatmapCurve,
     riskHeatmapGamma,

@@ -25,7 +25,7 @@ export type HeatmapBusinessPressureOffsetControlsProps = {
 };
 
 /**
- * Linear add/subtract on 0–1 cell pressure before transfer curve (Market risk lens only).
+ * Global linear shift on each lens’s 0–1 heatmap input before transfer (single- and multi-market; not YAML).
  */
 export function HeatmapBusinessPressureOffsetControls({ className, idPrefix }: HeatmapBusinessPressureOffsetControlsProps) {
   const v = useAtcStore((s) => s.riskHeatmapBusinessPressureOffset);
@@ -36,20 +36,25 @@ export function HeatmapBusinessPressureOffsetControls({ className, idPrefix }: H
   return (
     <div className={cn('space-y-2', className)}>
       <div className="space-y-1">
-        <p className="text-xs font-semibold text-foreground">Pressure offset</p>
+        <p className="text-xs font-semibold text-foreground">Global pressure offset</p>
         <p className="text-[10px] leading-relaxed text-muted-foreground">
-          Adds a constant to every cell’s deployment-risk score (0–1){' '}
-          <strong className="font-medium text-foreground/90">before</strong> the heatmap transfer curve, then clamps to
-          0–1. Use small nudges to calm or lift the whole runway without changing YAML.
+          <strong className="font-medium text-foreground/90">Same Δ for every lens and every runway column</strong> (one
+          market or compare strip). Add to the lens heatmap input (0–1) after any Technology headroom→stress flip, then
+          clamp, then <strong className="font-medium text-foreground/90">Heatmap transfer</strong> (curve, γ, tail).{' '}
+          <span className="font-medium text-foreground/85">Technology / Code</span>: stress;{' '}
+          <span className="font-medium text-foreground/85">Restaurant</span>: store intensity;{' '}
+          <span className="font-medium text-foreground/85">Market risk</span>:{' '}
+          <span className="font-mono text-foreground/85">deployment_risk_01</span>. Not in YAML.
         </p>
       </div>
       <div className={TUNING_CONTROL_GRID}>
         <div className="flex min-w-0 flex-col gap-0.5">
           <Label htmlFor={id} className="text-xs font-normal">
-            Linear shift
+            Δ on heatmap input (0–1)
           </Label>
           <p className="text-[9px] leading-snug text-muted-foreground">
-            Negative = cooler overall; positive = hotter. <span className="font-mono text-foreground/80">0</span> = off.
+            <span className="font-mono text-foreground/80">input + Δ</span>, clamped, then transfer. Negative = cooler;
+            positive = hotter. <span className="font-mono text-foreground/80">0</span> = off.
           </p>
         </div>
         <div className="flex min-w-0 flex-col gap-1">
@@ -64,7 +69,7 @@ export function HeatmapBusinessPressureOffsetControls({ className, idPrefix }: H
               value={snapped}
               onChange={(e) => set(Number(e.target.value))}
               className={TUNING_RANGE}
-              aria-label="Market risk heatmap pressure linear offset"
+              aria-label="Global linear shift on heatmap input before transfer, all lenses and columns"
             />
           </div>
         </div>

@@ -46,19 +46,15 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="text-pretty">
-            Runway palette and campaign overlay; heatmap transfer (curve, γ, high-end power for Technology Teams) appears
-            here for <strong className="font-medium text-foreground">Technology Teams</strong> and{' '}
-            <strong className="font-medium text-foreground">Code</strong>.{' '}
-            <strong className="font-medium text-foreground">Market risk</strong> has its own transfer, pressure offset,
-            and scalers under <strong className="font-medium text-foreground">Business Patterns</strong>.{' '}
-            <strong className="font-medium text-foreground">Restaurant Activity</strong> follows the YAML curve and
-            business γ (no separate high-end power on that lens).
+            Runway palette and campaign overlay.             Global heatmap (pressure offset, curve, γ, tail power) is the same here and under{' '}
+            <strong className="font-medium text-foreground">Business Patterns</strong> for every lens and column.{' '}
+            <strong className="font-medium text-foreground">Market risk</strong> also has mix scalers in Business Patterns.
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">
           <HeatmapSettingsPanel
             showCampaignBoost={viewMode !== 'combined'}
-            showHeatmapTransferTuning={viewMode !== 'in_store' && viewMode !== 'market_risk'}
+            showHeatmapTransferTuning={viewMode !== 'in_store'}
           />
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
@@ -85,7 +81,10 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
         <DialogHeader>
           <DialogTitle>Workspace</DialogTitle>
           <DialogDescription className="text-pretty">
-            Team YAML on the cloud (when enabled) and reset options for this browser — each section below is separate.
+            Team YAML on the cloud (when enabled) is separate from{' '}
+            <strong className="font-medium text-foreground">view settings in this browser</strong> (heatmap transfer,
+            filters, palette). Use <span className="font-medium text-foreground/90">View on this device</span> to export
+            or import that JSON — it does not replace Save to cloud. Reset options apply only to local storage.
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">

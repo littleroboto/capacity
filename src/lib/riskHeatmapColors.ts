@@ -112,7 +112,8 @@ export type HeatmapColorOpts = {
    */
   riskHeatmapTailPower?: number;
   /**
-   * Added to raw 0–1 pressure for the Market risk lens before clamp and transfer (not YAML).
+   * Global linear shift added to each lens’s heatmap input (0–1, after any headroom→stress flip) before clamp and
+   * transfer — same value for single- and multi-market views (not YAML).
    */
   businessHeatmapPressureOffset?: number;
   /** Default spectrum bands; mono uses {@link monoColor} with alpha from transformed 0–1. */
@@ -175,8 +176,8 @@ export function heatmapTransformedMetric01(metric: number | undefined, opts?: He
 
 /**
  * Maps a view’s heatmap metric through optional γ into discrete temperature-band colours.
- * **Technology** (`combined`) passes **headroom** 0–1; colour uses **stress** = 1 − headroom so
- * tighter capacity reads hotter (same ramp as other lenses).
+ * **Technology** (`combined`, `code`) passes **headroom** 0–1; colour uses **stress** = 1 − headroom so
+ * tighter capacity reads hotter. **Global pressure offset** (see opts) shifts that 0–1 input (all lenses) before transfer.
  */
 export function heatmapColorForViewMode(
   mode: ViewModeId,
@@ -184,10 +185,10 @@ export function heatmapColorForViewMode(
   opts?: HeatmapColorOpts
 ): string {
   let colorMetric = metric;
-  if (mode === 'combined' && metric != null && !Number.isNaN(metric)) {
+  if ((mode === 'combined' || mode === 'code') && metric != null && !Number.isNaN(metric)) {
     colorMetric = Math.min(1, Math.max(0, 1 - metric));
   }
-  if (mode === 'market_risk' && colorMetric != null && !Number.isNaN(colorMetric)) {
+  if (colorMetric != null && !Number.isNaN(colorMetric)) {
     const d = opts?.businessHeatmapPressureOffset ?? 0;
     colorMetric = Math.min(1, Math.max(0, colorMetric + d));
   }
@@ -255,10 +256,10 @@ export function transformedHeatmapMetric(
   opts?: HeatmapColorOpts
 ): number {
   let colorMetric = metric;
-  if (mode === 'combined' && metric != null && !Number.isNaN(metric)) {
+  if ((mode === 'combined' || mode === 'code') && metric != null && !Number.isNaN(metric)) {
     colorMetric = Math.min(1, Math.max(0, 1 - metric));
   }
-  if (mode === 'market_risk' && colorMetric != null && !Number.isNaN(colorMetric)) {
+  if (colorMetric != null && !Number.isNaN(colorMetric)) {
     const d = opts?.businessHeatmapPressureOffset ?? 0;
     colorMetric = Math.min(1, Math.max(0, colorMetric + d));
   }
