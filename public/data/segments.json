@@ -1,3 +1,4 @@
 {
-  "LIOM": ["AU", "UK", "DE", "CA", "FR", "IT", "ES", "PL"]
+  "LIOM": ["AU", "UK", "DE", "CA", "FR", "IT", "ES", "PL"],
+  "IOM": ["CH", "AT", "NL", "BE", "PT", "CZ", "SK", "SL", "UA"]
 }

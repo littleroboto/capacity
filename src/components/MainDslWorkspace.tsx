@@ -3,7 +3,7 @@ import { DslAssistantPanel } from '@/components/DslAssistantPanel';
 import { DslEditorCore } from '@/components/DslEditorCore';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 import { applyCodeTabDocumentEdit, getCodeTabDocumentText } from '@/lib/codeViewMarketTabs';
-import { isRunwayAllMarkets } from '@/lib/markets';
+import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { marketIdToCircleFlagCode } from '@/lib/marketCircleFlag';
 import { cn } from '@/lib/utils';
 import { useAtcStore } from '@/store/useAtcStore';
@@ -60,7 +60,7 @@ export function MainDslWorkspace() {
   }, [runwayMarketOrder, codeMarketTab]);
 
   useEffect(() => {
-    if (!isRunwayAllMarkets(country) && runwayMarketOrder.includes(country)) {
+    if (!isRunwayMultiMarketStrip(country) && runwayMarketOrder.includes(country)) {
       setCodeMarketTab(country);
     }
   }, [country, runwayMarketOrder]);

@@ -14,7 +14,7 @@ import { publicAsset } from '@/lib/publicUrl';
 import { setAtcDsl } from '@/lib/storage';
 import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
 import { fetchRunwayMarketOrder } from '@/lib/runwayManifest';
-import { isRunwayAllMarkets } from '@/lib/markets';
+import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import { mergeStateToFullMultiDoc, splitToDslByMarket } from '@/lib/multiDocMarketYaml';
 import {
@@ -121,7 +121,7 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    if (isRunwayAllMarkets(country) && viewMode === 'code') {
+    if (isRunwayMultiMarketStrip(country) && viewMode === 'code') {
       setViewMode('combined');
     }
   }, [country, viewMode, setViewMode]);

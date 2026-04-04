@@ -13,7 +13,7 @@ import {
   roundCapacityShapeUnit,
   type CapacityShapeMonthKey,
 } from '@/lib/capacityShapeMonthlyDsl';
-import { gammaFocusMarket, isRunwayAllMarkets } from '@/lib/markets';
+import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 
 const TUNING_RANGE = 'h-3 w-full min-w-0 cursor-pointer accent-primary';
@@ -156,7 +156,7 @@ export function TechCapacityPlanningPanel() {
           Lab slots and tech staff by month start from YAML resources. Use the chart or type whole numbers for each
           month. Combined / BAU / Project filters above are unchanged.
         </p>
-        {isRunwayAllMarkets(country) ? (
+        {isRunwayMultiMarketStrip(country) ? (
           <p className="mt-1 text-xs text-muted-foreground">
             Comparing all markets: editing <span className="font-medium text-foreground/85">{focusMarket}</span>.
           </p>

@@ -2,13 +2,21 @@ import {
   FALLBACK_RUNWAY_MARKET_IDS,
   RUNWAY_ALL_MARKETS_LABEL,
   RUNWAY_ALL_MARKETS_VALUE,
+  RUNWAY_IOM_MARKETS_LABEL,
+  RUNWAY_IOM_MARKETS_VALUE,
+  RUNWAY_IOM_SEGMENT_MARKET_IDS,
+  RUNWAY_LIOM_SEGMENT_MARKET_IDS,
+  runwaySegmentMarketsOrdered,
 } from '@/lib/markets';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -16,7 +24,7 @@ import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 import { ChevronLeft } from 'lucide-react';
 
-/** LIOM / single-market picker — lives at top-left of the main runway card (primary context control). */
+/** LIOM / IOM / single-market picker — nested by segment under the main runway card. */
 export function RunwayFocusSelect({ className }: { className?: string }) {
   const country = useAtcStore((s) => s.country);
   const runwayReturnPicker = useAtcStore((s) => s.runwayReturnPicker);
@@ -25,13 +33,21 @@ export function RunwayFocusSelect({ className }: { className?: string }) {
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
   const ids = runwayMarketOrder.length ? runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
 
+  const liomMarkets = runwaySegmentMarketsOrdered(RUNWAY_LIOM_SEGMENT_MARKET_IDS, ids);
+  const iomMarkets = runwaySegmentMarketsOrdered(RUNWAY_IOM_SEGMENT_MARKET_IDS, ids);
+  const grouped = new Set([...liomMarkets, ...iomMarkets]);
+  const otherMarkets = ids.filter((id) => !grouped.has(id));
+
   const labelForMarket = (id: string) => {
     if (id === RUNWAY_ALL_MARKETS_VALUE) return RUNWAY_ALL_MARKETS_LABEL;
+    if (id === RUNWAY_IOM_MARKETS_VALUE) return RUNWAY_IOM_MARKETS_LABEL;
     const cfg = configs.find((c) => c.market === id);
     const t = cfg?.title?.trim();
     if (t && t !== id) return `${id} — ${t}`;
     return id;
   };
+
+  const marketItemClass = 'pl-10 text-[13px]';
 
   return (
     <div className={cn('flex min-w-0 flex-wrap items-end gap-2 sm:gap-2.5', className)}>
@@ -50,12 +66,40 @@ export function RunwayFocusSelect({ className }: { className?: string }) {
             <SelectValue placeholder="Market" />
           </SelectTrigger>
           <SelectContent className="max-h-[min(24rem,var(--radix-select-content-available-height))]">
-            <SelectItem value={RUNWAY_ALL_MARKETS_VALUE}>{RUNWAY_ALL_MARKETS_LABEL}</SelectItem>
-            {ids.map((id) => (
-              <SelectItem key={id} value={id}>
-                {labelForMarket(id)}
+            <SelectGroup>
+              <SelectItem value={RUNWAY_ALL_MARKETS_VALUE}>
+                {RUNWAY_ALL_MARKETS_LABEL} (Segment)
               </SelectItem>
-            ))}
+              {liomMarkets.map((id) => (
+                <SelectItem key={id} value={id} className={marketItemClass}>
+                  {labelForMarket(id)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+            <SelectSeparator />
+            <SelectGroup>
+              <SelectItem value={RUNWAY_IOM_MARKETS_VALUE}>
+                {RUNWAY_IOM_MARKETS_LABEL} (Segment)
+              </SelectItem>
+              {iomMarkets.map((id) => (
+                <SelectItem key={id} value={id} className={marketItemClass}>
+                  {labelForMarket(id)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+            {otherMarkets.length > 0 ? (
+              <>
+                <SelectSeparator />
+                <SelectGroup>
+                  <SelectLabel>Other</SelectLabel>
+                  {otherMarkets.map((id) => (
+                    <SelectItem key={id} value={id} className={marketItemClass}>
+                      {labelForMarket(id)}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </>
+            ) : null}
           </SelectContent>
         </Select>
       </div>

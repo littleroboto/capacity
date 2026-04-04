@@ -4,7 +4,7 @@ import { HeatmapTransferControls } from '@/components/HeatmapTransferControls';
 import { RightPanelSection } from '@/components/RightPanelSection';
 import { RestaurantTradingPatternsPanel } from '@/components/RestaurantTradingPatternsPanel';
 import { TechLensPatternsPanel } from '@/components/TechLensPatternsPanel';
-import { isRunwayAllMarkets } from '@/lib/markets';
+import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 
 const PATTERNS_INNER_SCROLL =
@@ -18,7 +18,7 @@ export function RiskModelPanel() {
   const [expanded, setExpanded] = useState(false);
   const country = useAtcStore((s) => s.country);
   const viewMode = useAtcStore((s) => s.viewMode);
-  const compareAllMarkets = isRunwayAllMarkets(country);
+  const compareAllMarkets = isRunwayMultiMarketStrip(country);
 
   const patternKind = useMemo(() => {
     if (viewMode === 'in_store' || viewMode === 'market_risk') return 'trading' as const;

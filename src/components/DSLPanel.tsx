@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { isRunwayAllMarkets } from '@/lib/markets';
+import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { OPEN_WORKSPACE_EVENT } from '@/lib/sharedDslSync';
 import { useAtcStore } from '@/store/useAtcStore';
 import { ChevronLeft, ChevronRight, Database, FileCode2, SlidersHorizontal } from 'lucide-react';
@@ -38,7 +38,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
   const setViewMode = useAtcStore((s) => s.setViewMode);
   const viewMode = useAtcStore((s) => s.viewMode);
   const resetRiskTuning = useAtcStore((s) => s.resetRiskTuning);
-  const compareAllMarkets = isRunwayAllMarkets(country);
+  const compareAllMarkets = isRunwayMultiMarketStrip(country);
 
   const settingsDialog = (
     <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>

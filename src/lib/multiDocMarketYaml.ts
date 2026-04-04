@@ -1,6 +1,6 @@
 import { parseDslMarketId } from '@/lib/dslMarketLine';
 import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
-import { isRunwayAllMarkets } from '@/lib/markets';
+import { isRunwayMultiMarketStrip } from '@/lib/markets';
 
 /** Match `dslRiskHeatmapPatch` / YAML multi-doc convention. */
 export const MULTI_DOC_SPLIT = /\r?\n---\s*\r?\n/;
@@ -72,10 +72,13 @@ export type MergeStateSlice = {
 /**
  * Full multi-document YAML for the pipeline and `atc_dsl` persistence.
  * When a single market is selected, `dslText` is that market's doc; other markets come from `dslByMarket`.
+ * When LIOM or IOM is selected, `dslText` is the segment slice; this merges it back into the full manifest order.
  */
 export function mergeStateToFullMultiDoc(s: MergeStateSlice): string {
-  if (isRunwayAllMarkets(s.country)) {
-    return s.dslText.trim();
+  if (isRunwayMultiMarketStrip(s.country)) {
+    const split = splitToDslByMarket(s.dslText.trim());
+    const bm = { ...s.dslByMarket, ...split };
+    return mergeMarketsToMultiDocYaml(bm, s.runwayMarketOrder);
   }
   const t = s.dslText.trim();
   const bm = { ...s.dslByMarket, [s.country]: t };

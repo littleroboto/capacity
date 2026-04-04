@@ -12,7 +12,7 @@ import {
   TECH_WEEKLY_DAY_KEYS,
   type TechWeeklyDayKey,
 } from '@/lib/techRhythmDsl';
-import { gammaFocusMarket, isRunwayAllMarkets } from '@/lib/markets';
+import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import type { TradingMonthlyPatternPatch } from '@/lib/dslTradingMonthlyPatch';
 import type { TradingWeeklyPatternPatch } from '@/lib/dslTradingWeeklyPatch';
@@ -172,7 +172,7 @@ export function RestaurantTradingPatternsPanel() {
           <span className="font-mono text-foreground/80">trading.weekly_pattern</span>, multiplied by monthly weights
           and seasonal. Not <span className="font-mono text-foreground/80">weekday_intensity</span> (Technology lens).
         </p>
-        {isRunwayAllMarkets(country) ? (
+        {isRunwayMultiMarketStrip(country) ? (
           <p className="text-[10px] leading-snug text-muted-foreground">
             LIOM: editing <span className="font-mono text-foreground/80">{focusMarket}</span>.
           </p>

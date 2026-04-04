@@ -45,9 +45,9 @@ import {
   type VerticalYearSection,
 } from '@/lib/calendarQuarterLayout';
 import {
-  isRunwayAllMarkets,
-  RUNWAY_ALL_MARKETS_LABEL,
-  RUNWAY_ALL_MARKETS_VALUE,
+  isRunwayMultiMarketStrip,
+  runwayCompareMarketIds,
+  runwayFocusStripLabel,
 } from '@/lib/markets';
 import {
   RUNWAY_CELL_GAP_PX,
@@ -1291,18 +1291,18 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   const selectCompareMarket = useCallback(
     (marketId: string) => {
       onSlotSelection(null);
-      setCountry(marketId, { returnPickerForBack: RUNWAY_ALL_MARKETS_VALUE });
+      setCountry(marketId, { returnPickerForBack: country });
     },
-    [onSlotSelection, setCountry]
+    [onSlotSelection, setCountry, country]
   );
   const configs = useAtcStore((s) => s.configs);
   const techWorkloadScope = useAtcStore((s) => s.techWorkloadScope);
-  const compareAllMarkets = isRunwayAllMarkets(country);
+  const compareAllMarkets = isRunwayMultiMarketStrip(country);
   const runwayTitleWithMarket = `${
     viewMode === 'combined'
       ? technologyRunwayTitleForWorkloadScope(techWorkloadScope)
       : runwayHeatmapTitleForViewMode(viewMode)
-  }: ${compareAllMarkets ? RUNWAY_ALL_MARKETS_LABEL : country}`;
+  }: ${runwayFocusStripLabel(country)}`;
   const riskTuning = useAtcStore((s) => s.riskTuning);
   const riskHeatmapGamma = useAtcStore((s) => s.riskHeatmapGamma);
   const riskHeatmapGammaTech = useAtcStore((s) => s.riskHeatmapGammaTech);
@@ -1380,9 +1380,11 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
 
   const marketsOrdered = useMemo(() => {
     const fromCfg = configs.map((c) => c.market);
-    if (fromCfg.length) return fromCfg;
-    return [...new Set(riskSurface.map((r) => r.market))].sort();
-  }, [configs, riskSurface]);
+    const base = fromCfg.length ? fromCfg : [...new Set(riskSurface.map((r) => r.market))].sort();
+    if (!isRunwayMultiMarketStrip(country)) return base;
+    const present = new Set(base);
+    return runwayCompareMarketIds(country, base).filter((id) => present.has(id));
+  }, [configs, riskSurface, country]);
 
   const singleMarketId = compareAllMarkets ? '' : country;
   const marketConfig = useMemo(
@@ -1417,7 +1419,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     }
     /** Single ↔ all-markets changes layout root (flat columns vs city block / strip). A delayed handoff + multi `set()` in `setCountry` re-schedules the timer every render and can starve the 260ms timeout — skeleton never clears until full reload. */
     const crossCompareBoundary =
-      isRunwayAllMarkets(country) !== isRunwayAllMarkets(displayedCountry);
+      isRunwayMultiMarketStrip(country) !== isRunwayMultiMarketStrip(displayedCountry);
     if (crossCompareBoundary) {
       if (country !== displayedCountry) setDisplayedCountry(country);
       setCountrySwitchLoading(false);

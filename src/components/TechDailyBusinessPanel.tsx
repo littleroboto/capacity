@@ -5,7 +5,7 @@ import {
   TECH_WEEKLY_DAY_KEYS,
   type TechWeeklyDayKey,
 } from '@/lib/techRhythmDsl';
-import { gammaFocusMarket, isRunwayAllMarkets } from '@/lib/markets';
+import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import type { TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import { WeightingLineMiniChart } from '@/components/WeightingLineMiniChart';
@@ -46,7 +46,7 @@ export function TechDailyBusinessPanel() {
           How hard BAU engineering runs Mon–Sun (0 = off, 1 = full). Store trading has its own curve under Restaurant
           Activity.
         </p>
-        {isRunwayAllMarkets(country) ? (
+        {isRunwayMultiMarketStrip(country) ? (
           <p className="mt-1 text-xs text-muted-foreground">
             Editing <span className="font-medium text-foreground/85">{focusMarket}</span>.
           </p>

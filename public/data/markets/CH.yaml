@@ -1,0 +1,438 @@
+# Switzerland — IOM segment sample market (template from PL; holidays are illustrative).
+
+market: CH
+title: Switzerland
+
+
+
+# Capacity — labs, staff (monthly headcount), parallel test slots.
+
+resources:
+  labs:
+    capacity: 7
+  staff:
+    capacity: 5
+    monthly_pattern_basis: absolute
+    monthly_pattern:
+      Jan: 5
+      Feb: 5
+      Mar: 5
+      Apr: 4
+      May: 4
+      Jun: 3
+      Jul: 3
+      Aug: 3
+      Sep: 4
+      Oct: 5
+      Nov: 4
+      Dec: 3
+  testing_capacity: 5
+
+# BAU — routine workload + how heavy Market IT / restaurant support is each weekday (0–1).
+# (Not tech_programmes — those are dated change projects.)
+
+bau:
+  days_in_use: [mo, tu, we, th, fr, sa, su]
+  weekly_cycle:
+    labs_required: 1
+    staff_required: 1
+    support_days: 0
+  market_it_weekly_load:
+    weekday_intensity:
+      Mon: 0.840
+      Tue: 0.730
+      Wed: 0.360
+      Thu: 0.280
+      Fri: 0.440
+      Sat: 0.220
+      Sun: 0.250
+
+# Marketing campaigns — timing, impact, prep/live support.
+# Synthetic test fixtures: 28-day prep, ~30-day live, 1 lab + 1 Market IT (tech_staff) each.
+# 2027 rows repeat the same seasonal pattern (+1 calendar year on month/day).
+
+campaigns:
+  - name: CH Campaign 1 (Easter)
+    start_date: '2026-04-07'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH Campaign 1 (Easter) (2027)
+    start_date: '2027-04-07'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH Campaign 2 (Summer)
+    start_date: '2026-07-16'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH Campaign 2 (Summer) (2027)
+    start_date: '2027-07-16'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH Campaign 4 (Monopoly) (School holidays)
+    start_date: '2026-07-22'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH Campaign 4 (Monopoly) (School holidays) (2027)
+    start_date: '2027-07-22'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH Campaign 3 (Advent)
+    start_date: '2026-12-03'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH Campaign 3 (Advent) (2027)
+    start_date: '2027-12-03'
+    duration: 30
+    testing_prep_duration: 28
+    impact: medium
+    business_uplift: 1.0
+    live_tech_load_scale: 1
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+
+# Tech programmes — non-campaign engineering. Two ~60d POS rollouts / year (1 lab + 1 Market IT); 2027 rows repeat the same pattern (+1 calendar year).
+
+tech_programmes:
+  - name: CH POS Deployment H1
+    start_date: '2026-01-13'
+    duration: 60
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH POS Deployment H2
+    start_date: '2026-08-28'
+    duration: 58
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH POS Deployment H1 (2027)
+    start_date: '2027-01-13'
+    duration: 60
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 1
+  - name: CH POS Deployment H2 (2027)
+    start_date: '2027-08-28'
+    duration: 58
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 1
+
+# Public holidays — bank / national closures (Kanton Zürich (public); school = Stadt Zürich / Kanton Zürich ferien.)
+
+public_holidays:
+  auto: false
+  dates:
+    - '2026-01-01'
+    - '2026-04-03'
+    - '2026-04-06'
+    - '2026-05-01'
+    - '2026-05-14'
+    - '2026-05-25'
+    - '2026-08-01'
+    - '2026-12-25'
+    - '2026-12-26'
+  staffing_multiplier: 0.25
+  trading_multiplier: 1.0
+
+# School breaks — explicit dates (school = Stadt Zürich / Kanton Zürich ferien.)
+
+school_holidays:
+  auto: false
+  dates:
+    # 2025-12-22 – 2026-01-02 — Zürich winter (school year 2025/26)
+    - '2025-12-22'
+    - '2025-12-23'
+    - '2025-12-24'
+    - '2025-12-25'
+    - '2025-12-26'
+    - '2025-12-27'
+    - '2025-12-28'
+    - '2025-12-29'
+    - '2025-12-30'
+    - '2025-12-31'
+    - '2026-01-01'
+    - '2026-01-02'
+    # 2026-02-09 – 2026-02-20 — Zürich Sportferien
+    - '2026-02-09'
+    - '2026-02-10'
+    - '2026-02-11'
+    - '2026-02-12'
+    - '2026-02-13'
+    - '2026-02-14'
+    - '2026-02-15'
+    - '2026-02-16'
+    - '2026-02-17'
+    - '2026-02-18'
+    - '2026-02-19'
+    - '2026-02-20'
+    # 2026-04-20 – 2026-05-01 — Zürich Frühlingsferien
+    - '2026-04-20'
+    - '2026-04-21'
+    - '2026-04-22'
+    - '2026-04-23'
+    - '2026-04-24'
+    - '2026-04-25'
+    - '2026-04-26'
+    - '2026-04-27'
+    - '2026-04-28'
+    - '2026-04-29'
+    - '2026-04-30'
+    - '2026-05-01'
+    # 2026-05-14 – 2026-05-15 — Auffahrt (short break)
+    - '2026-05-14'
+    - '2026-05-15'
+    # 2026-07-13 – 2026-08-14 — Zürich summer
+    - '2026-07-13'
+    - '2026-07-14'
+    - '2026-07-15'
+    - '2026-07-16'
+    - '2026-07-17'
+    - '2026-07-18'
+    - '2026-07-19'
+    - '2026-07-20'
+    - '2026-07-21'
+    - '2026-07-22'
+    - '2026-07-23'
+    - '2026-07-24'
+    - '2026-07-25'
+    - '2026-07-26'
+    - '2026-07-27'
+    - '2026-07-28'
+    - '2026-07-29'
+    - '2026-07-30'
+    - '2026-07-31'
+    - '2026-08-01'
+    - '2026-08-02'
+    - '2026-08-03'
+    - '2026-08-04'
+    - '2026-08-05'
+    - '2026-08-06'
+    - '2026-08-07'
+    - '2026-08-08'
+    - '2026-08-09'
+    - '2026-08-10'
+    - '2026-08-11'
+    - '2026-08-12'
+    - '2026-08-13'
+    - '2026-08-14'
+    # 2026-12-21 – 2027-01-01 — Zürich Christmas (school year 2026/27)
+    - '2026-12-21'
+    - '2026-12-22'
+    - '2026-12-23'
+    - '2026-12-24'
+    - '2026-12-25'
+    - '2026-12-26'
+    - '2026-12-27'
+    - '2026-12-28'
+    - '2026-12-29'
+    - '2026-12-30'
+    - '2026-12-31'
+    - '2027-01-01'
+  staffing_multiplier: 0.75
+  trading_multiplier: 1.0
+  load_effects:
+    lab_load_mult: 1.0
+    team_load_mult: 1.0
+    backend_load_mult: 1.0
+    ops_activity_mult: 1.0
+    commercial_activity_mult: 1.0
+
+# Holiday capacity shaping — taper and lab ceiling vs public + school calendars above.
+
+holidays:
+  capacity_taper_days: 0
+  lab_capacity_scale: 1.0
+
+# Store / restaurant trading — demand shape (separate from tech supply).
+
+trading:
+  campaign_store_boost_prep: 0
+  campaign_store_boost_live: 0.28
+  campaign_effect_scale: 2.5
+  payday_month_peak_multiplier: 1.2
+  monthly_pattern:
+    Jan: 0.56
+    Feb: 0.58
+    Mar: 0.69
+    Apr: 0.77
+    May: 0.85
+    Jun: 0.91
+    Jul: 0.97
+    Aug: 0.92
+    Sep: 0.84
+    Oct: 0.72
+    Nov: 0.60
+    Dec: 1.0
+  weekly_pattern:
+    Mon: 0.6
+    Tue: 0.7
+    Wed: 0.8
+    Thu: 0.9
+    Fri: 1.0
+    Sat: 1.0
+    Sun: 0.8
+  seasonal:
+    peak_month: 7
+    amplitude: 0.1
+
+# Market risk lens — dated events / blackouts below; optional deployment_risk_month_curve adds Jan–Dec lift.
+
+deployment_risk_week_weight: 0.21
+
+# deployment_risk_month_curve omitted — engine applies a light Oct–Dec default; add a custom curve in YAML if needed.
+
+deployment_risk_events:
+  - id: earnings_q1_fy2026
+    start: '2026-05-13'
+    end: '2026-05-15'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q2_fy2026
+    start: '2026-08-11'
+    end: '2026-08-13'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q3_fy2026
+    start: '2026-11-10'
+    end: '2026-11-12'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q4_fy2026
+    start: '2027-02-10'
+    end: '2027-02-12'
+    severity: 0.55
+    kind: earnings
+  - id: earnings_q1_fy2027
+    start: '2027-05-12'
+    end: '2027-05-14'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q2_fy2027
+    start: '2027-08-10'
+    end: '2027-08-12'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q3_fy2027
+    start: '2027-11-09'
+    end: '2027-11-11'
+    severity: 0.52
+    kind: earnings
+  - id: earnings_q4_fy2027
+    start: '2028-02-09'
+    end: '2028-02-11'
+    severity: 0.55
+    kind: earnings
+  - id: agm_prep_fy2026
+    start: '2026-10-14'
+    end: '2026-10-20'
+    severity: 0.48
+    kind: agm_prep
+  - id: agm_day_fy2026
+    start: '2026-10-21'
+    end: '2026-10-21'
+    severity: 0.42
+    kind: agm
+  - id: agm_prep_fy2027
+    start: '2027-10-13'
+    end: '2027-10-19'
+    severity: 0.48
+    kind: agm_prep
+  - id: agm_day_fy2027
+    start: '2027-10-20'
+    end: '2027-10-20'
+    severity: 0.42
+    kind: agm
+
+deployment_risk_blackouts:
+  - id: year_end_change_blackout_fy2026
+    start: '2026-12-15'
+    end: '2027-01-15'
+    severity: 0.42
+    public_reason: 'Change freeze / low resourcing window'
+    operational_note: 'Peak Q4 trading — lock-in month; thin bench if issues land'
+  - id: year_end_change_blackout_fy2027
+    start: '2027-12-15'
+    end: '2028-01-15'
+    severity: 0.42
+    public_reason: 'Change freeze / low resourcing window'
+    operational_note: 'Peak Q4 trading — lock-in month; thin bench if issues land'

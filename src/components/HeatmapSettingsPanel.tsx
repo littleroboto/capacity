@@ -1,7 +1,7 @@
 import { HeatmapTransferControls } from '@/components/HeatmapTransferControls';
 import { Label } from '@/components/ui/label';
 import { HEATMAP_MONO_COLOR_PRESETS } from '@/lib/riskHeatmapColors';
-import { isRunwayAllMarkets } from '@/lib/markets';
+import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 import { Palette } from 'lucide-react';
@@ -45,7 +45,7 @@ export function HeatmapSettingsPanel({ showCampaignBoost, showHeatmapTransferTun
   const configs = useAtcStore((s) => s.configs);
 
   const yamlCampaignScaleFocused = (() => {
-    if (isRunwayAllMarkets(country)) return null;
+    if (isRunwayMultiMarketStrip(country)) return null;
     const c = configs.find((x) => x.market === country);
     const y = c?.tradingPressure?.campaign_effect_scale;
     const n = y != null && Number.isFinite(y) ? y : 1;

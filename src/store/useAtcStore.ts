@@ -22,7 +22,8 @@ import {
 import {
   FALLBACK_RUNWAY_MARKET_IDS,
   gammaFocusMarket,
-  isRunwayAllMarkets,
+  isRunwayMultiMarketStrip,
+  runwayCompareMarketIds,
   RUNWAY_ALL_MARKETS_VALUE,
 } from '@/lib/markets';
 
@@ -297,7 +298,7 @@ export const useAtcStore = create<AtcState>()(
         setStored('picker', c);
         const prev = get().country;
         let dslByMarket = { ...get().dslByMarket };
-        if (!isRunwayAllMarkets(prev)) {
+        if (!isRunwayMultiMarketStrip(prev)) {
           dslByMarket[prev] = get().dslText.trim();
         }
         set({ country: c, dslByMarket, runwayReturnPicker: nextRunwayReturnPicker });
@@ -306,19 +307,23 @@ export const useAtcStore = create<AtcState>()(
         const riskTuning = get().riskTuning;
         const mergedFromMap = mergeMarketsToMultiDocYaml(get().dslByMarket, order);
 
-        if (isRunwayAllMarkets(c)) {
-          let full = mergedFromMap;
-          if (!full.trim() || !looksLikeYamlDsl(full)) {
-            const fb = order[0]!;
-            full = get().dslByMarket[fb] ?? defaultDslForMarket(fb);
+        if (isRunwayMultiMarketStrip(c)) {
+          const segmentOrder = runwayCompareMarketIds(c, order);
+          let segmentYaml = mergeMarketsToMultiDocYaml(get().dslByMarket, segmentOrder);
+          if (!segmentYaml.trim() || !looksLikeYamlDsl(segmentYaml)) {
+            const fb = segmentOrder[0] ?? order[0]!;
+            segmentYaml = get().dslByMarket[fb] ?? defaultDslForMarket(fb);
           }
-          if (!looksLikeYamlDsl(full)) full = defaultDslForMarket(order[0]!);
-          const split = splitToDslByMarket(full);
+          if (!looksLikeYamlDsl(segmentYaml)) {
+            segmentYaml = defaultDslForMarket(segmentOrder[0] ?? order[0]!);
+          }
+          const split = splitToDslByMarket(segmentYaml);
           if (Object.keys(split).length) {
             set({ dslByMarket: { ...get().dslByMarket, ...split } });
           }
-          set({ dslText: full });
+          set({ dslText: segmentYaml });
           if (get().viewMode === 'code') return;
+          const full = mergeStateToFullMultiDoc(get());
           const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, c));
           set({
             riskSurface: r.riskSurface,
@@ -439,7 +444,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -461,7 +466,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -483,7 +488,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -507,7 +512,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -529,7 +534,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -551,7 +556,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -573,7 +578,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -595,7 +600,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -623,7 +628,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -645,7 +650,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -667,7 +672,7 @@ export const useAtcStore = create<AtcState>()(
         const split = splitToDslByMarket(nextFull);
         const dslByMarket = { ...state.dslByMarket, ...split };
         let dslText = nextFull;
-        if (!isRunwayAllMarkets(country)) {
+        if (!isRunwayMultiMarketStrip(country)) {
           dslText = extractMarketDocument(nextFull, country) ?? nextFull;
         }
         set({ dslText, dslByMarket });
@@ -691,20 +696,28 @@ export const useAtcStore = create<AtcState>()(
         const co = get().country;
         const order = get().runwayMarketOrder;
         let dslByMarket = { ...get().dslByMarket };
-        if (!isRunwayAllMarkets(co)) {
+        if (!isRunwayMultiMarketStrip(co)) {
           dslByMarket[co] = dsl;
         }
-        const full = isRunwayAllMarkets(co)
-          ? dsl
-          : mergeMarketsToMultiDocYaml(dslByMarket, order);
+        let full: string;
+        if (isRunwayMultiMarketStrip(co)) {
+          const splitSeg = splitToDslByMarket(dsl);
+          dslByMarket = { ...dslByMarket, ...splitSeg };
+          full = mergeMarketsToMultiDocYaml(dslByMarket, order);
+        } else {
+          full = mergeMarketsToMultiDocYaml(dslByMarket, order);
+        }
         const fullFinal = full.trim() && looksLikeYamlDsl(full) ? full : dsl;
         const split = splitToDslByMarket(fullFinal);
         if (Object.keys(split).length) {
           dslByMarket = { ...dslByMarket, ...split };
         }
         setAtcDsl(fullFinal);
+        const nextEditorText = isRunwayMultiMarketStrip(co)
+          ? mergeMarketsToMultiDocYaml(dslByMarket, runwayCompareMarketIds(co, order))
+          : dsl;
         set({
-          dslText: isRunwayAllMarkets(co) ? fullFinal : dsl,
+          dslText: nextEditorText,
           dslByMarket,
         });
         const r = runPipelineFromDsl(
@@ -721,16 +734,20 @@ export const useAtcStore = create<AtcState>()(
       resetDsl: () => {
         const { country, dslByMarket, riskTuning, runwayMarketOrder } = get();
         const merged = mergeMarketsToMultiDocYaml(dslByMarket, runwayMarketOrder);
-        const fallbackMarket = isRunwayAllMarkets(country) ? runwayMarketOrder[0]! : country;
+        const fallbackMarket = isRunwayMultiMarketStrip(country)
+          ? (runwayCompareMarketIds(country, runwayMarketOrder)[0] ?? runwayMarketOrder[0]!)
+          : country;
         let full =
           merged.trim() && looksLikeYamlDsl(merged)
             ? merged
-            : (dslByMarket[country] ?? defaultDslForMarket(fallbackMarket));
+            : (isRunwayMultiMarketStrip(country)
+                ? defaultDslForMarket(fallbackMarket)
+                : (dslByMarket[country] ?? defaultDslForMarket(fallbackMarket)));
         if (!looksLikeYamlDsl(full)) full = defaultDslForMarket(fallbackMarket);
         const split = splitToDslByMarket(full);
         const nextByMarket = Object.keys(split).length ? { ...dslByMarket, ...split } : dslByMarket;
-        const editorText = isRunwayAllMarkets(country)
-          ? full
+        const editorText = isRunwayMultiMarketStrip(country)
+          ? mergeMarketsToMultiDocYaml(nextByMarket, runwayCompareMarketIds(country, runwayMarketOrder))
           : extractMarketDocument(full, country) ??
             nextByMarket[country] ??
             defaultDslForMarket(fallbackMarket);
@@ -750,16 +767,24 @@ export const useAtcStore = create<AtcState>()(
         const mergedFromDisk = mergeMarketsToMultiDocYaml(dslByMarket, runwayMarketOrder);
         const firstId = runwayMarketOrder[0] ?? FALLBACK_RUNWAY_MARKET_IDS[0]!;
         let singleFallback: string;
-        if (isRunwayAllMarkets(country)) {
+        if (isRunwayMultiMarketStrip(country)) {
+          const segOrder = runwayCompareMarketIds(country, runwayMarketOrder);
+          const segYaml = mergeMarketsToMultiDocYaml(dslByMarket, segOrder);
+          const fb = segOrder[0] ?? firstId;
           singleFallback =
-            mergedFromDisk.trim() && looksLikeYamlDsl(mergedFromDisk)
-              ? mergedFromDisk
-              : defaultDslForMarket(firstId);
+            segYaml.trim() && looksLikeYamlDsl(segYaml)
+              ? segYaml
+              : (dslByMarket[fb] ?? defaultDslForMarket(fb));
         } else {
           singleFallback = dslByMarket[country] ?? defaultDslForMarket(country);
         }
         if (!looksLikeYamlDsl(singleFallback)) {
-          singleFallback = isRunwayAllMarkets(country) ? defaultDslForMarket(firstId) : defaultDslForMarket(country);
+          if (isRunwayMultiMarketStrip(country)) {
+            const fb = runwayCompareMarketIds(country, runwayMarketOrder)[0] ?? firstId;
+            singleFallback = defaultDslForMarket(fb);
+          } else {
+            singleFallback = defaultDslForMarket(country);
+          }
         }
         const merged =
           multiDocFallback?.trim() && looksLikeYamlDsl(multiDocFallback)
@@ -783,7 +808,13 @@ export const useAtcStore = create<AtcState>()(
         const nextByMarket =
           Object.keys(split).length > 0 ? { ...get().dslByMarket, ...split } : { ...get().dslByMarket };
         let dslText = dsl;
-        if (!isRunwayAllMarkets(country)) {
+        if (isRunwayMultiMarketStrip(country)) {
+          dslText = mergeMarketsToMultiDocYaml(
+            nextByMarket,
+            runwayCompareMarketIds(country, runwayMarketOrder)
+          );
+          if (!looksLikeYamlDsl(dslText)) dslText = singleFallback;
+        } else {
           dslText =
             extractMarketDocument(dsl, country) ?? nextByMarket[country] ?? singleFallback;
           if (!looksLikeYamlDsl(dslText)) dslText = singleFallback;

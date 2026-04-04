@@ -1,12 +1,21 @@
 {
   "markets": [
+    "AT",
     "AU",
+    "BE",
     "CA",
+    "CH",
+    "CZ",
     "DE",
     "ES",
     "FR",
     "IT",
+    "NL",
     "PL",
+    "PT",
+    "SK",
+    "SL",
+    "UA",
     "UK"
   ]
 }
