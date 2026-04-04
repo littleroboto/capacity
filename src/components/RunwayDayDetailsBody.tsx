@@ -6,6 +6,7 @@ import {
   glossaryFillScorePopover,
   glossaryPlanningBlend,
   glossaryPlanningBlendPopover,
+  glossaryTileVsBandCollapse,
 } from '@/lib/runwayDayDetailsGlossary';
 import { cn } from '@/lib/utils';
 
@@ -303,27 +304,25 @@ function ContributorsBlock({
           ) : null}
         </>
       )}
-      <p
-        className={cn(
-          'border-t border-border leading-snug text-muted-foreground',
-          presentation === 'markdown' ? 'mt-4 border-border/60 pt-3 text-[13px]' : 'mt-3 border-border/60 pt-2.5 text-[10px]'
-        )}
-      >
-        {techLens ? (
-          <>
-            Band uses the full planning blend (tech, stores, campaigns, holidays)—not the same as tech headroom in the
-            tile.
-          </>
-        ) : p.viewMode === 'market_risk' ? (
-          <>
-            Band uses the full planning blend; this heatmap is market risk only.
-          </>
-        ) : (
-          <>
-            Band includes tech delivery too; this heatmap highlights trading-style pressure only.
-          </>
-        )}
-      </p>
+      {presentation === 'markdown' ? (
+        <p
+          className={cn(
+            'border-t border-border leading-snug text-muted-foreground',
+            'mt-4 border-border/60 pt-3 text-[13px]'
+          )}
+        >
+          {techLens ? (
+            <>
+              Band uses the full planning blend (tech, stores, campaigns, holidays)—not the same as tech headroom in the
+              tile.
+            </>
+          ) : p.viewMode === 'market_risk' ? (
+            <>Band uses the full planning blend; this heatmap is market risk only.</>
+          ) : (
+            <>Band includes tech delivery too; this heatmap highlights trading-style pressure only.</>
+          )}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -441,14 +440,14 @@ export function RunwayDayDetailsPayloadBody({
           </p>
           <p className="mt-2 font-mono text-sm tabular-nums text-foreground">
             <span className="inline-flex items-center gap-0.5 text-muted-foreground">
-              <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
-            </span>{' '}
-            <span className="font-semibold">{heatmapScoreStr}</span>
-            <span className="mx-2 text-muted-foreground/50">·</span>
-            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
               <TermWithDefinition label="Planning blend" definition={planningGlossary} dense />
             </span>{' '}
             <span className="font-semibold">{planningBlendStr}</span>
+            <span className="mx-2 text-muted-foreground/50">·</span>
+            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+              <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
+            </span>{' '}
+            <span className="font-semibold">{heatmapScoreStr}</span>
           </p>
           <LensScoreFootnote viewMode={p.viewMode} presentation={presentation} />
         </header>
@@ -482,14 +481,7 @@ export function RunwayDayDetailsPayloadBody({
             <span className="mx-1.5 text-muted-foreground/50">·</span>
             {fillLeadForPresentation}
           </p>
-          <p className="mt-2 text-[11px] font-mono tabular-nums leading-snug text-foreground">
-            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
-              <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
-            </span>{' '}
-            <span className="font-semibold">{heatmapScoreStr}</span>
-          </p>
-          <LensScoreFootnote viewMode={p.viewMode} presentation={presentation} />
-          <div className="mt-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
+          <div className="mt-2.5 rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
             <p className="text-[11px] font-mono tabular-nums leading-snug text-foreground">
               <span className="inline-flex items-center gap-0.5 text-muted-foreground">
                 <TermWithDefinition label="Planning blend" definition={planningGlossary} dense />
@@ -497,13 +489,54 @@ export function RunwayDayDetailsPayloadBody({
               <span className="font-semibold">{planningBlendStr}</span>
             </p>
           </div>
+          <p className="mt-2.5 text-[11px] font-mono tabular-nums leading-snug text-foreground">
+            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+              <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
+            </span>{' '}
+            <span className="font-semibold">{heatmapScoreStr}</span>
+          </p>
         </header>
       )}
 
       <div className={bodyPad}>
+        {presentation !== 'markdown' && p.row.public_holiday_flag ? (
+          <div className="mt-1 rounded-md border border-sky-500/35 bg-sky-500/10 px-3 py-2.5 dark:border-sky-400/30 dark:bg-sky-400/10">
+            <p className="text-xs font-semibold text-sky-950 dark:text-sky-200">Public holiday</p>
+            <p className="mt-1.5 text-sm font-medium leading-snug text-foreground">
+              {p.publicHolidayName ?? 'Stub calendar'}
+            </p>
+          </div>
+        ) : null}
+
+        {presentation !== 'markdown' && p.row.school_holiday_flag ? (
+          <p className="mt-3 text-[11px] font-medium leading-relaxed text-muted-foreground">
+            School break — the model may treat this as a busier or tighter week.
+          </p>
+        ) : null}
+
+        {presentation === 'markdown' ? (
+          <>
+            <h3 className="mt-0 text-sm font-semibold tracking-tight text-foreground">What shaped this day</h3>
+            <div className="mt-3 space-y-5">
+              {p.driverSummaryBlocks.map((block) => (
+                <div key={block.heading}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {block.heading}
+                  </p>
+                  <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[14px] leading-relaxed text-foreground marker:text-muted-foreground">
+                    {block.bullets.map((b, i) => (
+                      <li key={`${block.heading}-${i}`}>{b}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+
         {presentation === 'markdown' && p.viewMode === 'combined' ? (
           <>
-            <h3 className="mt-5 text-sm font-semibold tracking-tight text-foreground">Tech programmes</h3>
+            <h3 className="mt-6 text-sm font-semibold tracking-tight text-foreground">Tech programmes</h3>
             {primaryTech.shown.length > 0 ? (
               <BulletList items={primaryTech.shown} presentation={presentation} />
             ) : (
@@ -517,7 +550,7 @@ export function RunwayDayDetailsPayloadBody({
 
         {presentation === 'markdown' && (p.viewMode === 'in_store' || p.viewMode === 'market_risk') ? (
           <>
-            <h3 className="mt-5 text-sm font-semibold tracking-tight text-foreground">Marketing campaigns</h3>
+            <h3 className="mt-6 text-sm font-semibold tracking-tight text-foreground">Marketing campaigns</h3>
             {primaryCamps.shown.length > 0 ? (
               <BulletList items={primaryCamps.shown} presentation={presentation} />
             ) : (
@@ -536,37 +569,6 @@ export function RunwayDayDetailsPayloadBody({
             ) : null}
           </>
         ) : null}
-
-        {presentation === 'markdown' ? (
-          <>
-            <h3 className="mt-6 text-sm font-semibold tracking-tight text-foreground first:mt-0">
-              What shaped this day
-            </h3>
-            <div className="mt-3 space-y-5">
-              {p.driverSummaryBlocks.map((block) => (
-                <div key={block.heading}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {block.heading}
-                  </p>
-                  <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[14px] leading-relaxed text-foreground marker:text-muted-foreground">
-                    {block.bullets.map((b, i) => (
-                      <li key={`${block.heading}-${i}`}>{b}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <details className="mt-2 rounded-md border border-border/70 bg-muted/10 open:shadow-sm">
-            <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-semibold tracking-tight text-foreground hover:bg-muted/30">
-              Heatmap breakdown
-            </summary>
-            <div className="border-t border-border/60 px-1 pb-2 pt-0">
-              <ContributorsBlock p={p} presentation={presentation} embedded />
-            </div>
-          </details>
-        )}
 
         {camps.shown.length > 0 && presentation !== 'markdown' ? (
           <>
@@ -617,13 +619,30 @@ export function RunwayDayDetailsPayloadBody({
           </>
         ) : null}
 
-        {p.row.public_holiday_flag ? (
-          <div
-            className={cn(
-              'mt-6 rounded-md border border-sky-500/35 bg-sky-500/10 dark:border-sky-400/30 dark:bg-sky-400/10',
-              presentation === 'markdown' ? 'px-3 py-3' : 'mt-4 px-3 py-2.5'
-            )}
-          >
+        {presentation !== 'markdown' ? (
+          <details className="mt-2 rounded-md border border-border/70 bg-muted/10 open:shadow-sm">
+            <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-semibold tracking-tight text-foreground hover:bg-muted/30">
+              Heatmap breakdown
+            </summary>
+            <div className="border-t border-border/60 px-1 pb-2 pt-0">
+              <ContributorsBlock p={p} presentation={presentation} embedded />
+            </div>
+          </details>
+        ) : null}
+
+        {presentation !== 'markdown' ? (
+          <details className="mt-2 rounded-md border border-border/70 bg-muted/10">
+            <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-semibold tracking-tight text-muted-foreground hover:bg-muted/30">
+              Why the band can differ from the tile
+            </summary>
+            <p className="border-t border-border/60 px-3 pb-3 pt-2 text-[11px] leading-snug text-muted-foreground">
+              {glossaryTileVsBandCollapse(p.viewMode)}
+            </p>
+          </details>
+        ) : null}
+
+        {presentation === 'markdown' && p.row.public_holiday_flag ? (
+          <div className="mt-6 rounded-md border border-sky-500/35 bg-sky-500/10 px-3 py-3 dark:border-sky-400/30 dark:bg-sky-400/10">
             <p className="text-xs font-semibold text-sky-950 dark:text-sky-200">Public holiday</p>
             <p className="mt-1.5 text-sm font-medium leading-snug text-foreground">
               {p.publicHolidayName ?? 'Stub calendar'}
@@ -631,13 +650,8 @@ export function RunwayDayDetailsPayloadBody({
           </div>
         ) : null}
 
-        {p.row.school_holiday_flag ? (
-          <p
-            className={cn(
-              'font-medium leading-relaxed text-muted-foreground',
-              presentation === 'markdown' ? 'mt-5 text-sm' : 'mt-3 text-[11px]'
-            )}
-          >
+        {presentation === 'markdown' && p.row.school_holiday_flag ? (
+          <p className="mt-5 text-sm font-medium leading-relaxed text-muted-foreground">
             School break — the model may treat this as a busier or tighter week.
           </p>
         ) : null}

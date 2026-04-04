@@ -1,51 +1,61 @@
 import type { ViewModeId } from '@/lib/constants';
 
-/** Fill score — side panel / markdown (full). */
+/** Align with `docs/LENS_GLOSSARY.md` — side panel / markdown (full). */
 export function glossaryFillScore(mode: ViewModeId): string {
   if (mode === 'combined') {
-    return 'Tech capacity headroom behind this heatmap (0–1 before colour transfer and gamma): share of lab and Market IT capacity still available versus scheduled work on those lanes (headline excludes backend). The large percentage in the tile is this value × 100%.';
+    return 'Headroom on lab and Market IT lanes (0–1 before colour transfer and γ): more free capacity vs scheduled work on those lanes; backend is excluded from the headline. The tile % is this value × 100%.';
   }
   if (mode === 'market_risk') {
-    return 'Market risk score (0–1 before colour transfer and gamma): deployment and calendar fragility from holidays, Q4 ramp in the month curve, trading intensity, campaigns, and optional YAML deployment events—not a ban. The tile % is this value × 100%.';
+    return 'Market risk (0–1 before transfer and γ): deployment and calendar fragility—holidays, Q4/month curve, trading intensity, campaigns × peaks, tech bench strain, YAML events. Hotter = more fragile, not a ban. The tile % is this value × 100%.';
   }
-  return 'Modeled restaurant / store trading intensity (0–1 before display tweaks): the store-pressure lane only—calendar rhythm, **early-month lift** (busier starts of the month), seasonal shape, public-holiday trading multiplier, and any YAML **store** boosts during live (or prep if configured). Does not change scheduled tech work. Marketing campaign risk is not blended in separately. The tile % is this value × 100%.';
+  return 'Trading pressure: modeled restaurant / store trading intensity from the store-pressure lane (0–1 before display tweaks)—rhythm, early-month lift, holidays, store boosts. Does not add scheduled tech work. The tile % is this value × 100%.';
 }
 
-/** Planning blend — side panel / markdown (full). */
+/** Align with `docs/LENS_GLOSSARY.md` — planning blend (full). */
 export function glossaryPlanningBlend(mode: ViewModeId): string {
   const base =
-    'Single 0–1 **planning blend** that mixes technology pressure, store/restaurant pressure, campaign risk, and (when enabled) a holiday term, using your risk tuning weights. Drives the Low / Medium / High band and overall headroom.';
+    'Separate 0–1 planning blend: tech + store + campaign + holiday weights (your risk tuning). Drives the Low / Medium / High band—not the tile percentage.';
   if (mode === 'combined') {
-    return `${base} Not the same as the Technology heatmap tile, which shows tech capacity headroom only.`;
+    return `${base} The Technology Teams tile shows tech capacity headroom only.`;
   }
   if (mode === 'market_risk') {
-    return `${base} The Market risk heatmap shows deployment/calendar fragility only; the band still reflects this full planning mix.`;
+    return `${base} The Market risk heatmap shows deployment/calendar fragility only; the band still reflects the full operational mix.`;
   }
-  return `${base} Restaurant Activity shows store trading intensity only; the blend still includes tech delivery and campaign terms, so the two numbers can differ.`;
+  return `${base} Restaurant Activity shows store trading only while the blend still includes tech and campaigns, so the two numbers can differ.`;
 }
 
-/** Fill score — popover `TermWithDefinition` (short). */
+/** Popover `TermWithDefinition` (compact). */
 export function glossaryFillScorePopover(mode: ViewModeId): string {
   if (mode === 'combined') {
-    return 'Lab + Market IT headroom (0–1) before γ and colour transfer. The big % is this score × 100.';
+    return 'Lab + Market IT headroom (0–1) before γ and transfer. Tile % = this × 100. Cooler = more capacity free.';
   }
   if (mode === 'market_risk') {
-    return 'Market risk (0–1) before γ and colour transfer. The big % is this score × 100.';
+    return 'Deployment/calendar fragility (0–1) before γ and transfer. Tile % = this × 100.';
   }
-  return 'Store trading intensity (0–1) before display tweaks. The big % is this score × 100.';
+  return 'Store-pressure trading intensity (0–1) before display tweaks. Tile % = this × 100.';
 }
 
-/** Planning blend — popover `TermWithDefinition` (short). */
+/** Popover — planning blend (compact). */
 export function glossaryPlanningBlendPopover(mode: ViewModeId): string {
-  const core =
-    'Blends tech, store, campaigns, and holidays (your tuning weights). Sets the Low / Medium / High band.';
+  const core = '0–1 mix (tech, store, campaigns, holidays) from your weights. Sets the band.';
   if (mode === 'combined') {
-    return `${core} Different from the tech headroom number in the tile.`;
+    return `${core} Not the tile headroom %.`;
   }
   if (mode === 'market_risk') {
-    return `${core} The tile is market risk only.`;
+    return `${core} Tile is market-risk only.`;
   }
-  return `${core} The tile is store trading only.`;
+  return `${core} Tile is store trading only.`;
+}
+
+/** Popover footnote — closed by default; avoids repeating header glossary. */
+export function glossaryTileVsBandCollapse(mode: ViewModeId): string {
+  if (mode === 'combined') {
+    return 'The band uses the full planning blend. The large percentage is Technology Teams headroom on lab + Market IT only—backend excluded from that headline.';
+  }
+  if (mode === 'market_risk') {
+    return 'The band uses the full planning blend. The tile is the market-risk score (deployment/calendar fragility) only.';
+  }
+  return 'The band uses the full planning blend. The tile is restaurant/store trading intensity from the store curve only.';
 }
 
 /** @deprecated Use {@link glossaryPlanningBlend}. */
