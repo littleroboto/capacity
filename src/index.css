@@ -16,6 +16,16 @@
     --accent-foreground: 222 47% 11%;
     --border: 220 13% 88%;
     --radius: 0.5rem;
+    /* Isometric runway: empty slot (cell === false) — three faces, light neutrals */
+    --iso-empty-top: 220 14% 91%;
+    --iso-empty-left: 220 13% 85%;
+    --iso-empty-right: 220 15% 78%;
+    /* Pad days (in-range but no row): slightly softer than empty */
+    --iso-pad-top: 220 14% 89%;
+    --iso-pad-left: 220 13% 83%;
+    --iso-pad-right: 220 14% 76%;
+    /* Ground labels: halo stroke width (px) for readability on light bg */
+    --iso-label-stroke-width: 3.1px;
   }
 
   .dark {
@@ -30,6 +40,13 @@
     --accent: 217 33% 14%;
     --accent-foreground: 210 40% 98%;
     --border: 217 33% 18%;
+    --iso-empty-top: 217 18% 30%;
+    --iso-empty-left: 217 20% 24%;
+    --iso-empty-right: 217 22% 19%;
+    --iso-pad-top: 217 17% 33%;
+    --iso-pad-left: 217 19% 28%;
+    --iso-pad-right: 217 21% 23%;
+    --iso-label-stroke-width: 2.65px;
   }
 
   * {

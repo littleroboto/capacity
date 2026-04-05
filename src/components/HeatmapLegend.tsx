@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { ViewModeId } from '@/lib/constants';
 import {
   HEATMAP_TEMPERATURE_STEP_COUNT,
@@ -54,6 +55,13 @@ export function HeatmapLegend({
   const gradientCss =
     heatmapOpts && continuousSpectrum ? heatmapSpectrumLegendGradientCss(heatmapOpts) : null;
 
+  /** Transformed-metric positions of discrete band edges (0–1, high at top of legend) — guides the eye vs 10-band mode. */
+  const discreteBandEdgeTicks01 = useMemo(
+    () =>
+      Array.from({ length: HEATMAP_TEMPERATURE_STEP_COUNT - 1 }, (_, i) => (i + 1) / HEATMAP_TEMPERATURE_STEP_COUNT),
+    []
+  );
+
   const techHeadroom = viewMode === 'combined';
   const topLabel = techHeadroom ? 'Less free' : 'High';
   const bottomLabel = techHeadroom ? 'More free' : 'Low';
@@ -63,8 +71,8 @@ export function HeatmapLegend({
       : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} opacity steps (single colour).`
     : continuousSpectrum
       ? techHeadroom
-        ? 'Heat map legend: less delivery capacity free at top, more at bottom, smooth colour ramp.'
-        : 'Heat map legend: higher pressure at top, lower at bottom, smooth colour ramp.'
+        ? 'Heat map legend: less delivery capacity free at top, more at bottom, smooth colour ramp with faint lines at the ten-band boundaries.'
+        : 'Heat map legend: higher pressure at top, lower at bottom, smooth colour ramp with faint lines at the ten-band boundaries.'
       : techHeadroom
         ? `Heat map legend: less delivery capacity free at top, more at bottom, ${legendSteps} colour steps.`
         : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} colour steps from cool to warm.`;
@@ -85,13 +93,23 @@ export function HeatmapLegend({
         </span>
         {gradientCss ? (
           <div
-            className={cn('shrink-0 cursor-default', LEGEND_CELL_ROUNDED)}
+            className={cn('relative shrink-0 cursor-default overflow-hidden', LEGEND_CELL_ROUNDED)}
             style={{
               width: cellSizePx,
               height: cellSizePx * legendSteps + cellGapPx * (legendSteps - 1),
-              backgroundImage: gradientCss,
             }}
-          />
+          >
+            <div className="absolute inset-0" style={{ backgroundImage: gradientCss }} />
+            <div className="pointer-events-none absolute inset-0" aria-hidden>
+              {discreteBandEdgeTicks01.map((t) => (
+                <div
+                  key={t}
+                  className="absolute right-0 left-0 h-px bg-foreground/14 dark:bg-foreground/20"
+                  style={{ top: `${(1 - t) * 100}%`, transform: 'translateY(-50%)' }}
+                />
+              ))}
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col" style={{ width: cellSizePx, ...stackStyle }}>
             {swatchesHighToLow.map(({ color, bandFromLow }, i) => (

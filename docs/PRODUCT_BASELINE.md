@@ -25,6 +25,8 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 
 **Compare runway** (header: all markets / single market) uses the same engine with market columns as today.
 
+**Heatmap palette** (Settings → Palette, temperature / spectrum mode): cells can use **10 solid bands** (default) or **smooth ramp** — RGB interpolation between the same anchor colours after the same transfer curve and γ (`heatmapColorDiscrete` vs `heatmapColorContinuous` in `src/lib/riskHeatmapColors.ts`). **Single colour** (mono) mode still uses opacity steps only. The legend shows a vertical gradient when smooth ramp is on, with faint ticks at the discrete band boundaries for reference.
+
 ## Model and dates
 
 - The engine builds a **day-indexed runway** per market: calendar → phase expansion → daily loads → capacity → **combined risk** (`src/engine/pipeline.ts`, `capacityModel.ts`, `riskModel.ts`).
@@ -37,7 +39,7 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 - **Optimistic locking** on the server: Blob **`ifMatch`** / ETag on `PUT` to reduce blind overwrites.
 - **No** in-app “newer copy on server” toast or multi-tab stale banner — multi-tab users rely on **Pull from cloud** in Workspace when they need to align.
 - **409 conflict**: manual save shows an error in Workspace; auto-save logs a **console warning** only.
-- **View settings JSON** (Workspace dialog → **View on this device**): export/import heatmap transfer, γ, palette, runway year/quarter filters, and risk-tuning sliders — **browser-only**, not a substitute for team YAML on the cloud (`src/lib/viewSettingsPreset.ts`).
+- **View settings JSON** (Workspace dialog → **View on this device**): export/import heatmap transfer, γ, palette (including banded vs smooth spectrum), runway year/quarter filters, and risk-tuning sliders — **browser-only**, not a substitute for team YAML on the cloud (`src/lib/viewSettingsPreset.ts`).
 
 ## Not in this baseline (planned / backlog)
 
@@ -61,5 +63,6 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 | DSL parse | `src/engine/yamlDslParser.ts` |
 | App state | `src/store/useAtcStore.ts` |
 | View settings preset (export/import) | `src/lib/viewSettingsPreset.ts`, Workspace → Local data panel |
+| Heatmap discrete vs smooth spectrum | `src/lib/riskHeatmapColors.ts`, `HeatmapSettingsPanel.tsx`, `HeatmapLegend.tsx` |
 
 When docs or epics disagree with this file, **trust this file for “what we run in prod now”** and update epics or deep-dive docs as you extend the product.

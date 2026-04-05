@@ -40,9 +40,15 @@ export function contribPanelFill(baseHex: string, panel: 'top' | 'left' | 'right
   }
 }
 
-export const EMPTY_TOP = 'rgb(58, 68, 86)';
-export const EMPTY_LEFT = 'rgb(48, 58, 74)';
-export const EMPTY_RIGHT = 'rgb(38, 46, 60)';
+/** Empty calendar slot (`cell === false`) — theme HSL from `index.css`. */
+export const EMPTY_TOP = 'hsl(var(--iso-empty-top))';
+export const EMPTY_LEFT = 'hsl(var(--iso-empty-left))';
+export const EMPTY_RIGHT = 'hsl(var(--iso-empty-right))';
+
+/** In-range pad days in iso view only — three faces; 2D grid still uses {@link HEATMAP_RUNWAY_PAD_FILL}. */
+export const ISO_PAD_TOP = 'hsl(var(--iso-pad-top))';
+export const ISO_PAD_LEFT = 'hsl(var(--iso-pad-left))';
+export const ISO_PAD_RIGHT = 'hsl(var(--iso-pad-right))';
 
 export type IsoLayoutCore = {
   canvasH: number;
@@ -137,10 +143,8 @@ function TodayDotSvg({ cx, cy }: { cx: number; cy: number }) {
       cx={cx}
       cy={cy}
       r={Math.max(1.8, 2.6)}
-      className="pointer-events-none"
-      fill="white"
-      stroke="rgba(15,23,42,0.45)"
-      strokeWidth={0.55}
+      className="pointer-events-none fill-background stroke-foreground/45"
+      strokeWidth={0.65}
     />
   );
 }
@@ -179,7 +183,9 @@ export function calHeightFromMetric(height01: number, towerPx: number, isPad: bo
 /** Stroke halo so iso ground-plane labels stay readable in light and dark themes. */
 export const ISO_GROUND_LABEL_TEXT_PROPS = {
   stroke: 'hsl(var(--background))',
-  strokeWidth: 2.75,
   paintOrder: 'stroke fill' as const,
-  style: { strokeLinejoin: 'round' as const },
+  style: {
+    strokeLinejoin: 'round' as const,
+    strokeWidth: 'var(--iso-label-stroke-width)',
+  },
 };

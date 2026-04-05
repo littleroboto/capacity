@@ -12,8 +12,15 @@ import {
   type VerticalYearSection,
 } from '@/lib/calendarQuarterLayout';
 import {
+  isoGroundLabelAnchorAtChronWeek,
+  isoGroundMoMatrix,
+  isoLabelBleedComp,
+  isoLabelLaneDi,
+} from '@/lib/runwayIsoGroundLabels';
+import {
   computeSkylineBounds,
   isoCellTopLeft,
+  isoGroundRightEdgeChronSpanCenter,
   isoGridSteps,
   isoWiForLayoutLi,
   SKYLINE_MONTH_ISO_GAP_STEPS,
@@ -26,6 +33,9 @@ import {
   EMPTY_RIGHT,
   EMPTY_TOP,
   ISO_GROUND_LABEL_TEXT_PROPS,
+  ISO_PAD_LEFT,
+  ISO_PAD_RIGHT,
+  ISO_PAD_TOP,
   isoHandlers,
   type IsoLayoutCore,
 } from '@/components/RunwayIsoHeatCell';
@@ -65,6 +75,11 @@ function chronologyLineStyleMajor(g: SkylineChronologyGroup): { width: number; o
   if (g.yearLabel) return { width: 1.4, opacity: 0.38 };
   if (g.quarterLabel) return { width: 0.95, opacity: 0.28 };
   return null;
+}
+
+/** Week-boundary seam: use the same weekday column on both weeks so the segment follows iso “week” steps (−stepX,+stepY), not a diagonal across the row. */
+function groundSeamWeekdayCol(nDayCols: number): number {
+  return Math.max(0, Math.min(nDayCols - 1, Math.floor((nDayCols - 1) / 2)));
 }
 
 export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
@@ -134,43 +149,50 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
   const nCols = layoutWeeks[0]?.length ?? 7;
   const maxDi = nCols - 1;
   const halfCell = cellPx / 2;
-
-  const isoLen = Math.sqrt(stepX * stepX + stepY * stepY);
-  const uDx = stepX / isoLen;
-  const uDy = stepY / isoLen;
-
-  const BASELINE_FRAC = 0.35;
-
-  const moMatrix = (tx: number, ty: number, fs: number) => {
-    const off = BASELINE_FRAC * fs;
-    const tx2 = tx + uDy * off;
-    const ty2 = ty + uDx * off;
-    return `matrix(${uDx.toFixed(4)}, ${(-uDy).toFixed(4)}, ${uDx.toFixed(4)}, ${uDy.toFixed(4)}, ${tx2.toFixed(2)}, ${ty2.toFixed(2)})`;
-  };
+  const labelBleed = isoLabelBleedComp(stepX, stepY);
 
   const MONTH_3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
-  const ROW_GAP = 1.8;
 
-  const rightEdgeMidPos = (chronW0: number, chronW1: number, di: number) => {
-    const li0 = Math.max(0, Math.min(nWeeks - 1, nWeeks - 1 - chronW0));
-    const li1 = Math.max(0, Math.min(nWeeks - 1, nWeeks - 1 - chronW1));
-    const isoMid = (layoutToIsoWi(li0) + layoutToIsoWi(li1)) / 2;
-    const { ax, ay } = isoCellTopLeft(isoMid, di, stepX, stepY);
-    return { tx: ax + halfCell - minX, ty: ay - minY + L.canvasH };
-  };
+  const rightEdgeMidPos = (chronW0: number, chronW1: number, di: number) =>
+    isoGroundRightEdgeChronSpanCenter(
+      chronW0,
+      chronW1,
+      di,
+      nWeeks,
+      stepX,
+      stepY,
+      halfCell,
+      minX,
+      minY,
+      L.canvasH,
+      (li) => layoutToIsoWi(li)
+    );
 
   type DateLabel = { key: string; tx: number; ty: number; text: string };
 
   const monthRow = useMemo(() => {
     if (chronologyAll.length === 0) return [];
-    const di = maxDi + 0.8;
+    const diLane = isoLabelLaneDi(maxDi, 0);
     const out: DateLabel[] = [];
     for (let i = 0; i < chronologyAll.length; i++) {
       const g = chronologyAll[i]!;
       const w0 = g.weekIndex;
       const w1 = i + 1 < chronologyAll.length ? chronologyAll[i + 1]!.weekIndex - 1 : nWeeks - 1;
       if (w1 < w0) continue;
-      const { tx, ty } = rightEdgeMidPos(w0, w1, di);
+      /** ~⅔ through the month’s weeks (clamped) — pure midpoint still read early on the iso strip. */
+      const wMonthLabel = Math.min(w1, Math.max(w0, w0 + Math.round((w1 - w0) * (2 / 3))));
+      const { tx, ty } = isoGroundLabelAnchorAtChronWeek(
+        wMonthLabel,
+        diLane,
+        nWeeks,
+        stepX,
+        stepY,
+        halfCell,
+        minX,
+        minY,
+        L.canvasH,
+        (li) => layoutToIsoWi(li)
+      );
       out.push({ key: `mo-${g.sectionYear}-${g.monthIndex}`, tx, ty, text: MONTH_3[g.monthIndex] ?? '' });
     }
     return out;
@@ -179,7 +201,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
 
   const quarterRow = useMemo(() => {
     if (chronologyAll.length === 0) return [];
-    const di = maxDi + 0.8 + ROW_GAP;
+    const di = isoLabelLaneDi(maxDi, 1);
     const out: DateLabel[] = [];
     let i = 0;
     while (i < chronologyAll.length) {
@@ -200,7 +222,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
 
   const yearRow = useMemo(() => {
     if (chronologyAll.length === 0) return [];
-    const di = maxDi + 0.8 + ROW_GAP * 2;
+    const di = isoLabelLaneDi(maxDi, 2);
     const out: DateLabel[] = [];
     let i = 0;
     while (i < chronologyAll.length) {
@@ -258,14 +280,15 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
         aria-label="Isometric pressure skyline"
       >
         {chronologyMajor.length > 0 && (
-          <g className="pointer-events-none" aria-hidden>
+          <g className="pointer-events-none text-muted-foreground" aria-hidden>
             {chronologyMajor.map((g) => {
               const style = chronologyLineStyleMajor(g);
               if (!style) return null;
               const cPrev = g.weekIndex - 1;
               const cCurr = g.weekIndex;
-              const a = groundPoint(chronToLayoutWi(cPrev), 6);
-              const b = groundPoint(chronToLayoutWi(cCurr), 0);
+              const diSeam = groundSeamWeekdayCol(nCols);
+              const a = groundPoint(chronToLayoutWi(cPrev), diSeam);
+              const b = groundPoint(chronToLayoutWi(cCurr), diSeam);
               return (
                 <line
                   key={`chrono-line-${g.weekIndex}`}
@@ -273,9 +296,10 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
-                  className="stroke-border"
+                  stroke="currentColor"
                   strokeWidth={style.width}
-                  opacity={style.opacity}
+                  strokeLinecap="round"
+                  opacity={Math.min(1, style.opacity * 1.2)}
                 />
               );
             })}
@@ -319,10 +343,9 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           const height01 = transformedHeatmapMetric(viewMode, metric, heatmapOpts);
           const calH = calHeightFromMetric(height01, rowTowerPx, isPad);
           const columnTy = deckAndColumnY(L, calH, runwayBandH);
-          const base = isPad ? HEATMAP_RUNWAY_PAD_FILL : fill;
-          const topC = contribPanelFill(base, 'top');
-          const leftC = contribPanelFill(base, 'left');
-          const rightC = contribPanelFill(base, 'right');
+          const topC = isPad ? ISO_PAD_TOP : contribPanelFill(fill, 'top');
+          const leftC = isPad ? ISO_PAD_LEFT : contribPanelFill(fill, 'left');
+          const rightC = isPad ? ISO_PAD_RIGHT : contribPanelFill(fill, 'right');
           const dot =
             !isPad && typeof dateStr === 'string' && dateStr === todayYmd
               ? { x: L.dxx * 0.48, y: L.dyy * 0.42 }
@@ -355,10 +378,11 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           {monthRow.map(({ key, tx, ty, text }) => (
             <text
               key={key}
-              x={0}
+              x={labelBleed * moFs}
               y={0}
               textAnchor="middle"
-              transform={moMatrix(tx, ty, moFs)}
+              dominantBaseline="central"
+              transform={isoGroundMoMatrix(tx, ty, stepX, stepY)}
               className="fill-muted-foreground font-medium tabular-nums tracking-tight"
               fontSize={moFs}
               {...ISO_GROUND_LABEL_TEXT_PROPS}
@@ -369,10 +393,11 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           {quarterRow.map(({ key, tx, ty, text }) => (
             <text
               key={key}
-              x={0}
+              x={labelBleed * qFs}
               y={0}
               textAnchor="middle"
-              transform={moMatrix(tx, ty, qFs)}
+              dominantBaseline="central"
+              transform={isoGroundMoMatrix(tx, ty, stepX, stepY)}
               className="fill-muted-foreground font-bold tabular-nums tracking-tight"
               fontSize={qFs}
               {...ISO_GROUND_LABEL_TEXT_PROPS}
@@ -383,10 +408,11 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           {yearRow.map(({ key, tx, ty, text }) => (
             <text
               key={key}
-              x={0}
+              x={labelBleed * yrFs}
               y={0}
               textAnchor="middle"
-              transform={moMatrix(tx, ty, yrFs)}
+              dominantBaseline="central"
+              transform={isoGroundMoMatrix(tx, ty, stepX, stepY)}
               className="fill-muted-foreground font-semibold tabular-nums tracking-tight"
               fontSize={yrFs}
               {...ISO_GROUND_LABEL_TEXT_PROPS}

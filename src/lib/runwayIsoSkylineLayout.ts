@@ -60,6 +60,43 @@ export function isoWiForLayoutLi(
   return packLast - packHere;
 }
 
+/** Layout row index for chronological week `chronWeekIndex` (0 = first week in model). */
+export function layoutLiForChronWeek(chronWeekIndex: number, nWeeks: number): number {
+  return Math.max(0, Math.min(nWeeks - 1, nWeeks - 1 - chronWeekIndex));
+}
+
+/**
+ * Ground-plane point for month/quarter/year labels on the right edge (column `di`): chronological **centre** of weeks
+ * `[chronW0, chronW1]` inclusive. Uses the middle week index and lerps packed `isoWi` when the centre falls between
+ * two weeks — **not** `(isoWi(first)+isoWi(last))/2`, which skews toward the first week when month gaps expand `wi`.
+ */
+export function isoGroundRightEdgeChronSpanCenter(
+  chronW0: number,
+  chronW1: number,
+  di: number,
+  nWeeks: number,
+  stepX: number,
+  stepY: number,
+  halfCell: number,
+  minX: number,
+  minY: number,
+  canvasH: number,
+  isoWiAtLayoutLi: (layoutLi: number) => number
+): { tx: number; ty: number } {
+  const w0c = Math.max(0, Math.min(nWeeks - 1, chronW0));
+  const w1c = Math.max(0, Math.min(nWeeks - 1, chronW1));
+  if (w1c < w0c) return { tx: 0, ty: 0 };
+  const wCenter = (w0c + w1c) / 2;
+  const wLo = Math.floor(wCenter);
+  const wHi = Math.ceil(wCenter);
+  const isoLo = isoWiAtLayoutLi(layoutLiForChronWeek(wLo, nWeeks));
+  const isoHi = isoWiAtLayoutLi(layoutLiForChronWeek(wHi, nWeeks));
+  const t = wCenter - wLo;
+  const isoW = isoLo + t * (isoHi - isoLo);
+  const { ax, ay } = isoCellTopLeft(isoW, di, stepX, stepY);
+  return { tx: ax + halfCell - minX, ty: ay - minY + canvasH };
+}
+
 export type SkylineBounds = {
   minX: number;
   minY: number;
