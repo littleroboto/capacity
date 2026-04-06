@@ -351,7 +351,7 @@ export function LandingPage() {
   }, []);
 
   return (
-    <div className="landing-root relative min-h-screen bg-[#040506] text-zinc-100 antialiased selection:bg-indigo-500/30">
+    <div className="landing-root relative min-h-screen bg-[#040506] text-zinc-100 antialiased selection:bg-[#FFC72C]/35">
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_65%_at_50%_115%,rgba(15,23,42,0.9),transparent_58%)]" />
         <div
@@ -421,9 +421,6 @@ export function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             >
-              <p className="font-landing mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-400/90">
-                Technology programmes
-              </p>
               <h1 className="font-landing text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">
                 Air traffic control for technology programmes
               </h1>
@@ -434,7 +431,7 @@ export function LandingPage() {
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   to="/app"
-                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_40px_-8px_rgba(99,102,241,0.55)] transition hover:bg-indigo-400"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#FFC72C] px-5 py-2.5 text-sm font-semibold text-[#292929] shadow-[0_0_40px_-8px_rgba(255,199,44,0.5)] transition hover:bg-[#E6B028]"
                 >
                   Enter the workbench
                   <ArrowRight className="h-4 w-4" aria-hidden />
@@ -472,7 +469,7 @@ export function LandingPage() {
                     'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]'
                   )}
                 >
-                  <Icon className="mb-3 h-5 w-5 text-indigo-400/90" strokeWidth={1.75} aria-hidden />
+                  <Icon className="mb-3 h-5 w-5 text-[#FFC72C]" strokeWidth={1.75} aria-hidden />
                   <h3 className="font-landing text-sm font-semibold text-zinc-100">{title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-zinc-500">{body}</p>
                 </motion.li>
