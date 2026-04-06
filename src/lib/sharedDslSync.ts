@@ -266,7 +266,24 @@ export type FetchSharedDslDetailed =
       httpStatus?: number;
       /** First ~120 chars of body when reason is `invalid_yaml` (debug). */
       bodyPreview?: string;
+      /** Parsed from JSON error bodies (e.g. blob_access_mismatch) for Connection check. */
+      serverDetail?: string;
     };
+
+function parseSharedDslErrorDetail(text: string): string | undefined {
+  const t = text.trim();
+  if (!t.startsWith('{')) return undefined;
+  try {
+    const j = JSON.parse(t) as { message?: unknown; hint?: unknown; error?: unknown };
+    const parts: string[] = [];
+    if (typeof j.error === 'string' && j.error.trim()) parts.push(j.error.trim());
+    if (typeof j.message === 'string' && j.message.trim()) parts.push(j.message.trim());
+    if (typeof j.hint === 'string' && j.hint.trim()) parts.push(j.hint.trim());
+    return parts.length ? parts.join(' — ') : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Human-readable lines for the Workspace “Connection check” panel. */
 export function describeSharedDslProbe(d: FetchSharedDslDetailed): string[] {
@@ -306,6 +323,7 @@ export function describeSharedDslProbe(d: FetchSharedDslDetailed): string[] {
       break;
     case 'server_error':
       lines.unshift(`GET failed with HTTP ${d.httpStatus ?? '?'}. Check Vercel function logs.`);
+      if (d.serverDetail) lines.push(d.serverDetail);
       break;
     case 'invalid_yaml':
       lines.unshift('Response was not valid workspace YAML (wrong body, API source file, or unexpected text).');
@@ -343,7 +361,18 @@ export async function fetchSharedDslDetailed(): Promise<FetchSharedDslDetailed> 
     const res = await fetch(apiUrl(), { method: 'GET', cache: 'no-store', headers: built.headers });
     if (res.status === 401) return { ok: false, authSent, reason: 'unauthorized', httpStatus: 401 };
     if (res.status === 404) return { ok: false, authSent, reason: 'not_found', httpStatus: 404 };
-    if (!res.ok) return { ok: false, authSent, reason: 'server_error', httpStatus: res.status };
+    if (!res.ok) {
+      const raw = await res.text();
+      const serverDetail = parseSharedDslErrorDetail(raw);
+      return {
+        ok: false,
+        authSent,
+        reason: 'server_error',
+        httpStatus: res.status,
+        bodyPreview: raw.replace(/\s+/g, ' ').trim().slice(0, 120) || undefined,
+        serverDetail,
+      };
+    }
 
     const ct = res.headers.get('content-type') ?? '';
     const yaml = await res.text();

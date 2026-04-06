@@ -17,7 +17,14 @@
  * - `cap_ed` — boolean; when true with segment scope, user may edit YAML for allowed markets only (PUT merges into full blob)
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { BlobNotFoundError, BlobPreconditionFailedError, get, head, put } from '@vercel/blob';
+import {
+  BlobError,
+  BlobNotFoundError,
+  BlobPreconditionFailedError,
+  get,
+  head,
+  put,
+} from '@vercel/blob';
 import {
   filterWorkspaceYamlToMarkets,
   mergePartialWorkspacePut,
@@ -40,6 +47,41 @@ const PATHNAME = 'capacity-shared/workspace.yaml';
 function blobStoreAccess(): 'public' | 'private' {
   const v = process.env.CAPACITY_BLOB_ACCESS?.trim().toLowerCase();
   return v === 'public' ? 'public' : 'private';
+}
+
+/** `get()` uses `{store}.{public|private}.blob.vercel-storage.com`; must match how objects were written. Retry alternate access on BlobError (common mis-set `CAPACITY_BLOB_ACCESS`). */
+async function getSharedWorkspaceBlob(token: string): Promise<Awaited<ReturnType<typeof get>>> {
+  const primary = blobStoreAccess();
+  const alternate: 'public' | 'private' = primary === 'private' ? 'public' : 'private';
+
+  const run = (access: 'public' | 'private') =>
+    get(PATHNAME, { access, token, useCache: false });
+
+  try {
+    return await run(primary);
+  } catch (first) {
+    if (!(first instanceof BlobError)) throw first;
+    try {
+      const second = await run(alternate);
+      if (second?.statusCode === 200 && second.stream) {
+        console.warn(
+          `[shared-dsl] Blob GET succeeded with access="${alternate}" but CAPACITY_BLOB_ACCESS implies "${primary}". Set CAPACITY_BLOB_ACCESS=${alternate} in Vercel env to match this store.`
+        );
+      }
+      return second;
+    } catch {
+      throw first;
+    }
+  }
+}
+
+function blobAccessMismatchResponse(errMsg: string) {
+  return {
+    error: 'blob_access_mismatch' as const,
+    message: errMsg,
+    hint:
+      'CAPACITY_BLOB_ACCESS must match how blobs were written (public vs private). Try unsetting it (defaults to private) or set CAPACITY_BLOB_ACCESS=public if the store is public. Redeploy after changing env.',
+  };
 }
 
 async function streamToText(stream: ReadableStream<Uint8Array>): Promise<string> {
@@ -171,8 +213,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const ra = await authorizeRead(req, res);
     if (!ra.ok) return;
     try {
-      const access = blobStoreAccess();
-      const result = await get(PATHNAME, { access, token, useCache: false });
+      const result = await getSharedWorkspaceBlob(token);
       if (!result || result.statusCode !== 200 || !result.stream) {
         res.status(404).json({ ok: false, reason: 'no_workspace' });
         return;
@@ -189,7 +230,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(200).send(yaml);
     } catch (e) {
       console.error('[shared-dsl GET]', e);
-      res.status(500).json({ error: 'Failed to read workspace' });
+      const errMsg = e instanceof Error ? e.message : String(e);
+      if (errMsg.includes('public access') && errMsg.includes('private store')) {
+        res.status(500).json(blobAccessMismatchResponse(errMsg));
+        return;
+      }
+      if (e instanceof BlobError) {
+        res.status(502).json({
+          error: 'blob_fetch_failed',
+          message: errMsg,
+          hint:
+            'Check BLOB_READ_WRITE_TOKEN and CAPACITY_BLOB_ACCESS on Vercel. Function logs may show more detail.',
+        });
+        return;
+      }
+      res.status(500).json({
+        error: 'Failed to read workspace',
+        message: errMsg,
+        hint: 'See Vercel function logs for [shared-dsl GET].',
+      });
     }
     return;
   }
@@ -215,14 +274,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ws.allowedMarketIds.size > 0
     ) {
       let current = '';
-      try {
-        const blobAccess = blobStoreAccess();
-        const curResult = await get(PATHNAME, { access: blobAccess, token, useCache: false });
-        if (curResult?.statusCode === 200 && curResult.stream) {
-          current = await streamToText(curResult.stream);
-        }
-      } catch (e) {
-        if (!(e instanceof BlobNotFoundError)) throw e;
+      const curResult = await getSharedWorkspaceBlob(token);
+      if (curResult?.statusCode === 200 && curResult.stream) {
+        current = await streamToText(curResult.stream);
       }
       yaml = mergePartialWorkspacePut(current, yaml, ws.allowedMarketIds);
     }
@@ -249,12 +303,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const errMsg = e instanceof Error ? e.message : String(e);
       console.error('[shared-dsl PUT]', e, { blobAccess, pathname: PATHNAME });
       if (errMsg.includes('public access') && errMsg.includes('private store')) {
-        res.status(500).json({
-          error: 'blob_access_mismatch',
-          message: errMsg,
-          hint:
-            'Production is sending public Blob access but your store is private. Redeploy so this api/shared-dsl.ts runs (it uses private access by default). In Vercel: Deployments → Redeploy, or push the latest commit. Do not set CAPACITY_BLOB_ACCESS=public unless the store is public.',
-        });
+        res.status(500).json(blobAccessMismatchResponse(errMsg));
         return;
       }
       res.status(500).json({ error: 'Failed to save workspace', message: errMsg });
