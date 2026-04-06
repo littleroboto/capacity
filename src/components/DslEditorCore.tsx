@@ -111,6 +111,8 @@ type DslEditorCoreProps = {
   collab?: { ytext: Y.Text; provider: YPartyKitProvider } | null;
   /** Bumps Monaco `key` when collab sessions reconnect (see {@link useCollabSession}). */
   collabRemountVersion?: number;
+  /** Tighter vertical chrome when the parent is a mobile full-viewport shell. */
+  fillVerticalSpace?: boolean;
 };
 
 export function DslEditorCore({
@@ -125,6 +127,7 @@ export function DslEditorCore({
   marketTabDocument = null,
   collab = null,
   collabRemountVersion = 0,
+  fillVerticalSpace = false,
 }: DslEditorCoreProps) {
   const [fontSize, setFontSize] = useState(initialFontSize);
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on');
@@ -265,7 +268,14 @@ export function DslEditorCore({
   const charCount = displaySource.length;
 
   return (
-    <div className={cn('flex min-h-0 flex-1 flex-col gap-2', className)}>
+    <div
+      className={cn(
+        'flex min-h-0 flex-1 flex-col',
+        fillVerticalSpace ? 'gap-1' : 'gap-2',
+        fillVerticalSpace && 'h-full min-h-0',
+        className
+      )}
+    >
       {description === 'full' ? <DslSyntaxHelpBody /> : null}
 
       <div

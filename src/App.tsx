@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
 import { ProductionAuthHintBanner } from '@/components/ProductionAuthHintBanner';
@@ -65,6 +66,7 @@ export default function App() {
   const dslPanelLayoutCollapsed = dslPanelCollapsed && lgUp;
   const mainGridRef = useRef<HTMLDivElement>(null);
   const [cloudLoadWarning, setCloudLoadWarning] = useState<string | null>(null);
+  const [mobileCodeFullscreen, setMobileCodeFullscreen] = useState(false);
 
   const [dslRightWidthPx, setDslRightWidthPx] = useState(() => {
     try {
@@ -140,6 +142,26 @@ export default function App() {
   }, [country, viewMode, setViewMode]);
 
   useEffect(() => {
+    if (viewMode !== 'code') setMobileCodeFullscreen(false);
+  }, [viewMode]);
+
+  const showMobileCodeFs = !lgUp && viewMode === 'code' && mobileCodeFullscreen;
+
+  useEffect(() => {
+    if (!showMobileCodeFs) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileCodeFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [showMobileCodeFs]);
+
+  useEffect(() => {
     let cancelled = false;
     let stopOutboundSync: (() => void) | undefined;
     const { setDslByMarket, setRunwayMarketOrder, hydrateFromStorage } = useAtcStore.getState();
@@ -213,71 +235,110 @@ export default function App() {
 
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
-      <ProductionAuthHintBanner />
-      {cloudLoadWarning ? (
-        <SharedCloudLoadWarningBanner message={cloudLoadWarning} onDismiss={() => setCloudLoadWarning(null)} />
-      ) : null}
-      <SharedDslConflictBanner />
-      <Header />
-      <main
-        className={cn(
-          'flex min-h-0 flex-1 flex-col bg-transparent text-foreground',
-          lgUp ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]'
-        )}
-      >
+      {showMobileCodeFs ? (
         <div
-          ref={mainGridRef}
-          className={cn(
-            'grid grid-cols-1 gap-0',
-            dslPanelLayoutCollapsed && 'lg:grid-cols-[minmax(0,1fr)_2.75rem]',
-            lgUp && 'min-h-0 flex-1 grid-rows-1',
-            !lgUp && 'w-full shrink-0'
-          )}
-          style={
-            lgUp && !dslPanelLayoutCollapsed
-              ? {
-                  gridTemplateColumns: `minmax(0, 1fr) ${WORKBENCH_SPLIT_HANDLE_PX}px minmax(${MIN_DSL_PANEL_PX}px, ${dslRightWidthPx}px)`,
-                }
-              : undefined
-          }
+          className="fixed inset-0 z-[100] flex min-h-[100dvh] w-full flex-col bg-background"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mobile-code-fs-title"
         >
           <div
+            className="flex shrink-0 items-center gap-2 border-b border-border/80 bg-background/95 px-3 py-2 backdrop-blur-sm"
+            style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
+          >
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setMobileCodeFullscreen(false)}
+              aria-label="Close full screen YAML editor"
+            >
+              Done
+            </Button>
+            <h2 id="mobile-code-fs-title" className="truncate text-sm font-semibold text-foreground">
+              YAML editor
+            </h2>
+          </div>
+          <div
+            className="flex min-h-0 flex-1 flex-col px-1 pb-[env(safe-area-inset-bottom)] pt-1"
+          >
+            <MainDslWorkspace fillViewport />
+          </div>
+        </div>
+      ) : (
+        <>
+          <ProductionAuthHintBanner />
+          {cloudLoadWarning ? (
+            <SharedCloudLoadWarningBanner message={cloudLoadWarning} onDismiss={() => setCloudLoadWarning(null)} />
+          ) : null}
+          <SharedDslConflictBanner />
+          <Header />
+          <main
             className={cn(
-              'flex min-h-0 min-w-0 flex-col gap-2 p-4',
-              viewMode === 'code'
-                ? 'flex-1 overflow-hidden'
-                : 'overflow-y-auto overflow-x-auto [scrollbar-gutter:stable]'
+              'flex min-h-0 flex-1 flex-col bg-transparent text-foreground',
+              lgUp ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]'
             )}
           >
-            {viewMode === 'code' ? (
-              <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
-                <MainDslWorkspace />
-              </div>
-            ) : (
-              <>
-                {parseError ? (
-                  <p className="shrink-0 text-sm text-red-600 dark:text-red-400">{parseError}</p>
-                ) : null}
-                <div className="flex min-h-0 w-full min-w-0 flex-col">
-                  <div className="min-w-0 overflow-visible">
-                    <RunwayGrid riskSurface={riskSurface} viewMode={viewMode} onSlotSelection={onSlotSelection} />
+            <div
+              ref={mainGridRef}
+              className={cn(
+                'grid grid-cols-1 gap-0',
+                dslPanelLayoutCollapsed && 'lg:grid-cols-[minmax(0,1fr)_2.75rem]',
+                lgUp && 'min-h-0 flex-1 grid-rows-1',
+                !lgUp && 'w-full shrink-0'
+              )}
+              style={
+                lgUp && !dslPanelLayoutCollapsed
+                  ? {
+                      gridTemplateColumns: `minmax(0, 1fr) ${WORKBENCH_SPLIT_HANDLE_PX}px minmax(${MIN_DSL_PANEL_PX}px, ${dslRightWidthPx}px)`,
+                    }
+                  : undefined
+              }
+            >
+              <div
+                className={cn(
+                  'flex min-h-0 min-w-0 flex-col gap-2 p-4',
+                  viewMode === 'code'
+                    ? 'flex-1 overflow-hidden'
+                    : 'overflow-y-auto overflow-x-auto [scrollbar-gutter:stable]'
+                )}
+              >
+                {viewMode === 'code' ? (
+                  <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+                    <MainDslWorkspace
+                      onRequestMobileFullscreen={
+                        !lgUp ? () => setMobileCodeFullscreen(true) : undefined
+                      }
+                    />
                   </div>
-                </div>
-              </>
-            )}
-          </div>
-          {lgUp && !dslPanelLayoutCollapsed ? (
-            <WorkbenchSplitHandle
-              rightWidthPx={dslRightWidthPx}
-              onWidthChange={setDslRightWidthPx}
-              onDragEnd={persistDslSplit}
-              containerRef={mainGridRef}
-              minRightPx={MIN_DSL_PANEL_PX}
-            />
-          ) : null}
-          <DSLPanel collapsed={dslPanelLayoutCollapsed} onCollapsedChange={setDslPanelCollapsed} />
-        </div>
-      </main>
+                ) : (
+                  <>
+                    {parseError ? (
+                      <p className="shrink-0 text-sm text-red-600 dark:text-red-400">{parseError}</p>
+                    ) : null}
+                    <div className="flex min-h-0 w-full min-w-0 flex-col">
+                      <div className="min-w-0 overflow-visible">
+                        <RunwayGrid riskSurface={riskSurface} viewMode={viewMode} onSlotSelection={onSlotSelection} />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              {lgUp && !dslPanelLayoutCollapsed ? (
+                <WorkbenchSplitHandle
+                  rightWidthPx={dslRightWidthPx}
+                  onWidthChange={setDslRightWidthPx}
+                  onDragEnd={persistDslSplit}
+                  containerRef={mainGridRef}
+                  minRightPx={MIN_DSL_PANEL_PX}
+                />
+              ) : null}
+              <DSLPanel collapsed={dslPanelLayoutCollapsed} onCollapsedChange={setDslPanelCollapsed} />
+            </div>
+          </main>
+        </>
+      )}
     </div>
   );
 }

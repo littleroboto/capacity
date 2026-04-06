@@ -8,7 +8,8 @@ import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { marketIdToCircleFlagCode } from '@/lib/marketCircleFlag';
 import { cn } from '@/lib/utils';
 import { useAtcStore } from '@/store/useAtcStore';
-import { GripHorizontal } from 'lucide-react';
+import { GripHorizontal, Maximize2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const DOCK_H_KEY = 'capacity:dsl-dock-px';
 const DEFAULT_DOCK_PX = 300;
@@ -41,8 +42,18 @@ function readDockHeight(): number {
   return DEFAULT_DOCK_PX;
 }
 
+type MainDslWorkspaceProps = {
+  /** Mobile full-screen shell: editor + assistant share viewport height without a floor min-height. */
+  fillViewport?: boolean;
+  /** Opens the mobile full-screen YAML layout (shown only below `lg`; button uses `lg:hidden`). */
+  onRequestMobileFullscreen?: () => void;
+};
+
 /** Full-width IDE layout: Monaco + resizable assistant dock (single main column). */
-export function MainDslWorkspace() {
+export function MainDslWorkspace({
+  fillViewport = false,
+  onRequestMobileFullscreen,
+}: MainDslWorkspaceProps = {}) {
   const llmFromQuery = useLlmAssistantFromQuery();
   const llmFromToybox = useAtcStore((s) => s.dslLlmAssistantEnabled);
   const showLlmAssistant = llmFromQuery || llmFromToybox;
@@ -181,11 +192,35 @@ export function MainDslWorkspace() {
     setDockHeight(clampDock(DEFAULT_DOCK_PX));
   }, [clampDock]);
 
+  const editorShellClass = fillViewport
+    ? 'min-h-0 min-w-0 flex-1 border-0 pt-0 shadow-none'
+    : showMarketTabs
+      ? 'min-h-[min(11rem,32dvh)] min-w-0 flex-1 border-0 pt-0 shadow-none'
+      : 'min-h-[min(12rem,35dvh)] min-w-0 flex-1';
+
   return (
     <div
       ref={workspaceRef}
-      className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-0"
+      className={cn(
+        'relative flex min-h-0 min-w-0 flex-1 flex-col gap-0',
+        fillViewport && 'h-full min-h-0'
+      )}
     >
+      {onRequestMobileFullscreen ? (
+        <div className="flex shrink-0 items-center justify-end border-b border-border/50 bg-muted/20 px-2 py-1.5 lg:hidden dark:bg-muted/10">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={onRequestMobileFullscreen}
+            aria-label="Open YAML editor full screen"
+          >
+            <Maximize2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+            Full screen
+          </Button>
+        </div>
+      ) : null}
       {showMarketTabs ? (
         <div
           className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 border-b border-border/50 bg-muted/15 px-2 pt-1.5 dark:bg-muted/10"
@@ -229,21 +264,23 @@ export function MainDslWorkspace() {
             })}
           </div>
           <DslEditorCore
-            className="min-h-[min(11rem,32dvh)] min-w-0 flex-1 border-0 pt-0 shadow-none"
+            className={cn('min-w-0', editorShellClass)}
             initialFontSize={16}
             editorChrome="studio"
             marketTabDocument={marketTabDocument}
             collab={collabBinding}
             collabRemountVersion={collabRemountVersion}
+            fillVerticalSpace={fillViewport}
           />
         </div>
       ) : (
         <DslEditorCore
-          className="min-h-[min(12rem,35dvh)] min-w-0 flex-1"
+          className={cn('min-w-0', editorShellClass)}
           initialFontSize={16}
           editorChrome="studio"
           collab={collabBinding}
           collabRemountVersion={collabRemountVersion}
+          fillVerticalSpace={fillViewport}
         />
       )}
 
