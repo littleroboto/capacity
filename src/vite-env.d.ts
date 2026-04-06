@@ -1,5 +1,15 @@
 /// <reference types="vite/client" />
 
+declare global {
+  /** Clerk session JWT custom claims (Sessions → Customize session token). */
+  interface CustomJwtSessionClaims {
+    cap_admin?: boolean;
+    cap_segs?: string;
+    cap_mkts?: string;
+    cap_ed?: boolean;
+  }
+}
+
 interface ImportMetaEnv {
   /** When `1` or `true`, load/save workspace YAML via `/api/shared-dsl` (Vercel Blob). */
   readonly VITE_SHARED_DSL?: string;

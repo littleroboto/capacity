@@ -16,6 +16,7 @@ import {
   sharedDslWriteReadySync,
   type FetchSharedDslDetailed,
 } from '@/lib/sharedDslSync';
+import { WorkspaceAccessSummary } from '@/components/WorkspaceAccessSummary';
 import { cn } from '@/lib/utils';
 
 function SectionDivider() {
@@ -222,6 +223,12 @@ export function SharedWorkspaceSection() {
           </>
         )}
       </p>
+
+      {clerkOn ? (
+        <div className="mb-3">
+          <WorkspaceAccessSummary />
+        </div>
+      ) : null}
 
       <div className="mb-3 flex flex-col gap-1.5">
         {clerkOn ? (

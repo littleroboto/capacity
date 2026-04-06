@@ -38,6 +38,8 @@ Configure under Clerk → **Sessions** → **Customize session token**. When **n
 
 **Ops pattern:** store source fields in Clerk **user or org `public_metadata`**, map them into claims with templates (same as comments in `src/lib/capacityAccess.ts`).
 
+**LIOM / IOM org hierarchy (segment vs market teams):** step-by-step metadata + JWT examples in [CLERK_CAPACITY_ORG_SETUP.md](./CLERK_CAPACITY_ORG_SETUP.md).
+
 ## Code map
 
 | Piece | Location |
