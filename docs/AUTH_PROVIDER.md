@@ -59,9 +59,9 @@ Configure under Clerk → **Sessions** → **Customize session token**. When **n
 | Token + ACL bridge | `src/components/ClerkSharedDslBridge.tsx` |
 | Client ACL helpers | `src/lib/capacityAccess.ts`, `src/lib/capacityAccessContext.tsx` |
 | Cloud sync | `src/lib/sharedDslSync.ts` |
-| API + Blob | `api/shared-dsl.ts` (Vercel entry), `api/lib/sharedDslRoute.ts` (handler) |
-| Server JWT + legacy bearer | `api/lib/clerkAuthSharedDsl.ts` |
-| Server YAML filter / merge | `api/lib/capacityWorkspaceAcl.ts` |
+| API + Blob | `api/shared-dsl.ts` (Vercel handler — single file + `api/capacityWorkspaceAcl.data.ts`) |
+| Server JWT + legacy bearer | same file (Clerk verify + bearer parsing) |
+| Server YAML filter / merge | same file (ACL helpers); email allowlist: `api/allowedUserEmails.ts` (also PartyKit) |
 
 ## Still open (backlog)
 

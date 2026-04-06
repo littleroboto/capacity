@@ -4,6 +4,8 @@
  *
  * JWT must include the user's email — add to Clerk → Sessions → Customize session token, e.g.:
  * `{ "email": "{{user.primary_email_address}}" }`
+ *
+ * Shared by `/api/shared-dsl` and PartyKit (`party/collab.ts`).
  */
 
 export function parseAllowedEmailSet(raw: string | undefined): Set<string> {

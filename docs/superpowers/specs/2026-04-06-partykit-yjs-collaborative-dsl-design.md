@@ -15,7 +15,7 @@ Today the team workspace is a **multi-document YAML** file in Vercel Blob, loade
 - **Two (or a few) concurrent participants** — typical case: a **market-focused** editor and a **segment-focused** editor, occasionally a third (e.g. admin). Scale assumptions: **low fan-out**, but **real merge semantics** and **clear mental model**.
 - **Live editing** without silent clobbering: **CRDT-backed** shared buffer for the DSL.
 - **Coexistence with Blob**: realtime layer for **draft / session** truth; Blob remains **durable checkpoint** with existing **version / 409** behaviour.
-- **Align with existing ACL**: session claims **`cap_admin`**, **`cap_segs`**, **`cap_mkts`**, **`cap_ed`** (see [AUTH_PROVIDER.md](../AUTH_PROVIDER.md)) and server behaviour in [`api/lib/capacityWorkspaceAcl.ts`](../../api/lib/capacityWorkspaceAcl.ts) (GET **filter**, PUT **merge** of allowed market documents).
+- **Align with existing ACL**: session claims **`cap_admin`**, **`cap_segs`**, **`cap_mkts`**, **`cap_ed`** (see [AUTH_PROVIDER.md](../AUTH_PROVIDER.md)) and server behaviour in [`api/shared-dsl.ts`](../../api/shared-dsl.ts) (GET **filter**, PUT **merge** of allowed market documents).
 
 ### 1.3 Non-goals (initial phases)
 
@@ -66,7 +66,7 @@ PUT merge already prevents **writing** disallowed markets; collab must not **lea
 
 On **WebSocket connect**, the PartyKit (or edge) handler:
 
-1. Verifies **Clerk JWT** (same trust model as [`api/lib/clerkAuthSharedDsl.ts`](../../api/lib/clerkAuthSharedDsl.ts)).
+1. Verifies **Clerk JWT** (same trust model as [`api/shared-dsl.ts`](../../api/shared-dsl.ts) + [`api/allowedUserEmails.ts`](../../api/allowedUserEmails.ts)).
 2. Parses **`parseCapacityWorkspaceAccess`** (or equivalent) from claims + org role.
 3. Parses **room id** → `marketId`.
 4. **Allow** connection iff **`allowedMarketIds.has(marketId)`** (or admin).
@@ -240,7 +240,7 @@ For **two** users, lightweight **awareness** (name, colour, cursor/selection in 
 
 - [BACKLOG_EPICS.md](../BACKLOG_EPICS.md) — `epic-partykit-yjs`, `epic-market-acl`, `epic-shared-dsl-hardening`
 - [AUTH_PROVIDER.md](../AUTH_PROVIDER.md) — `cap_*` claims
-- [`api/lib/capacityWorkspaceAcl.ts`](../../api/lib/capacityWorkspaceAcl.ts) — filter + partial merge
+- [`api/shared-dsl.ts`](../../api/shared-dsl.ts) — filter + partial merge (ACL inlined)
 - [`src/lib/codeViewMarketTabs.ts`](../../src/lib/codeViewMarketTabs.ts) — tab ↔ multi-doc merge
 - [`src/components/DslEditorCore.tsx`](../../src/components/DslEditorCore.tsx) — Monaco
 

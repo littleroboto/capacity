@@ -53,7 +53,7 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 | Area | Location |
 |------|----------|
 | Shared Blob API | `api/shared-dsl.ts` |
-| Clerk + session claims (`cap_*`) | [AUTH_PROVIDER.md](./AUTH_PROVIDER.md), `api/lib/capacityWorkspaceAcl.ts`, `src/lib/capacityAccess.ts` |
+| Clerk + session claims (`cap_*`) | [AUTH_PROVIDER.md](./AUTH_PROVIDER.md), `api/shared-dsl.ts`, `src/lib/capacityAccess.ts` |
 | Client sync (save / pull / autosave) | `src/lib/sharedDslSync.ts` |
 | Workspace UI | `src/components/SharedWorkspaceSection.tsx` |
 | Cloud save conflict banner (409) | `src/components/SharedDslConflictBanner.tsx` |

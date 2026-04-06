@@ -1,5 +1,5 @@
 /**
- * Emits `api/lib/capacityWorkspaceAcl.data.ts` from `public/data` so `/api/shared-dsl`
+ * Emits `api/capacityWorkspaceAcl.data.ts` from `public/data` so `/api/shared-dsl`
  * never reads the filesystem at runtime (avoids Vercel FUNCTION_INVOCATION_FAILED).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const segmentsPath = path.join(repoRoot, 'public/data/segments.json');
 const manifestPath = path.join(repoRoot, 'public/data/markets/manifest.json');
-const outPath = path.join(repoRoot, 'api/lib/capacityWorkspaceAcl.data.ts');
+const outPath = path.join(repoRoot, 'api/capacityWorkspaceAcl.data.ts');
 
 function load() {
   const rawSeg = JSON.parse(readFileSync(segmentsPath, 'utf8'));
@@ -44,7 +44,7 @@ ${segEntries}
 };
 `;
   writeFileSync(outPath, content, 'utf8');
-  console.log('sync-api-workspace-acl: wrote api/lib/capacityWorkspaceAcl.data.ts');
+  console.log('sync-api-workspace-acl: wrote api/capacityWorkspaceAcl.data.ts');
 }
 
 emit(load());
