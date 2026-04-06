@@ -12,7 +12,7 @@ export function looksLikeHtmlOrSpaShell(text: string | null | undefined): boolea
 
 /**
  * Reject obvious non-YAML (e.g. saved index.html, SPA shell, pasted page source,
- * or `api/shared-dsl.ts` accidentally stored in Blob / returned as GET body).
+ * or `api/_sharedDslImpl.ts` accidentally stored in Blob / returned as GET body).
  */
 export function looksLikeYamlDsl(text: string | null | undefined): boolean {
   if (text == null || !String(text).trim()) return false;

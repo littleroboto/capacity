@@ -2,9 +2,9 @@
 
 **Epic:** User, org, and permissions (see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md))  
 **Epic id:** `epic-auth-org`  
-**Stack context:** React 18 + Vite 6 SPA, deployed on **Vercel**, workspace YAML via **`api/shared-dsl.ts`** + **Vercel Blob** (`@vercel/blob`).
+**Stack context:** React 18 + Vite 6 SPA, deployed on **Vercel**, workspace YAML via **`api/shared-dsl.js`** (bundled handler) + **Vercel Blob** (`@vercel/blob`).
 
-**Implementation status (repo):** **Phases 1–4 largely shipped** — `ClerkProvider` + `SignInGate` + **`ClerkSharedDslBridge`** (`getToken`, org write allow list, `useCapacityAccess`). **`VITE_AUTH_DISABLED=1`** bypasses the gate. When **`CLERK_SECRET_KEY`** is set, GET/HEAD require a session JWT; PUT verifies JWT (optional legacy `CAPACITY_SHARED_DSL_SECRET`; disable with **`CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE`**) — logic lives in `api/shared-dsl.ts`. **Org UI:** `OrganizationSwitcher`, `UserButton`. **Market ACL:** `cap_*` session claims + **`cap_mkts`**; server **filters GET** and **merges PUT** in the same handler. One-pager: [AUTH_PROVIDER.md](./AUTH_PROVIDER.md). **Still open:** per-org Blob pathname, SSO/SCIM runbooks, automated auth test matrix. **Agent rule:** use the **user-clerk** MCP when changing auth — see `.cursor/rules/clerk-auth-mcp.mdc`.
+**Implementation status (repo):** **Phases 1–4 largely shipped** — `ClerkProvider` + `SignInGate` + **`ClerkSharedDslBridge`** (`getToken`, org write allow list, `useCapacityAccess`). **`VITE_AUTH_DISABLED=1`** bypasses the gate. When **`CLERK_SECRET_KEY`** is set, GET/HEAD require a session JWT; PUT verifies JWT (optional legacy `CAPACITY_SHARED_DSL_SECRET`; disable with **`CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE`**) — logic lives in `api/_sharedDslImpl.ts` (esbuild → `shared-dsl.js` on Vercel). **Org UI:** `OrganizationSwitcher`, `UserButton`. **Market ACL:** `cap_*` session claims + **`cap_mkts`**; server **filters GET** and **merges PUT** in the same handler. One-pager: [AUTH_PROVIDER.md](./AUTH_PROVIDER.md). **Still open:** per-org Blob pathname, SSO/SCIM runbooks, automated auth test matrix. **Agent rule:** use the **user-clerk** MCP when changing auth — see `.cursor/rules/clerk-auth-mcp.mdc`.
 
 This document is a **build-ready handoff**: it assumes the reader will implement identity, protect the API, and wrap the existing shell—without rewriting the runway engine or DSL pipeline.
 
@@ -44,7 +44,7 @@ This document is a **build-ready handoff**: it assumes the reader will implement
 |------|--------|
 | Bootstrap (cloud vs bundle) | `src/App.tsx` (effect ~L126–186): `fetchSharedDsl()` → `hydrateFromStorage` → `initSharedDslOutboundSync()` |
 | Cloud sync client | `src/lib/sharedDslSync.ts` — `fetchSharedDsl`, `putSharedDsl`, `getSharedDslBearer`, debounced auto-save |
-| Cloud sync API | `api/shared-dsl.ts` — HEAD/GET/PUT, Blob path `capacity-shared/workspace.yaml` |
+| Cloud sync API | `api/shared-dsl.js` — HEAD/GET/PUT, Blob path `capacity-shared/workspace.yaml` |
 | Workspace UI | `src/components/SharedWorkspaceSection.tsx`, `src/components/DSLPanel.tsx` |
 | Env types | `src/vite-env.d.ts` |
 
@@ -86,7 +86,7 @@ This document is a **build-ready handoff**: it assumes the reader will implement
 | Orgs & roles | Organizations + roles map cleanly to **viewer / editor / admin**. |
 | SSO later | Enterprise plans add SAML for same integration. |
 
-**Alternative:** **Auth0** or **Descope** — same shape: SPA SDK + JWT verification in `api/shared-dsl.ts`. Pick one and avoid abstraction layers until a second provider is real.
+**Alternative:** **Auth0** or **Descope** — same shape: SPA SDK + JWT verification in the shared-dsl handler. Pick one and avoid abstraction layers until a second provider is real.
 
 **Deliverable:** Record the choice in this repo (e.g. `docs/AUTH_PROVIDER.md` one-pager) once decided.
 
@@ -152,7 +152,7 @@ For **enterprise v1**, Option A is faster; Option B if you’re doing landing in
 3. **Bypass:** set **`VITE_AUTH_DISABLED=1`** so the workbench loads without sign-in even if the publishable key is present.
 4. **Next:** add **`UserButton`** to the header for sign-out (optional polish).
 
-### Phase 2 — Server: verify token in `api/shared-dsl.ts` (1–2 days)
+### Phase 2 — Server: verify token in shared-dsl handler (1–2 days)
 
 1. Add a small **`lib/verifyClerkRequest.ts`** (or inline) that:
    - Reads `Authorization: Bearer <token>`.
@@ -246,7 +246,7 @@ For **enterprise v1**, Option A is faster; Option B if you’re doing landing in
 | Day | Deliverable |
 |-----|-------------|
 | 1 | Clerk project + `ClerkProvider` + sign-in gate; prod keys on Vercel |
-| 2–3 | Verify JWT in `api/shared-dsl.ts`; GET/PUT protected; dual-mode env |
+| 2–3 | Verify JWT in shared-dsl handler; GET/PUT protected; dual-mode env |
 | 4 | `sharedDslSync` sends token; remove secret UI path in prod; 401 handling in bootstrap |
 | 5 | Org + viewer/editor; README + baseline doc update |
 

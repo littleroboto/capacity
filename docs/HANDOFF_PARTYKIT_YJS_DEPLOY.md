@@ -82,7 +82,7 @@ Use the **same Clerk application** (e.g. production `sk_live_…` on PartyKit wh
 
 ## 6. If “deploy fixed nothing” on shared-dsl
 
-- Confirm the **production deployment** is building commit that contains the current [`api/shared-dsl.ts`](../api/shared-dsl.ts) (static import of `handleSharedDsl`).
+- Confirm **prebuild** runs `bundle-shared-dsl` on Vercel and `api/_shared-dsl.runtime.cjs` exists in the build output (see [`api/shared-dsl.js`](../api/shared-dsl.js)).
 - In Vercel: **Redeploy** with **clear build cache** if the function still throws module errors.
 - Read **Vercel → Functions → `/api/shared-dsl` → logs** for the exact stack line.
 

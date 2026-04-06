@@ -2,10 +2,8 @@
  * Optional deployment allowlist: only these primary emails may use Clerk-protected APIs.
  * Set `CAPACITY_ALLOWED_USER_EMAILS` (comma-separated, case-insensitive).
  *
- * JWT must include the user's email — add to Clerk → Sessions → Customize session token, e.g.:
- * `{ "email": "{{user.primary_email_address}}" }`
- *
- * Shared by `/api/shared-dsl` and PartyKit (`party/collab.ts`).
+ * Leading `_`: not deployed as its own Vercel `/api/*` route (bundled into shared-dsl).
+ * Shared by bundled handler and PartyKit (`party/collab.ts`).
  */
 
 export function parseAllowedEmailSet(raw: string | undefined): Set<string> {

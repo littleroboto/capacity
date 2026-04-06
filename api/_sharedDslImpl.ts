@@ -1,13 +1,9 @@
 /**
- * Vercel entry: GET | HEAD | PUT `/api/shared-dsl`.
+ * Implementation for `/api/shared-dsl` — bundled by `scripts/bundle-shared-dsl.mjs` into
+ * `shared-dsl.runtime.cjs`. File name starts with `_` so Vercel does not deploy it as a
+ * separate serverless route.
  *
- * Handler logic lives in this single file so the serverless bundle does not rely on
- * `api/lib/*.js` chunks (production was failing with ERR_MODULE_NOT_FOUND for missing
- * `/var/task/api/lib/sharedDslRoute` when the compiler split modules).
- *
- * Small shared modules stay as sibling files: `./allowedUserEmails`, `./capacityWorkspaceAcl.data`.
- *
- * Env matrix: see previous `sharedDslRoute` docstring (Blob, Clerk, allowlist, cap_* claims).
+ * Env: Blob, Clerk, allowlist, cap_* claims (same as before).
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
@@ -19,8 +15,8 @@ import {
   put,
 } from '@vercel/blob';
 import { verifyToken } from '@clerk/backend';
-import { isClerkJwtEmailAllowed, parseAllowedEmailSet } from './allowedUserEmails';
-import { SEGMENT_TO_MARKETS, WORKSPACE_MANIFEST_MARKET_ORDER } from './capacityWorkspaceAcl.data';
+import { isClerkJwtEmailAllowed, parseAllowedEmailSet } from './_allowedUserEmails';
+import { SEGMENT_TO_MARKETS, WORKSPACE_MANIFEST_MARKET_ORDER } from './_capacityWorkspaceAcl.data';
 
 // --- dslMarketLine ---
 const DSL_MARKET_LINE = /^((?:market|country):\s*(\S+))/m;

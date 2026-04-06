@@ -109,7 +109,7 @@ Output: `**dist/**`.
 
 ### Shared workspace (Vercel Blob; no redeploy for team YAML edits)
 
-The app stores **one team workspace** in [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) using **`access: private`** by default. The serverless handler **`api/shared-dsl.ts`** uses **`BLOB_READ_WRITE_TOKEN`** to read and write **`capacity-shared/workspace.yaml`**.
+The app stores **one team workspace** in [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) using **`access: private`** by default. The serverless handler **`api/shared-dsl.js`** (pre-bundled from `api/_sharedDslImpl.ts`) uses **`BLOB_READ_WRITE_TOKEN`** to read and write **`capacity-shared/workspace.yaml`**.
 
 **With Clerk (recommended for production):** set **`CLERK_SECRET_KEY`** on Vercel. Then **GET/HEAD** require a **Clerk session JWT** (the SPA sends it automatically after sign-in). **PUT** uses the same JWT; optional **`CAPACITY_CLERK_DSL_WRITE_ROLES`** / **`VITE_CLERK_DSL_WRITE_ROLES`** restrict which **org membership roles** may save. Scoped users can use session claims **`cap_segs`**, **`cap_mkts`**, **`cap_ed`**, **`cap_admin`** — see **[docs/AUTH_PROVIDER.md](docs/AUTH_PROVIDER.md)**. Set **`CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE=1`** to stop accepting the old shared secret for PUT.
 
@@ -127,14 +127,14 @@ The app stores **one team workspace** in [Vercel Blob](https://vercel.com/docs/s
 
 **Local:** `vercel link`, then `vercel env pull` (or copy vars into `.env.local`) and run **`vercel dev`** — plain **`pnpm dev`** does not serve `/api/*`.
 
-**Troubleshooting — `Cannot use public access on a private store`:** Production may be running an **old** `api/shared-dsl.ts`. **Redeploy** the latest commit (optionally clear build cache). Optional **`CAPACITY_BLOB_ACCESS`**: omit or `private` for private stores; use `public` only if the Blob store is public.
+**Troubleshooting — `Cannot use public access on a private store`:** Production may be running an **old** shared-dsl bundle. **Redeploy** the latest commit (optionally clear build cache). Optional **`CAPACITY_BLOB_ACCESS`**: omit or `private` for private stores; use `public` only if the Blob store is public.
 
 #### Versioning and visibility (later)
 
 - **Today:** Blob **ETags** / **`ifMatch`** on **PUT**; **409** conflict banner; **Pull from cloud** in Workspace. **GET** is **not** world-readable when **`CLERK_SECRET_KEY`** protects the API.
 - **Next:** **Named snapshots** or audit trail → Postgres (or **per-org** blob paths). **Deployment Protection** on previews.
 
-Handler: `api/shared-dsl.ts`.
+Handler: `api/shared-dsl.js` + `api/_shared-dsl.runtime.cjs` (built in `prebuild`).
 
 ---
 

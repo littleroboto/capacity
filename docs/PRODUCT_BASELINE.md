@@ -7,7 +7,7 @@ Single source of truth for **what this repo ships today**, so older docs (OWM, c
 - **React + TypeScript + Vite** SPA. Runway visualisation uses **Visx** (not cal-heatmap).
 - **Deployed on Vercel**: static client build + **serverless** routes under `api/` (today: shared workspace YAML only).
 - **Default data**: bundled per-market YAML under `public/data/markets/*.yaml`, driven by the generated manifest (`pnpm` / `npm` **prebuild** runs `scripts/generate-market-manifest.mjs`).
-- **Optional team workspace**: when **`VITE_SHARED_DSL=1`** at build time and Blob + secrets are set on Vercel, the app reads/writes **one** multi-document YAML via **`GET`/`PUT` `/api/shared-dsl`** ([Vercel Blob](https://vercel.com/docs/storage/vercel-blob)). With Clerk, **GET/HEAD require a session JWT** when **`CLERK_SECRET_KEY`** is set on the server; **PUT** accepts JWT (and optionally the legacy **`CAPACITY_SHARED_DSL_SECRET`** unless disabled). See `api/shared-dsl.ts` and [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
+- **Optional team workspace**: when **`VITE_SHARED_DSL=1`** at build time and Blob + secrets are set on Vercel, the app reads/writes **one** multi-document YAML via **`GET`/`PUT` `/api/shared-dsl`** ([Vercel Blob](https://vercel.com/docs/storage/vercel-blob)). With Clerk, **GET/HEAD require a session JWT** when **`CLERK_SECRET_KEY`** is set on the server; **PUT** accepts JWT (and optionally the legacy **`CAPACITY_SHARED_DSL_SECRET`** unless disabled). See `api/shared-dsl.js` / `api/_sharedDslImpl.ts` and [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
 - **Optional Clerk sign-in**: when **`VITE_CLERK_PUBLISHABLE_KEY`** is set at build time and **`VITE_AUTH_DISABLED`** is not truthy, the SPA shows Clerk **sign-in before the workbench** ([`@clerk/react`](https://clerk.com/docs)). The shared-dsl API can verify the same session when **`CLERK_SECRET_KEY`** is configured.
 
 ## Runway UI and lenses
@@ -52,8 +52,8 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 
 | Area | Location |
 |------|----------|
-| Shared Blob API | `api/shared-dsl.ts` |
-| Clerk + session claims (`cap_*`) | [AUTH_PROVIDER.md](./AUTH_PROVIDER.md), `api/shared-dsl.ts`, `src/lib/capacityAccess.ts` |
+| Shared Blob API | `api/shared-dsl.js` (esbuild bundle from `_sharedDslImpl.ts`) |
+| Clerk + session claims (`cap_*`) | [AUTH_PROVIDER.md](./AUTH_PROVIDER.md), `api/_sharedDslImpl.ts`, `src/lib/capacityAccess.ts` |
 | Client sync (save / pull / autosave) | `src/lib/sharedDslSync.ts` |
 | Workspace UI | `src/components/SharedWorkspaceSection.tsx` |
 | Cloud save conflict banner (409) | `src/components/SharedDslConflictBanner.tsx` |

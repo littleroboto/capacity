@@ -12,4 +12,5 @@ coverage
 .vite
 pnpm-lock.yaml
 .vercel
+api/_shared-dsl.runtime.cjs
 src/lib/buildMeta.generated.ts

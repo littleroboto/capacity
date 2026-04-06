@@ -1,7 +1,7 @@
 import type * as Party from 'partykit/server';
 import { verifyToken } from '@clerk/backend';
 import { onConnect } from 'y-partykit';
-import { isClerkJwtEmailAllowed, parseAllowedEmailSet } from '../api/allowedUserEmails';
+import { isClerkJwtEmailAllowed, parseAllowedEmailSet } from '../api/_allowedUserEmails';
 import { parseCollabRoomId } from './collabRoomId';
 import {
   extractOrgRoleNormFromVerifiedJwt,
