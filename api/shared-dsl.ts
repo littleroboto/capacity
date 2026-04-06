@@ -60,7 +60,7 @@ async function getSharedWorkspaceBlob(token: string): Promise<Awaited<ReturnType
   try {
     return await run(primary);
   } catch (first) {
-    if (!(first instanceof BlobError)) throw first;
+    if (!isBlobTransportError(first)) throw first;
     try {
       const second = await run(alternate);
       if (second?.statusCode === 200 && second.stream) {
@@ -82,6 +82,11 @@ function blobAccessMismatchResponse(errMsg: string) {
     hint:
       'CAPACITY_BLOB_ACCESS must match how blobs were written (public vs private). Try unsetting it (defaults to private) or set CAPACITY_BLOB_ACCESS=public if the store is public. Redeploy after changing env.',
   };
+}
+
+function isBlobTransportError(e: unknown): boolean {
+  if (e instanceof BlobError) return true;
+  return typeof e === 'object' && e !== null && (e as { name?: string }).name === 'BlobError';
 }
 
 async function streamToText(stream: ReadableStream<Uint8Array>): Promise<string> {
@@ -235,7 +240,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(500).json(blobAccessMismatchResponse(errMsg));
         return;
       }
-      if (e instanceof BlobError) {
+      if (isBlobTransportError(e)) {
         res.status(502).json({
           error: 'blob_fetch_failed',
           message: errMsg,

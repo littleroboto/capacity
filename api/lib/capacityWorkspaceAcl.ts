@@ -1,22 +1,14 @@
 /**
  * Server-side workspace ACL for `/api/shared-dsl`.
- * Segment list and manifest order are read from repo JSON at module load (same sources as the SPA).
+ * Segment list and manifest order come from the same JSON as the SPA, imported so Vercel bundles
+ * them into the function (avoids `readFileSync` + `process.cwd()` failures on serverless).
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import path from 'node:path';
+import rawManifest from '../../public/data/markets/manifest.json';
+import rawSegments from '../../public/data/segments.json';
 import { parseDslMarketId } from './dslMarketLine';
 
-function readProjectJson<T>(relativeFromRepoRoot: string): T {
-  const full = path.join(process.cwd(), relativeFromRepoRoot);
-  if (!existsSync(full)) {
-    throw new Error(`capacityWorkspaceAcl: missing ${full} (cwd=${process.cwd()})`);
-  }
-  return JSON.parse(readFileSync(full, 'utf8')) as T;
-}
-
-function loadSegmentToMarkets(): Record<string, readonly string[]> {
-  const raw = readProjectJson<Record<string, unknown>>('public/data/segments.json');
+function loadSegmentToMarkets(raw: Record<string, unknown>): Record<string, readonly string[]> {
   const out: Record<string, readonly string[]> = {};
   for (const [k, v] of Object.entries(raw)) {
     const code = k.trim().toUpperCase();
@@ -27,8 +19,7 @@ function loadSegmentToMarkets(): Record<string, readonly string[]> {
   return out;
 }
 
-function loadManifestMarketOrder(): readonly string[] {
-  const m = readProjectJson<{ markets?: unknown }>('public/data/markets/manifest.json');
+function loadManifestMarketOrder(m: { markets?: unknown }): readonly string[] {
   const list = m.markets;
   if (!Array.isArray(list)) {
     throw new Error('capacityWorkspaceAcl: manifest.json missing "markets" array');
@@ -37,10 +28,14 @@ function loadManifestMarketOrder(): readonly string[] {
 }
 
 /** Segment code → ordered market ids (`public/data/segments.json`). */
-export const SEGMENT_TO_MARKETS: Record<string, readonly string[]> = loadSegmentToMarkets();
+export const SEGMENT_TO_MARKETS: Record<string, readonly string[]> = loadSegmentToMarkets(
+  rawSegments as Record<string, unknown>
+);
 
 /** Runway market order from generated manifest (`public/data/markets/manifest.json`). */
-export const WORKSPACE_MANIFEST_MARKET_ORDER: readonly string[] = loadManifestMarketOrder();
+export const WORKSPACE_MANIFEST_MARKET_ORDER: readonly string[] = loadManifestMarketOrder(
+  rawManifest as { markets?: unknown }
+);
 
 const MULTI_DOC_SPLIT = /\r?\n---\s*\r?\n/;
 
