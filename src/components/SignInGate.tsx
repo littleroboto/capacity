@@ -13,8 +13,37 @@ type SignInGateProps = {
   children: ReactNode;
 };
 
+function emailFromSessionClaims(sessionClaims: unknown): string {
+  if (!sessionClaims || typeof sessionClaims !== 'object') return '';
+  const c = sessionClaims as Record<string, unknown>;
+  const raw = c.email ?? c.primary_email_address;
+  if (typeof raw !== 'string' || !raw.includes('@')) return '';
+  return normalizeUserEmail(raw);
+}
+
+function AllowlistDenied() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 py-10 text-center">
+      <p className="max-w-md text-sm text-muted-foreground">
+        This deployment only allows specific sign-ins. The account you used is not on the list. Sign out and try an
+        authorized email, or ask the administrator to add you to{' '}
+        <code className="rounded bg-muted px-1 font-mono text-xs">VITE_ALLOWED_USER_EMAILS</code> /{' '}
+        <code className="rounded bg-muted px-1 font-mono text-xs">CAPACITY_ALLOWED_USER_EMAILS</code>.
+      </p>
+      <SignOutButton>
+        <button
+          type="button"
+          className="rounded-md border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
+        >
+          Sign out
+        </button>
+      </SignOutButton>
+    </div>
+  );
+}
+
 function AuthGateInner({ children }: { children: ReactNode }) {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, sessionClaims } = useAuth();
   const { isLoaded: userLoaded, user } = useUser();
   const allow = viteAllowedUserEmails();
 
@@ -47,6 +76,12 @@ function AuthGateInner({ children }: { children: ReactNode }) {
   }
 
   if (allow.size > 0) {
+    const fromClaim = emailFromSessionClaims(sessionClaims);
+    if (fromClaim) {
+      if (!isEmailInAllowList(fromClaim, allow)) return <AllowlistDenied />;
+      return <>{children}</>;
+    }
+
     if (!userLoaded) {
       return (
         <div
@@ -60,26 +95,7 @@ function AuthGateInner({ children }: { children: ReactNode }) {
     }
     const primary = user?.primaryEmailAddress?.emailAddress;
     const norm = primary ? normalizeUserEmail(primary) : '';
-    if (!norm || !isEmailInAllowList(norm, allow)) {
-      return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 py-10 text-center">
-          <p className="max-w-md text-sm text-muted-foreground">
-            This deployment only allows specific sign-ins. The account you used is not on the list. Sign out and try an
-            authorized email, or ask the administrator to add you to{' '}
-            <code className="rounded bg-muted px-1 font-mono text-xs">VITE_ALLOWED_USER_EMAILS</code> /{' '}
-            <code className="rounded bg-muted px-1 font-mono text-xs">CAPACITY_ALLOWED_USER_EMAILS</code>.
-          </p>
-          <SignOutButton>
-            <button
-              type="button"
-              className="rounded-md border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
-            >
-              Sign out
-            </button>
-          </SignOutButton>
-        </div>
-      );
-    }
+    if (!norm || !isEmailInAllowList(norm, allow)) return <AllowlistDenied />;
   }
 
   return <>{children}</>;

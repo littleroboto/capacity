@@ -12,6 +12,7 @@ import {
 } from '@/lib/buildMeta';
 import { landingBomSourceHref } from '@/lib/landingBomGithub';
 import { isClerkConfigured } from '@/lib/clerkConfig';
+import { prefetchWorkbenchApp } from '@/lib/prefetchWorkbench';
 import { cn } from '@/lib/utils';
 import { LandingCellDetailCardMock } from '@/components/landing/LandingCellDetailCardMock';
 import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMock';
@@ -548,6 +549,11 @@ export function LandingPage() {
     document.title = 'Segment Capacity Workbench · Air traffic control for technology programmes';
   }, []);
 
+  useEffect(() => {
+    const t = window.setTimeout(() => prefetchWorkbenchApp(), 1200);
+    return () => window.clearTimeout(t);
+  }, []);
+
   return (
     <div className="landing-root relative min-h-screen bg-[#040506] text-zinc-100 antialiased selection:bg-[#FFC72C]/35">
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
@@ -605,6 +611,8 @@ export function LandingPage() {
             <Link
               to="/app"
               className="inline-flex items-center gap-2 rounded-lg bg-white/[0.09] px-4 py-2 text-sm font-medium text-white ring-1 ring-white/[0.12] transition hover:bg-white/[0.14]"
+              onMouseEnter={prefetchWorkbenchApp}
+              onFocus={prefetchWorkbenchApp}
             >
               Open workbench
               <ArrowRight className="h-4 w-4 opacity-80" aria-hidden />
@@ -630,6 +638,8 @@ export function LandingPage() {
                 <Link
                   to="/app"
                   className="inline-flex items-center gap-2 rounded-lg bg-[#FFC72C] px-5 py-2.5 text-sm font-semibold text-[#292929] shadow-[0_0_40px_-8px_rgba(255,199,44,0.5)] transition hover:bg-[#E6B028]"
+                  onMouseEnter={prefetchWorkbenchApp}
+                  onFocus={prefetchWorkbenchApp}
                 >
                   Enter the workbench
                   <ArrowRight className="h-4 w-4" aria-hidden />
