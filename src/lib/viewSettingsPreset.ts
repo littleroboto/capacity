@@ -72,6 +72,20 @@ export const VIEW_SETTINGS_PAYLOAD_KEYS = [
 
 export type ViewSettingsPayloadKey = (typeof VIEW_SETTINGS_PAYLOAD_KEYS)[number];
 
+/**
+ * Zustand `partialize` must include exactly these keys — use this helper so new payload keys cannot be
+ * added to export/import without also persisting (or the omission is an explicit one-off).
+ */
+export function sliceViewSettingsForPersist(
+  s: Record<ViewSettingsPayloadKey, unknown>
+): Record<ViewSettingsPayloadKey, unknown> {
+  const out = {} as Record<ViewSettingsPayloadKey, unknown>;
+  for (const key of VIEW_SETTINGS_PAYLOAD_KEYS) {
+    out[key] = s[key];
+  }
+  return out;
+}
+
 export function buildViewSettingsFile(
   settings: Partial<ViewSettingsPayloadV1>,
   scope: ViewSettingsExportScope,

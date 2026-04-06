@@ -31,17 +31,17 @@ export const VIEW_MODES = [
   },
   {
     id: 'market_risk',
-    label: 'Market risk',
-    runwayHeatmapTitle: 'Market risk',
+    label: 'Deployment Risk',
+    runwayHeatmapTitle: 'Deployment Risk',
     title:
-      'Deployment and calendar fragility (the Market risk score): holidays, optional blackout windows (often “resourcing” but overlapping peak trading), trading intensity, campaign × peak-week compounding, tech bench strain, and YAML events. Hotter = more fragile—not a ban. γ_business and transfer curve apply when set separately from Technology Teams.',
+      'Deployment and calendar fragility (the deployment risk score): holidays, optional blackout windows (often “resourcing” but overlapping peak trading), trading intensity, campaign × peak-week compounding, tech bench strain, and YAML events. Hotter = more fragile—not a ban. γ_business and transfer curve apply when set separately from Technology Teams.',
   },
   {
     id: 'code',
     label: 'Code',
     runwayHeatmapTitle: 'Market configuration',
     title:
-      'Full multi-market YAML in the main area. Edits stay local until you switch back to Technology Teams, Restaurant Activity, or Market risk — then the model re-runs and the runway updates.',
+      'Full multi-market YAML in the main area. Edits stay local until you switch back to Technology Teams, Restaurant Activity, or Deployment Risk — then the model re-runs and the runway updates.',
   },
 ] as const;
 

@@ -25,7 +25,8 @@
     --iso-pad-left: 220 13% 83%;
     --iso-pad-right: 220 14% 76%;
     /* Ground labels: halo stroke width (px) for readability on light bg */
-    --iso-label-stroke-width: 3.1px;
+    /* Slightly stronger halo so iso ground labels stay crisp on light backgrounds */
+    --iso-label-stroke-width: 3.35px;
   }
 
   .dark {

@@ -1,9 +1,10 @@
 import { STORAGE_KEYS } from '@/lib/constants';
-import { APP_VERSION, GIT_COMMIT_SHORT } from '@/lib/buildMeta';
+import { APP_VERSION, BUILD_TIME_ISO, GIT_COMMIT_SHORT } from '@/lib/buildMeta';
 import { HeaderClerkOrgSwitcher } from '@/components/HeaderClerkOrgSwitcher';
 import { HeaderClerkUser } from '@/components/HeaderClerkUser';
 import { cn } from '@/lib/utils';
 import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAtcStore } from '@/store/useAtcStore';
 import { Button } from '@/components/ui/button';
 import { Atom, Bot, ChevronDown, ChevronUp, GitBranch, Moon, Sparkles, Sun } from 'lucide-react';
@@ -40,6 +41,12 @@ export function Header() {
     });
   }, []);
 
+  const titleLinkClass = cn(
+    'text-inherit no-underline decoration-transparent transition-colors',
+    'hover:underline hover:decoration-foreground/50',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card rounded-sm'
+  );
+
   return (
     <header className="border-b border-border bg-card shadow-sm">
       <div
@@ -52,11 +59,17 @@ export function Header() {
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-1.5">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <h1 className="text-sm font-bold leading-tight tracking-tight text-foreground sm:text-[0.9375rem]">
-                Experiment: Segment Capacity Workbench
+                <Link to="/" className={titleLinkClass} title="Landing page" aria-label="Go to landing page">
+                  Experiment: Segment Capacity Workbench
+                </Link>
               </h1>
               <span
                 className="text-[10px] tabular-nums leading-none text-muted-foreground"
-                title={`Version ${APP_VERSION} · commit ${GIT_COMMIT_SHORT}`}
+                title={
+                  BUILD_TIME_ISO
+                    ? `v${APP_VERSION} · ${GIT_COMMIT_SHORT} · built ${BUILD_TIME_ISO}`
+                    : `v${APP_VERSION} · ${GIT_COMMIT_SHORT}`
+                }
               >
                 <span className="font-medium text-foreground/70">v{APP_VERSION}</span>
                 <span className="text-muted-foreground/80"> · </span>
@@ -150,9 +163,14 @@ export function Header() {
                 <div className="flex min-w-0 items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h1 className="text-foreground">
-                      <span className="text-lg font-bold tracking-tight md:text-xl">
+                      <Link
+                        to="/"
+                        className={cn(titleLinkClass, 'text-lg font-bold tracking-tight md:text-xl')}
+                        title="Landing page"
+                        aria-label="Go to landing page"
+                      >
                         Experiment: Segment Capacity Workbench
-                      </span>
+                      </Link>
                     </h1>
                   </div>
                   <div className="flex min-w-0 shrink-0 items-center gap-1">
@@ -175,7 +193,11 @@ export function Header() {
                 </div>
                 <p
                   className="mt-1 inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] tabular-nums leading-snug text-muted-foreground md:text-[11px]"
-                  title={`Version ${APP_VERSION} · commit ${GIT_COMMIT_SHORT}`}
+                  title={
+                    BUILD_TIME_ISO
+                      ? `v${APP_VERSION} · ${GIT_COMMIT_SHORT} · built ${BUILD_TIME_ISO}`
+                      : `v${APP_VERSION} · ${GIT_COMMIT_SHORT}`
+                  }
                 >
                   <GitBranch className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
                   <span className="font-medium text-foreground/70">v{APP_VERSION}</span>

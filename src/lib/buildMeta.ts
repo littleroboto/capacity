@@ -1,3 +1,10 @@
-/** Injected at dev/build time via `vite.config.ts` `define`. */
-export const APP_VERSION: string = __APP_VERSION__;
-export const GIT_COMMIT_SHORT: string = __GIT_COMMIT__;
+/** Written by `scripts/write-build-meta.mjs` (postinstall, prebuild, dev). */
+export {
+  APP_VERSION,
+  BUILD_TIME_ISO,
+  GIT_COMMIT_SHORT,
+  LANDING_BOM_AUTH,
+  LANDING_BOM_CLIENT,
+  LANDING_BOM_FLAGS,
+  LANDING_BOM_HOSTING,
+} from './buildMeta.generated';

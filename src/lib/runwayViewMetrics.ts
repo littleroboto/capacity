@@ -162,7 +162,7 @@ export function runwayHeatmapCellFillAndDim(
  * (weekly × monthly × seasonal rhythm, **early-month multiplier** on that rhythm, public-holiday trading
  * multiplier, live campaign **store** boost and prep **store** boost from YAML if any, then operating-window
  * store multipliers). Does **not** affect lab / Market IT / backend loads. Does **not** blend in marketing
- * `campaign_risk` as a separate heatmap lane; it still feeds the planning blend and Market risk.
+ * `campaign_risk` as a separate heatmap lane; it still feeds the planning blend and Deployment Risk.
  */
 export function inStoreHeatmapMetric(
   row: RiskRow,

@@ -204,6 +204,29 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
 
   const { minX, minY, vbW, vbH } = bounds;
 
+  /** Faint ground seams between market strips (compare-all 3D); middle of fractional inter-market gap in `di`. */
+  const marketStripSeams = useMemo(() => {
+    if (nMarkets < 2 || nWeeks < 1) return [];
+    const G = MARKET_GAP_STEPS;
+    const out: { key: string; x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (let mi = 0; mi < nMarkets - 1; mi++) {
+      const di = mi * (nCols + G) + (nCols - 1) + G / 2;
+      const isoW0 = isoWiAt(0);
+      const isoW1 = isoWiAt(nWeeks - 1);
+      const p0 = isoCellTopLeft(isoW0, di, stepX, stepY);
+      const p1 = isoCellTopLeft(isoW1, di, stepX, stepY);
+      out.push({
+        key: `mkt-seam-${mi}`,
+        x1: p0.ax - minX,
+        y1: p0.ay - minY + L.canvasH,
+        x2: p1.ax - minX,
+        y2: p1.ay - minY + L.canvasH,
+      });
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nMarkets, nWeeks, nCols, monthStartChronWeeks, minX, minY, L.canvasH, stepX, stepY]);
+
   const maxIsoWi = nWeeks > 0 ? isoWiAt(nWeeks - 1) : 0;
   const maxDi = marketDi(nMarkets - 1, nCols - 1);
   const labelBleed = isoLabelBleedComp(stepX, stepY);
@@ -347,10 +370,30 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
         viewBox={`0 0 ${vbW} ${vbH}`}
         width="100%"
         height="100%"
-        className="block h-full min-h-0 w-full flex-1 overflow-visible text-foreground"
+        className="block h-full min-h-0 w-full flex-1 overflow-visible text-foreground [shape-rendering:geometricPrecision]"
         preserveAspectRatio="xMidYMin meet"
         aria-label="Multi-market isometric city block"
       >
+        {marketStripSeams.length > 0 ? (
+          <g
+            className="pointer-events-none text-muted-foreground opacity-[0.2] dark:opacity-[0.34]"
+            aria-hidden
+          >
+            {marketStripSeams.map(({ key, x1, y1, x2, y2 }) => (
+              <line
+                key={key}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke="currentColor"
+                strokeWidth={1}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+          </g>
+        ) : null}
         {cells.map(({ li, mi, di, dayCol, cell, isoW }) => {
           const { ax, ay } = isoCellTopLeft(isoW, di, stepX, stepY);
           const gx = ax - minX;

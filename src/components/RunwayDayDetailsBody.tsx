@@ -118,7 +118,11 @@ function BulletList({
 }
 
 function contributorShortLabel(label: string): string {
-  return label.replace(/\s*\(heatmap\)\s*/i, '').replace(/\s*\(live campaigns[^)]*\)\s*/i, '').trim();
+  return label
+    .replace(/\s*\(this heatmap\)\s*/i, '')
+    .replace(/\s*\(heatmap\)\s*/i, '')
+    .replace(/\s*\(live campaigns[^)]*\)\s*/i, '')
+    .trim();
 }
 
 function ContributorsBlock({
@@ -198,16 +202,35 @@ function ContributorsBlock({
             </p>
           ) : null}
           {p.pressureSurfaceLines.length > 0 ? (
-            <ul
+            <div
               className={cn(
-                'space-y-1 leading-relaxed text-muted-foreground',
-                presentation === 'markdown' ? 'mt-3 list-disc pl-5 text-sm' : 'mt-2 text-[11px]'
+                'space-y-1 text-muted-foreground',
+                presentation === 'markdown' ? 'mt-3 text-sm' : 'mt-2 text-[11px]'
               )}
             >
-              {p.pressureSurfaceLines.slice(0, 4).map((line, i) => (
-                <li key={i}>{line}</li>
-              ))}
-            </ul>
+              <ul
+                className={cn(
+                  'space-y-1 leading-relaxed',
+                  presentation === 'markdown' ? 'list-disc pl-5' : ''
+                )}
+              >
+                {p.pressureSurfaceLines.slice(0, 4).map((line, i) => (
+                  <li key={i} className={presentation === 'markdown' ? '' : 'pl-0.5 leading-snug'}>
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              {p.pressureSurfaceFootnote ? (
+                <p
+                  className={cn(
+                    'leading-snug text-muted-foreground/90',
+                    presentation === 'markdown' ? 'mt-2 text-[13px]' : 'mt-1.5 text-[10px]'
+                  )}
+                >
+                  {p.pressureSurfaceFootnote}
+                </p>
+              ) : null}
+            </div>
           ) : null}
           {p.storeTradingLine ? (
             <p
@@ -317,7 +340,7 @@ function ContributorsBlock({
               tile.
             </>
           ) : p.viewMode === 'market_risk' ? (
-            <>Band uses the full planning blend; this heatmap is market risk only.</>
+            <>Band uses the full planning blend; this heatmap is deployment risk only.</>
           ) : (
             <>Band includes tech delivery too; this heatmap highlights trading-style pressure only.</>
           )}
@@ -353,7 +376,7 @@ function LensScoreFootnote({
   if (viewMode === 'market_risk') {
     return (
       <p className={cls}>
-        Tile is the market risk score (deployment/calendar fragility).{' '}
+        Tile is the deployment risk score (deployment/calendar fragility).{' '}
         <span className="font-medium text-foreground">Planning blend</span> is still the wider operational mix used for
         the band.
       </p>

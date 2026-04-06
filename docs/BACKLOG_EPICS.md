@@ -103,7 +103,7 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 
 ### epic-runway-lens-naming — Runway lens naming & surface consistency
 
-**Goal:** **Control labels, runway headings, and tooltips** use the same vocabulary so execs and planners aren’t reconciling “Technology Teams” vs “tech headroom” or “Market risk” vs “deployment / calendar risk.”
+**Goal:** **Control labels, runway headings, and tooltips** use the same vocabulary so execs and planners aren’t reconciling “Technology Teams” vs “tech headroom” or inconsistent deployment-risk naming.
 
 **Scope (indicative):**
 

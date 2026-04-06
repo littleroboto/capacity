@@ -131,11 +131,11 @@ export function deploymentRiskFromLinearSum(raw: number): number {
 }
 
 /**
- * Graded 0–1 deployment / calendar fragility for the Market risk heatmap.
+ * Graded 0–1 deployment / calendar fragility for the Deployment Risk heatmap.
  * Internally sums bounded factors, then maps through {@link deploymentRiskFromLinearSum} so the runway keeps
  * dynamic range when many layers (Q4, year-end, stores, shape, …) stack. Store load raises consequence, not
  * trading “busyness” alone. Blackouts / events add acute spikes on top.
- * {@link MarketRiskComponentScales} scales each group independently (Market risk lens only).
+ * {@link MarketRiskComponentScales} scales each group independently (Deployment Risk lens only).
  */
 export function computeDeploymentRisk01(
   row: RiskRow,

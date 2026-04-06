@@ -48,7 +48,7 @@ export function RiskModelPanel() {
         {' · '}
         weekly / monthly / early-month
         {viewMode === 'market_risk'
-          ? ' · market risk shape · heatmap · deploy. context'
+          ? ' · deployment risk shape · heatmap · deploy. context'
           : ' · global heatmap + offset'}
       </span>
     ) : (
@@ -76,7 +76,7 @@ export function RiskModelPanel() {
                 {' — '}
                 same Business Patterns as single-market (2D or 3D). YAML follows runway focus{' '}
                 <span className="font-mono text-foreground/80">{focusMarket}</span>; heatmap pressure offset, curve, γ,
-                tail power, and market-risk mix are global across columns and lenses.
+                tail power, and deployment-risk mix are global across columns and lenses.
               </p>
             ) : null}
             {patternKind === 'trading' ? (

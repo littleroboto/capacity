@@ -1,7 +1,16 @@
-import { useEffect } from 'react';
+import { Fragment, useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Show, SignInButton, UserButton } from '@clerk/react';
 import { motion, useReducedMotion } from 'motion/react';
+import {
+  APP_VERSION,
+  GIT_COMMIT_SHORT,
+  LANDING_BOM_AUTH,
+  LANDING_BOM_CLIENT,
+  LANDING_BOM_FLAGS,
+  LANDING_BOM_HOSTING,
+} from '@/lib/buildMeta';
+import { landingBomSourceHref } from '@/lib/landingBomGithub';
 import { isClerkConfigured } from '@/lib/clerkConfig';
 import { cn } from '@/lib/utils';
 import { LandingCellDetailCardMock } from '@/components/landing/LandingCellDetailCardMock';
@@ -9,7 +18,17 @@ import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMoc
 import { LandingMonacoYamlMock } from '@/components/landing/LandingMonacoYamlMock';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 import { heatmapColorDiscrete, heatmapSpectrumLegendGradientCss } from '@/lib/riskHeatmapColors';
-import { ArrowRight, BarChart3, Columns2, GitBranch, Globe2, Layers, Radar } from 'lucide-react';
+import {
+  ArrowRight,
+  BarChart3,
+  ChevronDown,
+  Columns2,
+  ExternalLink,
+  GitBranch,
+  Globe2,
+  Layers,
+  Radar,
+} from 'lucide-react';
 
 const DOW = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
 const MONTH_SHORT = [
@@ -342,6 +361,185 @@ const FEATURES = [
   },
 ] as const;
 
+type LandingBomEntry = {
+  readonly label: string;
+  readonly range: string;
+  readonly pkg: string;
+  /** Logical sub-bundle; repeated on consecutive rows — table shows one sub-heading per change. */
+  readonly bundle?: string;
+};
+
+function LandingBomBundleHeader({ title, variant }: { title: string; variant: 'flush' | 'ruled' }) {
+  return (
+    <tr
+      className={cn(
+        'bg-black/[0.18]',
+        variant === 'ruled' && 'border-t border-dashed border-white/[0.06]'
+      )}
+    >
+      <th
+        scope="colgroup"
+        colSpan={2}
+        className={cn(
+          'px-3 pb-1 pl-5 text-left text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-600',
+          variant === 'flush' ? 'pt-2' : 'pt-1.5'
+        )}
+      >
+        {title}
+      </th>
+    </tr>
+  );
+}
+
+function LandingBomSectionHeader({ title }: { title: string }) {
+  return (
+    <tr className="border-y border-white/[0.06] bg-white/[0.03]">
+      <th
+        scope="colgroup"
+        colSpan={2}
+        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-500"
+      >
+        {title}
+      </th>
+    </tr>
+  );
+}
+
+function LandingBomRowView({ row }: { row: LandingBomEntry }) {
+  const href = landingBomSourceHref(row.pkg);
+  return (
+    <tr className="border-b border-white/[0.04] transition-colors last:border-b-0 hover:bg-white/[0.02]">
+      <th
+        scope="row"
+        className="max-w-[min(100%,16rem)] py-2 pl-3 pr-2 align-middle font-normal sm:max-w-none"
+      >
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="group inline-flex items-center gap-1.5 text-left text-zinc-400 underline decoration-white/[0.08] underline-offset-[3px] transition hover:text-zinc-100 hover:decoration-[#FFC72C]/50"
+        >
+          <span className="text-pretty">{row.label}</span>
+          <ExternalLink
+            className="h-3 w-3 shrink-0 opacity-40 transition-opacity group-hover:opacity-80"
+            aria-hidden
+          />
+        </a>
+      </th>
+      <td className="whitespace-nowrap py-2 pl-2 pr-3 text-right align-middle font-mono text-[10px] leading-none text-zinc-500 tabular-nums sm:w-[6.5rem] sm:min-w-[6.5rem] sm:text-left">
+        {row.range}
+      </td>
+    </tr>
+  );
+}
+
+function LandingBomRows({ rows }: { rows: readonly LandingBomEntry[] }) {
+  let bundleHeadersInSection = 0;
+  return (
+    <>
+      {rows.map((row, i) => {
+        const prev = i > 0 ? rows[i - 1] : undefined;
+        const bundle = row.bundle?.trim();
+        const showBundle = Boolean(bundle && (!prev || prev.bundle?.trim() !== bundle));
+        if (showBundle && bundle) bundleHeadersInSection += 1;
+        return (
+          <Fragment key={row.pkg}>
+            {showBundle && bundle ? (
+              <LandingBomBundleHeader
+                title={bundle}
+                variant={bundleHeadersInSection === 1 ? 'flush' : 'ruled'}
+              />
+            ) : null}
+            <LandingBomRowView row={row} />
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
+/** ~5–6 table body lines visible; thead sticks while scrolling. */
+const LANDING_BOM_SCROLL_MAX_H = 'min(13.5rem,42vh)';
+
+function LandingBomTable() {
+  const panelId = useId();
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="mx-auto mt-5 w-full max-w-4xl sm:mx-0">
+      <button
+        type="button"
+        id={`${panelId}-toggle`}
+        aria-expanded={open}
+        aria-controls={`${panelId}-panel`}
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          'flex w-full items-center justify-between gap-3 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5 text-left transition-colors',
+          'hover:border-white/[0.1] hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFC72C]/35'
+        )}
+      >
+        <span className="min-w-0 text-pretty text-[11px] leading-snug text-zinc-500">
+          <span className="font-medium text-zinc-400">Bill of materials</span>
+          <span className="text-zinc-600"> · dependency bundles, semver ranges, upstream links</span>
+        </span>
+        <ChevronDown
+          className={cn('h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-200', open && '-rotate-180')}
+          aria-hidden
+        />
+      </button>
+
+      <div
+        id={`${panelId}-panel`}
+        role="region"
+        aria-labelledby={`${panelId}-toggle`}
+        hidden={!open}
+      >
+        <div className="mt-2 overflow-hidden rounded-lg border border-white/[0.07] bg-[#050608]/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-sm">
+          <div
+            className="overflow-x-auto overflow-y-auto overscroll-y-contain [scrollbar-color:rgba(63,63,70,0.55)_transparent] [scrollbar-width:thin]"
+            style={{ maxHeight: LANDING_BOM_SCROLL_MAX_H }}
+          >
+            <table className="w-full min-w-[280px] border-collapse text-left text-[11px]">
+              <caption className="sr-only">
+                Bill of materials: open-source dependencies with declared semver ranges and links to upstream source
+                repositories on GitHub or GitLab.
+              </caption>
+              <thead className="sticky top-0 z-[2] border-b border-white/[0.08] bg-[#06080a]/95 text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500 backdrop-blur-sm">
+                <tr>
+                  <th scope="col" className="py-2.5 pl-3 pr-2 font-medium">
+                    Module
+                  </th>
+                  <th
+                    scope="col"
+                    className="py-2.5 pl-2 pr-3 text-right font-medium sm:w-[6.5rem] sm:min-w-[6.5rem] sm:text-left"
+                  >
+                    Range
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="text-zinc-500">
+                <LandingBomSectionHeader title="Client bundle" />
+                <LandingBomRows rows={LANDING_BOM_CLIENT} />
+                <LandingBomSectionHeader title="Hosting & sync" />
+                <LandingBomRows rows={LANDING_BOM_HOSTING} />
+                <LandingBomSectionHeader title="Auth (optional)" />
+                <LandingBomRows rows={LANDING_BOM_AUTH} />
+                <LandingBomSectionHeader title="Market chrome" />
+                <LandingBomRows rows={LANDING_BOM_FLAGS} />
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p className="mt-2 max-w-4xl text-pretty text-[10px] leading-relaxed text-zinc-600 sm:mx-0">
+          Ranges are from <code className="rounded bg-white/[0.04] px-1 font-mono text-[9px]">package.json</code> at
+          build. Links open the upstream source repo on GitHub (or GitLab / npm when that is canonical). Deployed on
+          Vercel; no Next.js — Vite SPA only.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function LandingPage() {
   const reducedMotion = useReducedMotion();
   const clerkOn = isClerkConfigured();
@@ -425,8 +623,8 @@ export function LandingPage() {
                 Air traffic control for technology programmes
               </h1>
               <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-zinc-400 sm:text-lg">
-                A calm, shared picture of how capacity is consumed — BAU technology streams, project
-                load, markets, and segments — so teams steer before things stack up.
+                A shared picture of how capacity is consumed — BAU technology streams, project load, markets, and
+                segments — so teams steer before things stack up.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
@@ -511,7 +709,17 @@ export function LandingPage() {
         </main>
 
         <footer className="mt-20 border-t border-white/[0.06] pt-8 text-center text-xs text-zinc-600 sm:text-left">
-          Designed &amp; Engineered by Doug Booth, Segment Architecture
+          <p className="text-zinc-500">Designed &amp; Engineered by Doug Booth, Segment Architecture</p>
+          <p className="mx-auto mt-3 max-w-4xl text-pretty text-[11px] font-normal leading-relaxed tracking-normal text-zinc-600 sm:mx-0">
+            <span className="sr-only">Release — </span>
+            v<span className="text-zinc-500">{APP_VERSION}</span>
+            <span aria-hidden> · </span>
+            <span className="whitespace-nowrap">
+              git <span className="font-mono text-zinc-500">{GIT_COMMIT_SHORT}</span>
+            </span>
+            <span className="text-zinc-600"> — BOM semver ranges frozen at build from package.json.</span>
+          </p>
+          <LandingBomTable />
         </footer>
       </div>
     </div>

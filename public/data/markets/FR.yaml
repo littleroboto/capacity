@@ -401,7 +401,7 @@ trading:
     peak_month: 7
     amplitude: 0.09
 
-# Market risk lens — dated events / blackouts below; optional deployment_risk_month_curve adds Jan–Dec lift.
+# Deployment Risk lens — dated events / blackouts below; optional deployment_risk_month_curve adds Jan–Dec lift.
 
 deployment_risk_week_weight: 0.22
 

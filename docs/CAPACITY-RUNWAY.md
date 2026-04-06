@@ -39,8 +39,8 @@ Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL**
 | **Parser** | `src/engine/yamlDslParser.ts` → `src/engine/types.ts` (`MarketConfig`) |
 | **Pipeline** | `src/engine/pipeline.ts` orchestrates calendar → phases → capacity → risk → noise |
 | **Runway** | **7 days wide** (Mon–Sun) per month; **months stacked vertically** in one column (Q1–Q4 labels on Jan / Apr / Jul / Oct). **All markets**: one column per market, horizontal scroll, shared colour scale |
-| **Heatmap colour** | 10-step green→red from the **active lens metric** after γ and transfer curve (`heatmapCellMetric` → `src/lib/riskHeatmapColors.ts`). **Technology** (`combined`): **`technologyHeadroomHeatmapMetric`**. **Restaurant** (`in_store`): **`inStoreHeatmapMetric`** / **`store_pressure`**. **Market risk** (`market_risk`): **`deployment_risk_01`**. Not raw **`risk_score`**. |
-| **View modes** | **Technology Teams** (`combined`), **Restaurant Activity** (`in_store`), **Market risk** (`market_risk`), **Code** (`code`); legacy ids map via `normalizeViewModeId` in `src/lib/constants.ts`. |
+| **Heatmap colour** | 10-step green→red from the **active lens metric** after γ and transfer curve (`heatmapCellMetric` → `src/lib/riskHeatmapColors.ts`). **Technology** (`combined`): **`technologyHeadroomHeatmapMetric`**. **Restaurant** (`in_store`): **`inStoreHeatmapMetric`** / **`store_pressure`**. **Deployment Risk** (`market_risk`): **`deployment_risk_01`**. Not raw **`risk_score`**. |
+| **View modes** | **Technology Teams** (`combined`), **Restaurant Activity** (`in_store`), **Deployment Risk** (`market_risk`), **Code** (`code`); legacy ids map via `normalizeViewModeId` in `src/lib/constants.ts`. |
 | **Slot selection** | Drag rectangle aggregates the **same lens metric** as the heatmap (`heatmapCellMetric`); no footer readout while status bar is absent |
 | **Scenarios** | Save/load named scenarios in `localStorage` (`atc_scenarios`) |
 | **Guards** | Reject HTML/page source in editor/storage; sane `public/` URLs (`src/lib/dslGuards.ts`, `src/lib/publicUrl.ts`) |

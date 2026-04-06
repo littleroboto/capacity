@@ -197,11 +197,11 @@ export type MarketConfig = {
   deployment_risk_month_curve?: Partial<Record<TradingMonthKey, number>>;
   /**
    * Optional second Jan–Dec **0–1** layer (`deployment_risk_context_month_curve`), **summed** with the primary
-   * deployment month lift for Market risk—local context without rewriting the main curve.
+   * deployment month lift for Deployment Risk—local context without rewriting the main curve.
    */
   deployment_risk_context_month_curve?: Partial<Record<TradingMonthKey, number>>;
   /**
-   * Optional **0–1** multiplier on within-week load shape (trading + tech `weekly_pattern`) in Market risk.
+   * Optional **0–1** multiplier on within-week load shape (trading + tech `weekly_pattern`) in Deployment Risk.
    * Omit for engine default **0.2**; raise in aggressive trading markets.
    */
   deployment_risk_week_weight?: number;

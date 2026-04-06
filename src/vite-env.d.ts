@@ -19,9 +19,6 @@ interface ImportMetaEnv {
   readonly VITE_CAPACITY_ORG_ADMIN_ROLES?: string;
 }
 
-declare const __APP_VERSION__: string;
-declare const __GIT_COMMIT__: string;
-
 declare module '*.yaml?raw' {
   const src: string;
   export default src;

@@ -13,6 +13,7 @@ import {
 import { STORE_PRESSURE_MAX } from '@/engine/riskModelTuning';
 import { TRADING_MONTH_KEYS } from '@/lib/tradingMonthlyDsl';
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
+import { lensHeatmapBlendCaption } from '@/lib/lensCopy';
 import { buildDriverSummaryBlocks, type RunwayDriverBlock } from '@/lib/runwayScoreSummary';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -164,6 +165,10 @@ const SURFACE_LABEL: Record<string, string> = {
   carryover: 'Carry-over',
 };
 
+/** Shown once under surface bullets in day detail (avoids repeating per line). */
+export const PRESSURE_SURFACE_LANE_FOOTNOTE =
+  'Lane = tighter of lab / Market IT; headline excludes backend.';
+
 /** Tech-pressure contribution by surface (same cap logic as combined tech; not additive to headline). */
 export function pressureSurfaceLines(row: RiskRow): string[] {
   const ps = row.pressure_surfaces;
@@ -175,7 +180,7 @@ export function pressureSurfaceLines(row: RiskRow): string[] {
     const used = Math.min(1, Math.max(0, v));
     const avail = Math.round((1 - used) * 100);
     const usedPct = Math.round(used * 100);
-    return `${label}: ~${avail}% of the tighter lab / Market IT lane still free for this slice (~${usedPct}% of that lane scheduled; headline excludes backend)`;
+    return `${label}: ~${avail}% free (~${usedPct}% of lane scheduled)`;
   });
 }
 
@@ -233,14 +238,12 @@ export function techReadinessSustainExplanation(row: RiskRow): string | null {
   const sustainAvail = Math.round(Math.max(0, (1 - Math.min(1, sustainU)) * 100));
   const parts: string[] = [];
   if (readinessU >= 0.02) {
-    parts.push(
-      `readiness / change: ~${readinessAvail}% of the tighter lab / Market IT lane still free (headline excludes backend)`
-    );
+    parts.push(`readiness / change ~${readinessAvail}% free`);
   }
   if (sustainU >= 0.02) {
-    parts.push(`live / support: ~${sustainAvail}% still free on that lane`);
+    parts.push(`live / support ~${sustainAvail}% free`);
   }
-  return `Breakdown: ${parts.join(' · ')}. Slices do not sum to the headline — the tile uses all scheduled work together.`;
+  return `Breakdown (tighter lab / Market IT lane): ${parts.join(' · ')}. Slices do not sum to the headline; backend is not in the headline tile.`;
 }
 
 export type RiskBlendTerm = {
@@ -265,7 +268,7 @@ export function buildLensRiskBlendTerms(
     return [
       {
         key: 'tech_headroom',
-        label: 'Tech capacity headroom (this heatmap)',
+        label: lensHeatmapBlendCaption('combined'),
         factor: headroom,
         weight: 1,
         contribution: headroom,
@@ -277,7 +280,7 @@ export function buildLensRiskBlendTerms(
     return [
       {
         key: 'deployment',
-        label: 'Market risk (this heatmap)',
+        label: lensHeatmapBlendCaption('market_risk'),
         factor: d,
         weight: 1,
         contribution: d,
@@ -288,7 +291,7 @@ export function buildLensRiskBlendTerms(
   return [
     {
       key: 'store',
-      label: 'Restaurant trading (this heatmap)',
+      label: lensHeatmapBlendCaption('in_store'),
       factor: fill01,
       weight: 1,
       contribution: fill01,
@@ -424,10 +427,12 @@ export type RunwayTooltipPayload = {
   /** When `public_holiday_flag`, stub catalog name(s) for tooltips. */
   publicHolidayName: string | null;
   pressureSurfaceLines: string[];
+  /** Single footnote when {@link pressureSurfaceLines} is non-empty. */
+  pressureSurfaceFootnote: string | null;
   headroomLine: string | null;
   /** Campaigns / holidays / resourcing groupings for the summary panel. */
   driverSummaryBlocks: RunwayDriverBlock[];
-  /** Market risk lens: human-readable factor summary. */
+  /** Deployment Risk lens: human-readable factor summary. */
   deploymentRiskLine: string | null;
 };
 
@@ -498,6 +503,7 @@ export function buildRunwayTooltipPayload(input: {
     cellFillHex,
     publicHolidayName: row.public_holiday_flag ? getStubPublicHolidayName(market, dateStr) : null,
     pressureSurfaceLines: pressureLines,
+    pressureSurfaceFootnote: pressureLines.length > 0 ? PRESSURE_SURFACE_LANE_FOOTNOTE : null,
     headroomLine:
       row.headroom != null
         ? `Room left before max pressure: about ${(row.headroom * 100).toFixed(0)}%`

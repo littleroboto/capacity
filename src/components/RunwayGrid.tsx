@@ -276,7 +276,7 @@ function fillMetricHeadlineForView(mode: ViewModeId, techWorkloadScope: TechWork
     case 'in_store':
       return 'Trading pressure';
     case 'market_risk':
-      return 'Market risk';
+      return 'Deployment Risk';
     default:
       return 'Pressure';
   }
@@ -289,7 +289,7 @@ function fillMetricLabelForView(mode: ViewModeId, techWorkloadScope: TechWorkloa
     case 'in_store':
       return 'Restaurant trading intensity from the store curve—rhythm, holidays, and store boosts when live (or prep if YAML says so)';
     case 'market_risk':
-      return 'Market risk score (0–1): deployment and calendar fragility from holidays, Q4 month ramp, store intensity, campaigns, and optional deployment events in YAML.';
+      return 'Deployment risk score (0–1): deployment and calendar fragility from holidays, Q4 month ramp, store intensity, campaigns, and optional deployment events in YAML.';
     default:
       return 'Metric';
   }
@@ -309,7 +309,7 @@ function fillMetricLeadCompactForView(mode: ViewModeId, techWorkloadScope: TechW
     case 'in_store':
       return 'Store trading intensity from the curve—rhythm, holidays, and store boosts (0–1).';
     case 'market_risk':
-      return 'Market risk: deployment/calendar fragility in the model (0–1); hotter = more fragile, not a ban.';
+      return 'Deployment risk: deployment/calendar fragility in the model (0–1); hotter = more fragile, not a ban.';
     default:
       return fillMetricLabelForView(mode, techWorkloadScope);
   }

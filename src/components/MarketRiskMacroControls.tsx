@@ -13,7 +13,7 @@ const ROWS: { key: keyof MarketRiskMacros; label: string; blurb: string }[] = [
   {
     key: 'programme',
     label: 'Programme pressure',
-    blurb: 'How much campaigns count in Market risk (linear + peak-week terms). YAML still sets dates and loads.',
+    blurb: 'How much campaigns count in Deployment Risk (linear + peak-week terms). YAML still sets dates and loads.',
   },
   {
     key: 'yearEndRunway',
@@ -47,7 +47,7 @@ export type MarketRiskMacroControlsProps = {
   className?: string;
 };
 
-/** Four coarse knobs for Market risk deployment shape; pairs with expert per-component scales. */
+/** Four coarse knobs for Deployment Risk deployment shape; pairs with expert per-component scales. */
 export function MarketRiskMacroControls({ className }: MarketRiskMacroControlsProps) {
   const riskTuning = useAtcStore((s) => s.riskTuning);
   const setRiskTuning = useAtcStore((s) => s.setRiskTuning);
@@ -62,7 +62,7 @@ export function MarketRiskMacroControls({ className }: MarketRiskMacroControlsPr
     >
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-xs font-semibold tracking-tight text-foreground">Market risk shape</h3>
+          <h3 className="text-xs font-semibold tracking-tight text-foreground">Deployment risk shape</h3>
           <p className="mt-0.5 max-w-[42ch] text-[10px] leading-relaxed text-muted-foreground">
             Four multipliers on top of defaults. Use{' '}
             <span className="font-medium text-foreground/85">1×</span> for neutral; open Expert below to tune

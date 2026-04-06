@@ -7,7 +7,7 @@ import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 import { useReducedMotion } from 'motion/react';
 
-/** Compare strip: Technology Teams, Restaurant Activity, and Market risk only (no Code in this control). */
+/** Compare strip: Technology Teams, Restaurant Activity, and Deployment Risk only (no Code in this control). */
 const RUNWAY_LENS_MODE_IDS: readonly ViewModeId[] = ['combined', 'in_store', 'market_risk'];
 
 const TECH_WORKLOAD_OPTIONS: { value: TechWorkloadScope; label: string; title: string }[] = [

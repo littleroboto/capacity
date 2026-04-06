@@ -12,3 +12,4 @@ coverage
 .vite
 pnpm-lock.yaml
 .vercel
+src/lib/buildMeta.generated.ts

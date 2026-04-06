@@ -46,7 +46,7 @@ export function fullTradingMonthlyPatternFromPartial(
 }
 
 /**
- * Full Jan–Dec for `deployment_risk_context_month_curve`: missing months → **0** (additive Market risk only).
+ * Full Jan–Dec for `deployment_risk_context_month_curve`: missing months → **0** (additive Deployment Risk only).
  */
 export function fullDeploymentRiskContextMonthFromPartial(
   partial?: Partial<Record<TradingMonthKey, number>> | undefined

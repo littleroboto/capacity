@@ -192,7 +192,9 @@ export function SharedWorkspaceSection() {
   return (
     <div className="rounded-md border border-border/60 bg-muted/10 p-3">
       <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
-        One shared YAML for the team (Vercel Blob).
+        <span className="font-medium text-foreground/85">Team scenario</span> — one shared YAML on Vercel Blob (bundled
+        markets until the first successful save). Personal heatmap curves, filters, palette, and 3D are per browser — use{' '}
+        <span className="font-medium text-foreground/85">View on this device</span> below to export/import that state.
         {clerkOn ? (
           <>
             {' '}

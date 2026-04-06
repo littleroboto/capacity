@@ -54,9 +54,11 @@ The interface is a **dynamic visual of system pressure**. Colour and summaries e
 
 - **Restaurant Activity** — restaurant trading curve (**`store_pressure`**) as the heatmap; the planning blend still mixes tech and campaigns for banding.
 - **Technology Teams** — lab and Market IT **capacity headroom** (0–1 tile; headline excludes backend); cooler tiles mean more slack versus scheduled work.
-- **Market risk** — deployment/calendar fragility (**`deployment_risk_01`**) as the heatmap; banding still uses the full planning blend.
+- **Deployment Risk** — deployment/calendar fragility (**`deployment_risk_01`**) as the heatmap; banding still uses the full planning blend.
 
 The same **YAML-driven model** powers every market. Parameters are named and scaled **consistently** so you can **compare regions and countries** side by side without reconciling different spreadsheets or definitions.
+
+**Scenario vs this browser:** Multi-market YAML on **Vercel Blob** (or bundled files) is what the team shares. **Workspace → View on this device** stores personal heatmap and UI choices (curves, filters, palette, 3D runway, etc.) in local storage; use export/import JSON there if two machines should match — that is separate from **Save to cloud** for YAML.
 
 ---
 

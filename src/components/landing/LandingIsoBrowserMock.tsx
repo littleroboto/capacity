@@ -15,11 +15,7 @@ import {
   transformedHeatmapMetric,
   type HeatmapColorOpts,
 } from '@/lib/riskHeatmapColors';
-import {
-  heatmapCellMetric,
-  runwayHeatmapCellFillAndDim,
-  technologyRunwayTitleForWorkloadScope,
-} from '@/lib/runwayViewMetrics';
+import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
 import {
   computeSkylineBounds,
   isoCellTopLeft,
@@ -619,7 +615,7 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
 
         <div className="relative z-10 flex items-start gap-2 border-b border-white/[0.05] bg-[#0a0a0c] px-3 py-2.5 sm:px-4">
           <h3 className="font-landing text-sm font-semibold tracking-tight text-white sm:text-base">
-            {technologyRunwayTitleForWorkloadScope(LANDING_ISO_TECH_SCOPE)}: DE
+            Deployment risk profile: DE
           </h3>
           <MarketCircleFlag marketId="DE" size={20} className="ring-white/15" />
         </div>

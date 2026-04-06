@@ -33,11 +33,11 @@ function weekdayShortFromYmd(ymd: string): string {
 }
 
 /** Mirrors {@link RunwayGrid} `fillMetric*` helpers for `market_risk`. */
-const FILL_HEADLINE = 'Market risk';
+const FILL_HEADLINE = 'Deployment Risk';
 const FILL_LABEL =
-  'Market risk score (0–1): deployment and calendar fragility from holidays, Q4 month ramp, store intensity, campaigns, and optional deployment events in YAML.';
+  'Deployment risk score (0–1): deployment and calendar fragility from holidays, Q4 month ramp, store intensity, campaigns, and optional deployment events in YAML.';
 const FILL_LEAD_COMPACT =
-  'Market risk: deployment/calendar fragility in the model (0–1); hotter = more fragile, not a ban.';
+  'Deployment risk: deployment/calendar fragility in the model (0–1); hotter = more fragile, not a ban.';
 
 export const LandingCellDetailCardMock = memo(function LandingCellDetailCardMock() {
   const reducedMotion = useReducedMotion();
@@ -97,8 +97,12 @@ export const LandingCellDetailCardMock = memo(function LandingCellDetailCardMock
             Heatmap detail cards
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-            Click a cell in the workbench and you get this structured summary — planning blend, fill score, campaigns,
-            and expandable breakdowns. This preview uses a live payload from bundled Germany YAML ({DEMO_DATE}).
+            Each colour-coded runway cell opens a detail panel: drill one market or sweep a whole segment and you are
+            still exploring the same{' '}
+            <strong className="font-medium text-zinc-300">risk surfaces</strong>, in one place. The card spells out what
+            is happening on that day — trading rhythm, campaigns, resourcing pressure, and the rest — so you can see
+            how each layer feeds the <strong className="font-medium text-zinc-300">risk and capacity score</strong>.
+            This preview uses a live payload from bundled Germany YAML ({DEMO_DATE}).
           </p>
         </div>
 

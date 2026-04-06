@@ -275,7 +275,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
         viewBox={`0 0 ${adjVbW} ${adjVbH}`}
         width="100%"
         height="100%"
-        className="block h-full min-h-0 w-full flex-1 overflow-visible text-foreground"
+        className="block h-full min-h-0 w-full flex-1 overflow-visible text-foreground [shape-rendering:geometricPrecision]"
         preserveAspectRatio="xMidYMin meet"
         aria-label="Isometric pressure skyline"
       >

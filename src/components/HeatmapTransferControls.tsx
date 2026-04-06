@@ -95,7 +95,7 @@ export type HeatmapTransferControlsProps = {
 
 /**
  * Heatmap pressure → colour transfer: curve, γ, and high-end power (t^p).
- * One persisted triple for every lens (Technology Teams, Code, Restaurant Activity, Market risk); not per-market YAML.
+ * One persisted triple for every lens (Technology Teams, Code, Restaurant Activity, Deployment Risk); not per-market YAML.
  */
 export function HeatmapTransferControls({ className, idPrefix }: HeatmapTransferControlsProps) {
   const riskHeatmapGamma = useAtcStore((s) => s.riskHeatmapGamma);
@@ -154,7 +154,7 @@ export function HeatmapTransferControls({ className, idPrefix }: HeatmapTransfer
           <strong className="font-medium text-foreground/90">after</strong> the global pressure offset Δ (above) on every
           lens. <strong className="font-medium text-foreground/90">One global</strong> curve / γ / tail for every column —
           browser only, not YAML. γ stays aligned from the shared slider. High-end{' '}
-          <span className="font-mono text-foreground/80">p</span> applies to Technology Teams, Market risk, and Code;
+          <span className="font-mono text-foreground/80">p</span> applies to Technology Teams, Deployment Risk, and Code;
           Restaurant Activity keeps <span className="font-mono text-foreground/80">p = 1</span> on the runway.
         </p>
       </div>

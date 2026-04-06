@@ -48,7 +48,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           <DialogDescription className="text-pretty">
             Runway palette and campaign overlay.             Global heatmap (pressure offset, curve, γ, tail power) is the same here and under{' '}
             <strong className="font-medium text-foreground">Business Patterns</strong> for every lens and column.{' '}
-            <strong className="font-medium text-foreground">Market risk</strong> also has mix scalers in Business Patterns.
+            <strong className="font-medium text-foreground">Deployment Risk</strong> also has mix scalers in Business Patterns.
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">

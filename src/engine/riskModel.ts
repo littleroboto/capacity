@@ -43,9 +43,9 @@ export type RiskRow = CapacityRow & {
   store_pressure: number;
   campaign_risk: number;
   campaign_presence: number;
-  /** 0–1 blended planning signal (tech + store + campaign + holiday weights). Drives band / headroom; not the Market risk heatmap. */
+  /** 0–1 blended planning signal (tech + store + campaign + holiday weights). Drives band / headroom; not the Deployment Risk heatmap. */
   planning_blend_01: number;
-  /** 0–1 deployment / calendar fragility (Market risk lens). */
+  /** 0–1 deployment / calendar fragility (Deployment Risk lens). */
   deployment_risk_01: number;
   risk_band: string;
   /** True if public or school holiday (capacity scaling & optional combined-risk holiday term). */

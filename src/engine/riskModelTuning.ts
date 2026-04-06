@@ -18,7 +18,7 @@ export const HOLIDAY_CAPACITY_SCALE = 0.5;
 export const STORE_PRESSURE_MAX = 2.5;
 
 /**
- * Per-component multipliers for the **Market risk** heatmap only (`deployment_risk_01`).
+ * Per-component multipliers for the **Deployment Risk** heatmap only (`deployment_risk_01`).
  * Does not affect Restaurant Activity, Technology lens, or global campaign/store pipeline—only how those
  * signals are weighted inside the deployment-risk sum. Default **1** = engine base weights; raise/lower independently.
  */
@@ -56,7 +56,7 @@ export const DEFAULT_MARKET_RISK_SCALES: MarketRiskComponentScales = {
 };
 
 /**
- * High-level Market risk multipliers (default **1** = neutral). Each scales a small group inside the deployment-risk
+ * High-level Deployment Risk multipliers (default **1** = neutral). Each scales a small group inside the deployment-risk
  * sum on top of {@link MarketRiskComponentScales}. Use for the main UX; expert per-component sliders refine further.
  */
 export type MarketRiskMacros = {
@@ -141,9 +141,9 @@ export type RiskModelTuning = {
    * on each campaign row for relative programme size. 1 = YAML-only; 0 = mute campaign pressure from those channels.
    */
   campaignEffectUiMultiplier: number;
-  /** Independent scalers for Market risk deployment sum; see {@link MarketRiskComponentScales}. */
+  /** Independent scalers for Deployment Risk deployment sum; see {@link MarketRiskComponentScales}. */
   marketRiskScales: MarketRiskComponentScales;
-  /** Coarse Market risk shape knobs; see {@link MarketRiskMacros}. */
+  /** Coarse Deployment Risk shape knobs; see {@link MarketRiskMacros}. */
   marketRiskMacros: MarketRiskMacros;
 };
 
@@ -168,7 +168,7 @@ export const DEFAULT_RISK_TUNING: RiskModelTuning = {
 
 /**
  * Tuning passed into {@link runPipelineFromDsl}. Compare strips use the same persisted {@link RiskModelTuning} as
- * single-market views so campaign overlay, payday knots, and market-risk scalers stay globally consistent across columns.
+ * single-market views so campaign overlay, payday knots, and deployment-risk scalers stay globally consistent across columns.
  */
 export function riskTuningForPipelineView(
   tuning: RiskModelTuning,

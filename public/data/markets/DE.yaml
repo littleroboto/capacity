@@ -378,9 +378,9 @@ trading:
     peak_month: 12
     amplitude: 0.11
 
-# Market risk lens — dated events / blackouts below; optional deployment_risk_month_curve adds Jan–Dec lift.
+# Deployment Risk lens — dated events / blackouts below; optional deployment_risk_month_curve adds Jan–Dec lift.
 
-# Within-week trading + tech rhythm in Market risk (0–1; omit → engine default 0.2).
+# Within-week trading + tech rhythm in Deployment Risk (0–1; omit → engine default 0.2).
 deployment_risk_week_weight: 0.24
 
 # deployment_risk_month_curve omitted — engine applies a light Oct–Dec default; add a custom curve in YAML if needed.

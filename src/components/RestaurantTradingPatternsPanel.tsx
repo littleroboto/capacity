@@ -166,7 +166,7 @@ export function RestaurantTradingPatternsPanel() {
         <span className="font-medium text-foreground/85">YAML</span> blocks are saved for{' '}
         <span className="font-mono text-foreground/80">{focusMarket}</span> only.{' '}
         <span className="font-medium text-foreground/85">Global</span> sections: pressure offset (same Δ on every lens and
-        column), then heatmap curve, γ, and tail power — one persisted set; Market risk also exposes deployment-risk mix
+        column), then heatmap curve, γ, and tail power — one persisted set; Deployment Risk also exposes deployment-risk mix
         and expert scalers. Temperature / mono: gear → Settings.
         {isRunwayMultiMarketStrip(country) ? (
           <> Change runway focus to edit another strip market.</>
@@ -337,7 +337,7 @@ export function RestaurantTradingPatternsPanel() {
               Second <strong className="font-medium text-foreground/80">0–1 Jan–Dec</strong> curve,{' '}
               <strong className="font-medium text-foreground/80">added</strong> on top of{' '}
               <span className="font-mono text-foreground/80">deployment_risk_month_curve</span> for the{' '}
-              <strong className="font-medium text-foreground/80">Market risk</strong> heatmap only—e.g. local
+              <strong className="font-medium text-foreground/80">Deployment Risk</strong> heatmap only—e.g. local
               regulatory windows or operational fragility without rewriting the primary deployment month shape. Default{' '}
               <span className="font-mono text-foreground/80">0</span> = no effect; all zeros removes this block from YAML for{' '}
               <span className="font-mono text-foreground/80">{focusMarket}</span>.
@@ -385,7 +385,7 @@ export function RestaurantTradingPatternsPanel() {
           <p className="text-[11px] leading-snug text-muted-foreground">
             Order matches the engine. Δ shifts store-intensity input here; tail{' '}
             <span className="font-mono text-foreground/80">p</span> is 1× on this lens. Same Δ is shared with Technology and
-            Market risk.
+            Deployment Risk.
           </p>
           <HeatmapBusinessPressureOffsetControls idPrefix="patterns-instore" />
           <HeatmapTransferControls idPrefix="patterns-instore" className="border-t border-border/40 pt-3" />
@@ -396,7 +396,7 @@ export function RestaurantTradingPatternsPanel() {
         <>
           <div className="space-y-2 border-t border-border/50 pt-3">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Global market-risk mix — all columns
+              Global deployment-risk mix — all columns
             </span>
             <p className="text-[11px] leading-snug text-muted-foreground">
               Adjusts weights inside the deployment-risk sum for <strong className="font-medium text-foreground/80">every</strong>{' '}

@@ -178,7 +178,7 @@ Optional: **global** defaults in shared DSL blob; **per-market** overrides.
 2. **Campaign risk:** Include **`campaign_risk`** in deployment risk or keep campaigns **only** in blended `risk_score`?
 3. **Executive gating:** v1 ships **same app for all users**; **role-based** Risk is **Phase 3 auth** (see **`BACKLOG_EPICS.md`**).
 4. **Noise:** **`withOperationalNoise`**—exclude **`deployment_risk_01`** by default.
-5. **Naming:** User-facing label **“Market risk”** vs **“Deployment risk”** vs **“Calendar risk”**—align with steering committee language.
+5. **Naming:** User-facing label is **Deployment Risk** (internal id `market_risk`); aligns with deployment/calendar fragility framing.
 
 ---
 

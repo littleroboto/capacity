@@ -43,7 +43,7 @@ export function HeatmapBusinessPressureOffsetControls({ className, idPrefix }: H
           clamp, then <strong className="font-medium text-foreground/90">Heatmap transfer</strong> (curve, γ, tail).{' '}
           <span className="font-medium text-foreground/85">Technology / Code</span>: stress;{' '}
           <span className="font-medium text-foreground/85">Restaurant</span>: store intensity;{' '}
-          <span className="font-medium text-foreground/85">Market risk</span>:{' '}
+          <span className="font-medium text-foreground/85">Deployment Risk</span>:{' '}
           <span className="font-mono text-foreground/85">deployment_risk_01</span>. Not in YAML.
         </p>
       </div>

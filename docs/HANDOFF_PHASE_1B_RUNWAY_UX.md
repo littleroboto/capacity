@@ -60,12 +60,12 @@ Success looks like: *a new user can name what the active heatmap measures in one
 ### 2.4 Known string drift (examples — not exhaustive)
 
 - [`src/components/RunwayGrid.tsx`](../src/components/RunwayGrid.tsx) — local strings such as **“Trading pressure”**, **“Deployment risk”** for export / labels; must stay **consistent** with `VIEW_MODES` / chosen glossary.
-- Panels: [`HeatmapSettingsPanel.tsx`](../src/components/HeatmapSettingsPanel.tsx), [`DSLPanel.tsx`](../src/components/DSLPanel.tsx), [`RiskModelPanel.tsx`](../src/components/RiskModelPanel.tsx), [`RestaurantTradingPatternsPanel.tsx`](../src/components/RestaurantTradingPatternsPanel.tsx) — inline copy references **Technology Teams**, **Restaurant Activity**, **Market risk**, deployment context, etc.
+- Panels: [`HeatmapSettingsPanel.tsx`](../src/components/HeatmapSettingsPanel.tsx), [`DSLPanel.tsx`](../src/components/DSLPanel.tsx), [`RiskModelPanel.tsx`](../src/components/RiskModelPanel.tsx), [`RestaurantTradingPatternsPanel.tsx`](../src/components/RestaurantTradingPatternsPanel.tsx) — inline copy references **Technology Teams**, **Restaurant Activity**, **Deployment Risk**, deployment context, etc.
 
 **Discovery command (run during implementation):**
 
 ```bash
-rg -n "Technology Teams|Restaurant Activity|Market risk|Tech capacity|Trading pressure|Deployment / calendar|deployment risk|headroom|combined risk|planning blend" src docs README.md
+rg -n "Technology Teams|Restaurant Activity|Deployment Risk|Tech capacity|Trading pressure|Deployment / calendar|deployment risk|headroom|combined risk|planning blend" src docs README.md
 ```
 
 ---
@@ -88,7 +88,7 @@ Produce a **single table** (Notion / Figma / markdown in `docs/` — optional `d
 
 Resolve explicitly:
 
-- **“Market risk”** vs **“Deployment / calendar risk”** — pick **one customer-facing family** and use **subtitle** for nuance if needed.
+- Customer-facing lens label: **Deployment Risk** (`market_risk` id); subtitle/tooltips carry deployment / calendar nuance.
 - **Technology lens:** **headroom** vs **demand** — `PRODUCT_BASELINE` still mentions direction on colouring; **copy** must match what the **number in the cell** actually is today (verify in code before rewriting).
 
 ### 3.2 Deliverable: **Day-detail IA wireframe**

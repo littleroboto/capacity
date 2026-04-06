@@ -34,12 +34,18 @@ export function LandingMonacoYamlMock() {
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-violet-400/90">
           Configuration as code
         </p>
-        <h2 id="monaco-mock-heading" className="font-landing text-2xl font-semibold text-white">
-          Data driven
+        <h2
+          id="monaco-mock-heading"
+          className="font-landing text-balance text-2xl font-semibold leading-snug text-white sm:text-[1.65rem]"
+        >
+          Data Driven Globally Consistent Visualisations Made Easy
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          The same Monaco surface as the workbench — Capacity syntax theme, folding, minimap, and multi-market
-          tabs — with live sample data for Australia.
+          The same Monaco surface as the workbench — Capacity syntax theme, folding, minimap, and multi-market tabs —
+          here with live sample YAML for Australia. What you edit is the programme itself: resourcing and lab capacity,
+          campaign and test schedules, trading patterns, the cadence of the year, and public and school holidays,
+          expressed together in one place. The model folds those inputs into deployment risk scores and a forward view
+          of capacity usage — so pressure shows up on the runway while you can still steer.
         </p>
       </div>
 

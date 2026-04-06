@@ -1,13 +1,14 @@
 {
   "name": "capacity-atc",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "generate:markets": "node scripts/generate-market-manifest.mjs",
     "sync:market-holidays": "tsx scripts/sync-market-holiday-dates.ts",
-    "dev": "node scripts/generate-market-manifest.mjs && vite",
-    "prebuild": "node scripts/generate-market-manifest.mjs",
+    "dev": "node scripts/generate-market-manifest.mjs && node scripts/write-build-meta.mjs && vite",
+    "postinstall": "node scripts/write-build-meta.mjs",
+    "prebuild": "node scripts/generate-market-manifest.mjs && node scripts/write-build-meta.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },

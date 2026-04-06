@@ -222,10 +222,10 @@ export function LandingIsoControlsSidepanel() {
         'flex max-h-[min(52vh,420px)] flex-col overflow-hidden rounded-lg border border-white/[0.08] bg-[#0a0a0e]',
         'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]'
       )}
-      aria-label="Controls"
+      aria-label="Trading patterns"
     >
       <div className="flex shrink-0 items-center justify-between border-b border-white/[0.06] px-2.5 py-2">
-        <span className="font-landing text-xs font-semibold text-white">Controls</span>
+        <span className="font-landing text-xs font-semibold text-white">Trading patterns</span>
         <ChevronRight className="h-3.5 w-3.5 text-zinc-500" aria-hidden />
       </div>
 
@@ -241,7 +241,7 @@ export function LandingIsoControlsSidepanel() {
           <div
             className="flex items-center gap-1.5 rounded-md border border-white/20 bg-white/[0.06] px-2 py-1.5"
             role="status"
-            aria-label="Runway lens: Market risk (fixed for this preview)"
+            aria-label="Runway lens: Deployment Risk (fixed for this preview)"
           >
             <span
               className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full border border-white bg-white/15"
@@ -249,7 +249,7 @@ export function LandingIsoControlsSidepanel() {
             >
               <span className="h-1.5 w-1.5 rounded-full bg-white opacity-100" />
             </span>
-            <span className="font-landing text-[9px] font-medium leading-tight text-zinc-200">Market risk</span>
+            <span className="font-landing text-[9px] font-medium leading-tight text-zinc-200">Deployment Risk</span>
           </div>
         </div>
 

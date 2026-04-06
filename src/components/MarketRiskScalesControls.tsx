@@ -43,8 +43,8 @@ export type MarketRiskScalesControlsProps = {
 };
 
 /**
- * Per-component multipliers for the Market risk deployment sum (0–4×).
- * Shown in Business Patterns when the Market risk lens is active.
+ * Per-component multipliers for the Deployment Risk deployment sum (0–4×).
+ * Shown in Business Patterns when the Deployment Risk lens is active.
  */
 export function MarketRiskScalesControls({ className, compact }: MarketRiskScalesControlsProps) {
   const riskTuning = useAtcStore((s) => s.riskTuning);
@@ -55,7 +55,7 @@ export function MarketRiskScalesControls({ className, compact }: MarketRiskScale
       <div>
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           Fine-grained multipliers (0–4×).{' '}
-          <strong className="font-medium text-foreground/90">Market risk shape</strong> above scales groups; these split
+          <strong className="font-medium text-foreground/90">Deployment risk shape</strong> above scales groups; these split
           terms inside each group. Settings <span className="font-medium text-foreground/85">Campaign Boost</span> is
           separate (global store/campaign pipeline).
         </p>

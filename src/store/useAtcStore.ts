@@ -81,6 +81,7 @@ import {
   buildViewSettingsFile,
   parseViewSettingsFile,
   pickViewSettingsPayload,
+  sliceViewSettingsForPersist,
   type ViewSettingsExportScope,
   type ViewSettingsFileV1,
   type ViewSettingsPayloadKey,
@@ -221,7 +222,7 @@ type AtcState = {
   setTechWeeklyPattern: (pattern: TechWeeklyPatternPatch) => void;
   /** Writes explicit Jan–Dec `trading.monthly_pattern` (0–1) for the focused market and re-runs the pipeline. */
   setTradingMonthlyPattern: (pattern: TradingMonthlyPatternPatch) => void;
-  /** Writes Jan–Dec `deployment_risk_context_month_curve` (0–1, additive Market risk); all-zero removes the YAML block. */
+  /** Writes Jan–Dec `deployment_risk_context_month_curve` (0–1, additive Deployment Risk); all-zero removes the YAML block. */
   setDeploymentRiskContextMonthCurve: (pattern: DeploymentRiskContextMonthPatch) => void;
   /** Writes explicit Mon–Sun `trading.weekly_pattern` (0–1) for the focused market and re-runs the pipeline. */
   setTradingWeeklyPattern: (pattern: TradingWeeklyPatternPatch) => void;
@@ -289,7 +290,7 @@ export const useAtcStore = create<AtcState>()(
       runwayIncludeFollowingQuarter: false,
       heatmapRenderStyle: 'spectrum',
       heatmapMonoColor: DEFAULT_HEATMAP_MONO_COLOR,
-      heatmapSpectrumContinuous: false,
+      heatmapSpectrumContinuous: true,
       riskSurface: [],
       configs: [],
       parseError: null,
@@ -899,8 +900,8 @@ export const useAtcStore = create<AtcState>()(
     }),
     {
       name: STORAGE_KEYS.capacity_atc,
-      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. v4: tech workload scope. v5: DSL LLM assistant toybox toggle. v6: runway year/quarter filter. v7: runway + following quarter. v8: heatmap tail power. v9: business heatmap pressure offset. v10: market-risk-only heatmap transfer state. v11: unified global heatmap transfer (drop lens-specific keys). */
-      version: 11,
+      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. v4: tech workload scope. v5: DSL LLM assistant toybox toggle. v6: runway year/quarter filter. v7: runway + following quarter. v8: heatmap tail power. v9: business heatmap pressure offset. v10: market-risk-only heatmap transfer state. v11: unified global heatmap transfer (drop lens-specific keys). v12: default smooth spectrum ramp (continuous) for temperature heatmap. */
+      version: 12,
       migrate: (persistedState, fromVersion) => {
         let ps = { ...(persistedState ?? {}) } as Record<string, unknown>;
         if (fromVersion < 1) {
@@ -1042,6 +1043,12 @@ export const useAtcStore = create<AtcState>()(
           delete r.marketRiskHeatmapGamma;
           delete r.marketRiskHeatmapTailPower;
         }
+        if (fromVersion < 12) {
+          ps = {
+            ...ps,
+            heatmapSpectrumContinuous: true,
+          };
+        }
         return ps;
       },
       merge: (persisted, current) => {
@@ -1159,29 +1166,11 @@ export const useAtcStore = create<AtcState>()(
           riskHeatmapGammaBusiness,
         };
       },
-      partialize: (s) => ({
-        country: s.country,
-        viewMode: s.viewMode,
-        theme: s.theme,
-        riskTuning: s.riskTuning,
-        discoMode: s.discoMode,
-        runway3dHeatmap: s.runway3dHeatmap,
-        runwaySvgHeatmap: s.runwaySvgHeatmap,
-        heatmapRenderStyle: s.heatmapRenderStyle,
-        heatmapMonoColor: s.heatmapMonoColor,
-        heatmapSpectrumContinuous: s.heatmapSpectrumContinuous,
-        techWorkloadScope: s.techWorkloadScope,
-        dslLlmAssistantEnabled: s.dslLlmAssistantEnabled,
-        runwayFilterYear: s.runwayFilterYear,
-        runwayFilterQuarter: s.runwayFilterQuarter,
-        runwayIncludeFollowingQuarter: s.runwayIncludeFollowingQuarter,
-        riskHeatmapGamma: s.riskHeatmapGamma,
-        riskHeatmapGammaTech: s.riskHeatmapGammaTech,
-        riskHeatmapGammaBusiness: s.riskHeatmapGammaBusiness,
-        riskHeatmapCurve: s.riskHeatmapCurve,
-        riskHeatmapTailPower: s.riskHeatmapTailPower,
-        riskHeatmapBusinessPressureOffset: s.riskHeatmapBusinessPressureOffset,
-      }),
+      partialize: (s) =>
+        sliceViewSettingsForPersist(s as unknown as Record<ViewSettingsPayloadKey, unknown>) as Pick<
+          AtcState,
+          ViewSettingsPayloadKey
+        >,
     }
   )
 );
