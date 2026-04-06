@@ -46,6 +46,15 @@ Until someone saves once, the app uses bundled `public/data/markets/*.yaml`; the
 
 Omit both role env vars to keep **any signed-in user can PUT** (no org role filter).
 
+### Optional real-time collab (PartyKit + Yjs + Monaco)
+
+The **SPA and `/api/shared-dsl` deploy on Vercel** when you push Git. The **collab WebSocket server does not**: it is a separate **PartyKit** project (`party/collab.ts`, `pnpm party:deploy`). **`y-monaco`** is only an npm dependency bundled by Vite when collab is enabled.
+
+- **Agent / operator checklist** (env matrix, order of operations, what fails where): **[docs/HANDOFF_PARTYKIT_YJS_DEPLOY.md](docs/HANDOFF_PARTYKIT_YJS_DEPLOY.md)**  
+- **Product / ACL design:** [docs/superpowers/specs/2026-04-06-partykit-yjs-collaborative-dsl-design.md](docs/superpowers/specs/2026-04-06-partykit-yjs-collaborative-dsl-design.md)
+
+You need **`CLERK_SECRET_KEY` on PartyKit** (via `npx partykit env add …` + deploy) as well as on Vercel, and **`VITE_COLLAB_ENABLED` + `VITE_PARTYKIT_HOST`** set on Vercel **Production** with a **redeploy** so Vite embeds them.
+
 ---
 
 ## What you’re looking at

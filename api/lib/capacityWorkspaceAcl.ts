@@ -45,10 +45,6 @@ function parseSegList(raw: unknown): string[] {
     .filter(Boolean);
 }
 
-function normalizeOrgRoleToken(raw: string): string {
-  return raw.trim().toLowerCase().replace(/^org:/, '');
-}
-
 /**
  * Read cap_* claims from verified Clerk JWT payload (customize session token in Clerk).
  */

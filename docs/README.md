@@ -20,5 +20,6 @@ Start here after the [root README](../README.md) (run, deploy, Blob env vars).
 | [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md) | **Engineering handoff** — identity, protected `/api/shared-dsl`, roles; next step for enterprise-grade tenancy. |
 | [HANDOFF_EPIC_LANDING.md](./HANDOFF_EPIC_LANDING.md) | **Engineering handoff** — landing vs workbench routes, SEO, Clerk entry alignment (`epic-landing`). |
 | [HANDOFF_EPIC_MARKETS.md](./HANDOFF_EPIC_MARKETS.md) | **Engineering handoff** — segments, manifest, markets data model (`epic-markets`). |
+| [HANDOFF_PARTYKIT_YJS_DEPLOY.md](./HANDOFF_PARTYKIT_YJS_DEPLOY.md) | **PartyKit + Yjs + y-monaco** — two deploy targets (Vercel vs PartyKit), env matrix, CLI deploy, troubleshooting vs `/api/shared-dsl`. |
 
 Removed as obsolete (pre-rebaseline): stale-toast handoff, OWM/cal-heatmap implementation plan, one-off review prompt, dated ATC brief plan (superseded by current React/Visx app).
