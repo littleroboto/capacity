@@ -6,9 +6,9 @@
   "scripts": {
     "generate:markets": "node scripts/generate-market-manifest.mjs",
     "sync:market-holidays": "tsx scripts/sync-market-holiday-dates.ts",
-    "dev": "node scripts/generate-market-manifest.mjs && node scripts/write-build-meta.mjs && vite",
+    "dev": "node scripts/generate-market-manifest.mjs && node scripts/write-build-meta.mjs && node scripts/sync-api-workspace-acl.mjs && vite",
     "postinstall": "node scripts/write-build-meta.mjs",
-    "prebuild": "node scripts/generate-market-manifest.mjs && node scripts/write-build-meta.mjs",
+    "prebuild": "node scripts/generate-market-manifest.mjs && node scripts/write-build-meta.mjs && node scripts/sync-api-workspace-acl.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "party:dev": "partykit dev",

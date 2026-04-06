@@ -1,8 +1,3 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
-  "functions": {
-    "api/shared-dsl.ts": {
-      "includeFiles": "public/data/**"
-    }
-  }
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
