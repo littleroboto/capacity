@@ -379,7 +379,7 @@ export function LandingPage() {
       <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-5 pb-20 pt-6 sm:px-8 sm:pt-10">
         <header className="mb-16 flex flex-wrap items-center justify-between gap-4 sm:mb-20">
           <motion.div
-            className="min-w-0 max-w-[min(100%,18rem)] font-landing-wordmark text-balance text-base font-extrabold leading-snug tracking-[-0.02em] text-zinc-50 sm:max-w-none sm:text-xl"
+            className="min-w-0 max-w-[min(100%,18rem)] font-landing text-balance text-base font-extrabold leading-snug tracking-[-0.02em] text-zinc-50 sm:max-w-none sm:text-xl"
             initial={reducedMotion ? false : { opacity: 0, filter: 'blur(10px)', y: 5 }}
             animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
@@ -514,7 +514,7 @@ export function LandingPage() {
         </main>
 
         <footer className="mt-20 border-t border-white/[0.06] pt-8 text-center text-xs text-zinc-600 sm:text-left">
-          Communication surface for capacity — not a replacement for your planning systems.
+          Designed &amp; Engineered by Doug Booth, Segment Architecture
         </footer>
       </div>
     </div>
