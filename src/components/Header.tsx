@@ -68,7 +68,13 @@ export function Header() {
               >
                 <span className="font-medium text-foreground/70">v{APP_VERSION}</span>
                 <span className="text-muted-foreground/80"> · </span>
-                <span className="font-mono text-foreground/65">{GIT_COMMIT_SHORT}</span>
+                <span className="inline-flex items-center gap-0.5">
+                  <GitBranch
+                    className="h-2.5 w-2.5 shrink-0 text-muted-foreground/80"
+                    aria-hidden
+                  />
+                  <span className="font-mono text-foreground/65">{GIT_COMMIT_SHORT}</span>
+                </span>
               </span>
             </div>
 
