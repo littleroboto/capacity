@@ -15,14 +15,6 @@ export default {
           'Arial',
           'sans-serif',
         ],
-        'landing-wordmark': [
-          'Syne',
-          'Outfit',
-          'ui-sans-serif',
-          'system-ui',
-          'Segoe UI',
-          'sans-serif',
-        ],
       },
       colors: {
         border: 'hsl(var(--border))',
