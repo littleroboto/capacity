@@ -314,6 +314,8 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 
 **Goal:** **Multiple editors** in the same workspace without last-write-wins over HTTP Blob alone.
 
+**Repo status:** **MVP shipped in tree** — PartyKit server `party/collab.ts` (per-market rooms, Clerk JWT + `cap_*` ACL), client `src/lib/collab/*` + `DslEditorCore` `y-monaco` when `VITE_COLLAB_ENABLED=1` and `VITE_PARTYKIT_HOST` set. Deploy PartyKit (`pnpm party:deploy`), set `CLERK_SECRET_KEY` on the PartyKit project. Spec: [docs/superpowers/specs/2026-04-06-partykit-yjs-collaborative-dsl-design.md](./superpowers/specs/2026-04-06-partykit-yjs-collaborative-dsl-design.md).
+
 **Scope (indicative):**
 
 - PartyKit project, `y-partykit` server, deploy + env (`VITE_PARTYKIT_HOST`, room id strategy).

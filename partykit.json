@@ -1,0 +1,5 @@
+{
+  "name": "capacity-collab",
+  "main": "party/collab.ts",
+  "compatibilityDate": "2025-01-01"
+}

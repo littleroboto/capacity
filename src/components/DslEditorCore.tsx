@@ -1,6 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type BeforeMount, type Monaco, type OnMount } from '@monaco-editor/react';
+import type YPartyKitProvider from 'y-partykit/provider';
+import * as Y from 'yjs';
+import { MonacoBinding } from 'y-monaco';
 import {
   ALargeSmall,
   AlertCircle,
@@ -102,6 +105,12 @@ type DslEditorCoreProps = {
    * Code view market tabs: bind Monaco to one document; omit to use store `dslText` only.
    */
   marketTabDocument?: DslEditorMarketTabBinding | null;
+  /**
+   * When set, Monaco is driven by Yjs (`y-monaco`) instead of controlled React `value` / `onChange`.
+   */
+  collab?: { ytext: Y.Text; provider: YPartyKitProvider } | null;
+  /** Bumps Monaco `key` when collab sessions reconnect (see {@link useCollabSession}). */
+  collabRemountVersion?: number;
 };
 
 export function DslEditorCore({
@@ -114,6 +123,8 @@ export function DslEditorCore({
   showApplyButton = true,
   editorChrome = 'default',
   marketTabDocument = null,
+  collab = null,
+  collabRemountVersion = 0,
 }: DslEditorCoreProps) {
   const [fontSize, setFontSize] = useState(initialFontSize);
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on');
@@ -133,8 +144,14 @@ export function DslEditorCore({
   const tabOnChangeRef = useRef(marketTabDocument?.onTextChange);
   tabOnChangeRef.current = marketTabDocument?.onTextChange;
 
+  const collabActive = Boolean(collab?.ytext && collab?.provider);
+  const collabRef = useRef(collab);
+  collabRef.current = collab;
+  const monacoBindingRef = useRef<MonacoBinding | null>(null);
+
   const editorValue = marketTabDocument?.text ?? dslText;
   const handleEditorChange = useCallback((v: string | undefined) => {
+    if (collabRef.current?.ytext) return;
     const tabFn = tabOnChangeRef.current;
     if (tabFn) tabFn(v ?? '');
     else setDslText(v ?? '');
@@ -194,7 +211,15 @@ export function DslEditorCore({
       matchBrackets: 'always' as const,
       unicodeHighlight: { ambiguousCharacters: false, invisibleCharacters: false },
     }),
-    [fontSize, wordWrap, minimapEnabled, lineNumbers, studio, dslAssistantEditorLock, dslMutationLocked]
+    [
+      fontSize,
+      wordWrap,
+      minimapEnabled,
+      lineNumbers,
+      studio,
+      dslAssistantEditorLock,
+      dslMutationLocked,
+    ]
   );
 
   const isDark = theme === 'dark';
@@ -205,6 +230,13 @@ export function DslEditorCore({
     registerCapacityYamlThemes(monaco);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      monacoBindingRef.current?.destroy();
+      monacoBindingRef.current = null;
+    };
+  }, [collabActive, collab?.ytext, collab?.provider, collabRemountVersion]);
+
   const handleMount = useCallback<OnMount>((editor) => {
     const sync = () => {
       const p = editor.getPosition();
@@ -212,10 +244,25 @@ export function DslEditorCore({
     };
     sync();
     editor.onDidChangeCursorPosition(sync);
+
+    const c = collabRef.current;
+    if (c?.ytext && c.provider) {
+      const model = editor.getModel();
+      if (model) {
+        monacoBindingRef.current?.destroy();
+        monacoBindingRef.current = new MonacoBinding(
+          c.ytext,
+          model,
+          new Set([editor]),
+          c.provider.awareness
+        );
+      }
+    }
   }, []);
 
-  const lineCount = editorValue.split('\n').length;
-  const charCount = editorValue.length;
+  const displaySource = collabActive && collab ? collab.ytext.toString() : editorValue;
+  const lineCount = displaySource.split('\n').length;
+  const charCount = displaySource.length;
 
   return (
     <div className={cn('flex min-h-0 flex-1 flex-col gap-2', className)}>
@@ -376,12 +423,16 @@ export function DslEditorCore({
         ) : null}
         <div className="min-h-0 min-w-0 flex-1">
           <Editor
-            key={marketTabDocument ? `dsl-tab-${marketTabDocument.marketId}` : 'dsl-single'}
+            key={
+              marketTabDocument
+                ? `dsl-tab-${marketTabDocument.marketId}-c${collabRemountVersion}`
+                : `dsl-single-c${collabRemountVersion}`
+            }
             height="100%"
             defaultLanguage="yaml"
             theme={monacoTheme}
-            value={editorValue}
-            onChange={handleEditorChange}
+            value={collabActive ? undefined : editorValue}
+            onChange={collabActive ? undefined : handleEditorChange}
             options={editorOptions}
             beforeMount={handleBeforeMount as BeforeMount}
             onMount={handleMount}

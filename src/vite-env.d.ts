@@ -27,6 +27,12 @@ interface ImportMetaEnv {
    * Default: `admin`.
    */
   readonly VITE_CAPACITY_ORG_ADMIN_ROLES?: string;
+  /** When `1` or `true`, enable Yjs + PartyKit collab for the Code editor (requires Clerk + `VITE_PARTYKIT_HOST`). */
+  readonly VITE_COLLAB_ENABLED?: string;
+  /** PartyKit project host only, e.g. `localhost:1999` (dev) or `your-project.username.partykit.dev` (no scheme). */
+  readonly VITE_PARTYKIT_HOST?: string;
+  /** Workspace segment in PartyKit room ids when no Clerk org is active; default `default`. */
+  readonly VITE_COLLAB_WORKSPACE_KEY?: string;
 }
 
 declare module '*.yaml?raw' {

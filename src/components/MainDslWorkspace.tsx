@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { DslAssistantPanel } from '@/components/DslAssistantPanel';
 import { DslEditorCore } from '@/components/DslEditorCore';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
+import { useCollabSession } from '@/lib/collab/collabSessionContext';
 import { applyCodeTabDocumentEdit, getCodeTabDocumentText } from '@/lib/codeViewMarketTabs';
 import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { marketIdToCircleFlagCode } from '@/lib/marketCircleFlag';
@@ -47,6 +48,7 @@ export function MainDslWorkspace() {
   const showLlmAssistant = llmFromQuery || llmFromToybox;
   const country = useAtcStore((s) => s.country);
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
+  const collabCtx = useCollabSession();
   const dslText = useAtcStore((s) => s.dslText);
   const dslByMarket = useAtcStore((s) => s.dslByMarket);
   const showMarketTabs = runwayMarketOrder.length > 1;
@@ -85,6 +87,13 @@ export function MainDslWorkspace() {
       onTextChange: onMarketTabSliceChange,
     };
   }, [showMarketTabs, codeMarketTab, tabSliceText, onMarketTabSliceChange]);
+
+  const collabMarketId = showMarketTabs ? codeMarketTab : country;
+  const collabSession = collabCtx?.getSession(collabMarketId);
+  const collabBinding = collabSession
+    ? { ytext: collabSession.ytext, provider: collabSession.provider }
+    : null;
+  const collabRemountVersion = collabCtx?.version ?? 0;
 
   const [dockHeight, setDockHeight] = useState(readDockHeight);
   const [maxDockPx, setMaxDockPx] = useState(560);
@@ -224,6 +233,8 @@ export function MainDslWorkspace() {
             initialFontSize={16}
             editorChrome="studio"
             marketTabDocument={marketTabDocument}
+            collab={collabBinding}
+            collabRemountVersion={collabRemountVersion}
           />
         </div>
       ) : (
@@ -231,6 +242,8 @@ export function MainDslWorkspace() {
           className="min-h-[min(12rem,35dvh)] min-w-0 flex-1"
           initialFontSize={16}
           editorChrome="studio"
+          collab={collabBinding}
+          collabRemountVersion={collabRemountVersion}
         />
       )}
 
