@@ -1,9 +1,13 @@
 import { verifyToken } from '@clerk/backend';
+import { isClerkJwtEmailAllowed, parseAllowedEmailSet } from './allowedUserEmails';
 
 export type SharedDslPrincipal =
   | { kind: 'clerk'; userId: string; orgRoleNorm: string | null; jwtPayload: Record<string, unknown> }
   | { kind: 'legacy' }
-  | { kind: 'none' };
+  | { kind: 'none' }
+  | { kind: 'email_not_allowed' };
+
+const allowedUserEmails = parseAllowedEmailSet(process.env.CAPACITY_ALLOWED_USER_EMAILS);
 
 function normalizeClerkOrgRoleToken(raw: string): string {
   return raw.trim().toLowerCase().replace(/^org:/, '');
@@ -77,6 +81,9 @@ export async function authenticateSharedDslBearer(
       const payload = (await verifyToken(bearer, opts)) as Record<string, unknown>;
       const sub = typeof payload.sub === 'string' ? payload.sub : null;
       if (sub) {
+        if (!isClerkJwtEmailAllowed(payload, allowedUserEmails)) {
+          return { kind: 'email_not_allowed' };
+        }
         return {
           kind: 'clerk',
           userId: sub,

@@ -83,5 +83,33 @@ export function ProductionAuthHintBanner() {
     );
   }
 
+  if (pk.startsWith('pk_test_')) {
+    return (
+      <div
+        className="flex shrink-0 items-start gap-2 border-b border-amber-500/35 bg-amber-500/12 px-4 py-2 text-xs text-amber-950 dark:border-amber-400/25 dark:bg-amber-500/10 dark:text-amber-100"
+        role="status"
+      >
+        <p className="min-w-0 flex-1 leading-snug">
+          Clerk is in development mode (<code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">pk_test_…</code>
+          ). For production, use your Clerk production instance: set{' '}
+          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">VITE_CLERK_PUBLISHABLE_KEY</code> to{' '}
+          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">pk_live_…</code> and{' '}
+          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">CLERK_SECRET_KEY</code> to{' '}
+          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">sk_live_…</code> on Vercel, then redeploy. In the Clerk dashboard, turn off dev-only conveniences under your production app settings as needed.
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 shrink-0 p-0 text-amber-900 hover:bg-amber-500/20 dark:text-amber-50"
+          onClick={dismiss}
+          aria-label="Dismiss"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
+
   return null;
 }

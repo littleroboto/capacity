@@ -15,6 +15,8 @@ interface ImportMetaEnv {
   readonly VITE_SHARED_DSL?: string;
   /** Clerk publishable key — when set (and not disabled), the workbench requires sign-in. */
   readonly VITE_CLERK_PUBLISHABLE_KEY?: string;
+  /** Comma-separated emails allowed to use the workbench (must match server `CAPACITY_ALLOWED_USER_EMAILS`). */
+  readonly VITE_ALLOWED_USER_EMAILS?: string;
   /** When `1` or `true`, skip the Clerk sign-in gate even if `VITE_CLERK_PUBLISHABLE_KEY` is set. */
   readonly VITE_AUTH_DISABLED?: string;
   /**

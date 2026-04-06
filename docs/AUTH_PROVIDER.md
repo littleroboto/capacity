@@ -22,6 +22,17 @@
 | `CAPACITY_ORG_ADMIN_ROLES` / `VITE_CAPACITY_ORG_ADMIN_ROLES` | Server / Vite | Org roles treated as workspace admin |
 | `CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE` | Server | When `1` and Clerk is on, PUT rejects legacy shared secret |
 | `CAPACITY_SHARED_DSL_SECRET` | Server | Legacy write secret (reads never use this when Clerk protects GET) |
+| `VITE_ALLOWED_USER_EMAILS` / `CAPACITY_ALLOWED_USER_EMAILS` | Build / server / PartyKit | Optional comma-separated allowlist of **primary** sign-in emails. When unset, any signed-in Clerk user is allowed (subject to other rules). |
+
+**Clerk production vs development:** Use **`pk_live_…`** and **`sk_live_…`** from your Clerk **production** application in Vercel (not `pk_test_…`). The hosted build shows an amber banner while `pk_test_…` is baked in.
+
+**Email allowlist:** Set the same comma-separated addresses in **`VITE_ALLOWED_USER_EMAILS`** (client gate), **`CAPACITY_ALLOWED_USER_EMAILS`** (Vercel `/api/shared-dsl`), and **`CAPACITY_ALLOWED_USER_EMAILS`** on **PartyKit** if you use collab. The session JWT must include the user’s email, for example in Clerk → **Sessions** → **Customize session token** add to the JSON claims:
+
+```json
+"email": "{{user.primary_email_address}}"
+```
+
+Without that claim, the server cannot verify the allowlist and will return **403**.
 
 Details and migration notes: [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
 

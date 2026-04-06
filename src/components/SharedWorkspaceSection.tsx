@@ -73,6 +73,16 @@ export function SharedWorkspaceSection() {
       return;
     }
 
+    if (d.reason === 'forbidden') {
+      setRemoteOk(false);
+      setEtagPreview(null);
+      setCloudFeedback({
+        kind: 'err',
+        text: 'Cloud workspace returned 403 — your email may not be on the deployment allowlist, or the server JWT is missing the email claim. See “Connection check”.',
+      });
+      return;
+    }
+
     if (d.reason === 'html_spa_fallback' || d.reason === 'network') {
       setRemoteOk(false);
       setEtagPreview(null);

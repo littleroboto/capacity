@@ -249,6 +249,7 @@ export type FetchSharedDslResult = { yaml: string; etag: string };
 
 export type FetchSharedDslFailReason =
   | 'unauthorized'
+  | 'forbidden'
   | 'not_found'
   | 'server_error'
   | 'invalid_yaml'
@@ -318,6 +319,12 @@ export function describeSharedDslProbe(d: FetchSharedDslDetailed): string[] {
         );
       }
       break;
+    case 'forbidden':
+      lines.unshift(
+        'GET returned 403 — this account is not on the deployment email allowlist, or the session JWT does not include your email. Match VITE_ALLOWED_USER_EMAILS with CAPACITY_ALLOWED_USER_EMAILS on the server; in Clerk add `"email": "{{user.primary_email_address}}"` to the session token JSON.'
+      );
+      if (d.serverDetail) lines.push(d.serverDetail);
+      break;
     case 'not_found':
       lines.unshift('GET returned 404 — no Blob file yet (normal until someone saves once).');
       break;
@@ -360,6 +367,16 @@ export async function fetchSharedDslDetailed(): Promise<FetchSharedDslDetailed> 
     authSent = built.authSent;
     const res = await fetch(apiUrl(), { method: 'GET', cache: 'no-store', headers: built.headers });
     if (res.status === 401) return { ok: false, authSent, reason: 'unauthorized', httpStatus: 401 };
+    if (res.status === 403) {
+      const raw = await res.text();
+      return {
+        ok: false,
+        authSent,
+        reason: 'forbidden',
+        httpStatus: 403,
+        serverDetail: parseSharedDslErrorDetail(raw),
+      };
+    }
     if (res.status === 404) return { ok: false, authSent, reason: 'not_found', httpStatus: 404 };
     if (!res.ok) {
       const raw = await res.text();

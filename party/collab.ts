@@ -1,6 +1,7 @@
 import type * as Party from 'partykit/server';
 import { verifyToken } from '@clerk/backend';
 import { onConnect } from 'y-partykit';
+import { isClerkJwtEmailAllowed, parseAllowedEmailSet } from '../api/lib/allowedUserEmails';
 import { parseCollabRoomId } from './collabRoomId';
 import {
   extractOrgRoleNormFromVerifiedJwt,
@@ -8,6 +9,8 @@ import {
   parseCapacityAccessServer,
   parseOrgAdminRolesFromEnv,
 } from './parseCapacityAccessServer';
+
+const allowedUserEmails = parseAllowedEmailSet(process.env.CAPACITY_ALLOWED_USER_EMAILS);
 
 function authorizedParties(): string[] | undefined {
   const raw = process.env.CAPACITY_CLERK_AUTHORIZED_PARTIES?.trim();
@@ -43,6 +46,11 @@ export default class Collab implements Party.Server {
       payload = (await verifyToken(token, opts)) as Record<string, unknown>;
     } catch {
       conn.close(4401, 'invalid_token');
+      return;
+    }
+
+    if (!isClerkJwtEmailAllowed(payload, allowedUserEmails)) {
+      conn.close(4403, 'email_not_allowed');
       return;
     }
 

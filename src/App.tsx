@@ -209,6 +209,10 @@ export default function App() {
           setCloudLoadWarning(
             'The team cloud workspace did not authorize this session (HTTP 401). You are viewing bundled market YAML only. Check sign-in, Vercel CLERK_SECRET_KEY, and CAPACITY_CLERK_AUTHORIZED_PARTIES, then reload — or open Workspace below for a connection check.'
           );
+        } else if (detail.reason === 'forbidden' && !cancelled) {
+          setCloudLoadWarning(
+            'The team cloud workspace rejected this account (HTTP 403). You may not be on the deployment email allowlist, or the session JWT is missing your email claim. Check VITE_ALLOWED_USER_EMAILS / CAPACITY_ALLOWED_USER_EMAILS and Clerk session token customization — or open Workspace for a connection check.'
+          );
         }
       }
 

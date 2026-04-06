@@ -9,6 +9,7 @@
  * - `CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE` — when `1` and `CLERK_SECRET_KEY` is set, PUT rejects legacy shared secret (JWT only)
  * - `CAPACITY_CLERK_DSL_WRITE_ROLES` — optional comma list (e.g. `admin,member,editor`); JWT org role must match after normalizing; unset = any signed-in user may PUT
  * - `CAPACITY_ORG_ADMIN_ROLES` — comma list of Clerk org roles (normalized) that imply workspace admin (see `cap_*` claims in `api/lib/capacityWorkspaceAcl.ts`). Default: `admin`
+ * - `CAPACITY_ALLOWED_USER_EMAILS` — optional comma-separated emails; when set, only those users may use Clerk JWT for this API (JWT must include `email` — see `api/lib/allowedUserEmails.ts`). Match client `VITE_ALLOWED_USER_EMAILS`.
  *
  * Session token claims (optional; set in Clerk → Sessions → Customize session token). When absent, behaviour is unchanged (full workspace, edits if org role allows PUT):
  * - `cap_admin` — boolean; full markets + edit
@@ -122,6 +123,14 @@ async function authorizeRead(req: VercelRequest, res: VercelResponse): Promise<R
   if (!clerkSecretKeyConfigured()) return { ok: true, workspaceAccess: null };
   const bearer = bearerFromAuthorizationHeader(req.headers.authorization);
   const p = await authenticateSharedDslBearer(bearer, 'read');
+  if (p.kind === 'email_not_allowed') {
+    res.status(403).json({
+      error: 'forbidden',
+      message:
+        'This account is not on the deployment allowlist. Use an authorized email or ask for access. The JWT must include your email (Clerk → Sessions → Customize session token).',
+    });
+    return { ok: false };
+  }
   if (p.kind === 'clerk') {
     const workspaceAccess = parseCapacityWorkspaceAccess(p.jwtPayload, p.orgRoleNorm, orgAdminRoles());
     return { ok: true, workspaceAccess };
@@ -140,6 +149,14 @@ type WriteAuthResult =
 async function authorizeWrite(req: VercelRequest, res: VercelResponse): Promise<WriteAuthResult> {
   const bearer = bearerFromAuthorizationHeader(req.headers.authorization);
   const p = await authenticateSharedDslBearer(bearer, 'write');
+  if (p.kind === 'email_not_allowed') {
+    res.status(403).json({
+      error: 'forbidden',
+      message:
+        'This account is not on the deployment allowlist. Use an authorized email or ask for access. The JWT must include your email (Clerk → Sessions → Customize session token).',
+    });
+    return { ok: false };
+  }
   const full = fullWorkspaceAccess();
 
   if (clerkSecretKeyConfigured()) {
