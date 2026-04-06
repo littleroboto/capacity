@@ -5,6 +5,7 @@ import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 import { CollabLiveBadge } from '@/components/CollabLiveBadge';
 import { isCollabBuildEnabled, partykitHost } from '@/lib/collab/collabBuildFlags';
 import { useCollabSession } from '@/lib/collab/collabSessionContext';
+import { useCollabProviderStatus } from '@/lib/collab/useCollabProviderStatus';
 import { applyCodeTabDocumentEdit, getCodeTabDocumentText } from '@/lib/codeViewMarketTabs';
 import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { marketIdToCircleFlagCode } from '@/lib/marketCircleFlag';
@@ -108,6 +109,11 @@ export function MainDslWorkspace({
     : null;
   const collabRemountVersion = collabCtx?.version ?? 0;
   const showCollabChrome = isCollabBuildEnabled() && Boolean(partykitHost());
+  const collabLinkPhase = useCollabProviderStatus(collabSession?.provider);
+  const collabLiveEditorWrap =
+    showCollabChrome && collabSession && collabLinkPhase === 'synced'
+      ? 'shadow-[inset_0_2px_0_0_rgba(34,197,94,0.5)] ring-1 ring-emerald-500/20 dark:shadow-[inset_0_2px_0_0_rgba(52,211,153,0.35)] dark:ring-emerald-400/15'
+      : undefined;
 
   const [dockHeight, setDockHeight] = useState(readDockHeight);
   const [maxDockPx, setMaxDockPx] = useState(560);
@@ -277,6 +283,7 @@ export function MainDslWorkspace({
           </div>
           <DslEditorCore
             className={cn('min-w-0', editorShellClass)}
+            editorWrapClassName={collabLiveEditorWrap}
             initialFontSize={16}
             editorChrome="studio"
             marketTabDocument={marketTabDocument}
@@ -294,6 +301,7 @@ export function MainDslWorkspace({
           ) : null}
           <DslEditorCore
             className={cn('min-w-0', editorShellClass)}
+            editorWrapClassName={collabLiveEditorWrap}
             initialFontSize={16}
             editorChrome="studio"
             collab={collabBinding}

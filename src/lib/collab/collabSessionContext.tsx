@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useAuth, useOrganization } from '@clerk/react';
+import { useAuth, useOrganization, useUser } from '@clerk/react';
 import * as Y from 'yjs';
 import YPartyKitProvider from 'y-partykit/provider';
 import { useCapacityAccess } from '@/lib/capacityAccessContext';
@@ -55,6 +55,7 @@ function debounce<T extends (...args: never[]) => void>(fn: T, ms: number): T {
 export function ClerkCollabSessionRoot({ children }: { children: ReactNode }) {
   const access = useCapacityAccess();
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
   const { organization } = useOrganization();
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
   const [version, setVersion] = useState(0);
@@ -111,6 +112,15 @@ export function ClerkCollabSessionRoot({ children }: { children: ReactNode }) {
         },
       });
 
+      if (userLoaded) {
+        const awarenessName =
+          user?.firstName?.trim() ||
+          user?.username?.trim() ||
+          user?.primaryEmailAddress?.emailAddress?.split('@')[0]?.trim() ||
+          'Editor';
+        provider.awareness.setLocalStateField('capacity', { name: awarenessName });
+      }
+
       let seeded = false;
       const trySeed = () => {
         if (seeded) return;
@@ -162,7 +172,21 @@ export function ClerkCollabSessionRoot({ children }: { children: ReactNode }) {
       cleanupsRef.current = [];
       sessionsRef.current.clear();
     };
-  }, [collabOn, host, workspaceKey, isLoaded, isSignedIn, getToken, access, runwayMarketOrder.join()]);
+  }, [
+    collabOn,
+    host,
+    workspaceKey,
+    isLoaded,
+    isSignedIn,
+    getToken,
+    userLoaded,
+    user?.id,
+    user?.firstName,
+    user?.username,
+    user?.primaryEmailAddress?.emailAddress,
+    access,
+    runwayMarketOrder.join(),
+  ]);
 
   const getSession = useCallback((marketId: string) => sessionsRef.current.get(marketId), []);
 
