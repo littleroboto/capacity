@@ -3,8 +3,10 @@
  * Configure in Clerk Dashboard → Sessions → Customize session token, e.g.:
  *   "cap_admin": "{{user.public_metadata.capacity_admin}}",
  *   "cap_segs": "{{user.public_metadata.capacity_segments}}",
- *   "cap_ed": "{{user.public_metadata.capacity_editor}}"
- * (Use string for cap_segs, e.g. comma-separated "LIOM,IOM".)
+ *   "cap_ed": "{{user.public_metadata.capacity_editor}}",
+ *   "cap_mkts": "{{user.public_metadata.capacity_markets}}"
+ * Optional **cap_mkts** — comma-separated manifest market ids (e.g. "UK,IE"). Intersects with **cap_segs**
+ * when both are set; if only **cap_mkts** is set, allowance is those markets (viewer/editor still from cap_ed / admin).
  *
  * When no cap_* claims are present, behaviour matches pre-ACL deployments (full markets, edits allowed).
  */
@@ -88,14 +90,16 @@ export function parseCapacityAccess(
   const hasCapAdmin = Object.prototype.hasOwnProperty.call(c, 'cap_admin');
   const hasCapSegs = Object.prototype.hasOwnProperty.call(c, 'cap_segs');
   const hasCapEd = Object.prototype.hasOwnProperty.call(c, 'cap_ed');
+  const hasCapMkts = Object.prototype.hasOwnProperty.call(c, 'cap_mkts');
 
-  if (!hasCapAdmin && !hasCapSegs && !hasCapEd) {
+  if (!hasCapAdmin && !hasCapSegs && !hasCapEd && !hasCapMkts) {
     return { ...FULL_CAPACITY_ACCESS, legacyFullAccess: true };
   }
 
   const capAdmin = truthyClaim(c.cap_admin);
   const segs = parseSegList(c.cap_segs);
   const capEd = truthyClaim(c.cap_ed);
+  const capMkts = parseSegList(c.cap_mkts);
 
   const or = orgRole?.trim();
   const orgNorm = or ? normalizeOrgRoleToken(or) : '';
@@ -107,6 +111,20 @@ export function parseCapacityAccess(
   for (const seg of segs) {
     const ids = getSegmentMarkets(seg);
     if (ids) for (const id of ids) allowed.add(id);
+  }
+
+  if (capMkts.length > 0) {
+    const mset = new Set(capMkts);
+    if (allowed.size > 0) {
+      const narrowed = new Set<string>();
+      for (const id of allowed) {
+        if (mset.has(id)) narrowed.add(id);
+      }
+      allowed.clear();
+      for (const id of narrowed) allowed.add(id);
+    } else {
+      for (const id of capMkts) allowed.add(id);
+    }
   }
 
   const allowedMarketIds = [...allowed];

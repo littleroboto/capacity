@@ -30,7 +30,19 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 | | `epic-chat` | [In-app chat](#epic-chat--in-app-chat) |
 | **7 — Enterprise quality** | `epic-enterprise-readiness` | [Enterprise readiness — quality, access, trust](#epic-enterprise-readiness--enterprise-readiness--quality-access-and-trust-cross-cutting) |
 
-**Handoffs:** [HANDOFF_EPIC_MARKETS.md](./HANDOFF_EPIC_MARKETS.md) (`epic-markets`). [HANDOFF_EPIC_LANDING.md](./HANDOFF_EPIC_LANDING.md) (`epic-landing`). [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md) (`epic-auth-org`). Runway UX (naming + day-summary): [HANDOFF_PHASE_1B_RUNWAY_UX.md](./HANDOFF_PHASE_1B_RUNWAY_UX.md). Remaining runway UX notes: [HANDOFF_RUNWAY_UX_REMAINING.md](./HANDOFF_RUNWAY_UX_REMAINING.md).
+**Handoffs:** [HANDOFF_EPIC_MARKETS.md](./HANDOFF_EPIC_MARKETS.md) (`epic-markets`). [HANDOFF_EPIC_LANDING.md](./HANDOFF_EPIC_LANDING.md) (`epic-landing`). [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md) (`epic-auth-org`). Runway UX (naming + day-summary): [HANDOFF_PHASE_1B_RUNWAY_UX.md](./HANDOFF_PHASE_1B_RUNWAY_UX.md). Remaining runway UX notes (mostly addressed; see **Phase 1b snapshot** below): [HANDOFF_RUNWAY_UX_REMAINING.md](./HANDOFF_RUNWAY_UX_REMAINING.md).
+
+### Phase 1b — progress snapshot (Apr 2026)
+
+These epics are **largely shipped** in prod; treat scope bullets as **stretch / follow-ups** unless marked remaining in the epic body.
+
+| Epic id | Status |
+|---------|--------|
+| `epic-runway-lens-naming` | **Shipped** — `VIEW_MODES`, glossary, docs; `lensCopy.ts` for heatmap blend captions tied to the same source. |
+| `epic-heatmap-continuous-spectrum` | **Shipped** — smooth ramp + Settings toggle + legend gradient / ticks; mono and export semantics unchanged. |
+| `epic-day-summary-ia` | **Mostly shipped** — progressive disclosure + lead metric; repetitive tooltip copy reduced (shared footnote, shorter readiness line). Optional: compact surface **table** still backlog. |
+| `epic-iso-runway-polish` | **Mostly shipped** — themed empty/pad tokens, label halo, compare-all **market-strip seams**, SVG `geometricPrecision`, light-mode label tweak. Optional: HTML chronology band if breakpoints still misbehave. |
+| `epic-view-settings-presets` | **Shipped** — scenario vs device copy in Workspace; JSON export/import; **named on-device presets**; README / PRODUCT_BASELINE. Blob `ui_state` defaults still future. |
 
 **All epic ids (copy-paste):** `epic-markets`, `epic-landing`, `epic-shared-dsl-hardening`, `epic-runway-lens-naming`, `epic-heatmap-continuous-spectrum`, `epic-day-summary-ia`, `epic-iso-runway-polish`, `epic-view-settings-presets`, `epic-runway-autoplan`, `epic-corporate-calendar-risk`, `epic-auth-org`, `epic-market-acl`, `epic-partykit-yjs`, `epic-versioning`, `epic-comments`, `epic-chat`, `epic-enterprise-readiness`.
 
@@ -43,6 +55,8 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 ### epic-markets — Data model — segments, countries, and markets
 
 **Goal:** Let the product add **new runway segments** and **new countries/markets** without deep code changes each time.
+
+**Repo status:** Market inventory is **manifest-driven** (`scripts/generate-market-manifest.mjs`, `public/data/markets/*.yaml`, generated manifest consumed by the app). Formal “add a country” checklist and segment semantics remain in [HANDOFF_EPIC_MARKETS.md](./HANDOFF_EPIC_MARKETS.md).
 
 **Scope (indicative):**
 
@@ -64,6 +78,8 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 ### epic-landing — Landing page & first-run story
 
 **Goal:** A proper **marketing / entry** experience before the heavy app shell (or alongside it).
+
+**Repo status:** **Shipped baseline** — `BrowserRouter`: **`/`** = `LandingPage`, **`/app`** = workbench (`main.tsx`). Product story, mocks, and BOM-style sourcing on the landing page; workbench **header title links back to `/`**. SEO / OG polish can still deepen.
 
 **Scope (indicative):**
 
@@ -105,6 +121,8 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 
 **Goal:** **Control labels, runway headings, and tooltips** use the same vocabulary so execs and planners aren’t reconciling “Technology Teams” vs “tech headroom” or inconsistent deployment-risk naming.
 
+**Repo status:** **Shipped** — `VIEW_MODES` + `runwayHeatmapTitleForViewMode` in `constants.ts`; glossary and PRODUCT_BASELINE aligned; legacy ids via `normalizeViewModeId`. **`src/lib/lensCopy.ts`** keeps tooltip blend row captions derived from the same lens titles (reduces drift).
+
 **Scope (indicative):**
 
 - Align `VIEW_MODES` labels with `runwayHeatmapTitle` and glossary copy (`src/lib/constants.ts`, `runwayDayDetailsGlossary`, README / PRODUCT_BASELINE).
@@ -122,6 +140,8 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 ### epic-heatmap-continuous-spectrum — Heatmap — continuous spectrum (interpolated ramp)
 
 **Goal:** **Differentiate heavy-load days** beyond ten solid bands by interpolating colour along the existing anchor palette (same ten stops, smooth RGB lerp between neighbours).
+
+**Repo status:** **Shipped** — `heatmapColorContinuous` path, persisted **`heatmapSpectrumContinuous`**, Settings (Palette) toggle, **HeatmapLegend** gradient + reference ticks; discrete bands remain available; **mono** behaviour preserved.
 
 **Scope (indicative):**
 
@@ -141,6 +161,8 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 ### epic-day-summary-ia — Day summary & cell detail — information architecture
 
 **Goal:** Clicking a cell yields a **scannable** story: what the **tile colour means** for the active lens first; long KPI / blend copy is **secondary**, not one wall of text.
+
+**Repo status:** **Mostly shipped** — `RunwayDayDetailsBody` + glossary separate heatmap paint vs planning blend; progressive disclosure. **Apr 2026:** `runwayTooltipBreakdown` — shorter **pressure surface** lines + **one shared footnote** (`pressureSurfaceFootnote`); tighter **readiness / sustain** sentence. **Remaining (optional):** compact **Surface | scheduled | free** table instead of bullets.
 
 **Scope (indicative):**
 
@@ -162,6 +184,8 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 
 **Goal:** **Iso skyline / city block** feels as intentional in **light mode** as in dark mode; **month / quarter / year** labels don’t subtly drift with responsive SVG scaling.
 
+**Repo status:** **Mostly shipped** — CSS variables for **empty / pad** faces and **label stroke** (`index.css`, `RunwayIsoHeatCell`); ground chronology seams use theme `currentColor`. **Apr 2026:** **compare-all** faint **market-strip seams** on the ground plane (`RunwayIsoCityBlock`); root SVG **`shape-rendering: geometricPrecision`** (skyline + city block); slightly stronger **light-mode** label halo. **Remaining (optional):** HTML overlay or viewBox tweaks if label drift is still reported at specific breakpoints.
+
 **Scope (indicative):**
 
 - **Theme-aware empty / pad styling:** replace fixed `EMPTY_*` RGB in `RunwayIsoHeatCell` with tokens or CSS variables so light backgrounds don’t look like dark-mode leftovers; tune pad cells and strokes for contrast.
@@ -180,6 +204,8 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 ### epic-view-settings-presets — View settings vs scenario data — clarity & presets
 
 **Goal:** Users understand **what travels with the team** (YAML / Blob workspace) vs **what is personal** (browser persistence in `useAtcStore`), and can share **heatmap / filter preferences** without forking markets.
+
+**Repo status:** **Shipped** — In-app copy: **Team workspace** vs **View on this device** (`SharedWorkspaceSection`, `LocalDataSection`); **export / import JSON** (`viewSettingsPreset.ts`) with **`VIEW_SETTINGS_PAYLOAD_KEYS`** aligned to Zustand `partialize`; **named on-device presets** (`viewSettingsNamedPresets.ts`, save/apply/delete in Workspace). **README** + **PRODUCT_BASELINE** document scenario vs browser state. **Not shipped:** team-default **`ui_state`** in Blob / YAML sidecar (still later if product wants it).
 
 **Scope (indicative):**
 
@@ -244,6 +270,8 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 
 **Goal:** **Identity and tenancy** so shared workspaces, billing, and audit are sane later.
 
+**Repo status:** **Advanced POC** — **Clerk** sign-in (`SignInGate`, `VITE_AUTH_DISABLED` bypass); **GET/HEAD/PUT** verify session JWT when `CLERK_SECRET_KEY` is set; optional legacy write secret; **org write allow list** (`CAPACITY_CLERK_DSL_WRITE_ROLES` / `VITE_*`); **viewer vs editor** via `cap_*` session claims + org admin roles; **UserButton** / **OrganizationSwitcher** in shell. **Remaining:** per-org Blob paths, formal SSO/SCIM ops guides, optional `CAPACITY_AUTH_MODE`-style migration flag if you need an explicit legacy toggle beyond env presence. See [AUTH_PROVIDER.md](./AUTH_PROVIDER.md).
+
 **Scope (indicative):**
 
 - Provider choice (e.g. Clerk, Auth0) vs minimal custom JWT.
@@ -264,15 +292,17 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 
 **Goal:** **Enforceable** limits on which markets a user may **view, focus, and edit** in workspace YAML—e.g. **one market only**, **all markets in a segment** (e.g. IOM vs LIOM), or **full access** for admins—so restricted users cannot bypass the UI via the API.
 
+**Repo status:** **Mostly shipped** — Server **GET** returns YAML **filtered** to allowed markets; **PUT** **merges** partial multi-doc YAML for scoped editors (`api/lib/capacityWorkspaceAcl.ts`). Client **`useCapacityAccess`**, runway manifest order filtering, DSL mutation lock for viewers. Session claim **`cap_mkts`** (comma market ids) **narrows** **`cap_segs`** or stands alone. **Remaining:** Clerk ops doc for assigning metadata; **automated** role × market × PUT matrix tests; optional stricter “single market only” product rule on top of claims.
+
 **Scope (indicative):**
 
-- **Claims / metadata model** — extend or formalize session claims (see `src/lib/capacityAccess.ts`: e.g. `cap_admin`, `cap_segs`, `cap_ed`); add an explicit **market allow list** (or single market) for “local editor” personas if segments alone are insufficient.
+- **Claims / metadata model** — session claims `cap_admin`, `cap_segs`, `cap_ed`, **`cap_mkts`** (see [AUTH_PROVIDER.md](./AUTH_PROVIDER.md)); extend if product needs richer rules.
 - **Clerk (or provider)** — document how ops assign segment vs per-market access (user/org metadata + session token template).
 - **Client** — Monaco / runway / header: hide, disable, or read-only for disallowed markets; align with `filterManifestOrderForAccess` / `runwayFocusAllowed`.
-- **Server** — on **`/api/shared-dsl` PUT** (and optionally GET): parse multi-doc YAML, **reject or strip** documents whose `market` / `country` is outside the caller’s allowance; **org-scoped blob paths** when combined with `epic-auth-org` multi-tenancy.
-- **Tests / matrix** — roles × markets × PUT accept/reject.
+- **Server** — **`/api/shared-dsl`** filters GET YAML and merges scoped PUT bodies (implemented); **org-scoped blob paths** when combined with `epic-auth-org` multi-tenancy.
+- **Tests / matrix** — roles × markets × PUT accept/reject (automated coverage still backlog).
 
-**Dependencies:** **`epic-auth-org`** for verified JWT and (when shipped) org-scoped storage; client-side hooks exist today—**server enforcement** is the critical gap.
+**Dependencies:** **`epic-auth-org`** for verified JWT; **org-scoped storage paths** remain backlog. Server-side market ACL for shared-dsl **ships** with claim parsing in `api/lib/capacityWorkspaceAcl.ts`.
 
 **Outcomes:** Documented role matrix; no saving disallowed markets through the API; procurement-credible “who can edit what.”
 

@@ -13,6 +13,7 @@
  * Session token claims (optional; set in Clerk → Sessions → Customize session token). When absent, behaviour is unchanged (full workspace, edits if org role allows PUT):
  * - `cap_admin` — boolean; full markets + edit
  * - `cap_segs` — string e.g. `LIOM` or `LIOM,IOM` (segment codes from `segments.json`)
+ * - `cap_mkts` — optional comma-separated manifest market ids; intersects with `cap_segs` when both set
  * - `cap_ed` — boolean; when true with segment scope, user may edit YAML for allowed markets only (PUT merges into full blob)
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';

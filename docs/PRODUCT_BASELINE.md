@@ -44,7 +44,7 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 
 ## Not in this baseline (planned / backlog)
 
-- **Deeper tenancy** (per-org Blob paths, Postgres revision history, PartyKit) — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) (`epic-auth-org`, `epic-partykit-yjs`, `epic-versioning`). Clerk + segment-scoped YAML merge on the API is partially shipped; baseline doc above reflects current behaviour.
+- **Deeper tenancy** (per-org Blob paths, Postgres revision history, PartyKit) — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) (`epic-auth-org`, `epic-partykit-yjs`, `epic-versioning`). Clerk + scoped workspace ACL on `/api/shared-dsl` (segments, optional **`cap_mkts`**, GET filter / PUT merge) ships; per-org storage paths remain backlog. [AUTH_PROVIDER.md](./AUTH_PROVIDER.md) summarizes claims and env vars.
 - Real-time collab (Yjs / PartyKit); version history DB; comments/chat — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md).
 - **Runway auto-plan** (slot finder, ghost overlays, 3D viz) — backlog **Phase 2**; intended to build on runway lenses once shipped.
 
@@ -53,6 +53,7 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 | Area | Location |
 |------|----------|
 | Shared Blob API | `api/shared-dsl.ts` |
+| Clerk + session claims (`cap_*`) | [AUTH_PROVIDER.md](./AUTH_PROVIDER.md), `api/lib/capacityWorkspaceAcl.ts`, `src/lib/capacityAccess.ts` |
 | Client sync (save / pull / autosave) | `src/lib/sharedDslSync.ts` |
 | Workspace UI | `src/components/SharedWorkspaceSection.tsx` |
 | Cloud save conflict banner (409) | `src/components/SharedDslConflictBanner.tsx` |

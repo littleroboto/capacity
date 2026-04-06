@@ -94,8 +94,9 @@ export function parseCapacityWorkspaceAccess(
   const hasCapAdmin = Object.prototype.hasOwnProperty.call(c, 'cap_admin');
   const hasCapSegs = Object.prototype.hasOwnProperty.call(c, 'cap_segs');
   const hasCapEd = Object.prototype.hasOwnProperty.call(c, 'cap_ed');
+  const hasCapMkts = Object.prototype.hasOwnProperty.call(c, 'cap_mkts');
 
-  if (!hasCapAdmin && !hasCapSegs && !hasCapEd) {
+  if (!hasCapAdmin && !hasCapSegs && !hasCapEd && !hasCapMkts) {
     return {
       legacyFullAccess: true,
       admin: true,
@@ -108,6 +109,9 @@ export function parseCapacityWorkspaceAccess(
   const capAdmin = truthyClaim(c.cap_admin);
   const segs = parseSegList(c.cap_segs);
   const capEd = truthyClaim(c.cap_ed);
+  const capMktsRaw = parseSegList(c.cap_mkts);
+  const manifestSet = new Set(WORKSPACE_MANIFEST_MARKET_ORDER);
+  const capMkts = capMktsRaw.filter((id) => manifestSet.has(id));
   const adminByOrg = Boolean(orgRoleNorm && orgAdminRoles.includes(orgRoleNorm));
 
   const admin = capAdmin || adminByOrg;
@@ -115,6 +119,20 @@ export function parseCapacityWorkspaceAccess(
   for (const seg of segs) {
     const ids = SEGMENT_TO_MARKETS[seg];
     if (ids) for (const id of ids) allowed.add(id);
+  }
+
+  if (capMkts.length > 0) {
+    const mset = new Set(capMkts);
+    if (allowed.size > 0) {
+      const narrowed = new Set<string>();
+      for (const id of allowed) {
+        if (mset.has(id)) narrowed.add(id);
+      }
+      allowed.clear();
+      for (const id of narrowed) allowed.add(id);
+    } else {
+      for (const id of capMkts) allowed.add(id);
+    }
   }
 
   return {

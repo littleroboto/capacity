@@ -146,13 +146,10 @@ export default function App() {
 
     (async () => {
       const order = await fetchRunwayMarketOrder();
-      let orderEffective =
+      const orderEffective =
         access.legacyFullAccess || access.admin
           ? order
           : filterManifestOrderForAccess(order, access);
-      if (!access.legacyFullAccess && !access.admin && orderEffective.length === 0) {
-        orderEffective = order;
-      }
       const dslByMarket: Record<string, string> = {};
       for (const id of orderEffective) {
         try {

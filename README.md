@@ -100,7 +100,11 @@ Output: `**dist/**`.
 
 ### Shared workspace (Vercel Blob; no redeploy for team YAML edits)
 
-The app stores **one team workspace** in [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) using **`access: private`** (works with Vercel’s default **private** Blob stores). `api/shared-dsl.ts` reads/writes with the token; **writes** need the shared secret. **`GET /api/shared-dsl` is still unauthenticated** (anyone with the app URL can read YAML until you add auth). Treat as **test / internal** until then (see **Versioning and visibility** below).
+The app stores **one team workspace** in [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) using **`access: private`** by default. The serverless handler **`api/shared-dsl.ts`** uses **`BLOB_READ_WRITE_TOKEN`** to read and write **`capacity-shared/workspace.yaml`**.
+
+**With Clerk (recommended for production):** set **`CLERK_SECRET_KEY`** on Vercel. Then **GET/HEAD** require a **Clerk session JWT** (the SPA sends it automatically after sign-in). **PUT** uses the same JWT; optional **`CAPACITY_CLERK_DSL_WRITE_ROLES`** / **`VITE_CLERK_DSL_WRITE_ROLES`** restrict which **org membership roles** may save. Scoped users can use session claims **`cap_segs`**, **`cap_mkts`**, **`cap_ed`**, **`cap_admin`** — see **[docs/AUTH_PROVIDER.md](docs/AUTH_PROVIDER.md)**. Set **`CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE=1`** to stop accepting the old shared secret for PUT.
+
+**Legacy / bootstrap:** **`CAPACITY_SHARED_DSL_SECRET`** can still authorize **PUT** when Clerk is off or during migration; it is **not** accepted for **GET** when **`CLERK_SECRET_KEY`** is set. The Workspace UI can still paste the secret for that legacy write path.
 
 #### Enable Blob on Vercel (step by step)
 
@@ -108,19 +112,18 @@ The app stores **one team workspace** in [Vercel Blob](https://vercel.com/docs/s
 2. Go to **Storage** → **Create** (or **Browse Marketplace**) → choose **Blob**.
 3. **Create** a Blob store and, when prompted, **connect it to this project** so Vercel can inject env vars.
 4. Open **Project → Settings → Environment Variables** and confirm **`BLOB_READ_WRITE_TOKEN`** exists for **Production** (and Preview if previews should use Blob). If the store was not linked, use the Blob store’s **Connect Project** flow, or add **`BLOB_READ_WRITE_TOKEN`** manually from the store (mark **Sensitive**).
-5. Add **`CAPACITY_SHARED_DSL_SECRET`**: a long random string (e.g. `openssl rand -hex 32`). Use **Production** / **Preview** as needed. **Sensitive.** Users paste this value once per browser session as the write key (must match exactly).
-6. **Turn on the feature in the built app:** add env var **`VITE_SHARED_DSL`** = **`1`** (Production, and Preview if you want it there). Only variables whose names start with **`VITE_`** are embedded into the **frontend** bundle at **build** time. So this is the switch that makes the browser actually call `/api/shared-dsl` instead of skipping cloud sync entirely. If you add or change **`VITE_*`** later, you must **redeploy** so Vite runs `build` again with the new value.
-7. **Redeploy** production (after steps 4–6) so: (a) the new build includes **`VITE_SHARED_DSL`**, and (b) the serverless function has **`BLOB_READ_WRITE_TOKEN`** and **`CAPACITY_SHARED_DSL_SECRET`**.
-8. In the app: **Workspace** → **Save secret & upload** or **Save to cloud now**; failed saves show a red message under the buttons (e.g. wrong secret → `unauthorized`).
+5. **Clerk (recommended):** add **`CLERK_SECRET_KEY`** (server) and **`VITE_CLERK_PUBLISHABLE_KEY`** (build). Optionally **`CAPACITY_CLERK_AUTHORIZED_PARTIES`** listing your production (and preview) origins. **Or legacy-only:** add **`CAPACITY_SHARED_DSL_SECRET`** — long random string (e.g. `openssl rand -hex 32`); users may paste it in Workspace for writes when not using Clerk for PUT.
+6. **Turn on the feature in the built app:** **`VITE_SHARED_DSL`** = **`1`** (Production, and Preview if you want it there). Redeploy after any **`VITE_*`** change so Vite embeds the new values.
+7. **Redeploy** so the serverless function picks up Blob + auth env vars.
 
-**Local:** `vercel link`, then `vercel env pull` (or copy vars into `.env.local`) and run `vercel dev`.
+**Local:** `vercel link`, then `vercel env pull` (or copy vars into `.env.local`) and run **`vercel dev`** — plain **`pnpm dev`** does not serve `/api/*`.
 
-**Troubleshooting — `Cannot use public access on a private store`:** Production is still running an **old** `api/shared-dsl.ts` (before `access: private`). **Redeploy** the latest commit (Git push, or Vercel → Deployments → **Redeploy** with “Use existing Build Cache” **unchecked** if needed). Optional env **`CAPACITY_BLOB_ACCESS`**: omit or `private` for private stores; use `public` only if the Blob store is public.
+**Troubleshooting — `Cannot use public access on a private store`:** Production may be running an **old** `api/shared-dsl.ts`. **Redeploy** the latest commit (optionally clear build cache). Optional **`CAPACITY_BLOB_ACCESS`**: omit or `private` for private stores; use `public` only if the Blob store is public.
 
 #### Versioning and visibility (later)
 
-- **POC today:** Blob **ETags** and **`ifMatch`** on `PUT` still reduce clobbering; there is **no** in-app “server has newer YAML” banner — use **Pull from cloud** in Workspace if another tab saved. **409** on save surfaces in Workspace (manual) or the browser console (auto-save).
-- **Next:** **Named snapshots** or audit trail → Postgres (or multiple blob paths). **Who can read/write** → auth (e.g. Clerk), server-only blob reads, tenant checks, **Deployment Protection** on previews.
+- **Today:** Blob **ETags** / **`ifMatch`** on **PUT**; **409** conflict banner; **Pull from cloud** in Workspace. **GET** is **not** world-readable when **`CLERK_SECRET_KEY`** protects the API.
+- **Next:** **Named snapshots** or audit trail → Postgres (or **per-org** blob paths). **Deployment Protection** on previews.
 
 Handler: `api/shared-dsl.ts`.
 
