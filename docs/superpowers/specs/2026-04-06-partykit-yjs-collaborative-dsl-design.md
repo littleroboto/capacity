@@ -112,15 +112,21 @@ flowchart LR
 
 1. User completes normal **GET /api/shared-dsl** (filtered) → populate **`dslText` / `dslByMarket`** as today.
 2. **Collab enabled** (feature flag + `VITE_PARTYKIT_HOST` + auth): for each **`marketId`** the user may edit (or view, if viewers join rooms — §7), **open** PartyKit connection + **`Y.Doc`** / provider for that market.
-3. **Initial content:** for each room, if server Y state is empty, **seed** `Y.Text` from the parsed document for that market from step 1 (same as `getCodeTabDocumentText` / `splitMultiDocYamlToMap` semantics). If server already has state, **client applies sync** and local Zustand must **follow** (see §5.3).
+3. **Initial content:** for each room, if server Y state is empty, **seed** `Y.Text` from the parsed document for that market from step 1 (same as `getCodeTabDocumentText` / `splitMultiDocYamlToMap` semantics). If server already has state, **client applies sync** and local Zustand must **follow** (see §5.4).
 
-### 5.2 Monaco binding
+### 5.2 What a session looks like (product)
+
+- **Solo:** The Code editor looks the same as without PartyKit; you are still on Yjs, just alone. A **Live** badge (and tooltip) in the Code toolbar shows PartyKit connection state when `VITE_COLLAB_ENABLED` + `VITE_PARTYKIT_HOST` are set and you have an editor session for that market.
+- **Two editors:** Open the **same org**, **same market tab** (same `marketId` room), both signed in with **edit** rights. Type in one browser; the other should update within a second or so. There is **no** separate “collab window” — it is still one Monaco buffer, now CRDT-backed.
+- **If the badge stays Offline / Connecting:** Check PartyKit deploy, `CLERK_SECRET_KEY` on PartyKit, browser devtools **Network → WS**, and that production uses **`wss`** (local dev uses **`ws`**).
+
+### 5.3 Monaco binding
 
 - **Market tabs** (`MainDslWorkspace` + `DslEditorCore`): active tab for market **M** binds Monaco to **`Y.Text` for room M** via **`y-monaco`** (or equivalent maintained binding).
 - **Single-doc layout** (one country, no tabs): same idea — one room for that market’s id.
 - **Read-only** when `dslMutationLocked` / assistant lock — disable edits but optional **view sync** (§7).
 
-### 5.3 Zustand as derived state
+### 5.4 Zustand as derived state
 
 Epic calls for a **single writer** from the collab buffer into app state:
 
@@ -128,7 +134,7 @@ Epic calls for a **single writer** from the collab buffer into app state:
   **`setState`** → update **`dslByMarket[M]`** and recompute **`dslText`** via existing **`mergeMarketsToMultiDocYaml`** / manifest order (same paths as [`codeViewMarketTabs.ts`](../../src/lib/codeViewMarketTabs.ts)).
 - **Avoid** dual sources: while collab is active for market **M**, **do not** also write **M** from raw Monaco `onChange` into Zustand without going through Yjs — the binding should be **Yjs ↔ Monaco** and **Yjs → Zustand**.
 
-### 5.4 Staleness for non-synced markets
+### 5.5 Staleness for non-synced markets
 
 A market-scoped user only has rooms for their markets. Other markets’ slices in their local store come from **last GET** and **do not** receive realtime updates — consistent with **no read access**. Runway already **filters** manifest/order by access.
 

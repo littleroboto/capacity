@@ -32,6 +32,8 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 
 **Handoffs:** [HANDOFF_EPIC_MARKETS.md](./HANDOFF_EPIC_MARKETS.md) (`epic-markets`). [HANDOFF_EPIC_LANDING.md](./HANDOFF_EPIC_LANDING.md) (`epic-landing`). [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md) (`epic-auth-org`). Runway UX (naming + day-summary): [HANDOFF_PHASE_1B_RUNWAY_UX.md](./HANDOFF_PHASE_1B_RUNWAY_UX.md). Remaining runway UX notes (mostly addressed; see **Phase 1b snapshot** below): [HANDOFF_RUNWAY_UX_REMAINING.md](./HANDOFF_RUNWAY_UX_REMAINING.md).
 
+**Shelved (backlog):** **`epic-dsl-llm-assistant`** — OpenAI YAML coding assistant under Code view (former header Toybox toggle + `?llm` URL). **Header entry points removed** (Apr 2026) until a rebuild. Residual code: `useAtcStore.dslLlmAssistantEnabled`, `DslAssistantPanel`, `MainDslWorkspace` (`?llm` query can still open the dock for local dev).
+
 ### Phase 1b — progress snapshot (Apr 2026)
 
 These epics are **largely shipped** in prod; treat scope bullets as **stretch / follow-ups** unless marked remaining in the epic body.
@@ -44,7 +46,7 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 | `epic-iso-runway-polish` | **Mostly shipped** — themed empty/pad tokens, label halo, compare-all **market-strip seams**, SVG `geometricPrecision`, light-mode label tweak. Optional: HTML chronology band if breakpoints still misbehave. |
 | `epic-view-settings-presets` | **Shipped** — scenario vs device copy in Workspace; JSON export/import; **named on-device presets**; README / PRODUCT_BASELINE. Blob `ui_state` defaults still future. |
 
-**All epic ids (copy-paste):** `epic-markets`, `epic-landing`, `epic-shared-dsl-hardening`, `epic-runway-lens-naming`, `epic-heatmap-continuous-spectrum`, `epic-day-summary-ia`, `epic-iso-runway-polish`, `epic-view-settings-presets`, `epic-runway-autoplan`, `epic-corporate-calendar-risk`, `epic-auth-org`, `epic-market-acl`, `epic-partykit-yjs`, `epic-versioning`, `epic-comments`, `epic-chat`, `epic-enterprise-readiness`.
+**All epic ids (copy-paste):** `epic-markets`, `epic-landing`, `epic-shared-dsl-hardening`, `epic-runway-lens-naming`, `epic-heatmap-continuous-spectrum`, `epic-day-summary-ia`, `epic-iso-runway-polish`, `epic-view-settings-presets`, `epic-runway-autoplan`, `epic-corporate-calendar-risk`, `epic-auth-org`, `epic-market-acl`, `epic-partykit-yjs`, `epic-versioning`, `epic-comments`, `epic-chat`, `epic-enterprise-readiness`, `epic-dsl-llm-assistant` (shelved).
 
 ---
 

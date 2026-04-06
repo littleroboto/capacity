@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { DslAssistantPanel } from '@/components/DslAssistantPanel';
 import { DslEditorCore } from '@/components/DslEditorCore';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
+import { CollabLiveBadge } from '@/components/CollabLiveBadge';
+import { isCollabBuildEnabled, partykitHost } from '@/lib/collab/collabBuildFlags';
 import { useCollabSession } from '@/lib/collab/collabSessionContext';
 import { applyCodeTabDocumentEdit, getCodeTabDocumentText } from '@/lib/codeViewMarketTabs';
 import { isRunwayMultiMarketStrip } from '@/lib/markets';
@@ -105,6 +107,7 @@ export function MainDslWorkspace({
     ? { ytext: collabSession.ytext, provider: collabSession.provider }
     : null;
   const collabRemountVersion = collabCtx?.version ?? 0;
+  const showCollabChrome = isCollabBuildEnabled() && Boolean(partykitHost());
 
   const [dockHeight, setDockHeight] = useState(readDockHeight);
   const [maxDockPx, setMaxDockPx] = useState(560);
@@ -227,7 +230,8 @@ export function MainDslWorkspace({
           role="tablist"
           aria-label="Market YAML documents"
         >
-          <div className="flex min-h-8 shrink-0 gap-0.5 overflow-x-auto pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-h-8 shrink-0 items-end justify-between gap-2 pb-1.5">
+            <div className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {runwayMarketOrder.map((id) => {
               const selected = id === codeMarketTab;
               const label = id.slice(0, 2).toUpperCase();
@@ -262,6 +266,14 @@ export function MainDslWorkspace({
                 </button>
               );
             })}
+            </div>
+            {showCollabChrome && collabSession ? (
+              <CollabLiveBadge
+                className="shrink-0"
+                provider={collabSession.provider}
+                marketId={collabMarketId}
+              />
+            ) : null}
           </div>
           <DslEditorCore
             className={cn('min-w-0', editorShellClass)}
@@ -274,14 +286,21 @@ export function MainDslWorkspace({
           />
         </div>
       ) : (
-        <DslEditorCore
-          className={cn('min-w-0', editorShellClass)}
-          initialFontSize={16}
-          editorChrome="studio"
-          collab={collabBinding}
-          collabRemountVersion={collabRemountVersion}
-          fillVerticalSpace={fillViewport}
-        />
+        <>
+          {showCollabChrome && collabSession ? (
+            <div className="flex shrink-0 justify-end px-1 pb-1">
+              <CollabLiveBadge provider={collabSession.provider} marketId={collabMarketId} />
+            </div>
+          ) : null}
+          <DslEditorCore
+            className={cn('min-w-0', editorShellClass)}
+            initialFontSize={16}
+            editorChrome="studio"
+            collab={collabBinding}
+            collabRemountVersion={collabRemountVersion}
+            fillVerticalSpace={fillViewport}
+          />
+        </>
       )}
 
       {showLlmAssistant ? (

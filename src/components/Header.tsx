@@ -7,7 +7,7 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAtcStore } from '@/store/useAtcStore';
 import { Button } from '@/components/ui/button';
-import { Atom, Bot, ChevronDown, ChevronUp, GitBranch, Moon, Sparkles, Sun } from 'lucide-react';
+import { Atom, ChevronDown, ChevronUp, GitBranch, Moon, Sparkles, Sun } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 
 export function Header() {
@@ -15,17 +15,12 @@ export function Header() {
   const setTheme = useAtcStore((s) => s.setTheme);
   const discoModePref = useAtcStore((s) => s.discoMode);
   const setDiscoMode = useAtcStore((s) => s.setDiscoMode);
-  const viewMode = useAtcStore((s) => s.viewMode);
-  const dslLlmAssistantEnabled = useAtcStore((s) => s.dslLlmAssistantEnabled);
-  const setDslLlmAssistantEnabled = useAtcStore((s) => s.setDslLlmAssistantEnabled);
   const reduceMotion = useReducedMotion();
   const isDark = theme === 'dark';
-  /** Toybox: disco (dark theme) and LLM assist (code view). Runway SVG toggle lives on the Runway card toolbar (3D runway is off for now). */
-  const showToybox = isDark || viewMode === 'code';
+  /** Toybox: disco twinkle (dark theme only). LLM YAML assistant UI removed for now — see BACKLOG_EPICS.md. */
+  const showToybox = isDark;
 
   const swDisco = toyboxSwitchClasses(discoModePref);
-  const swLlm = toyboxSwitchClasses(dslLlmAssistantEnabled);
-  const swLlmSm = toyboxSwitchClasses(dslLlmAssistantEnabled, 'sm');
 
   const [compact, setCompact] = useState(readHeaderCompact);
 
@@ -107,35 +102,6 @@ export function Header() {
                     />
                   </button>
                 </div>
-                {viewMode === 'code' ? (
-                  <div
-                    className="flex shrink-0 items-center gap-1.5 border-l border-border/60 pl-2"
-                    title="LLM YAML assistant under Code view (Toybox, or add ?llm to URL)"
-                  >
-                    <Bot
-                      className={cn(
-                        'h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-90',
-                        dslLlmAssistantEnabled && 'text-primary'
-                      )}
-                      aria-hidden
-                    />
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={dslLlmAssistantEnabled}
-                      data-state={dslLlmAssistantEnabled ? 'on' : 'off'}
-                      aria-label={
-                        dslLlmAssistantEnabled
-                          ? 'Turn off LLM YAML assistant'
-                          : 'Turn on LLM YAML assistant'
-                      }
-                      onClick={() => setDslLlmAssistantEnabled(!dslLlmAssistantEnabled)}
-                      className={swLlmSm.track}
-                    >
-                      <span className={swLlmSm.thumb} />
-                    </button>
-                  </div>
-                ) : null}
               </div>
 
               <HeaderClerkOrgSwitcher compact />
@@ -150,7 +116,7 @@ export function Header() {
                 aria-expanded={false}
                 aria-controls="header-expanded-panel"
                 aria-label="Expand header details"
-                title="Show full header (theme + optional toybox)"
+                title="Show full header (theme + toybox when dark)"
               >
                 <ChevronDown className="h-4 w-4" aria-hidden />
               </Button>
@@ -286,40 +252,6 @@ export function Header() {
                             Disco twinkle is off while reduced motion is on.
                           </p>
                         ) : null}
-                      </div>
-                    ) : null}
-                    {viewMode === 'code' ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                          LLM assist
-                        </span>
-                        <div
-                          className="flex h-9 flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground"
-                          title="OpenAI-powered assistant dock below the Code editor. You can also add ?llm to the URL."
-                        >
-                          <Bot
-                            className={cn(
-                              'h-4 w-4 shrink-0 opacity-90',
-                              dslLlmAssistantEnabled && 'text-primary'
-                            )}
-                            aria-hidden
-                          />
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={dslLlmAssistantEnabled}
-                            data-state={dslLlmAssistantEnabled ? 'on' : 'off'}
-                            aria-label={
-                              dslLlmAssistantEnabled
-                                ? 'Turn off LLM YAML assistant'
-                                : 'Turn on LLM YAML assistant'
-                            }
-                            onClick={() => setDslLlmAssistantEnabled(!dslLlmAssistantEnabled)}
-                            className={swLlm.track}
-                          >
-                            <span className={swLlm.thumb} />
-                          </button>
-                        </div>
                       </div>
                     ) : null}
                   </div>
