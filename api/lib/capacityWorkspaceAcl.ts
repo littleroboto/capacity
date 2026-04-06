@@ -1,37 +1,46 @@
 /**
- * Server-side workspace ACL for `/api/shared-dsl`. Keep segment + manifest lists aligned with:
- * - `public/data/segments.json`
- * - `public/data/markets/manifest.json`
+ * Server-side workspace ACL for `/api/shared-dsl`.
+ * Segment list and manifest order are read from repo JSON at module load (same sources as the SPA).
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { parseDslMarketId } from './dslMarketLine';
 
-/** @internal — duplicate of `public/data/segments.json` */
-export const SEGMENT_TO_MARKETS: Record<string, readonly string[]> = {
-  LIOM: ['AU', 'UK', 'DE', 'CA', 'FR', 'IT', 'ES', 'PL'],
-  IOM: ['CH', 'AT', 'NL', 'BE', 'PT', 'CZ', 'SK', 'SL', 'UA'],
-};
+function readProjectJson<T>(relativeFromRepoRoot: string): T {
+  const full = path.join(process.cwd(), relativeFromRepoRoot);
+  if (!existsSync(full)) {
+    throw new Error(`capacityWorkspaceAcl: missing ${full} (cwd=${process.cwd()})`);
+  }
+  return JSON.parse(readFileSync(full, 'utf8')) as T;
+}
 
-/** @internal — duplicate of `public/data/markets/manifest.json` → markets */
-export const WORKSPACE_MANIFEST_MARKET_ORDER: readonly string[] = [
-  'AT',
-  'AU',
-  'BE',
-  'CA',
-  'CH',
-  'CZ',
-  'DE',
-  'ES',
-  'FR',
-  'IT',
-  'NL',
-  'PL',
-  'PT',
-  'SK',
-  'SL',
-  'UA',
-  'UK',
-];
+function loadSegmentToMarkets(): Record<string, readonly string[]> {
+  const raw = readProjectJson<Record<string, unknown>>('public/data/segments.json');
+  const out: Record<string, readonly string[]> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const code = k.trim().toUpperCase();
+    if (!code) continue;
+    if (!Array.isArray(v)) continue;
+    out[code] = v.map((x) => String(x).trim().toUpperCase()).filter(Boolean);
+  }
+  return out;
+}
+
+function loadManifestMarketOrder(): readonly string[] {
+  const m = readProjectJson<{ markets?: unknown }>('public/data/markets/manifest.json');
+  const list = m.markets;
+  if (!Array.isArray(list)) {
+    throw new Error('capacityWorkspaceAcl: manifest.json missing "markets" array');
+  }
+  return list.map((x) => String(x).trim().toUpperCase()).filter(Boolean);
+}
+
+/** Segment code → ordered market ids (`public/data/segments.json`). */
+export const SEGMENT_TO_MARKETS: Record<string, readonly string[]> = loadSegmentToMarkets();
+
+/** Runway market order from generated manifest (`public/data/markets/manifest.json`). */
+export const WORKSPACE_MANIFEST_MARKET_ORDER: readonly string[] = loadManifestMarketOrder();
 
 const MULTI_DOC_SPLIT = /\r?\n---\s*\r?\n/;
 

@@ -6,10 +6,9 @@ import {
   RUNWAY_ALL_MARKETS_VALUE,
   RUNWAY_IOM_MARKETS_LABEL,
   RUNWAY_IOM_MARKETS_VALUE,
-  RUNWAY_IOM_SEGMENT_MARKET_IDS,
-  RUNWAY_LIOM_SEGMENT_MARKET_IDS,
   runwaySegmentMarketsOrdered,
 } from '@/lib/markets';
+import { getSegmentMarkets } from '@/lib/segmentsConfig';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -37,8 +36,8 @@ export function RunwayFocusSelect({ className }: { className?: string }) {
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
   const ids = runwayMarketOrder.length ? runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
 
-  const liomMarketsRaw = runwaySegmentMarketsOrdered(RUNWAY_LIOM_SEGMENT_MARKET_IDS, ids);
-  const iomMarketsRaw = runwaySegmentMarketsOrdered(RUNWAY_IOM_SEGMENT_MARKET_IDS, ids);
+  const liomMarketsRaw = runwaySegmentMarketsOrdered(getSegmentMarkets('LIOM') ?? [], ids);
+  const iomMarketsRaw = runwaySegmentMarketsOrdered(getSegmentMarkets('IOM') ?? [], ids);
   const liomMarkets =
     access.legacyFullAccess || access.admin
       ? liomMarketsRaw

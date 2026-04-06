@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
 import { ProductionAuthHintBanner } from '@/components/ProductionAuthHintBanner';
 import { SharedCloudLoadWarningBanner } from '@/components/SharedCloudLoadWarningBanner';
+import { SharedDslConflictBanner } from '@/components/SharedDslConflictBanner';
 import { DSLPanel } from '@/components/DSLPanel';
 import { WORKBENCH_SPLIT_HANDLE_PX, WorkbenchSplitHandle } from '@/components/WorkbenchSplitHandle';
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
@@ -129,6 +130,10 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    document.title = 'Segment Capacity Workbench';
+  }, []);
+
+  useEffect(() => {
     if (isRunwayMultiMarketStrip(country) && viewMode === 'code') {
       setViewMode('combined');
     }
@@ -215,6 +220,7 @@ export default function App() {
       {cloudLoadWarning ? (
         <SharedCloudLoadWarningBanner message={cloudLoadWarning} onDismiss={() => setCloudLoadWarning(null)} />
       ) : null}
+      <SharedDslConflictBanner />
       <Header />
       <main
         className={cn(

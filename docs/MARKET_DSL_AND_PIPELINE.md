@@ -2,7 +2,7 @@
 
 This document explains **how the system works** from YAML to the runway heatmap, with emphasis on **DSL features** and what each field *means* in the model.
 
-For planning-domain layering, pressure surfaces, and export shapes, see [PLANNING_ARCHITECTURE.md](./PLANNING_ARCHITECTURE.md). For LLM-assisted authoring, see [LLM_MARKET_DSL_PROMPT.md](./LLM_MARKET_DSL_PROMPT.md).
+For planning-domain layering, pressure surfaces, and export shapes, see [PLANNING_ARCHITECTURE.md](./PLANNING_ARCHITECTURE.md). For LLM-assisted authoring, see [LLM_MARKET_DSL_PROMPT.md](./LLM_MARKET_DSL_PROMPT.md). For shipping a new market file, manifest, and segments, see [ADD_A_MARKET_CHECKLIST.md](./ADD_A_MARKET_CHECKLIST.md).
 
 ---
 
@@ -166,7 +166,7 @@ Public holidays still set `holiday_flag` but use this block only when the day is
 
 After YAML-derived weekly, monthly, and **seasonal** trading, **`getStorePressureForDate`** (`src/engine/pipeline.ts`) applies **fixed engine behaviour** (not controllable in DSL today):
 
-- **`applyDecemberRestaurantSeasoning`** — All markets: modest extra lift **1–24 Dec**, **0** on **25 Dec**, then YAML level only for the rest of December (`src/engine/weighting.ts`).
+- **`applyDecemberRestaurantSeasoning`** — All markets: ramp **1–24 Dec**, then **25–31 Dec** keep peak-season lift plus a **floor** so the whole month reads consistently hot on the Restaurant Activity lens (`src/engine/weighting.ts`).
 - **`applyAustraliaPostChristmasSummerLift`** — **`market === 'AU'`** only: small extra lift **26–31 Dec** and through **January** (southern summer / holidays).
 
 Authors comparing markets should treat these as **shared platform seasoning**, not per-file DSL.

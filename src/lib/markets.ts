@@ -1,3 +1,5 @@
+import { getSegmentMarkets } from '@/lib/segmentsConfig';
+
 /**
  * Fallback when `public/data/markets/manifest.json` is missing or invalid.
  * Normal runtime order comes from the manifest (generated from `*.yaml` via `scripts/generate-market-manifest.mjs`).
@@ -35,40 +37,12 @@ export const RUNWAY_ALL_MARKETS_VALUE = '__ALL__' as const;
 export const RUNWAY_ALL_MARKETS_LABEL = 'LIOM' as const;
 
 /**
- * LIOM segment market ids (portfolio list). Keep aligned with `public/data/segments.json` → `LIOM`.
- * The LIOM compare strip (`__ALL__`) shows only these columns (intersected with the manifest).
- */
-export const RUNWAY_LIOM_SEGMENT_MARKET_IDS = [
-  'AU',
-  'UK',
-  'DE',
-  'CA',
-  'FR',
-  'IT',
-  'ES',
-  'PL',
-] as const;
-
-/**
  * Header country value: multi-column runway for the IOM segment only (subset of manifest order).
  * Not a real `country:` key in DSL.
  */
 export const RUNWAY_IOM_MARKETS_VALUE = '__IOM__' as const;
 
 export const RUNWAY_IOM_MARKETS_LABEL = 'IOM' as const;
-
-/** IOM segment market ids (display / compare order). */
-export const RUNWAY_IOM_SEGMENT_MARKET_IDS = [
-  'CH',
-  'AT',
-  'NL',
-  'BE',
-  'PT',
-  'CZ',
-  'SK',
-  'SL',
-  'UA',
-] as const;
 
 export function isRunwayAllMarkets(country: string): boolean {
   return country === RUNWAY_ALL_MARKETS_VALUE;
@@ -97,12 +71,14 @@ export function runwaySegmentMarketsOrdered(
  */
 export function runwayCompareMarketIds(country: string, orderedIds: readonly string[]): string[] {
   if (isRunwayAllMarkets(country)) {
+    const seg = getSegmentMarkets('LIOM') ?? [];
     const present = new Set(orderedIds.map((x) => x.toUpperCase()));
-    return [...RUNWAY_LIOM_SEGMENT_MARKET_IDS].filter((id) => present.has(id));
+    return [...seg].filter((id) => present.has(id.toUpperCase()));
   }
   if (isRunwayIomMarkets(country)) {
+    const seg = getSegmentMarkets('IOM') ?? [];
     const present = new Set(orderedIds.map((x) => x.toUpperCase()));
-    return [...RUNWAY_IOM_SEGMENT_MARKET_IDS].filter((id) => present.has(id));
+    return [...seg].filter((id) => present.has(id.toUpperCase()));
   }
   return [...orderedIds];
 }

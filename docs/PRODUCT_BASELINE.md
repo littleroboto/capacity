@@ -7,8 +7,8 @@ Single source of truth for **what this repo ships today**, so older docs (OWM, c
 - **React + TypeScript + Vite** SPA. Runway visualisation uses **Visx** (not cal-heatmap).
 - **Deployed on Vercel**: static client build + **serverless** routes under `api/` (today: shared workspace YAML only).
 - **Default data**: bundled per-market YAML under `public/data/markets/*.yaml`, driven by the generated manifest (`pnpm` / `npm` **prebuild** runs `scripts/generate-market-manifest.mjs`).
-- **Optional team workspace**: when **`VITE_SHARED_DSL=1`** at build time and Blob + secrets are set on Vercel, the app reads/writes **one** multi-document YAML via **`GET`/`PUT` `/api/shared-dsl`** ([Vercel Blob](https://vercel.com/docs/storage/vercel-blob)). Writes require the shared **`CAPACITY_SHARED_DSL_SECRET`** pasted once per browser session (POC — not multi-user auth).
-- **Optional Clerk sign-in**: when **`VITE_CLERK_PUBLISHABLE_KEY`** is set at build time and **`VITE_AUTH_DISABLED`** is not truthy, the SPA shows Clerk **sign-in before the workbench** ([`@clerk/react`](https://clerk.com/docs)). **Server routes are unchanged** — workspace YAML over HTTP is not yet tied to the session (see [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md)).
+- **Optional team workspace**: when **`VITE_SHARED_DSL=1`** at build time and Blob + secrets are set on Vercel, the app reads/writes **one** multi-document YAML via **`GET`/`PUT` `/api/shared-dsl`** ([Vercel Blob](https://vercel.com/docs/storage/vercel-blob)). With Clerk, **GET/HEAD require a session JWT** when **`CLERK_SECRET_KEY`** is set on the server; **PUT** accepts JWT (and optionally the legacy **`CAPACITY_SHARED_DSL_SECRET`** unless disabled). See `api/shared-dsl.ts` and [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
+- **Optional Clerk sign-in**: when **`VITE_CLERK_PUBLISHABLE_KEY`** is set at build time and **`VITE_AUTH_DISABLED`** is not truthy, the SPA shows Clerk **sign-in before the workbench** ([`@clerk/react`](https://clerk.com/docs)). The shared-dsl API can verify the same session when **`CLERK_SECRET_KEY`** is configured.
 
 ## Runway UI and lenses
 
@@ -36,14 +36,14 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 
 ## Shared workspace (POC scope)
 
-- **Optimistic locking** on the server: Blob **`ifMatch`** / ETag on `PUT` to reduce blind overwrites.
-- **No** in-app “newer copy on server” toast or multi-tab stale banner — multi-tab users rely on **Pull from cloud** in Workspace when they need to align.
-- **409 conflict**: manual save shows an error in Workspace; auto-save logs a **console warning** only.
+- **Optimistic locking** on the server: Blob **`ifMatch`** / ETag on `PUT` to reduce blind overwrites. Successful **`PUT`** returns **`etag`** and duplicate **`version`** (same opaque token) for clients that want a named “revision” field.
+- **No live multi-tab sync** — there is no realtime “someone else is editing” channel; align with **Pull from cloud** when needed.
+- **409 conflict**: if another client saves first, **Workspace → Save to cloud** shows an inline error; **auto-save** also raises a **dismissible amber banner** (`SharedDslConflictBanner`) with a link to open Workspace. After a successful **Pull from cloud** or successful save, the banner clears.
 - **View settings JSON** (Workspace dialog → **View on this device**): export/import heatmap transfer, γ, palette (including banded vs smooth spectrum), runway year/quarter filters, and risk-tuning sliders — **browser-only**, not a substitute for team YAML on the cloud (`src/lib/viewSettingsPreset.ts`).
 
 ## Not in this baseline (planned / backlog)
 
-- **Full** user/org model on the **API** (protected `GET`/`PUT` shared DSL, roles, SSO) — partial client gate only today; see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) and [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
+- **Deeper tenancy** (per-org Blob paths, Postgres revision history, PartyKit) — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) (`epic-auth-org`, `epic-partykit-yjs`, `epic-versioning`). Clerk + segment-scoped YAML merge on the API is partially shipped; baseline doc above reflects current behaviour.
 - Real-time collab (Yjs / PartyKit); version history DB; comments/chat — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md).
 - **Runway auto-plan** (slot finder, ghost overlays, 3D viz) — backlog **Phase 2**; intended to build on runway lenses once shipped.
 
@@ -54,6 +54,7 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 | Shared Blob API | `api/shared-dsl.ts` |
 | Client sync (save / pull / autosave) | `src/lib/sharedDslSync.ts` |
 | Workspace UI | `src/components/SharedWorkspaceSection.tsx` |
+| Cloud save conflict banner (409) | `src/components/SharedDslConflictBanner.tsx` |
 | Bootstrap load (Blob vs bundled) | `src/App.tsx` |
 | View mode labels / runway titles | `src/lib/constants.ts` |
 | Heatmap metric per lens | `src/lib/runwayViewMetrics.ts` |

@@ -237,7 +237,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ifMatch,
       });
       res.setHeader('Cache-Control', 'no-store');
-      res.status(200).json({ ok: true, etag: putResult.etag });
+      /** `version` duplicates `etag` — opaque optimistic-lock token for clients (no integer revision until DB-backed versioning). */
+      res.status(200).json({ ok: true, etag: putResult.etag, version: putResult.etag });
     } catch (e) {
       if (e instanceof BlobPreconditionFailedError) {
         res.status(409).json({ error: 'conflict', message: 'Another edit was saved first. Reload the latest workspace.' });

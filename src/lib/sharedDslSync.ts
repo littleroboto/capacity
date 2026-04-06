@@ -9,6 +9,32 @@ const SESSION_BEARER_KEY = 'capacity:shared-dsl-bearer';
 /** Fired when Clerk token getter or legacy bearer changes (workspace UI should re-check publish readiness). */
 export const SHARED_DSL_AUTH_CHANGED_EVENT = 'capacity:shared-dsl-auth-changed';
 
+/** Fired when PUT returns 409 (another client saved first). App may show a dismissible banner. */
+export const SHARED_DSL_SAVE_CONFLICT_EVENT = 'capacity:shared-dsl-save-conflict';
+
+/** Fired after a successful cloud save or pull so any conflict banner can hide. */
+export const SHARED_DSL_CONFLICT_CLEARED_EVENT = 'capacity:shared-dsl-conflict-cleared';
+
+function notifySharedDslSaveConflict(): void {
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(SHARED_DSL_SAVE_CONFLICT_EVENT));
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function notifySharedDslConflictCleared(): void {
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(SHARED_DSL_CONFLICT_CLEARED_EVENT));
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 let clerkTokenGetter: (() => Promise<string | null>) | null = null;
 /** When false, Clerk session is present but org role is not allowed to PUT (see {@link setSharedDslClerkOrgWriteAllowed}). */
 let clerkOrgWriteAllowed = true;
@@ -175,8 +201,10 @@ export function isSharedDslLocallyEdited(): boolean {
 /**
  * After a successful PUT, prefer JSON `etag` (authoritative). If absent, GET once for metadata.
  */
-async function reconcileEtagAfterSuccessfulPut(body: { etag?: string }): Promise<void> {
-  const putEtag = typeof body.etag === 'string' && body.etag.trim() ? body.etag.trim() : '';
+async function reconcileEtagAfterSuccessfulPut(body: { etag?: string; version?: string }): Promise<void> {
+  const putEtag =
+    (typeof body.etag === 'string' && body.etag.trim() ? body.etag.trim() : '') ||
+    (typeof body.version === 'string' && body.version.trim() ? body.version.trim() : '');
   let next = putEtag;
   if (!next) {
     try {
@@ -384,7 +412,10 @@ export async function putSharedDsl(yaml: string, ifMatch: string | null): Promis
         ...(ifMatch ? { ifMatch } : {}),
       }),
     });
-    if (res.status === 409) return { ok: false, conflict: true, errorMessage: 'Someone else saved first (conflict).' };
+    if (res.status === 409) {
+      notifySharedDslSaveConflict();
+      return { ok: false, conflict: true, errorMessage: 'Someone else saved first (conflict).' };
+    }
     if (res.status === 403) {
       let msg = 'Save forbidden — your role cannot edit the team workspace.';
       try {
@@ -409,8 +440,9 @@ export async function putSharedDsl(yaml: string, ifMatch: string | null): Promis
       }
       return { ok: false, errorMessage };
     }
-    const j = (await res.json()) as { ok?: boolean; etag?: string };
+    const j = (await res.json()) as { ok?: boolean; etag?: string; version?: string };
     await reconcileEtagAfterSuccessfulPut(j);
+    notifySharedDslConflictCleared();
     return { ok: true, etag: getSharedDslEtag() ?? undefined };
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Network error';
@@ -445,6 +477,7 @@ export async function pullSharedDslToStore(): Promise<boolean> {
     const full = mergeStateToFullMultiDoc(useAtcStore.getState()).trim();
     setAtcDsl(full);
     markSharedDslBaseline(full);
+    notifySharedDslConflictCleared();
     return true;
   } finally {
     suppressSharedDslOutboundSync = false;
@@ -471,7 +504,6 @@ export function initSharedDslOutboundSync(): () => void {
       void (async () => {
         const r = await putSharedDsl(latest, lastKnownEtag);
         if (r.conflict) {
-          console.warn('[shared-dsl] Save conflict (409): another client saved first. Pull from cloud or merge manually.');
           return;
         }
         if (r.ok) {

@@ -57,11 +57,13 @@ export function isGregorianChristmasDay(isoDate: string): boolean {
 
 /**
  * December retail season on **in-store trading pressure** (all markets): ramp from 1 Dec through Christmas Eve,
- * then **closed** on 25 Dec. Late December after the 25th returns to the YAML weekly level only.
- * Peak extra lift ≈ {@link DECEMBER_RETAIL_STORE_BUMP} (was higher; tuned for a subtler holiday bump).
- * Applied after `weekly_pattern` and optional `trading.seasonal`.
+ * then **stay hot** through month-end (incl. 25 Dec) so December reads as one consistently stressed band on the runway.
+ * {@link DECEMBER_STORE_PRESSURE_FLOOR} keeps low YAML trading days from printing “cool” tiles mid-month.
+ * Peak extra lift ≈ {@link DECEMBER_RETAIL_STORE_BUMP}. Applied after `weekly_pattern` and optional `trading.seasonal`.
  */
-export const DECEMBER_RETAIL_STORE_BUMP = 0.15;
+export const DECEMBER_RETAIL_STORE_BUMP = 0.22;
+/** Floor (0–1) on store pressure for every day in December after the December bump. */
+export const DECEMBER_STORE_PRESSURE_FLOOR = 0.78;
 
 export function applyDecemberRestaurantSeasoning(isoDate: string, storePressure01: number): number {
   const p = Math.min(1, Math.max(0, storePressure01));
@@ -70,13 +72,19 @@ export function applyDecemberRestaurantSeasoning(isoDate: string, storePressure0
   const day = parts[2];
   if (!Number.isFinite(m) || !Number.isFinite(day)) return p;
   if (m !== 12) return p;
-  if (day === 25) return 0;
+
+  const peakMult = 1 + DECEMBER_RETAIL_STORE_BUMP;
+
   if (day >= 1 && day <= 24) {
     const t = clamp01((day - 1) / 23);
     const mult = 1 + DECEMBER_RETAIL_STORE_BUMP * smoothstep01(t);
-    return Math.min(1, p * mult);
+    const out = Math.min(1, p * mult);
+    return Math.min(1, Math.max(DECEMBER_STORE_PRESSURE_FLOOR, out));
   }
-  return p;
+
+  // 25–31: peak-season multiplier + same floor (no “closed” zero tile; year-end stays in the red band)
+  const out = Math.min(1, p * peakMult);
+  return Math.min(1, Math.max(DECEMBER_STORE_PRESSURE_FLOOR, out));
 }
 
 /**

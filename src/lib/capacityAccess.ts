@@ -8,13 +8,9 @@
  *
  * When no cap_* claims are present, behaviour matches pre-ACL deployments (full markets, edits allowed).
  */
-/** Keep in sync with `public/data/segments.json`. */
-export const SEGMENT_MARKET_IDS: Record<string, readonly string[]> = {
-  LIOM: ['AU', 'UK', 'DE', 'CA', 'FR', 'IT', 'ES', 'PL'],
-  IOM: ['CH', 'AT', 'NL', 'BE', 'PT', 'CZ', 'SK', 'SL', 'UA'],
-};
+import { getSegmentMarkets, type SegmentCode } from '@/lib/segmentsConfig';
 
-export type SegmentCode = keyof typeof SEGMENT_MARKET_IDS;
+export type { SegmentCode };
 
 export type CapacityAccess = {
   /** No cap_* claims on the session — treat as legacy full access. */
@@ -109,7 +105,7 @@ export function parseCapacityAccess(
 
   const allowed = new Set<string>();
   for (const seg of segs) {
-    const ids = SEGMENT_MARKET_IDS[seg];
+    const ids = getSegmentMarkets(seg);
     if (ids) for (const id of ids) allowed.add(id);
   }
 

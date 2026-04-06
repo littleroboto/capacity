@@ -56,4 +56,10 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-nebula-motion {
+      animation: none !important;
+    }
+  }
 }
