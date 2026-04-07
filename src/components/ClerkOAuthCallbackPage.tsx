@@ -17,7 +17,6 @@ export function ClerkOAuthCallbackPage() {
       </p>
       <AuthenticateWithRedirectCallback
         signInFallbackRedirectUrl={APP_PATH}
-        signUpFallbackRedirectUrl={APP_PATH}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { SignIn, SignOutButton, useAuth, useUser } from '@clerk/react';
+import { Loader2 } from 'lucide-react';
 import {
   isEmailInAllowList,
   normalizeUserEmail,
@@ -50,11 +51,12 @@ function AuthGateInner({ children }: { children: ReactNode }) {
   if (!isLoaded) {
     return (
       <div
-        className="flex min-h-screen flex-col items-center justify-center gap-2 bg-background px-4 text-sm text-muted-foreground"
+        className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-4 text-sm text-muted-foreground"
         role="status"
         aria-live="polite"
       >
-        <span>Loading sign-in…</span>
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/70" />
+        <span className="animate-pulse">Loading sign-in…</span>
       </div>
     );
   }
@@ -70,7 +72,15 @@ function AuthGateInner({ children }: { children: ReactNode }) {
         <p className="mb-6 max-w-md text-center text-sm text-muted-foreground">
           Sign in to open MarketZero Workbench.
         </p>
-        <SignIn routing="hash" fallbackRedirectUrl="/app" signUpFallbackRedirectUrl="/app" />
+        <SignIn
+          routing="hash"
+          fallbackRedirectUrl="/app"
+          appearance={{
+            elements: {
+              footerAction: { display: 'none' },
+            },
+          }}
+        />
       </div>
     );
   }
@@ -85,11 +95,12 @@ function AuthGateInner({ children }: { children: ReactNode }) {
     if (!userLoaded) {
       return (
         <div
-          className="flex min-h-screen flex-col items-center justify-center gap-2 bg-background px-4 text-sm text-muted-foreground"
+          className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-4 text-sm text-muted-foreground"
           role="status"
           aria-live="polite"
         >
-          <span>Loading account…</span>
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/70" />
+          <span className="animate-pulse">Loading account…</span>
         </div>
       );
     }

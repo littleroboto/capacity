@@ -1,12 +1,13 @@
 import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/react';
 import { ClerkOAuthCallbackPage } from '@/components/ClerkOAuthCallbackPage';
 import { ClerkSharedDslBridge } from '@/components/ClerkSharedDslBridge';
 import { SignInGate } from '@/components/SignInGate';
 import { FullCapacityAccessProvider } from '@/lib/capacityAccessContext';
 import { clerkPublishableKey, isClerkConfigured } from '@/lib/clerkConfig';
+import { ClerkUkWaitlistPage } from '@/pages/ClerkUkWaitlistPage';
 import { LandingPage } from '@/pages/LandingPage';
 import './index.css';
 
@@ -19,6 +20,13 @@ function workbenchBasename(): string {
   const base = import.meta.env.BASE_URL ?? '/';
   if (base === './' || base === '.') return '/';
   return base.endsWith('/') ? base.slice(0, -1) : base;
+}
+
+/** Public path to the UK waitlist (includes Vite `base` when not `/`). */
+function clerkWaitlistUrlPath(): string {
+  const b = workbenchBasename();
+  const path = '/uk/waitlist';
+  return b === '/' ? path : `${b}${path}`;
 }
 
 function WorkbenchLoading() {
@@ -53,21 +61,60 @@ function WorkbenchRoutes() {
   );
 }
 
-const router = (
-  <BrowserRouter basename={workbenchBasename()}>
+function AppRoutes() {
+  return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/uk/waitlist" element={<ClerkUkWaitlistPage />} />
       <Route path="/sso-callback" element={<ClerkOAuthCallbackPage />} />
       {/* Some Clerk setups use this path for the OAuth return URL */}
       <Route path="/sign-in/sso-callback" element={<ClerkOAuthCallbackPage />} />
       <Route path="/app" element={<WorkbenchRoutes />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  </BrowserRouter>
-);
+  );
+}
+
+const clerkAppearance = {
+  elements: {
+    footerAction: { display: 'none' as const },
+  },
+};
+
+/**
+ * Clerk must use React Router’s navigate for post-auth redirects. If it only
+ * mutates `history` directly, the SPA can stay on “Loading sign-in…” until a
+ * full refresh (stale router location / no re-render).
+ */
+function ClerkBrowserRoot() {
+  const navigate = useNavigate();
+
+  if (!clerkKey) {
+    return <AppRoutes />;
+  }
+
+  return (
+    <ClerkProvider
+      publishableKey={clerkKey}
+      appearance={clerkAppearance}
+      signInFallbackRedirectUrl="/app"
+      waitlistUrl={clerkWaitlistUrlPath()}
+      routerPush={(to) => {
+        navigate(to);
+      }}
+      routerReplace={(to) => {
+        navigate(to, { replace: true });
+      }}
+    >
+      <AppRoutes />
+    </ClerkProvider>
+  );
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {clerkKey ? <ClerkProvider publishableKey={clerkKey}>{router}</ClerkProvider> : router}
+    <BrowserRouter basename={workbenchBasename()}>
+      <ClerkBrowserRoot />
+    </BrowserRouter>
   </StrictMode>
 );

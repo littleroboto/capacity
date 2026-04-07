@@ -423,7 +423,7 @@ export function buildQuarterGridRunwayLayout(
 }
 
 /** Must match `RunwayGrid` runway zoom bounds. */
-const RUNWAY_COMPARE_FIT_CELL_PX_MIN = 12;
+export const RUNWAY_COMPARE_FIT_CELL_PX_MIN = 12;
 const RUNWAY_COMPARE_FIT_CELL_PX_MAX = 28;
 const RUNWAY_COMPARE_FIT_CELL_PX_STEP = 2;
 
@@ -493,6 +493,45 @@ export function bestCellPxForCompareAllRunwayFit(
       compareAllRunwayTotalContentHeightPx(px, sortedDatesYmd) > availableHeight
     ) {
       continue;
+    }
+    best = px;
+  }
+  return best;
+}
+
+/**
+ * Content width of a single-market quarter grid (3 months per row) for a given cell pixel size.
+ */
+function singleMarketQuarterGridContentWidth(cellPx: number): number {
+  const gap = RUNWAY_CELL_GAP_PX;
+  const stripW = runwayDayStripWidth(cellPx, gap, RUNWAY_DAY_COLUMNS);
+  return CALENDAR_QUARTER_GUTTER_W + 3 * stripW + 2 * CALENDAR_QUARTER_GRID_COL_GAP_PX;
+}
+
+/**
+ * Largest stepped cell size so a single-market quarter grid fits within
+ * `availableWidth` x `availableHeight`.
+ */
+export function bestCellPxForSingleMarketFit(
+  availableWidth: number,
+  availableHeight: number,
+  sortedDatesYmd: string[]
+): number {
+  if (!sortedDatesYmd.length || !Number.isFinite(availableWidth) || availableWidth <= 0) {
+    return RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+  }
+  const useHeight =
+    Number.isFinite(availableHeight) && availableHeight >= RUNWAY_COMPARE_FIT_MIN_VIEWPORT_H;
+  let best = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+  for (
+    let px = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+    px <= RUNWAY_COMPARE_FIT_CELL_PX_MAX;
+    px += RUNWAY_COMPARE_FIT_CELL_PX_STEP
+  ) {
+    if (singleMarketQuarterGridContentWidth(px) > availableWidth) continue;
+    if (useHeight) {
+      const layout = buildQuarterGridRunwayLayout(sortedDatesYmd, px);
+      if (layout && layout.contentHeight > availableHeight) continue;
     }
     best = px;
   }

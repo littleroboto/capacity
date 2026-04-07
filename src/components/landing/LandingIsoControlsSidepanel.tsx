@@ -239,17 +239,51 @@ export function LandingIsoControlsSidepanel() {
             Runway lens
           </p>
           <div
-            className="flex items-center gap-1.5 rounded-md border border-white/20 bg-white/[0.06] px-2 py-1.5"
+            className="flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/[0.08] px-2 py-1.5"
             role="status"
-            aria-label="Runway lens: Deployment Risk (fixed for this preview)"
+            aria-label="Runway lens: Technology — combined tech headroom (fixed for this preview)"
           >
             <span
-              className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full border border-white bg-white/15"
+              className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-400/20"
               aria-hidden
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-white opacity-100" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 opacity-100" />
             </span>
-            <span className="font-landing text-[9px] font-medium leading-tight text-zinc-200">Deployment Risk</span>
+            <span className="font-landing text-[9px] font-medium leading-tight text-zinc-200">Technology</span>
+          </div>
+          <div
+            className="mt-2 space-y-1.5 rounded-md border border-white/[0.06] bg-black/30 px-2 py-2"
+            role="note"
+            aria-label="How campaign phases affect tower height on the 3D runway"
+          >
+            <p className="font-landing text-[8px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+              Campaign phases on the strip
+            </p>
+            <p className="font-landing text-[8px] leading-snug text-zinc-500">
+              Extrusion uses the same readiness vs sustain split as day details in the app.
+            </p>
+            <ul className="space-y-1 font-landing text-[8px] leading-snug text-zinc-400">
+              <li className="flex gap-1.5">
+                <span
+                  className="mt-0.5 h-2 w-2 shrink-0 rounded-sm bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.45)]"
+                  aria-hidden
+                />
+                <span>
+                  <span className="font-semibold text-violet-200/90">Prep</span> — readiness / test load (
+                  <code className="font-mono text-[7px] text-zinc-500">campaign_support</code> segment)
+                </span>
+              </li>
+              <li className="flex gap-1.5">
+                <span
+                  className="mt-0.5 h-2 w-2 shrink-0 rounded-sm bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.35)]"
+                  aria-hidden
+                />
+                <span>
+                  <span className="font-semibold text-cyan-200/90">Live</span> — operational support (
+                  <code className="font-mono text-[7px] text-zinc-500">live_campaign_support</code>)
+                </span>
+              </li>
+            </ul>
           </div>
         </div>
 

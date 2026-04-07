@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { LandingCellDetailCardMock } from '@/components/landing/LandingCellDetailCardMock';
 import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMock';
 import { LandingMonacoYamlMock } from '@/components/landing/LandingMonacoYamlMock';
+import { LandingYamlProjectTwinMock } from '@/components/landing/LandingYamlProjectTwinMock';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 import { heatmapColorDiscrete, heatmapSpectrumLegendGradientCss } from '@/lib/riskHeatmapColors';
 import {
@@ -464,7 +465,7 @@ const LANDING_BOM_SCROLL_MAX_H = 'min(13.5rem,42vh)';
 
 function LandingBomTable() {
   const panelId = useId();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="mx-auto mt-5 w-full max-w-4xl sm:mx-0">
@@ -606,6 +607,13 @@ export function LandingPage() {
                 <Show when="signed-in">
                   <UserButton />
                 </Show>
+                <Link
+                  to="/uk/waitlist"
+                  className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-400 transition hover:text-white"
+                >
+                  <MarketCircleFlag marketId="UK" size={18} className="ring-white/15" />
+                  UK early access
+                </Link>
               </>
             ) : null}
             <Link
@@ -688,6 +696,8 @@ export function LandingPage() {
           <LandingIsoBrowserMock />
 
           <LandingCellDetailCardMock />
+
+          <LandingYamlProjectTwinMock />
 
           <LandingMonacoYamlMock />
 

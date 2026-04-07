@@ -38,6 +38,7 @@ import {
   CALENDAR_YEAR_STRIP_TOTAL_PX,
   QUARTER_LETTERS,
   bestCellPxForCompareAllRunwayFit,
+  bestCellPxForSingleMarketFit,
   buildQuarterGridRunwayLayout,
   buildVerticalMonthsRunwayLayout,
   flattenRunwayWeeksFromSections,
@@ -1365,6 +1366,8 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   const heatmapCaptureRef = useRef<HTMLDivElement>(null);
   /** LIOM compare: horizontal scrollport — measured to pick a cell size that fits the main heatmap column. */
   const compareScrollRef = useRef<HTMLDivElement>(null);
+  /** Single-market: measured to auto-fit cell size to available space. */
+  const singleMarketFitRef = useRef<HTMLDivElement>(null);
   const [pngExporting, setPngExporting] = useState(false);
   const [dimPastDays, setDimPastDays] = useState(false);
 
@@ -1492,6 +1495,37 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     countrySwitchLoading,
     showIso3d,
   ]);
+
+  useLayoutEffect(() => {
+    if (compareAllMarkets || countrySwitchLoading) return;
+    if (showIso3d) return;
+    const el = singleMarketFitRef.current;
+    if (!el) return;
+
+    const applyFit = () => {
+      const w = el.clientWidth;
+      if (w < 48) return;
+      const top = el.getBoundingClientRect().top;
+      const viewportBelow = Math.max(
+        80,
+        (typeof window !== 'undefined' ? window.innerHeight : 640) - top - 16
+      );
+      const measuredH = el.clientHeight;
+      const h =
+        measuredH > 48 ? Math.min(measuredH, viewportBelow) : viewportBelow;
+      const next = bestCellPxForSingleMarketFit(w, h, layoutDatesSorted);
+      setRunwayCellPx((prev) => (prev === next ? prev : next));
+    };
+
+    applyFit();
+    const ro = new ResizeObserver(() => applyFit());
+    ro.observe(el);
+    window.addEventListener('resize', applyFit);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', applyFit);
+    };
+  }, [compareAllMarkets, compareDatesFitKey, countrySwitchLoading, showIso3d]);
 
   const dismissTip = useCallback(() => {
     setTip(null);
@@ -1875,6 +1909,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
               >
                 <RunwayGridBody
                   compareScrollRef={compareScrollRef}
+                  singleMarketFitRef={singleMarketFitRef}
                   compareAllMarkets={compareAllMarkets}
                   marketsOrdered={marketsOrdered}
                   riskSurface={riskSurface}
@@ -1930,6 +1965,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
 
 type RunwayGridBodyProps = {
   compareScrollRef: RefObject<HTMLDivElement | null>;
+  singleMarketFitRef: RefObject<HTMLDivElement | null>;
   compareAllMarkets: boolean;
   marketsOrdered: string[];
   riskSurface: RiskRow[];
@@ -1978,6 +2014,7 @@ type RunwayGridBodyProps = {
 
 function RunwayGridBody({
   compareScrollRef,
+  singleMarketFitRef,
   compareAllMarkets,
   marketsOrdered,
   riskSurface,
@@ -2186,6 +2223,7 @@ function RunwayGridBody({
         ) : (
           <>
             <div
+              ref={singleMarketFitRef as Ref<HTMLDivElement>}
               className={cn(
                 'flex w-full pb-1',
                 heatmap3d

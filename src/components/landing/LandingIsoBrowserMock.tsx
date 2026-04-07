@@ -15,6 +15,14 @@ import {
   transformedHeatmapMetric,
   type HeatmapColorOpts,
 } from '@/lib/riskHeatmapColors';
+import {
+  deckAndColumnY,
+  LANDING_ISO_SKYLINE_CELL_PX,
+  LANDING_ISO_SKYLINE_GAP_PX,
+  LANDING_ISO_SKYLINE_HEATMAP_OPTS,
+  LANDING_ISO_SKYLINE_ROW_TOWER_PX,
+  snapViewBoxDim,
+} from '@/components/landing/landingIsoSkylineShared';
 import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
 import {
   computeSkylineBounds,
@@ -30,7 +38,6 @@ import {
   isoLabelBleedComp,
   isoLabelLaneDi,
 } from '@/lib/runwayIsoGroundLabels';
-import { RUNWAY_CELL_GAP_PX } from '@/lib/weekRunway';
 import { LandingIsoControlsSidepanel } from '@/components/landing/LandingIsoControlsSidepanel';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 import {
@@ -44,7 +51,6 @@ import {
   ISO_PAD_TOP,
   calHeightFromMetric,
   contribPanelFill,
-  type IsoLayoutCore,
 } from '@/components/RunwayIsoHeatCell';
 import {
   Box,
@@ -141,22 +147,38 @@ function landingSeasonalDisplayStress(ymd: string): number {
   return clamp01(a * (1 - f) + b * f);
 }
 
-/** Marketing-only blend: readable seasonal arc + real DE texture (still true pipeline colours). */
-const LANDING_ISO_SEASONAL_WEIGHT = 0.72;
+/**
+ * Light seasonal tint only — extrusion and colour are driven mainly by real DE pipeline rows so
+ * campaign **prep (readiness / test)** vs **live (operational support)** show up in tower height.
+ */
+const LANDING_ISO_DECOR_SEASONAL_WEIGHT = 0.12;
 
-/** Same heat defaults as a fresh workbench (`useAtcStore` initial + discrete spectrum). */
-const LANDING_ISO_HEATMAP_OPTS: HeatmapColorOpts = {
-  riskHeatmapCurve: 'power',
-  riskHeatmapGamma: 1,
-  riskHeatmapTailPower: 1,
-  businessHeatmapPressureOffset: 0,
-  renderStyle: 'spectrum',
-  heatmapSpectrumMode: 'discrete',
-};
+/**
+ * 0–1 display stress for **Technology** extrusion: when a campaign is in prep, readiness-tagged lab/team
+ * load dominates tower height; in live, sustain-tagged (operational / hypercare) load dominates.
+ * Matches {@link RiskRow.tech_readiness_pressure} / {@link RiskRow.tech_sustain_pressure} from the pipeline.
+ */
+function landingIsoTechnologyPhaseExtrusionStress(row: RiskRow): number {
+  const prep = row.tech_readiness_pressure ?? 0;
+  const sus = row.tech_sustain_pressure ?? 0;
+  const headroom = heatmapCellMetric(
+    row,
+    LANDING_ISO_VIEW,
+    DEFAULT_RISK_TUNING,
+    LANDING_ISO_TECH_SCOPE
+  );
+  const combined = landingRealDisplayStress(headroom, LANDING_ISO_SKYLINE_HEATMAP_OPTS);
 
-function deckAndColumnY(L: IsoLayoutCore, calH: number, runwayBandH: number): number {
-  const deckY = L.canvasH - runwayBandH;
-  return deckY - calH - L.dyy * 1.05;
+  if (row.holiday_flag) {
+    return clamp01(combined * 0.78 + prep * 0.11 + sus * 0.11);
+  }
+  if (row.campaign_in_prep) {
+    return clamp01(0.03 + prep * 0.86 + sus * 0.07 + combined * 0.06);
+  }
+  if (row.campaign_in_live) {
+    return clamp01(0.03 + sus * 0.74 + prep * 0.12 + combined * 0.09);
+  }
+  return combined;
 }
 
 function IsoLegend() {
@@ -167,7 +189,7 @@ function IsoLegend() {
       </span>
       <div
         className="min-h-[120px] w-2 flex-1 max-h-[220px] rounded-full border border-white/[0.08] shadow-inner shadow-black/40"
-        style={{ background: heatmapSpectrumLegendGradientCss(LANDING_ISO_HEATMAP_OPTS) }}
+        style={{ background: heatmapSpectrumLegendGradientCss(LANDING_ISO_SKYLINE_HEATMAP_OPTS) }}
         aria-hidden
       />
       <span className="font-landing text-[7px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
@@ -212,9 +234,9 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
   const reducedMotion = useReducedMotion();
 
   const { svgInner } = useMemo(() => {
-    const cellPx = 11;
-    const rowTowerPx = 34;
-    const gap = RUNWAY_CELL_GAP_PX;
+    const cellPx = LANDING_ISO_SKYLINE_CELL_PX;
+    const rowTowerPx = LANDING_ISO_SKYLINE_ROW_TOWER_PX;
+    const gap = LANDING_ISO_SKYLINE_GAP_PX;
 
     const { riskSurface, parseError } = runPipelineFromDsl(
       defaultDslForMarket('DE'),
@@ -373,12 +395,12 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
 
     const inner = (
       <svg
-        viewBox={`0 0 ${adjW} ${adjH}`}
+        viewBox={`0 0 ${snapViewBoxDim(adjW)} ${snapViewBoxDim(adjH)}`}
         width="100%"
         height="100%"
         className="block h-full max-h-[min(52vh,420px)] min-h-[200px] w-full text-foreground"
         preserveAspectRatio="xMidYMin meet"
-        aria-label="Simulated 3D Technology lens skyline for Germany (bundled DE.yaml)"
+        aria-label="Technology lens 3D runway for Germany (DE.yaml): tower height reflects readiness load in campaign prep and operational support load in campaign live, from the same pipeline as the workbench"
       >
         {cells.map(({ li, di, cell }) => {
           const { ax, ay } = isoCellTopLeft(layoutToIsoWi(li), di, stepX, stepY);
@@ -428,30 +450,24 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
               rightC = ISO_PAD_RIGHT;
               metricPad = true;
             } else {
-              const metric = heatmapCellMetric(
-                row,
-                LANDING_ISO_VIEW,
-                DEFAULT_RISK_TUNING,
-                LANDING_ISO_TECH_SCOPE
-              );
-              const realStress = landingRealDisplayStress(metric, LANDING_ISO_HEATMAP_OPTS);
               const seasonal = landingSeasonalDisplayStress(dateStr);
+              const phaseStress = landingIsoTechnologyPhaseExtrusionStress(row);
               const blendedStress = clamp01(
-                seasonal * LANDING_ISO_SEASONAL_WEIGHT +
-                  realStress * (1 - LANDING_ISO_SEASONAL_WEIGHT)
+                seasonal * LANDING_ISO_DECOR_SEASONAL_WEIGHT +
+                  phaseStress * (1 - LANDING_ISO_DECOR_SEASONAL_WEIGHT)
               );
               const fakeHeadroom = clamp01(1 - blendedStress);
               const { fill, dimOpacity } = runwayHeatmapCellFillAndDim(
                 LANDING_ISO_VIEW,
                 LANDING_ISO_TECH_SCOPE,
                 fakeHeadroom,
-                LANDING_ISO_HEATMAP_OPTS,
+                LANDING_ISO_SKYLINE_HEATMAP_OPTS,
                 row
               );
               height01 = transformedHeatmapMetric(
                 LANDING_ISO_VIEW,
                 fakeHeadroom,
-                LANDING_ISO_HEATMAP_OPTS
+                LANDING_ISO_SKYLINE_HEATMAP_OPTS
               );
               topC = contribPanelFill(fill, 'top');
               leftC = contribPanelFill(fill, 'left');
@@ -539,14 +555,19 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-500/80">
-          3D runway
+          Familiar inputs
         </p>
         <h2 id="iso-mock-heading" className="font-landing text-2xl font-semibold text-white">
-          Same data, isometric depth
+          Familiar Data, new depth
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          Colours and extrusion use the same Technology lens pipeline as the workbench — here driven by bundled{' '}
-          <span className="text-zinc-500">DE.yaml</span> so the landing mock matches Germany in the app.
+          Same <span className="text-zinc-300">DE.yaml</span> pipeline as the workbench — not a separate toy graphic.
+          During campaign <strong className="font-medium text-violet-200/90">prep</strong>, tower height tracks
+          readiness-tagged lab and Market IT load (build, test, integration). In{' '}
+          <strong className="font-medium text-cyan-200/90">live</strong>, extrusion follows operational / sustain support
+          — usually shorter than prep, just like <code className="rounded bg-white/[0.06] px-1 font-mono text-[11px] text-zinc-400">campaign_support</code> vs{' '}
+          <code className="rounded bg-white/[0.06] px-1 font-mono text-[11px] text-zinc-400">live_campaign_support</code>{' '}
+          in your file.
         </p>
       </div>
 
@@ -615,7 +636,7 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
 
         <div className="relative z-10 flex items-start gap-2 border-b border-white/[0.05] bg-[#0a0a0c] px-3 py-2.5 sm:px-4">
           <h3 className="font-landing text-sm font-semibold tracking-tight text-white sm:text-base">
-            Deployment risk profile: DE
+            Technology runway · prep vs live · DE
           </h3>
           <MarketCircleFlag marketId="DE" size={20} className="ring-white/15" />
         </div>
