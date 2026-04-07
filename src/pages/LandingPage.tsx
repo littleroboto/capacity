@@ -545,6 +545,7 @@ function LandingBomTable() {
 export function LandingPage() {
   const reducedMotion = useReducedMotion();
   const clerkOn = isClerkConfigured();
+  const landingSymbolPatternId = useId().replace(/:/g, '');
 
   useEffect(() => {
     document.title = 'MarketZero Workbench · Air traffic control for technology programmes';
@@ -570,6 +571,48 @@ export function LandingPage() {
             backgroundSize: '44px 44px, 44px 44px, auto, auto',
           }}
         />
+        <svg
+          className="absolute inset-0 h-full w-full opacity-[0.28] sm:opacity-[0.32]"
+          aria-hidden
+        >
+          <defs>
+            <pattern
+              id={landingSymbolPatternId}
+              width="88"
+              height="88"
+              patternUnits="userSpaceOnUse"
+            >
+              <g
+                fill="rgba(255,255,255,0.055)"
+                style={{
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                  fontSize: '11px',
+                  fontWeight: 300,
+                }}
+              >
+                <text x="12" y="20" transform="rotate(-11 12 20)">
+                  +
+                </text>
+                <text x="48" y="26" transform="rotate(8 48 26)" opacity={0.88}>
+                  +
+                </text>
+                <text x="76" y="44" transform="rotate(-6 76 44)" opacity={0.72}>
+                  −
+                </text>
+                <text x="26" y="54" transform="rotate(10 26 54)" opacity={0.78}>
+                  ·
+                </text>
+                <text x="60" y="66" transform="rotate(-9 60 66)" opacity={0.68}>
+                  ×
+                </text>
+                <text x="40" y="82" transform="rotate(5 40 82)" opacity={0.82}>
+                  +
+                </text>
+              </g>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill={`url(#${landingSymbolPatternId})`} />
+        </svg>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_65%_at_50%_115%,rgba(15,23,42,0.9),transparent_58%)]" />
         <div
           className="landing-nebula-motion absolute -left-[22%] -top-[28%] h-[90vh] w-[min(110vw,900px)] opacity-[0.42] blur-[88px] animate-landing-nebula-drift sm:blur-[104px]"
@@ -680,11 +723,8 @@ export function LandingPage() {
               <h2 id="features-heading" className="font-landing text-2xl font-semibold text-white">
                 What you get
               </h2>
-              <p className="mt-2 text-zinc-400">
-                Built for leaders and delivery teams who need one honest view of the runway.
-              </p>
-              <p className="mt-4 text-pretty text-sm leading-relaxed text-zinc-400">
-                We do not drown you in formulas. What matters is that the picture reflects how work actually lands:
+              <p className="mt-3 text-pretty text-sm leading-relaxed text-zinc-400">
+                we don&apos;t drown you in formulas. What matters is that the picture reflects how work actually lands:
                 holiday windows and resourcing interact; typical week, month, and year patterns carry through; campaign
                 weightings shape demand; and support load for large campaigns is part of the same calculation — so the
                 heat you see matches the operating reality.

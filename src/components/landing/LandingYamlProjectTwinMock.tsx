@@ -617,8 +617,8 @@ export function LandingYamlProjectTwinMock() {
       aria-labelledby={`${panelId}-heading`}
     >
       <div className="mb-6 max-w-2xl">
-        <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-400/85">
-          Model inputs
+        <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
+          Powerful models
         </p>
         <h2
           id={`${panelId}-heading`}

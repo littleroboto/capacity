@@ -124,7 +124,7 @@ export function LandingMultiMarketDeploymentMock() {
       aria-labelledby="multimarket-runway-heading"
     >
       <header className="mb-6 sm:mb-8">
-        <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]/92">
+        <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
           Multi-market runway
         </p>
         <h2

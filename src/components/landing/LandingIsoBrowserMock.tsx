@@ -554,8 +554,8 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
       aria-labelledby="iso-mock-heading"
     >
       <div className="mb-6 max-w-2xl">
-        <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-500/80">
-          Familiar inputs
+        <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
+          Data driven
         </p>
         <h2 id="iso-mock-heading" className="font-landing text-2xl font-semibold text-white">
           Familiar Data, new clarity
