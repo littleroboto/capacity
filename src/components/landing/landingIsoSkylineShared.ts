@@ -109,7 +109,12 @@ const MONTH_3_SHORT = [
   'Dec',
 ] as const;
 
-/** Mid-week anchor per calendar month for iso ground labels (chronological week indices). */
+/**
+ * Month labels on the iso ground plane — same anchor rule as {@link LandingIsoBrowserMock} /
+ * `skylineChronologyGroups`: for each month’s chron week span `[w0, w1]` inclusive, place at
+ * `w0 + round((w1 - w0) * 2/3)` (not the midpoint), so labels sit forward along the strip and
+ * align visually with month gaps in the packed iso grid.
+ */
 export function monthAxisLabelsForChronWeeks(
   chronWeeksOldestFirst: RunwayCalendarCellValue[][]
 ): { chron: number; text: string }[] {
@@ -119,15 +124,15 @@ export function monthAxisLabelsForChronWeeks(
   const boundaries = [0, ...starts, n];
   const out: { chron: number; text: string }[] = [];
   for (let i = 0; i < boundaries.length - 1; i++) {
-    const s = boundaries[i]!;
-    const e = boundaries[i + 1]! - 1;
-    if (s > e) continue;
-    const mid = Math.floor((s + e) / 2);
-    const ymd = chronWeeksOldestFirst[mid]!.find((c): c is string => typeof c === 'string');
+    const w0 = boundaries[i]!;
+    const w1 = boundaries[i + 1]! - 1;
+    if (w1 < w0) continue;
+    const wMonthLabel = Math.min(w1, Math.max(w0, w0 + Math.round((w1 - w0) * (2 / 3))));
+    const ymd = chronWeeksOldestFirst[wMonthLabel]!.find((c): c is string => typeof c === 'string');
     if (!ymd) continue;
     const mo = Number(ymd.split('-')[1]);
     if (!Number.isFinite(mo) || mo < 1 || mo > 12) continue;
-    out.push({ chron: mid, text: MONTH_3_SHORT[mo - 1] ?? '' });
+    out.push({ chron: wMonthLabel, text: MONTH_3_SHORT[mo - 1] ?? '' });
   }
   return out;
 }

@@ -12,7 +12,6 @@ import {
   IsoColumnAtOrigin,
   ISO_GROUND_LABEL_TEXT_PROPS,
   calHeightFromMetric,
-  contribPanelFill,
 } from '@/components/RunwayIsoHeatCell';
 import {
   computeSkylineBounds,
@@ -40,6 +39,19 @@ import {
 } from '@/components/landing/landingIsoSkylineShared';
 import { cn } from '@/lib/utils';
 import { Box, Landmark, Layers, Trees } from 'lucide-react';
+
+const LAYER_PULSE_TRANSITION = {
+  duration: 1.85,
+  repeat: Infinity,
+  ease: 'easeInOut' as const,
+};
+
+/** Amber pulse glow (Tailwind amber-500) for all sequential layer hints. */
+const LAYER_PULSE_BOX_SHADOW = [
+  '0 0 0 0 rgba(245,158,11,0)',
+  '0 0 20px 0 rgba(245,158,11,0.42)',
+  '0 0 0 0 rgba(245,158,11,0)',
+] as const;
 
 function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
@@ -89,15 +101,27 @@ function weekCampaignPhase(wi: number): CampaignPhase {
   return 'base';
 }
 
-/** BAU Technology rhythm: sprint waves, weekday shape, weekends — never a flat plane when campaign is off. */
+/**
+ * Weekly BAU shape on top of slow drift: `di` is Mon=0 … Sun=6 (consecutive Monday week rows).
+ * Quiet weekend, peak Monday, easing through Wednesday, then Thu–Fri pick up again.
+ */
+const BAU_DOW_BUMP: readonly number[] = [
+  0.2, // Mon — busiest
+  0.15, // Tue — down a notch from Mon
+  0.045, // Wed — mid-week lull
+  0.08, // Thu — back up
+  0.17, // Fri — strong finish
+  -0.055, // Sat — quiet
+  -0.08, // Sun — quieter
+];
+
 function bauActivityStress(wi: number, di: number): number {
-  const seasonal = 0.08 * Math.sin((wi / STORY_WEEKS) * Math.PI * 2);
-  const fortnight = 0.055 * Math.sin((wi / STORY_WEEKS) * Math.PI * 4 + 0.7);
-  const midWeek = di >= 2 && di <= 4 ? 0.09 : di <= 1 ? 0.035 : 0;
-  const weekend = di >= 5 ? 0.12 : 0;
-  const grain = (cellHash01(wi, di) - 0.5) * 0.1;
-  const teamPulse = 0.065 * Math.sin(wi * 0.85 + di * 1.15);
-  return clamp01(0.27 + seasonal + fortnight + midWeek + weekend + grain + teamPulse);
+  const seasonal = 0.065 * Math.sin((wi / STORY_WEEKS) * Math.PI * 2);
+  const fortnight = 0.045 * Math.sin((wi / STORY_WEEKS) * Math.PI * 4 + 0.7);
+  const dowBump = BAU_DOW_BUMP[di] ?? 0;
+  const grain = (cellHash01(wi, di) - 0.5) * 0.08;
+  const teamPulse = 0.048 * Math.sin(wi * 0.85 + di * 1.15);
+  return clamp01(0.19 + seasonal + fortnight + dowBump + grain + teamPulse);
 }
 
 function campaignStressAddition(wi: number, di: number, campaignMix: number): number {
@@ -106,16 +130,16 @@ function campaignStressAddition(wi: number, di: number, campaignMix: number): nu
   const ph = weekCampaignPhase(wi);
   if (ph === 'prep') {
     const ramp = 0.88 + 0.12 * ((wi - (GO_LIVE_WI - PREP_WEEKS)) / Math.max(1, PREP_WEEKS - 1));
-    return 0.74 * campaignMix * dow * ramp;
+    return 0.62 * campaignMix * dow * ramp;
   }
   if (ph === 'live') {
     const fade = 1 - 0.22 * ((wi - GO_LIVE_WI) / Math.max(1, LIVE_WEEKS - 1));
-    return 0.5 * campaignMix * dow * fade;
+    return 0.42 * campaignMix * dow * fade;
   }
-  return 0.07 * campaignMix;
+  return 0.055 * campaignMix;
 }
 
-/** National = closed day (pull utilisation down); school breaks add trading-shaped load (same DE flags). */
+/** National holidays spike displayed capacity into the red; school breaks add trading-shaped load (same DE flags). */
 function calendarStressAdjustment(
   row: RiskRow | undefined,
   publicMix: number,
@@ -123,13 +147,10 @@ function calendarStressAdjustment(
 ): number {
   if (!row) return 0;
   let delta = 0;
-  if (publicMix > 0 && row.public_holiday_flag) delta -= 0.38 * publicMix;
-  if (schoolMix > 0 && row.school_holiday_flag) delta += 0.24 * schoolMix;
+  if (publicMix > 0 && row.public_holiday_flag) delta += 0.52 * publicMix;
+  if (schoolMix > 0 && row.school_holiday_flag) delta += 0.19 * schoolMix;
   return delta;
 }
-
-/** Muted red isometric column — reads as “closed / national holiday”, not heatmap hot. */
-const PUBLIC_HOLIDAY_ISO_BASE = '#c41e1e';
 
 function technologyStressForCell(
   chronWi: number,
@@ -167,12 +188,6 @@ function PrepLiveTimelineBar({ mix, reducedMotion }: { mix: number; reducedMotio
       transition={reducedMotion ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       aria-hidden={mix < 0.06}
     >
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="font-landing text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-          Two quarters · weeks
-        </span>
-        <span className="font-mono text-[9px] text-zinc-600">26 × 7 cells</span>
-      </div>
       <div className="flex h-9 w-full overflow-hidden rounded-lg border border-white/[0.08] bg-black/35 shadow-inner shadow-black/40">
         {TIMELINE_SEGMENTS.map(({ phase, weeks, label, sub }, i) => {
           const wPct = (weeks / total) * 100;
@@ -206,20 +221,6 @@ function PrepLiveTimelineBar({ mix, reducedMotion }: { mix: number; reducedMotio
             </div>
           );
         })}
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 font-landing text-[9px] text-zinc-600">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-sm bg-violet-500/80 shadow-[0_0_10px_rgba(139,92,246,0.45)]" />
-          Prep = readiness / test workload (YAML <code className="font-mono text-[8px] text-zinc-500">campaign_support</code>)
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-sm bg-cyan-500/75 shadow-[0_0_10px_rgba(34,211,238,0.35)]" />
-          Live = operational support (YAML <code className="font-mono text-[8px] text-zinc-500">live_campaign_support</code>)
-        </span>
-        <span className="inline-flex items-center gap-1.5 text-zinc-500">
-          <span className="h-3 w-0.5 rounded-sm bg-[#FFC72C]/90 shadow-[0_0_8px_rgba(255,199,44,0.35)]" />
-          Gold edge = go-live
-        </span>
       </div>
     </motion.div>
   );
@@ -308,7 +309,7 @@ function QuarterIsoMiniRunway({
         height="100%"
         className="block max-h-[min(48vh,360px)] min-h-[200px] w-full sm:min-h-[230px]"
         preserveAspectRatio="xMidYMid meet"
-        aria-label="Half-year Technology strip: BAU rhythm; national holidays as short red columns when enabled; school breaks add load; campaign prep and live when enabled"
+        aria-label="Half-year Technology strip: BAU rhythm; national holidays spike capacity into the red when enabled; school breaks add load; campaign prep and live when enabled"
       >
         {cells.map(({ li, di, cell }) => {
           const { ax, ay } = isoCellTopLeft(layoutToIsoWi(li), di, stepX, stepY);
@@ -337,18 +338,14 @@ function QuarterIsoMiniRunway({
           const dateStr = typeof cell === 'string' ? cell : null;
           const row = dateStr ? riskByDate.get(dateStr) : undefined;
           const stress = technologyStressForCell(chronWi, di, row, campaignMix, publicMix, schoolMix);
-          const publicHolActive = publicMix > 0.06 && row?.public_holiday_flag;
           const { topC, leftC, rightC, height01 } = syntheticStressToIsoColumnStyle(stress);
           const calH = calHeightFromMetric(height01, rowTowerPx, false);
           const columnTy = deckAndColumnY(L, calH, runwayBandH);
-          const topCf = publicHolActive ? contribPanelFill(PUBLIC_HOLIDAY_ISO_BASE, 'top') : topC;
-          const leftCf = publicHolActive ? contribPanelFill(PUBLIC_HOLIDAY_ISO_BASE, 'left') : leftC;
-          const rightCf = publicHolActive ? contribPanelFill(PUBLIC_HOLIDAY_ISO_BASE, 'right') : rightC;
 
           return (
             <g key={`m-${li}-${di}`} transform={`translate(${gx.toFixed(2)} ${gy.toFixed(2)})`}>
               <g transform={`translate(${L.tx.toFixed(2)} ${columnTy.toFixed(2)})`}>
-                <IsoColumnAtOrigin L={L} calH={calH} topC={topCf} leftC={leftCf} rightC={rightCf} />
+                <IsoColumnAtOrigin L={L} calH={calH} topC={topC} leftC={leftC} rightC={rightC} />
               </g>
             </g>
           );
@@ -389,6 +386,8 @@ export function LandingYamlProjectTwinMock() {
   const [layerMixes, setLayerMixes] = useState<LayerMixes>(MIX_INITIAL);
   const mixRef = useRef<LayerMixes>(MIX_INITIAL);
   const [campaignEverOn, setCampaignEverOn] = useState(false);
+  const [hasClickedNational, setHasClickedNational] = useState(false);
+  const [hasClickedSchool, setHasClickedSchool] = useState(false);
 
   useEffect(() => {
     if (campaignOn) setCampaignEverOn(true);
@@ -429,11 +428,17 @@ export function LandingYamlProjectTwinMock() {
 
   const { c: mixCampaign, p: mixPublic, s: mixSchool } = layerMixes;
 
+  const pulseWithCampaign = !reducedMotion && !campaignEverOn;
+  const pulseNational = !reducedMotion && campaignEverOn && !hasClickedNational;
+  const pulseSchool = !reducedMotion && campaignEverOn && hasClickedNational && !hasClickedSchool;
+
   const layerHint = !campaignEverOn
-    ? 'Start with Baseline, then turn on With campaign to load prep and live on the strip.'
-    : !publicHolidaysOn && !schoolHolidaysOn
-      ? 'Next: add National holidays (closed days, red) and/or School holidays (extra load) from the DE calendar.'
-      : 'Mix layers freely — each toggle cross-fades; Baseline / With campaign still switches the YAML preview.';
+    ? 'Baseline is on. The pulsing control is next: turn on With campaign to load prep and live on the strip.'
+    : !hasClickedNational
+      ? 'Campaign is in play. National holidays is next (pulsing) — tap once to unlock School holidays.'
+      : !hasClickedSchool
+        ? 'School holidays is next (pulsing) — extra load from the DE calendar.'
+        : 'Mix layers freely — toggles cross-fade; Baseline / With campaign still switches the YAML preview.';
 
   const yamlBaseline: readonly (readonly YamlToken[])[] = [
     [{ t: '# ', c: 'text-zinc-600' }, { t: 'Campaign prep pulls Technology load forward', c: 'text-zinc-600' }],
@@ -517,7 +522,7 @@ export function LandingYamlProjectTwinMock() {
           <span className="text-zinc-300">campaign_support</span> applies — labs, tech, and test integration (readiness
           pressure). After go-live, <span className="text-zinc-300">live_campaign_support</span> is operational /
           hypercare-style load, usually lighter on the Technology lane.{' '}
-          <span className="text-zinc-300">National holidays</span> show as short red columns (closed day);{' '}
+          <span className="text-zinc-300">National holidays</span> spike the strip into the red (high displayed load);{' '}
           <span className="text-zinc-300">school breaks</span> add load. The preview opens on Baseline only — enable
           campaign first, then calendar layers when you are ready.
         </p>
@@ -567,60 +572,103 @@ export function LandingYamlProjectTwinMock() {
                   'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
                   !campaignOn
                     ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-100'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300'
+                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300',
+                  campaignEverOn && campaignOn && 'ring-1 ring-inset ring-cyan-500/35'
                 )}
               >
                 <Layers className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 Baseline
               </button>
-              <button
+              <motion.button
                 type="button"
                 onClick={() => setCampaignOn(true)}
                 aria-pressed={campaignOn}
+                initial={false}
+                animate={
+                  pulseWithCampaign
+                    ? {
+                        scale: [1, 1.042, 1],
+                        boxShadow: [...LAYER_PULSE_BOX_SHADOW],
+                      }
+                    : { scale: 1, boxShadow: '0 0 0 0 rgba(0,0,0,0)' }
+                }
+                transition={pulseWithCampaign ? LAYER_PULSE_TRANSITION : { duration: 0.2 }}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
+                  'inline-flex origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
                   campaignOn
                     ? 'border-violet-500/45 bg-violet-500/15 text-violet-100'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300'
+                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300',
+                  campaignEverOn && !campaignOn && 'ring-1 ring-inset ring-violet-500/35'
                 )}
               >
                 <Box className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 With campaign
-              </button>
+              </motion.button>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
+              <motion.button
                 type="button"
-                onClick={() => setPublicHolidaysOn((v) => !v)}
+                disabled={!campaignEverOn}
+                onClick={() => {
+                  setHasClickedNational(true);
+                  setPublicHolidaysOn((v) => !v);
+                }}
                 aria-pressed={publicHolidaysOn}
+                initial={false}
+                animate={
+                  pulseNational
+                    ? {
+                        scale: [1, 1.042, 1],
+                        boxShadow: [...LAYER_PULSE_BOX_SHADOW],
+                      }
+                    : { scale: 1, boxShadow: '0 0 0 0 rgba(0,0,0,0)' }
+                }
+                transition={pulseNational ? LAYER_PULSE_TRANSITION : { duration: 0.2 }}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
+                  'inline-flex origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
                   publicHolidaysOn
                     ? 'border-red-500/50 bg-red-500/14 text-red-100 shadow-[0_0_16px_-4px_rgba(239,68,68,0.35)]'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300'
+                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300',
+                  !campaignEverOn && 'cursor-not-allowed opacity-40 hover:border-white/[0.08] hover:text-zinc-500'
                 )}
               >
                 <Landmark className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 National holidays
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 type="button"
-                onClick={() => setSchoolHolidaysOn((v) => !v)}
+                disabled={!hasClickedNational}
+                onClick={() => {
+                  setHasClickedSchool(true);
+                  setSchoolHolidaysOn((v) => !v);
+                }}
                 aria-pressed={schoolHolidaysOn}
+                initial={false}
+                animate={
+                  pulseSchool
+                    ? {
+                        scale: [1, 1.042, 1],
+                        boxShadow: [...LAYER_PULSE_BOX_SHADOW],
+                      }
+                    : { scale: 1, boxShadow: '0 0 0 0 rgba(0,0,0,0)' }
+                }
+                transition={pulseSchool ? LAYER_PULSE_TRANSITION : { duration: 0.2 }}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
+                  'inline-flex origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
                   schoolHolidaysOn
                     ? 'border-sky-500/45 bg-sky-500/12 text-sky-100'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300'
+                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300',
+                  !hasClickedNational && 'cursor-not-allowed opacity-40 hover:border-white/[0.08] hover:text-zinc-500'
                 )}
               >
                 <Trees className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 School holidays
-              </button>
+              </motion.button>
             </div>
             <p
               id={`${panelId}-layer-hint`}
               className="font-landing text-[10px] leading-snug text-zinc-600"
+              aria-live="polite"
             >
               {layerHint}
             </p>
