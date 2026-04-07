@@ -624,7 +624,7 @@ export function LandingYamlProjectTwinMock() {
           id={`${panelId}-heading`}
           className="font-landing text-balance text-2xl font-semibold leading-snug text-white sm:text-[1.65rem]"
         >
-          Prep, cutover and run — all accounted for in the model
+          Prep, cutover and run, all in the model
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
           Think of the strip as a temperature of pressure across the horizon: calmer, cooler weeks versus stretches where
