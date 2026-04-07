@@ -1,4 +1,3 @@
-import { STORAGE_KEYS } from '@/lib/constants';
 import { APP_VERSION, BUILD_TIME_ISO, GIT_COMMIT_SHORT } from '@/lib/buildMeta';
 import { HeaderClerkOrgSwitcher } from '@/components/HeaderClerkOrgSwitcher';
 import { HeaderClerkUser } from '@/components/HeaderClerkUser';
@@ -22,18 +21,10 @@ export function Header() {
 
   const swDisco = toyboxSwitchClasses(discoModePref);
 
-  const [compact, setCompact] = useState(readHeaderCompact);
+  const [compact, setCompact] = useState(false);
 
   const toggleCompact = useCallback(() => {
-    setCompact((c) => {
-      const next = !c;
-      try {
-        localStorage.setItem(STORAGE_KEYS.header_compact, next ? '1' : '0');
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+    setCompact((c) => !c);
   }, []);
 
   const titleLinkClass = cn(
@@ -55,7 +46,7 @@ export function Header() {
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <h1 className="text-sm font-bold leading-tight tracking-tight text-foreground sm:text-[0.9375rem]">
                 <Link to="/" className={titleLinkClass} title="Landing page" aria-label="Go to landing page">
-                  Experiment: Segment Capacity Workbench
+                  MarketZero Workbench
                 </Link>
               </h1>
               <span
@@ -141,7 +132,7 @@ export function Header() {
                         title="Landing page"
                         aria-label="Go to landing page"
                       >
-                        Experiment: Segment Capacity Workbench
+                        MarketZero Workbench
                       </Link>
                     </h1>
                   </div>
@@ -269,14 +260,6 @@ export function Header() {
       </div>
     </header>
   );
-}
-
-function readHeaderCompact(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEYS.header_compact) === '1';
-  } catch {
-    return false;
-  }
 }
 
 function toyboxSwitchClasses(on: boolean, size: 'md' | 'sm' = 'md') {

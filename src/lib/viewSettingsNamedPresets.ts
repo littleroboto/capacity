@@ -1,7 +1,5 @@
 import { VIEW_SETTINGS_FILE_KIND, type ViewSettingsFileV1 } from '@/lib/viewSettingsPreset';
 
-export const NAMED_VIEW_SETTINGS_STORAGE_KEY = 'capacity:view-settings-named-presets-v1' as const;
-
 const MAX_NAMED_PRESETS = 12;
 
 export type NamedViewSettingsPresetV1 = {
@@ -12,6 +10,9 @@ export type NamedViewSettingsPresetV1 = {
 };
 
 type StoredV1 = { version: 1; presets: NamedViewSettingsPresetV1[] };
+
+/** Session memory only (no localStorage). */
+let namedPresetsMemory: NamedViewSettingsPresetV1[] = [];
 
 function isViewSettingsFileV1(x: unknown): x is ViewSettingsFileV1 {
   if (x === null || typeof x !== 'object') return false;
@@ -31,22 +32,12 @@ function isNamedPreset(x: unknown): x is NamedViewSettingsPresetV1 {
 }
 
 export function loadNamedViewSettingsPresets(): NamedViewSettingsPresetV1[] {
-  try {
-    const raw = localStorage.getItem(NAMED_VIEW_SETTINGS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (parsed === null || typeof parsed !== 'object') return [];
-    const o = parsed as StoredV1;
-    if (o.version !== 1 || !Array.isArray(o.presets)) return [];
-    return o.presets.filter(isNamedPreset);
-  } catch {
-    return [];
-  }
+  return [...namedPresetsMemory];
 }
 
 export function persistNamedViewSettingsPresets(presets: NamedViewSettingsPresetV1[]): void {
   const data: StoredV1 = { version: 1, presets: presets.slice(0, MAX_NAMED_PRESETS) };
-  localStorage.setItem(NAMED_VIEW_SETTINGS_STORAGE_KEY, JSON.stringify(data));
+  namedPresetsMemory = data.presets.filter(isNamedPreset);
 }
 
 export function addNamedViewSettingsPreset(
@@ -61,7 +52,7 @@ export function addNamedViewSettingsPreset(
   if (list.length >= MAX_NAMED_PRESETS) {
     return {
       ok: false,
-      error: `You can save at most ${MAX_NAMED_PRESETS} presets on this device. Delete one to add another.`,
+      error: `You can save at most ${MAX_NAMED_PRESETS} presets in this session. Delete one to add another.`,
     };
   }
 
@@ -82,10 +73,11 @@ export function removeNamedViewSettingsPreset(id: string): void {
   persistNamedViewSettingsPresets(next);
 }
 
+export function clearNamedViewSettingsPresets(): void {
+  namedPresetsMemory = [];
+}
+
+/** @deprecated Use {@link clearNamedViewSettingsPresets}. */
 export function clearNamedViewSettingsPresetsStorage(): void {
-  try {
-    localStorage.removeItem(NAMED_VIEW_SETTINGS_STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
+  clearNamedViewSettingsPresets();
 }

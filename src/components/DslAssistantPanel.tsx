@@ -46,7 +46,7 @@ import { cn } from '@/lib/utils';
 import { useAtcStore } from '@/store/useAtcStore';
 import { BookOpen, KeyRound, Loader2, Send, Square, Eye, EyeOff, Terminal } from 'lucide-react';
 
-/** Persists across browser sessions (localStorage). Legacy sessionStorage value is migrated once. */
+/** Session-only (tab); not localStorage. */
 const OPENAI_API_KEY_STORAGE_KEY = 'cpm_openai_api_key';
 const MAX_USER_CHARS = 8000;
 /** Prior user/assistant pairs in the API payload (excludes the current turn, which is sent as CURRENT_YAML + request). */
@@ -54,20 +54,7 @@ const ASSISTANT_API_HISTORY_MESSAGE_CAP = 28;
 
 function readStoredApiKey(): string {
   try {
-    let v = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) ?? '';
-    if (!v.trim()) {
-      const legacy = sessionStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) ?? '';
-      if (legacy.trim()) {
-        v = legacy.trim();
-        try {
-          localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, v);
-          sessionStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
-        } catch {
-          /* localStorage unavailable (e.g. private mode); keep using in-memory / legacy */
-        }
-      }
-    }
-    return v;
+    return sessionStorage.getItem(OPENAI_API_KEY_STORAGE_KEY)?.trim() ?? '';
   } catch {
     return '';
   }
@@ -130,10 +117,8 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
   const persistKey = useCallback(() => {
     try {
       if (apiKey.trim()) {
-        localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, apiKey.trim());
-        sessionStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
+        sessionStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, apiKey.trim());
       } else {
-        localStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
         sessionStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
       }
     } catch {
@@ -560,7 +545,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
                 ) : null}
               </div>
               <p className="text-[9px] leading-snug text-muted-foreground">
-                Saved in this browser (local storage); sent only to OpenAI from your machine.
+                Saved for this tab (session storage); sent only to OpenAI from your machine.
               </p>
             </div>
           ) : null}
@@ -721,9 +706,9 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
                     </Button>
                   </div>
                   <p className="text-[10px] leading-snug text-muted-foreground">
-                    Stored in this browser&apos;s local storage until you clear site data or remove it here. Your key
-                    never leaves your machine except to OpenAI. Static sites cannot hide secrets from the device owner
-                    — BYOK risk is accepted.
+                    Stored in this tab&apos;s session until you close the tab or remove it here. Your key never leaves
+                    your machine except to OpenAI. Static sites cannot hide secrets from the device owner — BYOK risk is
+                    accepted.
                   </p>
                 </div>
 

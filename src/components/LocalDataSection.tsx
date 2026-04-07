@@ -1,14 +1,12 @@
 import type { ChangeEvent, ReactNode } from 'react';
 import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
-import { STORAGE_KEYS } from '@/lib/constants';
 import {
   addNamedViewSettingsPreset,
-  clearNamedViewSettingsPresetsStorage,
+  clearNamedViewSettingsPresets,
   loadNamedViewSettingsPresets,
   removeNamedViewSettingsPreset,
 } from '@/lib/viewSettingsNamedPresets';
 import type { ViewSettingsExportScope } from '@/lib/viewSettingsPreset';
-import { setAtcDsl } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import { useAtcStore } from '@/store/useAtcStore';
 import { Button } from '@/components/ui/button';
@@ -132,25 +130,17 @@ export function LocalDataPanelContent() {
   );
 
   const clearAppliedDsl = () => {
-    setAtcDsl(null);
-    hydrateFromStorage();
+    const fb = useAtcStore.getState().getLastBootstrapMultiDoc();
+    hydrateFromStorage(fb);
   };
 
   const resetPersistedPrefs = () => {
     if (
       !window.confirm(
-        'Remove saved country, view mode, theme, and pressure mix controls from this browser? The page will reload.'
+        'Reload the app to reset country, view mode, theme, and pressure mix to defaults? In-memory state only — nothing is read from browser storage.'
       )
     ) {
       return;
-    }
-    try {
-      localStorage.removeItem(STORAGE_KEYS.capacity_atc);
-      localStorage.removeItem(STORAGE_KEYS.picker);
-      localStorage.removeItem(STORAGE_KEYS.layer);
-      localStorage.removeItem(STORAGE_KEYS.theme);
-    } catch {
-      /* ignore */
     }
     window.location.reload();
   };
@@ -158,22 +148,12 @@ export function LocalDataPanelContent() {
   const clearAllLocalData = () => {
     if (
       !window.confirm(
-        'Remove all Capacity data in this browser (applied DSL, preferences, and any legacy snapshot list)? The page will reload.'
+        'Reload and clear named view presets for this session? Team YAML is unchanged; this only affects this tab until you reload.'
       )
     ) {
       return;
     }
-    try {
-      localStorage.removeItem(STORAGE_KEYS.atc_scenarios);
-      localStorage.removeItem(STORAGE_KEYS.atc_dsl);
-      localStorage.removeItem(STORAGE_KEYS.capacity_atc);
-      localStorage.removeItem(STORAGE_KEYS.picker);
-      localStorage.removeItem(STORAGE_KEYS.layer);
-      localStorage.removeItem(STORAGE_KEYS.theme);
-      clearNamedViewSettingsPresetsStorage();
-    } catch {
-      /* ignore */
-    }
+    clearNamedViewSettingsPresets();
     window.location.reload();
   };
 
@@ -191,13 +171,11 @@ export function LocalDataPanelContent() {
       <div role="presentation" className="h-px shrink-0 bg-border/70" />
 
       <section className="space-y-2" aria-labelledby="view-device-heading">
-        <SectionHeading id="view-device-heading">View on this device</SectionHeading>
+        <SectionHeading id="view-device-heading">View in this session</SectionHeading>
         <p className="text-[11px] leading-snug text-muted-foreground">
           <span className="font-medium text-foreground/85">Team YAML</span> (Vercel Blob or bundled files) is the shared
-          scenario. <span className="font-medium text-foreground/85">View on this device</span> (saved in this browser)
-          holds heatmap transfer curves, γ, smooth vs banded palette, runway year/quarter filters, isometric 3D toggle,
-          disco, and pressure-mix sliders — export/import JSON if you want the same look on another machine; that does
-          not replace Save to cloud for YAML.
+          scenario. Lens, heatmap transfer, γ, palette, runway filters, and pressure-mix sliders live in memory for this
+          tab only — export/import JSON to copy a look across machines; that does not replace Save to cloud for YAML.
         </p>
         <input
           ref={importFileRef}
@@ -230,9 +208,9 @@ export function LocalDataPanelContent() {
         <div role="presentation" className="h-px shrink-0 bg-border/60" />
 
         <div className="space-y-2">
-          <p className="text-[11px] font-medium text-foreground/85">Named presets on this device</p>
+          <p className="text-[11px] font-medium text-foreground/85">Named presets (this tab)</p>
           <p className="text-[10px] leading-snug text-muted-foreground">
-            Same JSON format as export/import — stored only in this browser (not team YAML). Use{' '}
+            Same JSON format as export/import — kept in memory for this session only (not team YAML). Use{' '}
             <span className="font-medium text-foreground/80">Preferences</span> for a shareable lens;{' '}
             <span className="font-medium text-foreground/80">Full</span> if you want market + lens in the preset.
           </p>
@@ -327,16 +305,17 @@ export function LocalDataPanelContent() {
       <div role="presentation" className="h-px shrink-0 bg-border/70" />
 
       <section className="space-y-2" aria-labelledby="workspace-reset-heading">
-        <SectionHeading id="workspace-reset-heading">Reset browser storage</SectionHeading>
+        <SectionHeading id="workspace-reset-heading">Reset session</SectionHeading>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Does not change the team cloud copy. Use when this browser is out of date or you want a clean slate.
+          Does not change the team cloud copy. Reload resets in-memory preferences; “Clear applied DSL” reapplies the
+          last bundled or cloud YAML from when this tab loaded.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" onClick={clearAppliedDsl}>
             Clear applied DSL
           </Button>
           <Button type="button" variant="secondary" size="sm" onClick={resetPersistedPrefs}>
-            Reset preferences
+            Reload & reset defaults
           </Button>
           <Button
             type="button"
@@ -345,7 +324,7 @@ export function LocalDataPanelContent() {
             className="border-red-500/50 text-red-600 hover:bg-red-500/10 dark:text-red-400"
             onClick={clearAllLocalData}
           >
-            Clear everything
+            Clear presets &amp; reload
           </Button>
         </div>
       </section>

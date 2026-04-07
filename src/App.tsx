@@ -13,7 +13,6 @@ import { RunwayGrid, type SlotSelection } from '@/components/RunwayGrid';
 import { looksLikeYamlDsl } from '@/lib/dslGuards';
 import { defaultDslForMarket } from '@/lib/marketDslSeeds';
 import { publicAsset } from '@/lib/publicUrl';
-import { setAtcDsl } from '@/lib/storage';
 import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
 import { fetchRunwayMarketOrder } from '@/lib/runwayManifest';
 import { isRunwayMultiMarketStrip } from '@/lib/markets';
@@ -30,8 +29,6 @@ import {
   waitForSharedDslFetchAuth,
 } from '@/lib/sharedDslSync';
 
-const DSL_PANEL_COLLAPSED_STORAGE_KEY = 'capacity:dsl-panel-collapsed';
-const DSL_SPLIT_RIGHT_PX_KEY = 'capacity:dsl-split-right-px';
 const MIN_DSL_PANEL_PX = 280;
 const DEFAULT_DSL_PANEL_PX = 520;
 
@@ -51,42 +48,14 @@ export default function App() {
   const setViewMode = useAtcStore((s) => s.setViewMode);
   const theme = useAtcStore((s) => s.theme);
 
-  const [dslPanelCollapsed, setDslPanelCollapsed] = useState(() => {
-    try {
-      if (typeof localStorage === 'undefined') return true;
-      const v = localStorage.getItem(DSL_PANEL_COLLAPSED_STORAGE_KEY);
-      if (v === '1') return true;
-      if (v === '0') return false;
-      return true;
-    } catch {
-      return true;
-    }
-  });
+  const [dslPanelCollapsed, setDslPanelCollapsed] = useState(true);
   const lgUp = useMediaMinWidth(1024);
   const dslPanelLayoutCollapsed = dslPanelCollapsed && lgUp;
   const mainGridRef = useRef<HTMLDivElement>(null);
   const [cloudLoadWarning, setCloudLoadWarning] = useState<string | null>(null);
   const [mobileCodeFullscreen, setMobileCodeFullscreen] = useState(false);
 
-  const [dslRightWidthPx, setDslRightWidthPx] = useState(() => {
-    try {
-      if (typeof localStorage === 'undefined') return DEFAULT_DSL_PANEL_PX;
-      const v = localStorage.getItem(DSL_SPLIT_RIGHT_PX_KEY);
-      const n = v ? Number.parseInt(v, 10) : NaN;
-      if (Number.isFinite(n) && n >= MIN_DSL_PANEL_PX) return Math.min(n, 2400);
-    } catch {
-      /* ignore */
-    }
-    return DEFAULT_DSL_PANEL_PX;
-  });
-
-  const persistDslSplit = useCallback((w: number) => {
-    try {
-      localStorage.setItem(DSL_SPLIT_RIGHT_PX_KEY, String(Math.round(w)));
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const [dslRightWidthPx, setDslRightWidthPx] = useState(DEFAULT_DSL_PANEL_PX);
 
   useEffect(() => {
     if (!lgUp || dslPanelLayoutCollapsed || !mainGridRef.current) return;
@@ -120,19 +89,11 @@ export default function App() {
   }, [lgUp, dslPanelLayoutCollapsed]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(DSL_PANEL_COLLAPSED_STORAGE_KEY, dslPanelCollapsed ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
-  }, [dslPanelCollapsed]);
-
-  useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
   useEffect(() => {
-    document.title = 'Segment Capacity Workbench';
+    document.title = 'MarketZero Workbench';
   }, []);
 
   useEffect(() => {
@@ -198,7 +159,6 @@ export default function App() {
         const detail = await fetchSharedDslDetailed();
         if (cancelled) return;
         if (detail.ok) {
-          setAtcDsl(null);
           setSharedDslEtag(detail.etag || null);
           multiDocFallback = detail.yaml;
           const split = splitToDslByMarket(detail.yaml);
@@ -219,9 +179,6 @@ export default function App() {
       setRunwayMarketOrder(orderEffective);
       setDslByMarket(dslByMarket);
       hydrateFromStorage(multiDocFallback);
-      if (isSharedDslEnabled()) {
-        setAtcDsl(mergeStateToFullMultiDoc(useAtcStore.getState()));
-      }
       markSharedDslBaseline(mergeStateToFullMultiDoc(useAtcStore.getState()));
 
       if (!cancelled && isSharedDslEnabled()) {
@@ -333,7 +290,6 @@ export default function App() {
                 <WorkbenchSplitHandle
                   rightWidthPx={dslRightWidthPx}
                   onWidthChange={setDslRightWidthPx}
-                  onDragEnd={persistDslSplit}
                   containerRef={mainGridRef}
                   minRightPx={MIN_DSL_PANEL_PX}
                 />

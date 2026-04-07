@@ -1,7 +1,6 @@
 import { isClerkConfigured } from '@/lib/clerkConfig';
 import { looksLikeHtmlOrSpaShell, looksLikeYamlDsl } from '@/lib/dslGuards';
 import { mergeStateToFullMultiDoc } from '@/lib/multiDocMarketYaml';
-import { setAtcDsl } from '@/lib/storage';
 import { useAtcStore } from '@/store/useAtcStore';
 
 const SESSION_BEARER_KEY = 'capacity:shared-dsl-bearer';
@@ -505,7 +504,6 @@ export async function pushCurrentWorkspaceToCloud(): Promise<PutSharedDslResult>
   const r = await putSharedDsl(full, lastKnownEtag);
   if (r.ok) {
     lastPushedYaml = full;
-    setAtcDsl(full);
   }
   return r;
 }
@@ -517,11 +515,9 @@ export async function pullSharedDslToStore(): Promise<boolean> {
   clearOutboundSyncDebounce();
   suppressSharedDslOutboundSync = true;
   try {
-    setAtcDsl(null);
     setSharedDslEtag(r.etag || null);
     useAtcStore.getState().hydrateFromStorage(r.yaml);
     const full = mergeStateToFullMultiDoc(useAtcStore.getState()).trim();
-    setAtcDsl(full);
     markSharedDslBaseline(full);
     notifySharedDslConflictCleared();
     return true;
@@ -554,7 +550,6 @@ export function initSharedDslOutboundSync(): () => void {
         }
         if (r.ok) {
           lastPushedYaml = latest;
-          setAtcDsl(latest);
         } else if (r.errorMessage) {
           console.warn('[shared-dsl] Auto-save failed:', r.errorMessage);
         }

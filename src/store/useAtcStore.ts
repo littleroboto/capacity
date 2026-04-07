@@ -1,13 +1,11 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { normalizeViewModeId, STORAGE_KEYS, type ViewModeId } from '@/lib/constants';
+import { normalizeViewModeId, type ViewModeId } from '@/lib/constants';
 import { parseYamlToConfigs, runPipelineFromDsl } from '@/engine/pipeline';
 import type { RiskRow } from '@/engine/riskModel';
 import {
   applyRiskTuningPatch,
   DEFAULT_RISK_TUNING,
   riskTuningForPipelineView,
-  riskTuningFromPersisted,
   type RiskModelTuning,
 } from '@/engine/riskModelTuning';
 import type { MarketConfig } from '@/engine/types';
@@ -24,7 +22,6 @@ import {
   gammaFocusMarket,
   isRunwayMultiMarketStrip,
   runwayCompareMarketIds,
-  RUNWAY_ALL_MARKETS_VALUE,
 } from '@/lib/markets';
 
 /** Optional `setCountry` behaviour (e.g. remember LIOM when drilling from compare-all). */
@@ -68,7 +65,7 @@ import {
 import { patchDslHolidayStaffingMultiplier, type HolidayStaffingBlockKind } from '@/lib/dslHolidayStaffingPatch';
 import { patchDslTechWeeklyPattern, type TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import type { PaydayKnotTuple } from '@/engine/paydayMonthShape';
-import { parseRiskHeatmapCurve, type RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
+import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
 import {
   DEFAULT_HEATMAP_MONO_COLOR,
   normalizeHeatmapMonoHex,
@@ -76,38 +73,18 @@ import {
 } from '@/lib/riskHeatmapColors';
 import type { TechWorkloadScope } from '@/lib/runwayViewMetrics';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
-import { getAtcDsl, setAtcDsl, setStored, getStored } from '@/lib/storage';
 import {
   buildViewSettingsFile,
   parseViewSettingsFile,
   pickViewSettingsPayload,
-  sliceViewSettingsForPersist,
   type ViewSettingsExportScope,
   type ViewSettingsFileV1,
   type ViewSettingsPayloadKey,
   type ViewSettingsPayloadV1,
 } from '@/lib/viewSettingsPreset';
 
-/** Debounce writes to `atc_dsl` while painting Market IT `weekday_intensity` (YAML; legacy `weekly_pattern`). */
-let atcDslTechRhythmPersistTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Debounce writes to `atc_dsl` while editing `trading.monthly_pattern`. */
-let atcDslTradingMonthlyPersistTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Debounce writes while editing `deployment_risk_context_month_curve`. */
-let atcDslDeploymentRiskContextPersistTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Debounce writes to `atc_dsl` while editing `trading.weekly_pattern`. */
-let atcDslTradingWeeklyPersistTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Debounce writes to `atc_dsl` while editing `trading.payday_month_knot_multipliers`. */
-let atcDslTradingPaydayPersistTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Debounce writes to `atc_dsl` while editing `extra_support_*` (YAML; legacy `support_*_pattern`). */
-let atcDslTechSupportPersistTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Debounce writes while editing tech capacity planning (resources / tech.available / holiday staffing). */
-let atcDslTechCapacityPlanningPersistTimer: ReturnType<typeof setTimeout> | null = null;
+/** Last bundle/server multi-doc passed to hydrateFromStorage (session only; not localStorage). */
+let lastBootstrapMultiDoc: string | undefined;
 
 function countParsedMarkets(dsl: string): number {
   try {
@@ -238,8 +215,10 @@ type AtcState = {
   setHolidayStaffingMultiplier: (kind: HolidayStaffingBlockKind, value: number) => void;
   applyDsl: (text?: string) => void;
   resetDsl: () => void;
-  /** `multiDocFallback`: bundled all-markets YAML when `atc_dsl` is empty (first visit). */
+  /** `multiDocFallback`: bundled or cloud multi-doc YAML from bootstrap (session memory only). */
   hydrateFromStorage: (multiDocFallback?: string) => void;
+  /** Last valid `multiDocFallback` from bootstrap (for “reset DSL” without reload). */
+  getLastBootstrapMultiDoc: () => string | undefined;
   /** JSON snapshot of persisted UI state (heatmap, filters, tuning — not YAML). */
   exportViewSettingsFile: (scope: ViewSettingsExportScope, label?: string) => ViewSettingsFileV1;
   /** Apply a file from {@link exportViewSettingsFile} or {@link parseViewSettingsFile}. */
@@ -262,16 +241,10 @@ function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) =>
   });
 }
 
-function initialViewMode(): ViewModeId {
-  return normalizeViewModeId(getStored('layer'));
-}
-
-export const useAtcStore = create<AtcState>()(
-  persist(
-    (set, get) => ({
-      country: getStored('picker') || 'DE',
-      viewMode: initialViewMode(),
-      theme: getStored('theme') === 'light' ? 'light' : 'dark',
+export const useAtcStore = create<AtcState>()((set, get) => ({
+      country: 'DE',
+      viewMode: normalizeViewModeId(null),
+      theme: 'dark',
       runwayMarketOrder: [...FALLBACK_RUNWAY_MARKET_IDS],
       dslText: '',
       dslByMarket: {},
@@ -315,7 +288,6 @@ export const useAtcStore = create<AtcState>()(
             ? options.returnPickerForBack ?? null
             : null;
 
-        setStored('picker', c);
         const prev = get().country;
         let dslByMarket = { ...get().dslByMarket };
         if (!isRunwayMultiMarketStrip(prev)) {
@@ -377,12 +349,10 @@ export const useAtcStore = create<AtcState>()(
         if (prev === 'code' && v !== 'code') {
           get().applyDsl();
         }
-        setStored('layer', v);
         set({ viewMode: v });
       },
 
       setTheme: (t) => {
-        setStored('theme', t);
         set({ theme: t });
         document.documentElement.classList.toggle('dark', t === 'dark');
       },
@@ -505,11 +475,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTechRhythmPersistTimer != null) clearTimeout(atcDslTechRhythmPersistTimer);
-        atcDslTechRhythmPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTechRhythmPersistTimer = null;
-        }, 450);
       },
 
       setTradingMonthlyPattern: (pattern: TradingMonthlyPatternPatch) => {
@@ -528,11 +493,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTradingMonthlyPersistTimer != null) clearTimeout(atcDslTradingMonthlyPersistTimer);
-        atcDslTradingMonthlyPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTradingMonthlyPersistTimer = null;
-        }, 450);
       },
 
       setDeploymentRiskContextMonthCurve: (pattern: DeploymentRiskContextMonthPatch) => {
@@ -551,13 +511,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslDeploymentRiskContextPersistTimer != null) {
-          clearTimeout(atcDslDeploymentRiskContextPersistTimer);
-        }
-        atcDslDeploymentRiskContextPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslDeploymentRiskContextPersistTimer = null;
-        }, 450);
       },
 
       setTradingWeeklyPattern: (pattern: TradingWeeklyPatternPatch) => {
@@ -576,11 +529,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTradingWeeklyPersistTimer != null) clearTimeout(atcDslTradingWeeklyPersistTimer);
-        atcDslTradingWeeklyPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTradingWeeklyPersistTimer = null;
-        }, 450);
       },
 
       setTradingPaydayKnotMultipliers: (knots: PaydayKnotTuple) => {
@@ -599,11 +547,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTradingPaydayPersistTimer != null) clearTimeout(atcDslTradingPaydayPersistTimer);
-        atcDslTradingPaydayPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTradingPaydayPersistTimer = null;
-        }, 450);
       },
 
       setTechSupportWeeklyPattern: (pattern: TechSupportWeeklyPatternPatch) => {
@@ -622,11 +565,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTechSupportPersistTimer != null) clearTimeout(atcDslTechSupportPersistTimer);
-        atcDslTechSupportPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTechSupportPersistTimer = null;
-        }, 450);
       },
 
       setTechSupportMonthlyPattern: (pattern: TechSupportMonthlyPatternPatch) => {
@@ -645,11 +583,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTechSupportPersistTimer != null) clearTimeout(atcDslTechSupportPersistTimer);
-        atcDslTechSupportPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTechSupportPersistTimer = null;
-        }, 450);
       },
 
       setResourcesLabsMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => {
@@ -668,11 +601,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTechCapacityPlanningPersistTimer != null) clearTimeout(atcDslTechCapacityPlanningPersistTimer);
-        atcDslTechCapacityPlanningPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTechCapacityPlanningPersistTimer = null;
-        }, 450);
       },
 
       setResourcesStaffMonthlyPattern: (pattern: ResourceCapacityMonthlyPatternPatch) => {
@@ -697,11 +625,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTechCapacityPlanningPersistTimer != null) clearTimeout(atcDslTechCapacityPlanningPersistTimer);
-        atcDslTechCapacityPlanningPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTechCapacityPlanningPersistTimer = null;
-        }, 450);
       },
 
       setTechAvailableCapacityPattern: (pattern: TechAvailableCapacityPatternPatch) => {
@@ -720,11 +643,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTechCapacityPlanningPersistTimer != null) clearTimeout(atcDslTechCapacityPlanningPersistTimer);
-        atcDslTechCapacityPlanningPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTechCapacityPlanningPersistTimer = null;
-        }, 450);
       },
 
       setHolidayStaffingMultiplier: (kind: HolidayStaffingBlockKind, value: number) => {
@@ -743,11 +661,6 @@ export const useAtcStore = create<AtcState>()(
         }
         set({ dslText, dslByMarket });
         rerunPipeline(get, set);
-        if (atcDslTechCapacityPlanningPersistTimer != null) clearTimeout(atcDslTechCapacityPlanningPersistTimer);
-        atcDslTechCapacityPlanningPersistTimer = setTimeout(() => {
-          setAtcDsl(mergeStateToFullMultiDoc(get()));
-          atcDslTechCapacityPlanningPersistTimer = null;
-        }, 450);
       },
 
       applyDsl: (text) => {
@@ -779,7 +692,6 @@ export const useAtcStore = create<AtcState>()(
         if (Object.keys(split).length) {
           dslByMarket = { ...dslByMarket, ...split };
         }
-        setAtcDsl(fullFinal);
         const nextEditorText = isRunwayMultiMarketStrip(co)
           ? mergeMarketsToMultiDocYaml(dslByMarket, runwayCompareMarketIds(co, order))
           : dsl;
@@ -820,7 +732,6 @@ export const useAtcStore = create<AtcState>()(
             nextByMarket[country] ??
             defaultDslForMarket(fallbackMarket);
         set({ dslText: looksLikeYamlDsl(editorText) ? editorText : full, dslByMarket: nextByMarket });
-        setAtcDsl(full);
         const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, country));
         set({
           riskSurface: r.riskSurface,
@@ -829,8 +740,12 @@ export const useAtcStore = create<AtcState>()(
         });
       },
 
+      getLastBootstrapMultiDoc: () => lastBootstrapMultiDoc,
+
       hydrateFromStorage: (multiDocFallback) => {
-        const atc = getAtcDsl();
+        if (multiDocFallback?.trim() && looksLikeYamlDsl(multiDocFallback)) {
+          lastBootstrapMultiDoc = multiDocFallback.trim();
+        }
         const { country, dslByMarket, riskTuning, runwayMarketOrder } = get();
         const mergedFromDisk = mergeMarketsToMultiDocYaml(dslByMarket, runwayMarketOrder);
         const firstId = runwayMarketOrder[0] ?? FALLBACK_RUNWAY_MARKET_IDS[0]!;
@@ -859,19 +774,12 @@ export const useAtcStore = create<AtcState>()(
             ? multiDocFallback.trim()
             : mergedFromDisk;
         const mergedOk = merged.length > 0 && looksLikeYamlDsl(merged);
-        const storedOk = Boolean(atc?.trim()) && looksLikeYamlDsl(atc);
-        if (atc?.trim() && !storedOk) {
-          setAtcDsl(null);
-        }
+        const diskOk = mergedFromDisk.length > 0 && looksLikeYamlDsl(mergedFromDisk);
         const bundledCount = mergedOk ? countParsedMarkets(merged) : 0;
-        const storedCount = storedOk ? countParsedMarkets(atc!) : 0;
-        /** Shipped market list grew (e.g. IT/ES/PL): do not let an old `atc_dsl` win over the fetched bundle. */
-        const preferBundled =
-          mergedOk && bundledCount > 0 && (!storedOk || storedCount < bundledCount);
-        const dsl = preferBundled ? merged : storedOk ? atc! : mergedOk ? merged : singleFallback;
-        if (preferBundled && storedOk && storedCount < bundledCount) {
-          setAtcDsl(merged);
-        }
+        const diskCount = diskOk ? countParsedMarkets(mergedFromDisk) : 0;
+        /** Prefer bootstrap/cloud multi-doc when it has more markets than in-memory merge (e.g. new shipped markets). */
+        const preferBundled = mergedOk && bundledCount > 0 && (!diskOk || bundledCount > diskCount);
+        const dsl = preferBundled ? merged : diskOk ? mergedFromDisk : mergedOk ? merged : singleFallback;
         const split = splitToDslByMarket(dsl);
         const nextByMarket =
           Object.keys(split).length > 0 ? { ...get().dslByMarket, ...split } : { ...get().dslByMarket };
@@ -897,280 +805,4 @@ export const useAtcStore = create<AtcState>()(
         const th = get().theme;
         document.documentElement.classList.toggle('dark', th === 'dark');
       },
-    }),
-    {
-      name: STORAGE_KEYS.capacity_atc,
-      /** v1: balanced risk tuning. v2: default heatmap mono. v3: default temperature-band (spectrum) heatmap. v4: tech workload scope. v5: DSL LLM assistant toybox toggle. v6: runway year/quarter filter. v7: runway + following quarter. v8: heatmap tail power. v9: business heatmap pressure offset. v10: market-risk-only heatmap transfer state. v11: unified global heatmap transfer (drop lens-specific keys). v12: default smooth spectrum ramp (continuous) for temperature heatmap. */
-      version: 12,
-      migrate: (persistedState, fromVersion) => {
-        let ps = { ...(persistedState ?? {}) } as Record<string, unknown>;
-        if (fromVersion < 1) {
-          ps = {
-            ...ps,
-            riskTuning: riskTuningFromPersisted({}),
-          };
-        }
-        if (fromVersion < 2) {
-          ps = {
-            ...ps,
-            heatmapRenderStyle: 'mono',
-            heatmapMonoColor: normalizeHeatmapMonoHex(DEFAULT_HEATMAP_MONO_COLOR),
-          };
-        }
-        if (fromVersion < 3) {
-          ps = {
-            ...ps,
-            heatmapRenderStyle: 'spectrum',
-          };
-        }
-        if (fromVersion < 4) {
-          ps = {
-            ...ps,
-            techWorkloadScope: 'all',
-          };
-        }
-        if (fromVersion < 5) {
-          ps = {
-            ...ps,
-            dslLlmAssistantEnabled: false,
-          };
-        }
-        if (fromVersion < 6) {
-          ps = {
-            ...ps,
-            runwayFilterYear: null,
-            runwayFilterQuarter: null,
-          };
-        }
-        if (fromVersion < 7) {
-          ps = {
-            ...ps,
-            runwayIncludeFollowingQuarter: false,
-          };
-        }
-        if (fromVersion < 8) {
-          ps = {
-            ...ps,
-            riskHeatmapTailPower: 1,
-          };
-        }
-        if (fromVersion < 9) {
-          ps = {
-            ...ps,
-            riskHeatmapBusinessPressureOffset: 0,
-          };
-        }
-        if (fromVersion < 10) {
-          const curveRaw = ps.riskHeatmapCurve;
-          const gammaBiz =
-            typeof ps.riskHeatmapGammaBusiness === 'number' && Number.isFinite(ps.riskHeatmapGammaBusiness)
-              ? ps.riskHeatmapGammaBusiness
-              : typeof ps.riskHeatmapGamma === 'number' && Number.isFinite(ps.riskHeatmapGamma)
-                ? ps.riskHeatmapGamma
-                : 1;
-          const g = Math.min(3, Math.max(0.35, Math.round(gammaBiz * 100) / 100));
-          const tail =
-            typeof ps.riskHeatmapTailPower === 'number' && Number.isFinite(ps.riskHeatmapTailPower)
-              ? ps.riskHeatmapTailPower
-              : 1;
-          const tp = Math.min(2.75, Math.max(1, Math.round(tail * 100) / 100));
-          ps = {
-            ...ps,
-            marketRiskHeatmapCurve: parseRiskHeatmapCurve(curveRaw),
-            marketRiskHeatmapGamma: g,
-            marketRiskHeatmapTailPower: tp,
-          };
-        }
-        if (fromVersion < 11) {
-          const r = ps as Record<string, unknown>;
-          const mainCurve = parseRiskHeatmapCurve(
-            typeof r.riskHeatmapCurve === 'string' ? r.riskHeatmapCurve : undefined
-          );
-          const mCurve = parseRiskHeatmapCurve(
-            typeof r.marketRiskHeatmapCurve === 'string' ? r.marketRiskHeatmapCurve : undefined
-          );
-          const rg =
-            typeof r.riskHeatmapGamma === 'number' && Number.isFinite(r.riskHeatmapGamma)
-              ? r.riskHeatmapGamma
-              : 1;
-          const rt =
-            typeof r.riskHeatmapGammaTech === 'number' && Number.isFinite(r.riskHeatmapGammaTech)
-              ? r.riskHeatmapGammaTech
-              : rg;
-          const rb =
-            typeof r.riskHeatmapGammaBusiness === 'number' && Number.isFinite(r.riskHeatmapGammaBusiness)
-              ? r.riskHeatmapGammaBusiness
-              : rg;
-          const tail =
-            typeof r.riskHeatmapTailPower === 'number' && Number.isFinite(r.riskHeatmapTailPower) && r.riskHeatmapTailPower >= 1
-              ? r.riskHeatmapTailPower
-              : 1;
-          const tailClamped = Math.min(2.75, Math.max(1, Math.round(tail * 100) / 100));
-
-          const mg =
-            typeof r.marketRiskHeatmapGamma === 'number' && Number.isFinite(r.marketRiskHeatmapGamma)
-              ? r.marketRiskHeatmapGamma
-              : 1;
-          const mt =
-            typeof r.marketRiskHeatmapTailPower === 'number' &&
-            Number.isFinite(r.marketRiskHeatmapTailPower) &&
-            r.marketRiskHeatmapTailPower >= 1
-              ? r.marketRiskHeatmapTailPower
-              : 1;
-          const mtClamped = Math.min(2.75, Math.max(1, Math.round(mt * 100) / 100));
-
-          const mainIsDefault =
-            mainCurve === 'power' &&
-            Math.abs(rg - 1) < 1e-9 &&
-            Math.abs(rt - 1) < 1e-9 &&
-            Math.abs(rb - 1) < 1e-9 &&
-            Math.abs(tailClamped - 1) < 1e-9;
-
-          const marketTuned =
-            mCurve !== 'power' || Math.abs(mg - 1) > 1e-9 || Math.abs(mtClamped - 1) > 1e-9;
-
-          if (mainIsDefault && marketTuned) {
-            const g = Math.min(3, Math.max(0.35, Math.round(mg * 100) / 100));
-            const tp = mtClamped;
-            r.riskHeatmapCurve = mCurve;
-            r.riskHeatmapGamma = g;
-            r.riskHeatmapGammaTech = g;
-            r.riskHeatmapGammaBusiness = g;
-            r.riskHeatmapTailPower = tp;
-          }
-
-          delete r.marketRiskHeatmapCurve;
-          delete r.marketRiskHeatmapGamma;
-          delete r.marketRiskHeatmapTailPower;
-        }
-        if (fromVersion < 12) {
-          ps = {
-            ...ps,
-            heatmapSpectrumContinuous: true,
-          };
-        }
-        return ps;
-      },
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<AtcState> & {
-          runwayCompareAllMarkets?: boolean;
-          runwayCompareSvgHeatmap?: boolean;
-          runwaySvgHeatmap?: boolean;
-        };
-        const {
-          stressCutoff: _legacyStressCutoff,
-          riskHeatmapStressCutoff: _dropStressCutoff,
-          runwayCompareSvgHeatmap: legacyCompareSvg,
-          runwaySvgHeatmap: persistedSvg,
-          ...pWithoutStress
-        } = p as Partial<AtcState> & {
-          stressCutoff?: number;
-          riskHeatmapStressCutoff?: number;
-          runwayCompareSvgHeatmap?: boolean;
-          runwaySvgHeatmap?: boolean;
-        };
-        const base = { ...current, ...pWithoutStress };
-        let country = base.country;
-        if (p.runwayCompareAllMarkets === true) {
-          country = RUNWAY_ALL_MARKETS_VALUE;
-          setStored('picker', country);
-        }
-        const { runwayCompareAllMarkets: _drop, ...rest } = base as typeof base & {
-          runwayCompareAllMarkets?: boolean;
-        };
-        const runwaySvgHeatmap =
-          typeof persistedSvg === 'boolean'
-            ? persistedSvg
-            : typeof legacyCompareSvg === 'boolean'
-              ? legacyCompareSvg
-              : current.runwaySvgHeatmap;
-        const heatmapRenderStyle: HeatmapRenderStyle =
-          base.heatmapRenderStyle === 'mono' || base.heatmapRenderStyle === 'spectrum'
-            ? base.heatmapRenderStyle
-            : current.heatmapRenderStyle;
-        const heatmapSpectrumContinuous =
-          typeof base.heatmapSpectrumContinuous === 'boolean'
-            ? base.heatmapSpectrumContinuous
-            : current.heatmapSpectrumContinuous;
-        const heatmapMonoColor = normalizeHeatmapMonoHex(
-          typeof base.heatmapMonoColor === 'string' ? base.heatmapMonoColor : current.heatmapMonoColor
-        );
-        const theme: 'light' | 'dark' =
-          base.theme === 'light' || base.theme === 'dark' ? base.theme : current.theme;
-        const tw = base.techWorkloadScope;
-        const techWorkloadScope: TechWorkloadScope =
-          tw === 'bau' || tw === 'project' || tw === 'all' ? tw : 'all';
-        const dslLlmAssistantEnabled =
-          typeof base.dslLlmAssistantEnabled === 'boolean'
-            ? base.dslLlmAssistantEnabled
-            : current.dslLlmAssistantEnabled;
-        const runwayFilterYear =
-          typeof base.runwayFilterYear === 'number' && Number.isFinite(base.runwayFilterYear)
-            ? base.runwayFilterYear
-            : base.runwayFilterYear === null
-              ? null
-              : current.runwayFilterYear;
-        const rq = base.runwayFilterQuarter;
-        const runwayFilterQuarter: RunwayQuarter | null =
-          rq === 1 || rq === 2 || rq === 3 || rq === 4 ? rq : rq === null ? null : current.runwayFilterQuarter;
-        const runwayIncludeFollowingQuarter =
-          typeof base.runwayIncludeFollowingQuarter === 'boolean'
-            ? base.runwayIncludeFollowingQuarter
-            : current.runwayIncludeFollowingQuarter;
-        const rtp = base.riskHeatmapTailPower;
-        const riskHeatmapTailPower =
-          typeof rtp === 'number' && Number.isFinite(rtp) && rtp >= 1
-            ? Math.min(2.75, Math.max(1, Math.round(rtp * 100) / 100))
-            : current.riskHeatmapTailPower;
-        const rbo = base.riskHeatmapBusinessPressureOffset;
-        const riskHeatmapBusinessPressureOffset =
-          typeof rbo === 'number' && Number.isFinite(rbo)
-            ? Math.min(0.5, Math.max(-0.5, Math.round(rbo * 100) / 100))
-            : current.riskHeatmapBusinessPressureOffset;
-        const riskHeatmapCurve = parseRiskHeatmapCurve(
-          base.riskHeatmapCurve ?? current.riskHeatmapCurve
-        );
-        const clampGamma = (x: unknown, fallback: number) =>
-          typeof x === 'number' && Number.isFinite(x)
-            ? Math.min(3, Math.max(0.35, Math.round(x * 100) / 100))
-            : fallback;
-        const riskHeatmapGamma = clampGamma(base.riskHeatmapGamma, current.riskHeatmapGamma);
-        const riskHeatmapGammaTech = clampGamma(
-          base.riskHeatmapGammaTech,
-          current.riskHeatmapGammaTech
-        );
-        const riskHeatmapGammaBusiness = clampGamma(
-          base.riskHeatmapGammaBusiness,
-          current.riskHeatmapGammaBusiness
-        );
-        return {
-          ...rest,
-          country,
-          viewMode: normalizeViewModeId(typeof base.viewMode === 'string' ? base.viewMode : 'combined'),
-          riskTuning: riskTuningFromPersisted(base.riskTuning as Partial<RiskModelTuning>),
-          runwaySvgHeatmap,
-          heatmapRenderStyle,
-          heatmapMonoColor,
-          heatmapSpectrumContinuous,
-          theme,
-          techWorkloadScope,
-          dslLlmAssistantEnabled,
-          runwayFilterYear,
-          runwayFilterQuarter,
-          runwayIncludeFollowingQuarter,
-          riskHeatmapTailPower,
-          riskHeatmapBusinessPressureOffset,
-          riskHeatmapCurve,
-          riskHeatmapGamma,
-          riskHeatmapGammaTech,
-          riskHeatmapGammaBusiness,
-        };
-      },
-      partialize: (s) =>
-        sliceViewSettingsForPersist(s as unknown as Record<ViewSettingsPayloadKey, unknown>) as Pick<
-          AtcState,
-          ViewSettingsPayloadKey
-        >,
-    }
-  )
-);
+}));

@@ -104,8 +104,6 @@ const SWOOSH_DURATION_SEC = 0.42;
 const SWOOSH_POST_MS = Math.ceil((SWOOSH_MAX_STAGGER_SEC + SWOOSH_DURATION_SEC) * 1000) + 120;
 const SWOOSH_EASE = [0.2, 0.88, 0.22, 1] as const;
 
-const RUNWAY_DIM_PAST_DAYS_STORAGE_KEY = 'capacity:runway-dim-past-days';
-const RUNWAY_CELL_PX_STORAGE_KEY = 'capacity:runway-cell-px';
 
 /** Title-bar icon buttons: same surface language as `Button` outline / ghost (`accent` hover, `ring` focus). */
 const RUNWAY_TOOLBAR_ICON_BTN = cn(
@@ -1368,28 +1366,9 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
   /** LIOM compare: horizontal scrollport — measured to pick a cell size that fits the main heatmap column. */
   const compareScrollRef = useRef<HTMLDivElement>(null);
   const [pngExporting, setPngExporting] = useState(false);
-  const [dimPastDays, setDimPastDays] = useState(() => {
-    try {
-      return (
-        typeof localStorage !== 'undefined' &&
-        localStorage.getItem(RUNWAY_DIM_PAST_DAYS_STORAGE_KEY) === '1'
-      );
-    } catch {
-      return false;
-    }
-  });
+  const [dimPastDays, setDimPastDays] = useState(false);
 
-  const [runwayCellPx, setRunwayCellPx] = useState(() => {
-    try {
-      if (typeof localStorage === 'undefined') return CELL_PX;
-      const raw = localStorage.getItem(RUNWAY_CELL_PX_STORAGE_KEY);
-      const n = raw ? Number.parseInt(raw, 10) : NaN;
-      if (Number.isFinite(n)) return snapRunwayCellPx(n);
-    } catch {
-      /* ignore */
-    }
-    return CELL_PX;
-  });
+  const [runwayCellPx, setRunwayCellPx] = useState(CELL_PX);
 
   const cellPx = runwayCellPx;
 
@@ -1513,22 +1492,6 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     countrySwitchLoading,
     showIso3d,
   ]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(RUNWAY_DIM_PAST_DAYS_STORAGE_KEY, dimPastDays ? '1' : '0');
-    } catch {
-      /* ignore */
-    }
-  }, [dimPastDays]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(RUNWAY_CELL_PX_STORAGE_KEY, String(runwayCellPx));
-    } catch {
-      /* ignore */
-    }
-  }, [runwayCellPx]);
 
   const dismissTip = useCallback(() => {
     setTip(null);

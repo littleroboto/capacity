@@ -82,9 +82,9 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           <DialogTitle>Workspace</DialogTitle>
           <DialogDescription className="text-pretty">
             Team YAML on the cloud (when enabled) is separate from{' '}
-            <strong className="font-medium text-foreground">view settings in this browser</strong> (heatmap transfer,
-            filters, palette). Use <span className="font-medium text-foreground/90">View on this device</span> to export
-            or import that JSON — it does not replace Save to cloud. Reset options apply only to local storage.
+            <strong className="font-medium text-foreground">view settings in this session</strong> (heatmap transfer,
+            filters, palette). Use <span className="font-medium text-foreground/90">View in this session</span> to export
+            or import that JSON — it does not replace Save to cloud. Reset options only affect this tab until reload.
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">

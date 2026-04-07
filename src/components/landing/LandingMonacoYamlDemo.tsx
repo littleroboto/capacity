@@ -160,7 +160,7 @@ export default function LandingMonacoYamlDemo() {
     <div className="flex w-full flex-col overflow-hidden rounded-2xl border border-violet-500/25 bg-[#0f0f14] shadow-[0_0_0_1px_rgba(167,139,250,0.18),0_24px_60px_-12px_rgba(0,0,0,0.55)]">
       <div className="shrink-0 border-b border-violet-500/20 bg-gradient-to-r from-[#12101c] via-[#1a1428] to-[#12101c] px-2 py-1.5">
         <p className="mb-2 font-mono text-[10px] tabular-nums text-zinc-500">
-          Experiment: Market Capacity Surface v{APP_VERSION} · {GIT_COMMIT_SHORT}
+          MarketZero Workbench v{APP_VERSION} · {GIT_COMMIT_SHORT}
         </p>
         <div
           className="flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

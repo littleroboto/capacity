@@ -53,7 +53,7 @@ export function runwayHeatmapTitleForViewMode(id: ViewModeId): string {
   return m?.runwayHeatmapTitle ?? VIEW_MODES[0].runwayHeatmapTitle;
 }
 
-/** Map persisted / legacy layer ids to runway view modes (`combined` = Technology lens in the UI). */
+/** Map legacy layer ids to runway view modes (`combined` = Technology lens in the UI). */
 export function normalizeViewModeId(raw: string | null): ViewModeId {
   if (!raw) return 'combined';
   if (raw === 'combined' || raw === 'in_store' || raw === 'market_risk' || raw === 'code') {
@@ -75,14 +75,3 @@ export function normalizeViewModeId(raw: string | null): ViewModeId {
   return legacy[raw] ?? 'combined';
 }
 
-export const STORAGE_KEYS = {
-  picker: 'owm_picker',
-  layer: 'owm_layer',
-  theme: 'owm_theme',
-  atc_dsl: 'atc_dsl',
-  atc_scenarios: 'atc_scenarios',
-  /** Zustand persist blob for country, view mode, theme, pressure tuning (stored as `riskTuning`). */
-  capacity_atc: 'capacity-atc',
-  /** Header UI: compact bar (`1` / absent). */
-  header_compact: 'capacity_header_compact',
-} as const;

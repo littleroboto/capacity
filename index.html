@@ -3,9 +3,12 @@
   <head>
     <script>
       try {
-        var t = localStorage.getItem('owm_theme');
-        document.documentElement.classList.toggle('dark', t !== 'light');
-      } catch (e) {}
+        var light =
+          window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        document.documentElement.classList.toggle('dark', !light);
+      } catch (e) {
+        document.documentElement.classList.add('dark');
+      }
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -13,13 +16,13 @@
       name="description"
       content="Air traffic control for technology programmes — data-driven runway, YAML resourcing, markets & segments, BAU vs project load."
     />
-    <meta property="og:title" content="Segment Capacity Workbench · Technology programme runway" />
+    <meta property="og:title" content="MarketZero Workbench · Technology programme runway" />
     <meta
       property="og:description"
       content="Visualise technology capacity across BAU and project workstreams, markets, and segments — from YAML to a shared picture."
     />
     <meta property="og:type" content="website" />
-    <title>Segment Capacity Workbench · Technology programme runway</title>
+    <title>MarketZero Workbench · Technology programme runway</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

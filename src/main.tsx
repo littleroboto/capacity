@@ -2,6 +2,7 @@ import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/react';
+import { ClerkOAuthCallbackPage } from '@/components/ClerkOAuthCallbackPage';
 import { ClerkSharedDslBridge } from '@/components/ClerkSharedDslBridge';
 import { SignInGate } from '@/components/SignInGate';
 import { FullCapacityAccessProvider } from '@/lib/capacityAccessContext';
@@ -56,6 +57,9 @@ const router = (
   <BrowserRouter basename={workbenchBasename()}>
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/sso-callback" element={<ClerkOAuthCallbackPage />} />
+      {/* Some Clerk setups use this path for the OAuth return URL */}
+      <Route path="/sign-in/sso-callback" element={<ClerkOAuthCallbackPage />} />
       <Route path="/app" element={<WorkbenchRoutes />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

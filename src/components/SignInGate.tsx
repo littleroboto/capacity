@@ -68,9 +68,9 @@ function AuthGateInner({ children }: { children: ReactNode }) {
         )}
       >
         <p className="mb-6 max-w-md text-center text-sm text-muted-foreground">
-          Sign in to open the Market Capacity workspace.
+          Sign in to open MarketZero Workbench.
         </p>
-        <SignIn routing="hash" />
+        <SignIn routing="hash" fallbackRedirectUrl="/app" signUpFallbackRedirectUrl="/app" />
       </div>
     );
   }

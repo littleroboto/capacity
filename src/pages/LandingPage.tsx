@@ -546,7 +546,7 @@ export function LandingPage() {
   const clerkOn = isClerkConfigured();
 
   useEffect(() => {
-    document.title = 'Segment Capacity Workbench · Air traffic control for technology programmes';
+    document.title = 'MarketZero Workbench · Air traffic control for technology programmes';
   }, []);
 
   useEffect(() => {
@@ -588,7 +588,7 @@ export function LandingPage() {
             animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
           >
-            Segment Capacity Workbench
+            MarketZero Workbench
           </motion.div>
           <nav className="flex flex-wrap items-center gap-3">
             {clerkOn ? (
