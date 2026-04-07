@@ -16,7 +16,7 @@ import { prefetchWorkbenchApp } from '@/lib/prefetchWorkbench';
 import { cn } from '@/lib/utils';
 import { LandingCellDetailCardMock } from '@/components/landing/LandingCellDetailCardMock';
 import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMock';
-import { LandingMonacoYamlMock } from '@/components/landing/LandingMonacoYamlMock';
+import { LandingMultiMarketDeploymentMock } from '@/components/landing/LandingMultiMarketDeploymentMock';
 import { LandingYamlProjectTwinMock } from '@/components/landing/LandingYamlProjectTwinMock';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 import { heatmapColorDiscrete, heatmapSpectrumLegendGradientCss } from '@/lib/riskHeatmapColors';
@@ -558,6 +558,18 @@ export function LandingPage() {
   return (
     <div className="landing-root relative min-h-screen bg-[#040506] text-zinc-100 antialiased selection:bg-[#FFC72C]/35">
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
+        <div
+          className="absolute inset-0 opacity-[0.5]"
+          style={{
+            backgroundImage: [
+              'linear-gradient(to right, rgba(255,255,255,0.036) 1px, transparent 1px)',
+              'linear-gradient(to bottom, rgba(255,255,255,0.036) 1px, transparent 1px)',
+              'repeating-linear-gradient(45deg, transparent 0, transparent 34px, rgba(255,255,255,0.015) 34px, rgba(255,255,255,0.015) 35px)',
+              'repeating-linear-gradient(-45deg, transparent 0, transparent 52px, rgba(255,255,255,0.01) 52px, rgba(255,255,255,0.01) 53px)',
+            ].join(', '),
+            backgroundSize: '44px 44px, 44px 44px, auto, auto',
+          }}
+        />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_65%_at_50%_115%,rgba(15,23,42,0.9),transparent_58%)]" />
         <div
           className="landing-nebula-motion absolute -left-[22%] -top-[28%] h-[90vh] w-[min(110vw,900px)] opacity-[0.42] blur-[88px] animate-landing-nebula-drift sm:blur-[104px]"
@@ -584,7 +596,7 @@ export function LandingPage() {
       <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-5 pb-20 pt-6 sm:px-8 sm:pt-10">
         <header className="mb-16 flex flex-wrap items-center justify-between gap-4 sm:mb-20">
           <motion.div
-            className="min-w-0 max-w-[min(100%,18rem)] font-landing text-balance text-base font-extrabold leading-snug tracking-[-0.02em] text-zinc-50 sm:max-w-none sm:text-xl"
+            className="min-w-0 max-w-[min(100%,18rem)] font-landing text-balance text-base font-extrabold leading-snug tracking-[-0.02em] text-[#FFC72C] sm:max-w-none sm:text-xl"
             initial={reducedMotion ? false : { opacity: 0, filter: 'blur(10px)', y: 5 }}
             animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
@@ -671,6 +683,12 @@ export function LandingPage() {
               <p className="mt-2 text-zinc-400">
                 Built for leaders and delivery teams who need one honest view of the runway.
               </p>
+              <p className="mt-4 text-pretty text-sm leading-relaxed text-zinc-400">
+                We do not drown you in formulas. What matters is that the picture reflects how work actually lands:
+                holiday windows and resourcing interact; typical week, month, and year patterns carry through; campaign
+                weightings shape demand; and support load for large campaigns is part of the same calculation — so the
+                heat you see matches the operating reality.
+              </p>
             </motion.div>
             <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map(({ icon: Icon, title, body }, i) => (
@@ -699,33 +717,7 @@ export function LandingPage() {
 
           <LandingYamlProjectTwinMock />
 
-          <LandingMonacoYamlMock />
-
-          <section
-            aria-labelledby="model-heading"
-            className="rounded-2xl border border-white/[0.07] bg-white/[0.02] px-6 py-10 sm:px-10"
-          >
-            <motion.div
-              initial={reducedMotion ? false : { opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.45 }}
-            >
-              <h2 id="model-heading" className="font-landing text-xl font-semibold text-white">
-                Real-world rhythm, in the model
-              </h2>
-              <p className="mt-4 max-w-3xl text-pretty text-sm leading-relaxed text-zinc-400 sm:text-base">
-                We do not drown you in formulas. What matters is that the picture reflects how work
-                actually lands: <strong className="font-medium text-zinc-300">holiday windows</strong>{' '}
-                and <strong className="font-medium text-zinc-300">resourcing</strong> interact;
-                typical <strong className="font-medium text-zinc-300">week, month, and year</strong>{' '}
-                patterns carry through; <strong className="font-medium text-zinc-300">campaign weightings</strong>{' '}
-                shape demand; and{' '}
-                <strong className="font-medium text-zinc-300">support load for large campaigns</strong>{' '}
-                is part of the same calculation — so the heat you see matches the operating reality.
-              </p>
-            </motion.div>
-          </section>
+          <LandingMultiMarketDeploymentMock />
         </main>
 
         <footer className="mt-20 border-t border-white/[0.06] pt-8 text-center text-xs text-zinc-600 sm:text-left">

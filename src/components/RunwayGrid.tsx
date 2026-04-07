@@ -1306,9 +1306,28 @@ type RunwayGridProps = {
   riskSurface: RiskRow[];
   viewMode: ViewModeId;
   onSlotSelection: (s: SlotSelection | null) => void;
+  /** Compare strip: market header stickers do not navigate into a single market (e.g. landing demo). */
+  disableCompareColumnNavigation?: boolean;
+  /** Hide range/focus picks and heatmap toolbar; keep title + grid (e.g. landing demo). */
+  landingMinimalChrome?: boolean;
+  /** Cap auto-fitted compare-strip cell size (px) — keeps landing / embeds from growing too tall. */
+  landingCompareMaxCellPx?: number;
+  /** Compare strip: fixed column order (only with {@link landingMinimalChrome} + LIOM). */
+  landingCompareMarketOrder?: readonly string[];
+  /** Compare strip: clip overflow instead of scrollbars (fit sizing should keep content inside). */
+  landingCompareNoScroll?: boolean;
 };
 
-export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGridProps) {
+export function RunwayGrid({
+  riskSurface,
+  viewMode,
+  onSlotSelection,
+  disableCompareColumnNavigation = false,
+  landingMinimalChrome = false,
+  landingCompareMaxCellPx,
+  landingCompareMarketOrder,
+  landingCompareNoScroll = false,
+}: RunwayGridProps) {
   const country = useAtcStore((s) => s.country);
   const setCountry = useAtcStore((s) => s.setCountry);
   const selectCompareMarket = useCallback(
@@ -1387,8 +1406,15 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     const base = fromCfg.length ? fromCfg : [...new Set(riskSurface.map((r) => r.market))].sort();
     if (!isRunwayMultiMarketStrip(country)) return base;
     const present = new Set(base);
+    if (
+      landingMinimalChrome &&
+      landingCompareMarketOrder &&
+      landingCompareMarketOrder.length > 0
+    ) {
+      return landingCompareMarketOrder.filter((id) => present.has(id));
+    }
     return runwayCompareMarketIds(country, base).filter((id) => present.has(id));
-  }, [configs, riskSurface, country]);
+  }, [configs, riskSurface, country, landingMinimalChrome, landingCompareMarketOrder]);
 
   const singleMarketId = compareAllMarkets ? '' : country;
   const marketConfig = useMemo(
@@ -1470,12 +1496,15 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
       const measuredH = el.clientHeight;
       const h =
         measuredH > 48 ? Math.min(measuredH, viewportBelow) : viewportBelow;
-      const next = bestCellPxForCompareAllRunwayFit(
+      let next = bestCellPxForCompareAllRunwayFit(
         w,
         h,
         marketsOrdered.length,
         layoutDatesSorted
       );
+      if (landingCompareMaxCellPx != null) {
+        next = snapRunwayCellPx(Math.min(next, landingCompareMaxCellPx));
+      }
       setRunwayCellPx((prev) => (prev === next ? prev : next));
     };
 
@@ -1494,6 +1523,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
     marketsOrdered.length,
     countrySwitchLoading,
     showIso3d,
+    landingCompareMaxCellPx,
   ]);
 
   useLayoutEffect(() => {
@@ -1743,16 +1773,17 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
         className="mx-auto w-full max-w-full rounded-xl border border-border/45 bg-card/35 px-4 pb-3 pt-3 shadow-sm dark:bg-card/20 sm:px-5 sm:pb-4 sm:pt-3.5"
       >
         <div className="mb-3 flex flex-col gap-3 sm:mb-4">
-          <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between min-[480px]:gap-4">
-            <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 gap-y-2">
-              <RunwayFocusSelect className="min-w-0" />
-              <RunwayRangeSelect className="min-w-0" />
-            </div>
-            <div
-              className="flex shrink-0 flex-wrap items-center justify-center gap-0.5 min-[480px]:justify-end"
-              role="toolbar"
-              aria-label="Runway view actions"
-            >
+          {!landingMinimalChrome ? (
+            <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between min-[480px]:gap-4">
+              <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 gap-y-2">
+                <RunwayFocusSelect className="min-w-0" />
+                <RunwayRangeSelect className="min-w-0" />
+              </div>
+              <div
+                className="flex shrink-0 flex-wrap items-center justify-center gap-0.5 min-[480px]:justify-end"
+                role="toolbar"
+                aria-label="Runway view actions"
+              >
             <button
               type="button"
               disabled={countrySwitchLoading}
@@ -1869,8 +1900,9 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
                 <Download className="h-3.5 w-3.5 opacity-90" aria-hidden />
               )}
             </button>
+              </div>
             </div>
-          </div>
+          ) : null}
           <div className="flex min-w-0 flex-row flex-wrap items-center justify-center gap-2.5 min-[480px]:justify-start">
             <h2 className="min-w-0 text-center text-lg font-bold leading-snug tracking-tight text-foreground min-[480px]:text-left sm:text-xl">
               {runwayTitleWithMarket}
@@ -1911,6 +1943,7 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
                   compareScrollRef={compareScrollRef}
                   singleMarketFitRef={singleMarketFitRef}
                   compareAllMarkets={compareAllMarkets}
+                  landingCompareNoScroll={landingCompareNoScroll}
                   marketsOrdered={marketsOrdered}
                   riskSurface={riskSurface}
                   configs={configs}
@@ -1940,7 +1973,9 @@ export function RunwayGrid({ riskSurface, viewMode, onSlotSelection }: RunwayGri
                   heatmapCaptureRef={heatmapCaptureRef}
                   scrollTopRef={scrollTopRef}
                   onSlotSelection={onSlotSelection}
-                  onCompareMarketSelect={compareAllMarkets ? selectCompareMarket : undefined}
+                  onCompareMarketSelect={
+                    compareAllMarkets && !disableCompareColumnNavigation ? selectCompareMarket : undefined
+                  }
                   reduceMotion={!!reduceMotion}
                   useSideSummary={useSideSummary}
                   tip={tip}
@@ -1967,6 +2002,7 @@ type RunwayGridBodyProps = {
   compareScrollRef: RefObject<HTMLDivElement | null>;
   singleMarketFitRef: RefObject<HTMLDivElement | null>;
   compareAllMarkets: boolean;
+  landingCompareNoScroll?: boolean;
   marketsOrdered: string[];
   riskSurface: RiskRow[];
   configs: MarketConfig[];
@@ -2016,6 +2052,7 @@ function RunwayGridBody({
   compareScrollRef,
   singleMarketFitRef,
   compareAllMarkets,
+  landingCompareNoScroll = false,
   marketsOrdered,
   riskSurface,
   configs,
@@ -2132,7 +2169,10 @@ function RunwayGridBody({
           ) : (
           <div
             ref={compareScrollRef as Ref<HTMLDivElement>}
-            className="min-h-0 w-full flex-1 overflow-x-auto overflow-y-auto pb-1"
+            className={cn(
+              'min-h-0 w-full flex-1 pb-1',
+              landingCompareNoScroll ? 'overflow-hidden' : 'overflow-x-auto overflow-y-auto'
+            )}
           >
             <div
               className="flex w-max max-w-none flex-row items-start justify-start px-0.5"

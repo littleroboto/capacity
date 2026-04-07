@@ -400,7 +400,7 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
         height="100%"
         className="block h-full max-h-[min(52vh,420px)] min-h-[200px] w-full text-foreground"
         preserveAspectRatio="xMidYMin meet"
-        aria-label="Technology lens 3D runway for Germany (DE.yaml): tower height reflects readiness load in campaign prep and operational support load in campaign live, from the same pipeline as the workbench"
+        aria-label="Technology lens 3D runway: tower height and colour show how much technology pressure is scheduled each day — warmer and taller when prep and readiness stack up, usually easing in the live phase; same model as the workbench heatmap"
       >
         {cells.map(({ li, di, cell }) => {
           const { ax, ay } = isoCellTopLeft(layoutToIsoWi(li), di, stepX, stepY);
@@ -558,16 +558,17 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
           Familiar inputs
         </p>
         <h2 id="iso-mock-heading" className="font-landing text-2xl font-semibold text-white">
-          Familiar Data, new depth
+          Familiar Data, new clarity
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          Same <span className="text-zinc-300">DE.yaml</span> pipeline as the workbench — not a separate toy graphic.
-          During campaign <strong className="font-medium text-violet-200/90">prep</strong>, tower height tracks
-          readiness-tagged lab and Market IT load (build, test, integration). In{' '}
-          <strong className="font-medium text-cyan-200/90">live</strong>, extrusion follows operational / sustain support
-          — usually shorter than prep, just like <code className="rounded bg-white/[0.06] px-1 font-mono text-[11px] text-zinc-400">campaign_support</code> vs{' '}
-          <code className="rounded bg-white/[0.06] px-1 font-mono text-[11px] text-zinc-400">live_campaign_support</code>{' '}
-          in your file.
+          The isometric runway is the same technology lens as the workbench — here you read it as{' '}
+          <span className="text-zinc-300">temperature and height</span> along the calendar, not a separate illustration.
+          <strong className="font-medium text-zinc-200"> Taller, warmer towers</strong> mean more delivery load booked
+          into labs and market IT that day — less headroom.{' '}
+          <strong className="font-medium text-zinc-200">Shorter, cooler towers</strong> mean that week is calmer. In
+          campaign <strong className="font-medium text-violet-200/90">prep</strong>, the skyline climbs with readiness,
+          build, and test-integration pressure; in <strong className="font-medium text-cyan-200/90">live</strong>, it
+          usually eases because operational and sustain support sits lighter on the lane than the pre-cutover surge.
         </p>
       </div>
 
@@ -636,7 +637,7 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
 
         <div className="relative z-10 flex items-start gap-2 border-b border-white/[0.05] bg-[#0a0a0c] px-3 py-2.5 sm:px-4">
           <h3 className="font-landing text-sm font-semibold tracking-tight text-white sm:text-base">
-            Technology runway · prep vs live · DE
+            Technology runway · prep vs live
           </h3>
           <MarketCircleFlag marketId="DE" size={20} className="ring-white/15" />
         </div>

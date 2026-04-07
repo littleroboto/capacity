@@ -2,12 +2,12 @@
 <html lang="en">
   <head>
     <script>
+      // Default the whole site to dark tokens (landing embeds use bg-background / shadcn vars).
+      // Workbench theme toggle still updates this class when users switch light/dark in the app.
       try {
-        var light =
-          window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-        document.documentElement.classList.toggle('dark', !light);
-      } catch (e) {
         document.documentElement.classList.add('dark');
+      } catch (e) {
+        /* ignore */
       }
     </script>
     <meta charset="UTF-8" />

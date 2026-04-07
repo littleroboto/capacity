@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { motion, useReducedMotion, type Variants } from 'motion/react';
 import { runPipelineFromDsl } from '@/engine/pipeline';
 import { DEFAULT_RISK_TUNING } from '@/engine/riskModelTuning';
 import type { RiskRow } from '@/engine/riskModel';
@@ -40,18 +40,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Box, Landmark, Layers, Trees } from 'lucide-react';
 
-const LAYER_PULSE_TRANSITION = {
-  duration: 1.85,
-  repeat: Infinity,
-  ease: 'easeInOut' as const,
-};
-
-/** Amber pulse glow (Tailwind amber-500) for all sequential layer hints. */
-const LAYER_PULSE_BOX_SHADOW = [
-  '0 0 0 0 rgba(245,158,11,0)',
-  '0 0 20px 0 rgba(245,158,11,0.42)',
-  '0 0 0 0 rgba(245,158,11,0)',
-] as const;
+const LAYER_PRESS_TRANSITION = { type: 'spring' as const, stiffness: 520, damping: 32, mass: 0.85 };
 
 function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
@@ -386,12 +375,91 @@ export function LandingYamlProjectTwinMock() {
   const [layerMixes, setLayerMixes] = useState<LayerMixes>(MIX_INITIAL);
   const mixRef = useRef<LayerMixes>(MIX_INITIAL);
   const [campaignEverOn, setCampaignEverOn] = useState(false);
-  const [hasClickedNational, setHasClickedNational] = useState(false);
-  const [hasClickedSchool, setHasClickedSchool] = useState(false);
+  const [layerDemoDone, setLayerDemoDone] = useState(false);
+  const [toolbarSeen, setToolbarSeen] = useState(false);
+  const [pressKey, setPressKey] = useState<'campaign' | 'national' | 'school' | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (campaignOn) setCampaignEverOn(true);
   }, [campaignOn]);
+
+  useLayoutEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && e.intersectionRatio >= 0.2) {
+            setToolbarSeen(true);
+            break;
+          }
+        }
+      },
+      { root: null, rootMargin: '0px 0px -10% 0px', threshold: [0, 0.2, 0.35, 0.5, 0.75, 1] }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!toolbarSeen) return;
+    let cancelled = false;
+    const timers: number[] = [];
+
+    const schedule = (ms: number, fn: () => void) => {
+      timers.push(
+        window.setTimeout(() => {
+          if (!cancelled) fn();
+        }, ms)
+      );
+    };
+
+    if (reducedMotion) {
+      setCampaignOn(true);
+      setPublicHolidaysOn(true);
+      setSchoolHolidaysOn(true);
+      setLayerDemoDone(true);
+      return () => {
+        cancelled = true;
+        for (const t of timers) window.clearTimeout(t);
+      };
+    }
+
+    const STEP_MS = 900;
+    const PRESS_MS = 200;
+    const INITIAL_DELAY_MS = 600;
+
+    const flash = (key: 'campaign' | 'national' | 'school') => {
+      setPressKey(key);
+      timers.push(
+        window.setTimeout(() => {
+          if (!cancelled) setPressKey(null);
+        }, PRESS_MS)
+      );
+    };
+
+    schedule(INITIAL_DELAY_MS, () => {
+      flash('campaign');
+      setCampaignOn(true);
+    });
+    schedule(INITIAL_DELAY_MS + STEP_MS, () => {
+      flash('national');
+      setPublicHolidaysOn(true);
+    });
+    schedule(INITIAL_DELAY_MS + STEP_MS * 2, () => {
+      flash('school');
+      setSchoolHolidaysOn(true);
+    });
+    schedule(INITIAL_DELAY_MS + STEP_MS * 2 + 320, () => {
+      if (!cancelled) setLayerDemoDone(true);
+    });
+
+    return () => {
+      cancelled = true;
+      for (const t of timers) window.clearTimeout(t);
+    };
+  }, [toolbarSeen, reducedMotion]);
 
   useEffect(() => {
     const target: LayerMixes = {
@@ -428,17 +496,40 @@ export function LandingYamlProjectTwinMock() {
 
   const { c: mixCampaign, p: mixPublic, s: mixSchool } = layerMixes;
 
-  const pulseWithCampaign = !reducedMotion && !campaignEverOn;
-  const pulseNational = !reducedMotion && campaignEverOn && !hasClickedNational;
-  const pulseSchool = !reducedMotion && campaignEverOn && hasClickedNational && !hasClickedSchool;
+  const layerHint = !toolbarSeen
+    ? 'Use the layer toggles under the preview to blend campaign prep, run, and calendar stress.'
+    : !layerDemoDone && !reducedMotion
+      ? 'Watch once: we turn on With campaign, then National holidays, then School holidays — then mix freely.'
+      : 'Mix layers freely — toggles cross-fade; Baseline / With campaign switches the YAML preview.';
 
-  const layerHint = !campaignEverOn
-    ? 'Baseline is on. The pulsing control is next: turn on With campaign to load prep and live on the strip.'
-    : !hasClickedNational
-      ? 'Campaign is in play. National holidays is next (pulsing) — tap once to unlock School holidays.'
-      : !hasClickedSchool
-        ? 'School holidays is next (pulsing) — extra load from the DE calendar.'
-        : 'Mix layers freely — toggles cross-fade; Baseline / With campaign still switches the YAML preview.';
+  const layerToolbarVariants = useMemo(() => {
+    const instant = !!reducedMotion;
+    const row: Variants = instant
+      ? {
+          hidden: { opacity: 1, y: 0 },
+          visible: { opacity: 1, y: 0, transition: { duration: 0 } },
+        }
+      : {
+          hidden: { opacity: 0, y: 12 },
+          visible: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] },
+          },
+        };
+    const container: Variants = instant
+      ? {
+          hidden: {},
+          visible: { transition: { staggerChildren: 0, delayChildren: 0 } },
+        }
+      : {
+          hidden: {},
+          visible: {
+            transition: { staggerChildren: 0.14, delayChildren: 0.08 },
+          },
+        };
+    return { container, row };
+  }, [reducedMotion]);
 
   const yamlBaseline: readonly (readonly YamlToken[])[] = [
     [{ t: '# ', c: 'text-zinc-600' }, { t: 'Campaign prep pulls Technology load forward', c: 'text-zinc-600' }],
@@ -483,6 +574,24 @@ export function LandingYamlProjectTwinMock() {
   const activeLines = campaignOn ? yamlBaseline : yamlOff;
   const lineCount = Math.max(yamlBaseline.length, yamlOff.length);
 
+  const yamlCardRef = useRef<HTMLDivElement>(null);
+  const [yamlCardMinPx, setYamlCardMinPx] = useState<number | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const el = yamlCardRef.current;
+    if (!el) return;
+    const sync = () => {
+      const h = el.getBoundingClientRect().height;
+      setYamlCardMinPx((prev) => Math.max(prev ?? 0, Math.ceil(h)));
+    };
+    sync();
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(sync);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const storyChronWeeks = useMemo(
     () => buildConsecutiveMondayWeekRows(TWIN_STORY_START_MONDAY, STORY_WEEKS),
     []
@@ -515,25 +624,32 @@ export function LandingYamlProjectTwinMock() {
           id={`${panelId}-heading`}
           className="font-landing text-balance text-2xl font-semibold leading-snug text-white sm:text-[1.65rem]"
         >
-          Prep, go-live, and live — all drawing on capacity
+          Prep, cutover and run — all accounted for in the model
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          <span className="text-zinc-300">testing_prep_duration</span> defines how long{' '}
-          <span className="text-zinc-300">campaign_support</span> applies — labs, tech, and test integration (readiness
-          pressure). After go-live, <span className="text-zinc-300">live_campaign_support</span> is operational /
-          hypercare-style load, usually lighter on the Technology lane.{' '}
-          <span className="text-zinc-300">National holidays</span> spike the strip into the red (high displayed load);{' '}
-          <span className="text-zinc-300">school breaks</span> add load. The preview opens on Baseline only — enable
-          campaign first, then calendar layers when you are ready.
+          Think of the strip as a temperature of pressure across the horizon: calmer, cooler weeks versus stretches where
+          demand and delivery stack up. With a campaign in play, prep shows up as a warmer band on the Technology side
+          while readiness and testing run hot; after cutover, the run phase often eases that lane while support work
+          continues at a steadier, lower heat. National holidays read as the sharpest spikes — capacity feels tightest and
+          store-side pressure is highest. School holidays add sustained pressure in stores whilst tightening capacity on
+          the support side.
         </p>
       </div>
 
       <div
         className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] lg:items-stretch lg:gap-5"
         role="group"
-        aria-label="Compare baseline capacity with a campaign that adds prep then live Technology load"
+        aria-label="Compare baseline and campaign temperature on the capacity strip, with optional national and school holiday layers"
       >
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_20px_60px_-14px_rgba(0,0,0,0.75)]">
+        <div
+          ref={yamlCardRef}
+          className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_20px_60px_-14px_rgba(0,0,0,0.75)]"
+          style={
+            yamlCardMinPx != null && yamlCardMinPx > 0
+              ? { minHeight: yamlCardMinPx }
+              : undefined
+          }
+        >
           <div className="flex items-center gap-2 border-b border-white/[0.06] bg-[#111114] px-3 py-2">
             <div className="flex gap-1" aria-hidden>
               <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]/90" />
@@ -557,13 +673,18 @@ export function LandingYamlProjectTwinMock() {
               })}
             </div>
           </div>
-          <div
+          <motion.div
+            ref={toolbarRef}
             className="flex flex-col gap-2 border-t border-white/[0.06] bg-[#0e0e12] px-3 py-2.5"
             role="toolbar"
             aria-label="Preview layers for YAML and 3D strip"
             aria-describedby={`${panelId}-layer-hint`}
+            variants={layerToolbarVariants.container}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2, margin: '0px 0px -10% 0px' }}
           >
-            <div className="flex flex-wrap gap-2">
+            <motion.div variants={layerToolbarVariants.row} className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setCampaignOn(false)}
@@ -584,15 +705,8 @@ export function LandingYamlProjectTwinMock() {
                 onClick={() => setCampaignOn(true)}
                 aria-pressed={campaignOn}
                 initial={false}
-                animate={
-                  pulseWithCampaign
-                    ? {
-                        scale: [1, 1.042, 1],
-                        boxShadow: [...LAYER_PULSE_BOX_SHADOW],
-                      }
-                    : { scale: 1, boxShadow: '0 0 0 0 rgba(0,0,0,0)' }
-                }
-                transition={pulseWithCampaign ? LAYER_PULSE_TRANSITION : { duration: 0.2 }}
+                animate={{ scale: pressKey === 'campaign' ? 0.94 : 1 }}
+                transition={LAYER_PRESS_TRANSITION}
                 className={cn(
                   'inline-flex origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
                   campaignOn
@@ -604,32 +718,20 @@ export function LandingYamlProjectTwinMock() {
                 <Box className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 With campaign
               </motion.button>
-            </div>
-            <div className="flex flex-wrap gap-2">
+            </motion.div>
+            <motion.div variants={layerToolbarVariants.row} className="flex flex-wrap gap-2">
               <motion.button
                 type="button"
-                disabled={!campaignEverOn}
-                onClick={() => {
-                  setHasClickedNational(true);
-                  setPublicHolidaysOn((v) => !v);
-                }}
+                onClick={() => setPublicHolidaysOn((v) => !v)}
                 aria-pressed={publicHolidaysOn}
                 initial={false}
-                animate={
-                  pulseNational
-                    ? {
-                        scale: [1, 1.042, 1],
-                        boxShadow: [...LAYER_PULSE_BOX_SHADOW],
-                      }
-                    : { scale: 1, boxShadow: '0 0 0 0 rgba(0,0,0,0)' }
-                }
-                transition={pulseNational ? LAYER_PULSE_TRANSITION : { duration: 0.2 }}
+                animate={{ scale: pressKey === 'national' ? 0.94 : 1 }}
+                transition={LAYER_PRESS_TRANSITION}
                 className={cn(
                   'inline-flex origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
                   publicHolidaysOn
                     ? 'border-red-500/50 bg-red-500/14 text-red-100 shadow-[0_0_16px_-4px_rgba(239,68,68,0.35)]'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300',
-                  !campaignEverOn && 'cursor-not-allowed opacity-40 hover:border-white/[0.08] hover:text-zinc-500'
+                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300'
                 )}
               >
                 <Landmark className="h-3.5 w-3.5 opacity-80" aria-hidden />
@@ -637,42 +739,31 @@ export function LandingYamlProjectTwinMock() {
               </motion.button>
               <motion.button
                 type="button"
-                disabled={!hasClickedNational}
-                onClick={() => {
-                  setHasClickedSchool(true);
-                  setSchoolHolidaysOn((v) => !v);
-                }}
+                onClick={() => setSchoolHolidaysOn((v) => !v)}
                 aria-pressed={schoolHolidaysOn}
                 initial={false}
-                animate={
-                  pulseSchool
-                    ? {
-                        scale: [1, 1.042, 1],
-                        boxShadow: [...LAYER_PULSE_BOX_SHADOW],
-                      }
-                    : { scale: 1, boxShadow: '0 0 0 0 rgba(0,0,0,0)' }
-                }
-                transition={pulseSchool ? LAYER_PULSE_TRANSITION : { duration: 0.2 }}
+                animate={{ scale: pressKey === 'school' ? 0.94 : 1 }}
+                transition={LAYER_PRESS_TRANSITION}
                 className={cn(
                   'inline-flex origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
                   schoolHolidaysOn
                     ? 'border-sky-500/45 bg-sky-500/12 text-sky-100'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300',
-                  !hasClickedNational && 'cursor-not-allowed opacity-40 hover:border-white/[0.08] hover:text-zinc-500'
+                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300'
                 )}
               >
                 <Trees className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 School holidays
               </motion.button>
-            </div>
-            <p
+            </motion.div>
+            <motion.p
               id={`${panelId}-layer-hint`}
               className="font-landing text-[10px] leading-snug text-zinc-600"
               aria-live="polite"
+              variants={layerToolbarVariants.row}
             >
               {layerHint}
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
         </div>
 
         <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_20px_60px_-14px_rgba(0,0,0,0.75)]">

@@ -97,12 +97,13 @@ export const LandingCellDetailCardMock = memo(function LandingCellDetailCardMock
             Heatmap detail cards
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-            Each colour-coded runway cell opens a detail panel: drill one market or sweep a whole segment and you are
-            still exploring the same{' '}
-            <strong className="font-medium text-zinc-300">risk surfaces</strong>, in one place. The card spells out what
-            is happening on that day — trading rhythm, campaigns, resourcing pressure, and the rest — so you can see
-            how each layer feeds the <strong className="font-medium text-zinc-300">risk and capacity score</strong>.
-            This preview uses a live payload from bundled Germany YAML ({DEMO_DATE}).
+            When a day on the runway pulls focus, open it — the detail card is a same-day briefing that turns the heatmap
+            colour into a clear story. Trading rhythm, campaigns, where capacity lands, and the rest of the calendar
+            context are laid out so you can see{' '}
+            <strong className="font-medium text-zinc-300">what is driving the risk and capacity score</strong>. Zoom one
+            market or sweep a whole segment; you stay on the same{' '}
+            <strong className="font-medium text-zinc-300">risk surfaces</strong> in one place, so the narrative always
+            matches the grid.
           </p>
         </div>
 
