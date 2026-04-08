@@ -693,24 +693,6 @@ export function LandingPage() {
                 <span className="text-zinc-300">store and restaurant operations</span> can absorb—so you are not
                 scheduling heavy floor or ops change while a major marketing programme already owns the bandwidth.
               </p>
-              <ul className="mt-5 flex flex-wrap gap-2" aria-label="Work types modelled in configuration">
-                {(
-                  [
-                    'Run-the-business work',
-                    'Initiatives & campaigns',
-                    'Change programmes',
-                    'Trading & in-store capacity',
-                    'Long-running streams — as config',
-                  ] as const
-                ).map((label) => (
-                  <li
-                    key={label}
-                    className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 font-landing text-[11px] font-medium text-zinc-400"
-                  >
-                    {label}
-                  </li>
-                ))}
-              </ul>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   to="/app"
@@ -722,16 +704,6 @@ export function LandingPage() {
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
               </div>
-              <p className="mt-6 max-w-xl text-pretty text-sm leading-relaxed text-zinc-400">
-                Real calendars matter—public holidays, busy seasons, change freezes—so the model can reflect{' '}
-                <span className="text-zinc-300">appetite for change</span>, not just task lines. Each{' '}
-                <span className="text-zinc-300">lane</span> is plain configuration: pools of capacity, shapes of work,
-                rhythms you tune—not a one-size-fits-all template. This started as an{' '}
-                <span className="text-zinc-300">internal build</span> sharp enough to ship as its own thing: a{' '}
-                <span className="text-zinc-300">browser-native</span> workbench—beautiful visuals, no PPM vendor rent on
-                the concept, <span className="text-zinc-300">free for any team</span> that wants the picture without another
-                shelf-software invoice.
-              </p>
             </motion.div>
             <HeroBrowserHeatmap reducedMotion={!!reducedMotion} />
           </section>
