@@ -1822,14 +1822,48 @@ export function RunwayGrid({
         }
       }
 
-      const duration = 2800;
+      const clampX = (x: number) => Math.min(maxX, Math.max(0, x));
+      const clampY = (y: number) => Math.min(maxY, Math.max(0, y));
+
+      /** Piecewise path: horizontal zig-zag while y=0, then hold AU column x while scrolling y to the pulse band. */
+      type PanSeg = { u0: number; u1: number; x0: number; x1: number; y0: number; y1: number };
+      const xSweep = maxX * 0.88;
+      const xBack = maxX * 0.08;
+      const xMid = maxX * 0.5;
+      const segments: PanSeg[] =
+        maxX > 8
+          ? [
+              { u0: 0, u1: 0.22, x0: 0, x1: xSweep, y0: 0, y1: 0 },
+              { u0: 0.22, u1: 0.38, x0: xSweep, x1: xBack, y0: 0, y1: 0 },
+              { u0: 0.38, u1: 0.54, x0: xBack, x1: xMid, y0: 0, y1: 0 },
+              { u0: 0.54, u1: 0.68, x0: xMid, x1: xSweep, y0: 0, y1: 0 },
+              { u0: 0.68, u1: 0.8, x0: xSweep, x1: targetX, y0: 0, y1: 0 },
+              { u0: 0.8, u1: 1, x0: targetX, x1: targetX, y0: 0, y1: targetY },
+            ]
+          : [
+              { u0: 0, u1: 0.35, x0: 0, x1: targetX, y0: 0, y1: 0 },
+              { u0: 0.35, u1: 1, x0: targetX, x1: targetX, y0: 0, y1: targetY },
+            ];
+
+      const durationMs = maxX > 8 ? 5200 : 3200;
       const t0 = performance.now();
 
+      const scrollAt = (u: number) => {
+        const seg = segments.find((s) => u >= s.u0 && u <= s.u1) ?? segments[segments.length - 1]!;
+        const span = Math.max(1e-6, seg.u1 - seg.u0);
+        const lu = Math.min(1, Math.max(0, (u - seg.u0) / span));
+        const e = easeInOutCubic(lu);
+        return {
+          scrollLeft: clampX(seg.x0 + (seg.x1 - seg.x0) * e),
+          scrollTop: clampY(seg.y0 + (seg.y1 - seg.y0) * e),
+        };
+      };
+
       const tick = (now: number) => {
-        const u = Math.min(1, (now - t0) / duration);
-        const e = easeInOutCubic(u);
-        el.scrollTop = targetY * e;
-        el.scrollLeft = targetX * e;
+        const u = Math.min(1, (now - t0) / durationMs);
+        const { scrollLeft, scrollTop } = scrollAt(u);
+        el.scrollLeft = scrollLeft;
+        el.scrollTop = scrollTop;
         if (u < 1) raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
