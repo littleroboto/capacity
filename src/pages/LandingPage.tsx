@@ -4,6 +4,7 @@ import { Show, SignInButton, UserButton } from '@clerk/react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   APP_VERSION,
+  GIT_COMMIT_MESSAGE,
   GIT_COMMIT_SHORT,
   LANDING_BOM_AUTH,
   LANDING_BOM_CLIENT,
@@ -768,7 +769,10 @@ export function LandingPage() {
             <span className="whitespace-nowrap">
               git <span className="font-mono text-zinc-500">{GIT_COMMIT_SHORT}</span>
             </span>
-            <span className="text-zinc-600"> — BOM semver ranges frozen at build from package.json.</span>
+            <span className="text-zinc-600">
+              {' '}
+              — {GIT_COMMIT_MESSAGE}
+            </span>
           </p>
           <LandingBomTable />
         </footer>

@@ -137,14 +137,9 @@ export function LandingMultiMarketDeploymentMock() {
 
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_min(100%,720px)] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_min(100%,780px)]">
         <p className="max-w-xs text-pretty text-sm leading-relaxed text-zinc-400 sm:max-w-sm lg:max-w-[15.5rem] lg:pt-0.5 xl:max-w-[17rem]">
-          Planning needs a straight answer: <span className="text-zinc-300">which teams or regions can take</span> the
-          next pilot or wave without landing on an already hot quarter. The same{' '}
-          <span className="text-zinc-300">risk lens</span> runs across every column—here{' '}
-          {RUNWAY_ALL_MARKETS_LABEL} with five sample <span className="text-zinc-300">lanes</span> (Germany, France, the
-          UK, Australia, and Canada). Your config might be departments, products, or geographies; the idea is identical.
-          The preview trims to a few months (January–April 2026), renders only days the model emits, and uses compact
-          cells so every column fits without horizontal scroll. Click a cell for the same day-detail card as the
-          workbench; open the app for your full programme and configuration.
+          <span className="text-zinc-300">Which market—or team—gets the pilot?</span> Answer from{' '}
+          <span className="text-zinc-300">visible load</span>, not the loudest ask in the room. Put every lane on one
+          runway with the same risk read, and you see who already owns the quarter before the date is set in stone.
         </p>
 
         <div className="w-full min-w-0 justify-self-stretch lg:justify-self-end">
