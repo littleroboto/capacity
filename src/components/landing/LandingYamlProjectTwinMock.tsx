@@ -63,6 +63,292 @@ function YamlLine({ num, tokens }: { num: number; tokens: readonly YamlToken[] }
   );
 }
 
+type YamlDocLine = readonly YamlToken[];
+
+/** Shared top of the landing preview: comments, resources, then `bau` (DE-style order). */
+const LANDING_YAML_DOC_CORE: readonly YamlDocLine[] = [
+  [
+    { t: '# ', c: 'text-zinc-600' },
+    { t: 'Baseline Technology load is driven by ', c: 'text-zinc-600' },
+    { t: 'bau', c: 'text-cyan-300/85' },
+    { t: ' — routine rhythm, not campaign waves.', c: 'text-zinc-600' },
+  ],
+  [
+    { t: '# ', c: 'text-zinc-600' },
+    { t: 'Strip heat here is ', c: 'text-zinc-600' },
+    { t: 'weekly_cycle', c: 'text-cyan-300/85' },
+    { t: ' + ', c: 'text-zinc-600' },
+    { t: 'market_it_weekly_load.weekday_intensity', c: 'text-cyan-300/85' },
+    { t: '.', c: 'text-zinc-600' },
+  ],
+  [{ t: '', c: undefined }],
+  [{ t: 'resources', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
+  [
+    { t: '  ', c: undefined },
+    { t: 'labs', c: 'text-violet-300/95' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '{ ', c: 'text-zinc-500' },
+    { t: 'capacity', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '6', c: 'text-amber-200/90' },
+    { t: ' }', c: 'text-zinc-500' },
+  ],
+  [
+    { t: '  ', c: undefined },
+    { t: 'staff', c: 'text-violet-300/95' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '{ ', c: 'text-zinc-500' },
+    { t: 'capacity', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '4', c: 'text-amber-200/90' },
+    { t: ' }', c: 'text-zinc-500' },
+  ],
+  [{ t: '', c: undefined }],
+  [{ t: 'bau', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
+  [
+    { t: '  ', c: undefined },
+    { t: 'days_in_use', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '[mo, tu, we, th, fr, sa, su]', c: 'text-amber-200/90' },
+  ],
+  [{ t: '  ', c: undefined }, { t: 'weekly_cycle', c: 'text-emerald-300/90' }, { t: ':', c: 'text-zinc-500' }],
+  [
+    { t: '    ', c: undefined },
+    { t: 'labs_required', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '1', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '    ', c: undefined },
+    { t: 'staff_required', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '1', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '    ', c: undefined },
+    { t: 'support_days', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0', c: 'text-amber-200/90' },
+  ],
+  [{ t: '  ', c: undefined }, { t: 'market_it_weekly_load', c: 'text-emerald-300/90' }, { t: ':', c: 'text-zinc-500' }],
+  [{ t: '    ', c: undefined }, { t: 'weekday_intensity', c: 'text-emerald-300/90' }, { t: ':', c: 'text-zinc-500' }],
+  [
+    { t: '      ', c: undefined },
+    { t: 'Mon', c: 'text-cyan-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0.87', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '      ', c: undefined },
+    { t: 'Tue', c: 'text-cyan-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0.75', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '      ', c: undefined },
+    { t: 'Wed', c: 'text-cyan-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0.34', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '      ', c: undefined },
+    { t: 'Thu', c: 'text-cyan-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0.27', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '      ', c: undefined },
+    { t: 'Fri', c: 'text-cyan-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0.45', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '      ', c: undefined },
+    { t: 'Sat', c: 'text-cyan-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0.23', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '      ', c: undefined },
+    { t: 'Sun', c: 'text-cyan-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0.24', c: 'text-amber-200/90' },
+  ],
+];
+
+const LANDING_YAML_CAMPAIGN_OFF: readonly YamlDocLine[] = [
+  [{ t: '', c: undefined }],
+  [
+    { t: '# ', c: 'text-zinc-600' },
+    { t: 'No campaign wave in YAML — ', c: 'text-zinc-600' },
+    { t: 'campaigns', c: 'text-cyan-300/85' },
+    { t: ' is empty; strip shows BAU + calendar layers only.', c: 'text-zinc-600' },
+  ],
+  [{ t: 'campaigns', c: 'text-violet-300/95' }, { t: ': ', c: 'text-zinc-500' }, { t: '[]', c: 'text-zinc-500' }],
+];
+
+const LANDING_YAML_CAMPAIGN_ON: readonly YamlDocLine[] = [
+  [{ t: '', c: undefined }],
+  [
+    { t: '# ', c: 'text-zinc-600' },
+    { t: 'Ongoing programmes (POS, refresh, network) use the same blocks—different weights & durations', c: 'text-zinc-600' },
+  ],
+  [{ t: '# ', c: 'text-zinc-600' }, { t: 'Campaign prep pulls Technology load forward', c: 'text-zinc-600' }],
+  [{ t: '# ', c: 'text-zinc-600' }, { t: 'Prep ends the day before go-live (testing_prep_duration).', c: 'text-zinc-600' }],
+  [{ t: 'campaigns', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
+  [{ t: '  ', c: undefined }, { t: '- name: ', c: 'text-zinc-500' }, { t: '"Summer launch"', c: 'text-cyan-300/90' }],
+  [{ t: '    ', c: undefined }, { t: 'start_date', c: 'text-emerald-300/90' }, { t: ": '", c: 'text-zinc-500' }, { t: '2026-05-20', c: 'text-amber-200/90' }, { t: "'", c: 'text-zinc-500' }],
+  [{ t: '    ', c: undefined }, { t: 'duration', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '35', c: 'text-amber-200/90' }],
+  [{ t: '    ', c: undefined }, { t: 'testing_prep_duration', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '21', c: 'text-amber-200/90' }],
+  [{ t: '    ', c: undefined }, { t: 'impact', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: 'high', c: 'text-cyan-300/90' }],
+  [{ t: '    ', c: undefined }, { t: '# Prep segment → heavier labs + tech_staff', c: 'text-zinc-600' }],
+  [{ t: '    ', c: undefined }, { t: 'campaign_support', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
+  [{ t: '      ', c: undefined }, { t: 'labs_required', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '2', c: 'text-amber-200/90' }],
+  [{ t: '      ', c: undefined }, { t: 'tech_staff', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '1.5', c: 'text-amber-200/90' }],
+  [{ t: '      ', c: undefined }, { t: 'ops', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '0.25', c: 'text-amber-200/90' }],
+  [{ t: '    ', c: undefined }, { t: '# Live segment → steadier, lower support', c: 'text-zinc-600' }],
+  [{ t: '    ', c: undefined }, { t: 'live_campaign_support', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
+  [{ t: '      ', c: undefined }, { t: 'labs_required', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '1', c: 'text-amber-200/90' }],
+  [{ t: '      ', c: undefined }, { t: 'tech_staff', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '0.5', c: 'text-amber-200/90' }],
+];
+
+/** Shown when neither holiday chip is on — points at the toolbar. */
+const LANDING_YAML_CALENDAR_PLACEHOLDER: readonly YamlDocLine[] = [
+  [{ t: '', c: undefined }],
+  [
+    { t: '# ', c: 'text-zinc-600' },
+    {
+      t: 'public_holidays / school_holidays lists live here in a full market file — turn on National / School below to show sample YAML.',
+      c: 'text-zinc-600',
+    },
+  ],
+];
+
+/** DE-style excerpt when National holidays preview is on. */
+const LANDING_YAML_PUBLIC_HOLIDAYS: readonly YamlDocLine[] = [
+  [{ t: '', c: undefined }],
+  [
+    { t: '# ', c: 'text-zinc-600' },
+    { t: 'Public holidays — explicit dates; ', c: 'text-zinc-600' },
+    { t: 'staffing_multiplier', c: 'text-cyan-300/85' },
+    { t: ' scales support load on those days.', c: 'text-zinc-600' },
+  ],
+  [{ t: 'public_holidays', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
+  [{ t: '  ', c: undefined }, { t: 'auto', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: 'false', c: 'text-amber-200/90' }],
+  [{ t: '  ', c: undefined }, { t: 'dates', c: 'text-emerald-300/90' }, { t: ':', c: 'text-zinc-500' }],
+  [
+    { t: '    ', c: undefined },
+    { t: "- '", c: 'text-zinc-500' },
+    { t: '2026-01-01', c: 'text-amber-200/90' },
+    { t: "'", c: 'text-zinc-500' },
+  ],
+  [
+    { t: '    ', c: undefined },
+    { t: "- '", c: 'text-zinc-500' },
+    { t: '2026-05-01', c: 'text-amber-200/90' },
+    { t: "'", c: 'text-zinc-500' },
+  ],
+  [
+    { t: '    ', c: undefined },
+    { t: "- '", c: 'text-zinc-500' },
+    { t: '2026-12-25', c: 'text-amber-200/90' },
+    { t: "'", c: 'text-zinc-500' },
+  ],
+  [
+    { t: '    ', c: undefined },
+    { t: "- '", c: 'text-zinc-500' },
+    { t: '2026-12-26', c: 'text-amber-200/90' },
+    { t: "'", c: 'text-zinc-500' },
+  ],
+  [{ t: '    ', c: undefined }, { t: '# …', c: 'text-zinc-600' }],
+  [
+    { t: '  ', c: undefined },
+    { t: 'staffing_multiplier', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0.25', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '  ', c: undefined },
+    { t: 'trading_multiplier', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '1.0', c: 'text-amber-200/90' },
+  ],
+];
+
+/** DE-style excerpt when School holidays preview is on. */
+const LANDING_YAML_SCHOOL_HOLIDAYS: readonly YamlDocLine[] = [
+  [{ t: '', c: undefined }],
+  [
+    { t: '# ', c: 'text-zinc-600' },
+    { t: 'School breaks — date ranges (sample spring window); ', c: 'text-zinc-600' },
+    { t: 'load_effects', c: 'text-cyan-300/85' },
+    { t: ' can tune lab/team lift.', c: 'text-zinc-600' },
+  ],
+  [{ t: 'school_holidays', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
+  [{ t: '  ', c: undefined }, { t: 'auto', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: 'false', c: 'text-amber-200/90' }],
+  [{ t: '  ', c: undefined }, { t: 'dates', c: 'text-emerald-300/90' }, { t: ':', c: 'text-zinc-500' }],
+  [
+    { t: '    ', c: undefined },
+    { t: "- '", c: 'text-zinc-500' },
+    { t: '2026-04-06', c: 'text-amber-200/90' },
+    { t: "'", c: 'text-zinc-500' },
+  ],
+  [
+    { t: '    ', c: undefined },
+    { t: "- '", c: 'text-zinc-500' },
+    { t: '2026-04-07', c: 'text-amber-200/90' },
+    { t: "'", c: 'text-zinc-500' },
+  ],
+  [
+    { t: '    ', c: undefined },
+    { t: "- '", c: 'text-zinc-500' },
+    { t: '2026-04-08', c: 'text-amber-200/90' },
+    { t: "'", c: 'text-zinc-500' },
+  ],
+  [{ t: '    ', c: undefined }, { t: '# …', c: 'text-zinc-600' }],
+  [
+    { t: '  ', c: undefined },
+    { t: 'staffing_multiplier', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '0.75', c: 'text-amber-200/90' },
+  ],
+  [{ t: '  ', c: undefined }, { t: 'load_effects', c: 'text-emerald-300/90' }, { t: ':', c: 'text-zinc-500' }],
+  [
+    { t: '    ', c: undefined },
+    { t: 'lab_load_mult', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '1.0', c: 'text-amber-200/90' },
+  ],
+];
+
+const LANDING_YAML_DOC_FOOTER: readonly YamlDocLine[] = [
+  [{ t: '', c: undefined }],
+  [
+    { t: '# ', c: 'text-zinc-600' },
+    {
+      t: 'Optional holidays: block tapers lab ceiling vs the calendars above (see a full market.yaml).',
+      c: 'text-zinc-600',
+    },
+  ],
+  [{ t: 'holidays', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
+  [
+    { t: '  ', c: undefined },
+    { t: 'capacity_taper_days', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '1', c: 'text-amber-200/90' },
+  ],
+  [
+    { t: '  ', c: undefined },
+    { t: 'lab_capacity_scale', c: 'text-emerald-300/90' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '1.0', c: 'text-amber-200/90' },
+  ],
+];
+
+/** Fixed viewport for YAML editor + Technology strip so toggles do not resize the row. */
+const LANDING_TWIN_VIEWPORT_H =
+  'h-[min(36vh,260px)] sm:h-[min(40vh,300px)] lg:h-[min(42vh,320px)]';
+
 /** Two illustrative calendar quarters: twenty-six weeks × seven days (same iso lattice as the workbench). */
 const STORY_WEEKS = 26;
 const WEEK_DAYS = 7;
@@ -145,6 +431,7 @@ function technologyStressForCell(
   chronWi: number,
   di: number,
   row: RiskRow | undefined,
+  bauMix: number,
   campaignMix: number,
   publicMix: number,
   schoolMix: number
@@ -152,7 +439,7 @@ function technologyStressForCell(
   const bau = bauActivityStress(chronWi, di);
   const camp = campaignStressAddition(chronWi, di, campaignMix);
   const cal = calendarStressAdjustment(row, publicMix, schoolMix);
-  return clamp01(bau + camp + cal);
+  return clamp01(bau * bauMix + camp + cal);
 }
 
 const TIMELINE_SEGMENTS: { phase: CampaignPhase; weeks: number; label: string; sub: string }[] = [
@@ -216,12 +503,14 @@ function PrepLiveTimelineBar({ mix, reducedMotion }: { mix: number; reducedMotio
 }
 
 function QuarterIsoMiniRunway({
+  bauMix,
   campaignMix,
   publicMix,
   schoolMix,
   chronWeeks: chronWeeksProp,
   riskByDate,
 }: {
+  bauMix: number;
   campaignMix: number;
   publicMix: number;
   schoolMix: number;
@@ -298,7 +587,7 @@ function QuarterIsoMiniRunway({
         height="100%"
         className="block max-h-[min(48vh,360px)] min-h-[200px] w-full sm:min-h-[230px]"
         preserveAspectRatio="xMidYMid meet"
-        aria-label="Half-year Technology strip: BAU rhythm; national holidays spike capacity into the red when enabled; school breaks add load; campaign prep and live when enabled"
+        aria-label="Half-year Technology strip: BAU rhythm builds in first; optional campaign prep and live; national holidays spike into the red; school breaks add load when enabled"
       >
         {cells.map(({ li, di, cell }) => {
           const { ax, ay } = isoCellTopLeft(layoutToIsoWi(li), di, stepX, stepY);
@@ -326,7 +615,15 @@ function QuarterIsoMiniRunway({
           const chronWi = nWeeks - 1 - li;
           const dateStr = typeof cell === 'string' ? cell : null;
           const row = dateStr ? riskByDate.get(dateStr) : undefined;
-          const stress = technologyStressForCell(chronWi, di, row, campaignMix, publicMix, schoolMix);
+          const stress = technologyStressForCell(
+            chronWi,
+            di,
+            row,
+            bauMix,
+            campaignMix,
+            publicMix,
+            schoolMix
+          );
           const { topC, leftC, rightC, height01 } = syntheticStressToIsoColumnStyle(stress);
           const calH = calHeightFromMetric(height01, rowTowerPx, false);
           const columnTy = deckAndColumnY(L, calH, runwayBandH);
@@ -358,12 +655,12 @@ function QuarterIsoMiniRunway({
         </g>
       </svg>
     );
-  }, [campaignMix, publicMix, schoolMix, chronWeeksProp, riskByDate]);
+  }, [bauMix, campaignMix, publicMix, schoolMix, chronWeeksProp, riskByDate]);
 }
 
-type LayerMixes = { c: number; p: number; s: number };
+type LayerMixes = { g: number; c: number; p: number; s: number };
 
-const MIX_INITIAL: LayerMixes = { c: 0, p: 0, s: 0 };
+const MIX_INITIAL: LayerMixes = { g: 0, c: 0, p: 0, s: 0 };
 
 export function LandingYamlProjectTwinMock() {
   const reducedMotion = useReducedMotion();
@@ -374,15 +671,15 @@ export function LandingYamlProjectTwinMock() {
 
   const [layerMixes, setLayerMixes] = useState<LayerMixes>(MIX_INITIAL);
   const mixRef = useRef<LayerMixes>(MIX_INITIAL);
-  const [campaignEverOn, setCampaignEverOn] = useState(false);
+  const [gridBaseEnabled, setGridBaseEnabled] = useState(false);
   const [layerDemoDone, setLayerDemoDone] = useState(false);
   const [toolbarSeen, setToolbarSeen] = useState(false);
-  const [pressKey, setPressKey] = useState<'campaign' | 'national' | 'school' | null>(null);
+  const [pressKey, setPressKey] = useState<'baseline' | 'campaign' | 'national' | 'school' | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (campaignOn) setCampaignEverOn(true);
-  }, [campaignOn]);
+    if (campaignOn || publicHolidaysOn || schoolHolidaysOn) setGridBaseEnabled(true);
+  }, [campaignOn, publicHolidaysOn, schoolHolidaysOn]);
 
   useLayoutEffect(() => {
     const el = toolbarRef.current;
@@ -416,6 +713,7 @@ export function LandingYamlProjectTwinMock() {
     };
 
     if (reducedMotion) {
+      setGridBaseEnabled(true);
       setCampaignOn(true);
       setPublicHolidaysOn(true);
       setSchoolHolidaysOn(true);
@@ -426,11 +724,11 @@ export function LandingYamlProjectTwinMock() {
       };
     }
 
-    const STEP_MS = 900;
-    const PRESS_MS = 200;
-    const INITIAL_DELAY_MS = 600;
+    const STEP_MS = 1180;
+    const PRESS_MS = 260;
+    const INITIAL_DELAY_MS = 720;
 
-    const flash = (key: 'campaign' | 'national' | 'school') => {
+    const flash = (key: 'baseline' | 'campaign' | 'national' | 'school') => {
       setPressKey(key);
       timers.push(
         window.setTimeout(() => {
@@ -440,18 +738,22 @@ export function LandingYamlProjectTwinMock() {
     };
 
     schedule(INITIAL_DELAY_MS, () => {
+      flash('baseline');
+      setGridBaseEnabled(true);
+    });
+    schedule(INITIAL_DELAY_MS + STEP_MS, () => {
       flash('campaign');
       setCampaignOn(true);
     });
-    schedule(INITIAL_DELAY_MS + STEP_MS, () => {
+    schedule(INITIAL_DELAY_MS + STEP_MS * 2, () => {
       flash('national');
       setPublicHolidaysOn(true);
     });
-    schedule(INITIAL_DELAY_MS + STEP_MS * 2, () => {
+    schedule(INITIAL_DELAY_MS + STEP_MS * 3, () => {
       flash('school');
       setSchoolHolidaysOn(true);
     });
-    schedule(INITIAL_DELAY_MS + STEP_MS * 2 + 320, () => {
+    schedule(INITIAL_DELAY_MS + STEP_MS * 3 + 420, () => {
       if (!cancelled) setLayerDemoDone(true);
     });
 
@@ -463,6 +765,7 @@ export function LandingYamlProjectTwinMock() {
 
   useEffect(() => {
     const target: LayerMixes = {
+      g: gridBaseEnabled ? 1 : 0,
       c: campaignOn ? 1 : 0,
       p: publicHolidaysOn ? 1 : 0,
       s: schoolHolidaysOn ? 1 : 0,
@@ -475,13 +778,14 @@ export function LandingYamlProjectTwinMock() {
     const from = { ...mixRef.current };
     let start: number | null = null;
     let raf = 0;
-    const durationMs = 380;
+    const durationMs = 540;
     const ease = (t: number) => 1 - (1 - t) ** 3;
     const step = (now: number) => {
       if (start === null) start = now;
       const t = Math.min(1, (now - start) / durationMs);
       const e = ease(t);
       const next: LayerMixes = {
+        g: from.g + (target.g - from.g) * e,
         c: from.c + (target.c - from.c) * e,
         p: from.p + (target.p - from.p) * e,
         s: from.s + (target.s - from.s) * e,
@@ -492,29 +796,51 @@ export function LandingYamlProjectTwinMock() {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [campaignOn, publicHolidaysOn, schoolHolidaysOn, reducedMotion]);
+  }, [gridBaseEnabled, campaignOn, publicHolidaysOn, schoolHolidaysOn, reducedMotion]);
 
-  const { c: mixCampaign, p: mixPublic, s: mixSchool } = layerMixes;
+  const { g: mixGrid, c: mixCampaign, p: mixPublic, s: mixSchool } = layerMixes;
 
   const layerHint = !toolbarSeen
     ? 'Use the layer toggles under the preview to blend campaign prep, run, and calendar stress.'
     : !layerDemoDone && !reducedMotion
-      ? 'Watch once: we turn on With campaign, then National holidays, then School holidays — then mix freely.'
-      : 'Mix layers freely — toggles cross-fade; Baseline / With campaign switches the YAML preview.';
+      ? 'Watch once: the strip starts empty, then BAU rhythm, then campaign load, then national holidays, then school breaks — then mix freely.'
+      : 'Mix layers freely — one scrollable doc; toggles swap campaign + calendar YAML and smooth-scroll to the tail.';
 
   const layerToolbarVariants = useMemo(() => {
     const instant = !!reducedMotion;
-    const row: Variants = instant
+    const chip: Variants = instant
+      ? {
+          hidden: { opacity: 1, y: 0, scale: 1 },
+          visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0 } },
+        }
+      : {
+          hidden: { opacity: 0, y: 10, scale: 0.96 },
+          visible: {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+          },
+        };
+    const chipRow: Variants = instant
+      ? { hidden: {}, visible: { transition: { staggerChildren: 0, delayChildren: 0 } } }
+      : {
+          hidden: {},
+          visible: {
+            transition: { staggerChildren: 0.13, delayChildren: 0.04 },
+          },
+        };
+    const hint: Variants = instant
       ? {
           hidden: { opacity: 1, y: 0 },
           visible: { opacity: 1, y: 0, transition: { duration: 0 } },
         }
       : {
-          hidden: { opacity: 0, y: 12 },
+          hidden: { opacity: 0, y: 8 },
           visible: {
             opacity: 1,
             y: 0,
-            transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] },
+            transition: { delay: 0.58, duration: 0.38, ease: [0.22, 1, 0.36, 1] },
           },
         };
     const container: Variants = instant
@@ -525,76 +851,62 @@ export function LandingYamlProjectTwinMock() {
       : {
           hidden: {},
           visible: {
-            transition: { staggerChildren: 0.14, delayChildren: 0.08 },
+            transition: { staggerChildren: 0.12, delayChildren: 0.06 },
           },
         };
-    return { container, row };
+    return { container, chipRow, chip, hint };
   }, [reducedMotion]);
 
-  const yamlBaseline: readonly (readonly YamlToken[])[] = [
-    [
-      { t: '# ', c: 'text-zinc-600' },
-      { t: 'Ongoing programmes (POS, refresh, network) use the same blocks—different weights & durations', c: 'text-zinc-600' },
-    ],
-    [{ t: '# ', c: 'text-zinc-600' }, { t: 'Campaign prep pulls Technology load forward', c: 'text-zinc-600' }],
-    [{ t: '# ', c: 'text-zinc-600' }, { t: 'Prep ends the day before go-live (testing_prep_duration).', c: 'text-zinc-600' }],
-    [{ t: 'campaigns', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
-    [{ t: '  ', c: undefined }, { t: '- name: ', c: 'text-zinc-500' }, { t: '"Summer launch"', c: 'text-cyan-300/90' }],
-    [{ t: '    ', c: undefined }, { t: 'start_date', c: 'text-emerald-300/90' }, { t: ": '", c: 'text-zinc-500' }, { t: '2026-05-20', c: 'text-amber-200/90' }, { t: "'", c: 'text-zinc-500' }],
-    [{ t: '    ', c: undefined }, { t: 'duration', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '35', c: 'text-amber-200/90' }],
-    [{ t: '    ', c: undefined }, { t: 'testing_prep_duration', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '21', c: 'text-amber-200/90' }],
-    [{ t: '    ', c: undefined }, { t: 'impact', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: 'high', c: 'text-cyan-300/90' }],
-    [{ t: '    ', c: undefined }, { t: '# Prep segment → heavier labs + tech_staff', c: 'text-zinc-600' }],
-    [{ t: '    ', c: undefined }, { t: 'campaign_support', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
-    [{ t: '      ', c: undefined }, { t: 'labs_required', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '2', c: 'text-amber-200/90' }],
-    [{ t: '      ', c: undefined }, { t: 'tech_staff', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '1.5', c: 'text-amber-200/90' }],
-    [{ t: '      ', c: undefined }, { t: 'ops', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '0.25', c: 'text-amber-200/90' }],
-    [{ t: '    ', c: undefined }, { t: '# Live segment → steadier, lower support', c: 'text-zinc-600' }],
-    [{ t: '    ', c: undefined }, { t: 'live_campaign_support', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
-    [{ t: '      ', c: undefined }, { t: 'labs_required', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '0.5', c: 'text-amber-200/90' }],
-    [{ t: '      ', c: undefined }, { t: 'tech_staff', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '0.5', c: 'text-amber-200/90' }],
-  ];
+  const layerChipBtn = (pressed: boolean) =>
+    cn(
+      'inline-flex shrink-0 origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
+      pressed
+        ? 'border-[#FFC72C]/45 bg-[#FFC72C]/12 text-zinc-100 shadow-[0_0_22px_-10px_rgba(255,199,44,0.45)] ring-1 ring-inset ring-[#FFC72C]/20'
+        : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.14] hover:text-zinc-300'
+    );
 
-  const yamlOff: readonly (readonly YamlToken[])[] = [
-    [{ t: '# ', c: 'text-zinc-600' }, { t: 'No campaign — no prep or live segment', c: 'text-zinc-600' }],
-    [{ t: '# ', c: 'text-zinc-600' }, { t: 'Technology lens stays at BAU + calendar rhythm only.', c: 'text-zinc-600' }],
-    [{ t: 'campaigns', c: 'text-zinc-600' }, { t: ': ', c: 'text-zinc-600' }, { t: '[]', c: 'text-zinc-500' }],
-    [{ t: '', c: undefined }],
-    [{ t: '# ', c: 'text-zinc-600' }, { t: 'With a campaign, testing_prep_duration +', c: 'text-zinc-600' }],
-    [{ t: '# ', c: 'text-zinc-600' }, { t: 'campaign_support / live_campaign_support apply.', c: 'text-zinc-600' }],
-    [{ t: '', c: undefined }],
-    [{ t: 'resources', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
-    [{ t: '  ', c: undefined }, { t: 'labs', c: 'text-violet-300/95' }, { t: ': ', c: 'text-zinc-500' }, { t: '{ ', c: 'text-zinc-500' }, { t: 'capacity', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '6', c: 'text-amber-200/90' }, { t: ' }', c: 'text-zinc-500' }],
-    [{ t: '  ', c: undefined }, { t: 'staff', c: 'text-violet-300/95' }, { t: ': ', c: 'text-zinc-500' }, { t: '{ ', c: 'text-zinc-500' }, { t: 'capacity', c: 'text-emerald-300/90' }, { t: ': ', c: 'text-zinc-500' }, { t: '4', c: 'text-amber-200/90' }, { t: ' }', c: 'text-zinc-500' }],
-    [{ t: '', c: undefined }],
-    [{ t: '# ', c: 'text-zinc-600' }, { t: '…', c: 'text-zinc-600' }],
-    [{ t: '', c: undefined }],
-    [{ t: '', c: undefined }],
-    [{ t: '', c: undefined }],
-    [{ t: '', c: undefined }],
-    [{ t: '', c: undefined }],
-  ];
+  const yamlDocLines = useMemo(() => {
+    const calendar: YamlDocLine[] = [];
+    if (publicHolidaysOn) calendar.push(...LANDING_YAML_PUBLIC_HOLIDAYS);
+    if (schoolHolidaysOn) calendar.push(...LANDING_YAML_SCHOOL_HOLIDAYS);
+    if (!publicHolidaysOn && !schoolHolidaysOn) calendar.push(...LANDING_YAML_CALENDAR_PLACEHOLDER);
+    return [
+      ...LANDING_YAML_DOC_CORE,
+      ...(campaignOn ? LANDING_YAML_CAMPAIGN_ON : LANDING_YAML_CAMPAIGN_OFF),
+      ...calendar,
+      ...LANDING_YAML_DOC_FOOTER,
+    ];
+  }, [campaignOn, publicHolidaysOn, schoolHolidaysOn]);
 
-  const activeLines = campaignOn ? yamlBaseline : yamlOff;
-  const lineCount = Math.max(yamlBaseline.length, yamlOff.length);
-
-  const yamlCardRef = useRef<HTMLDivElement>(null);
-  const [yamlCardMinPx, setYamlCardMinPx] = useState<number | undefined>(undefined);
+  const yamlScrollRef = useRef<HTMLDivElement>(null);
+  const yamlLayoutSig = `${campaignOn}|${publicHolidaysOn}|${schoolHolidaysOn}`;
+  const yamlScrollBootRef = useRef(true);
+  const prevYamlLayoutSigRef = useRef(yamlLayoutSig);
 
   useLayoutEffect(() => {
-    const el = yamlCardRef.current;
+    const el = yamlScrollRef.current;
     if (!el) return;
-    const sync = () => {
-      const h = el.getBoundingClientRect().height;
-      setYamlCardMinPx((prev) => Math.max(prev ?? 0, Math.ceil(h)));
-    };
-    sync();
-    const ro = new ResizeObserver(() => {
-      requestAnimationFrame(sync);
+    if (yamlScrollBootRef.current) {
+      yamlScrollBootRef.current = false;
+      prevYamlLayoutSigRef.current = yamlLayoutSig;
+      return;
+    }
+    if (prevYamlLayoutSigRef.current === yamlLayoutSig) return;
+    prevYamlLayoutSigRef.current = yamlLayoutSig;
+    let cancelled = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        el.scrollTo({
+          top: el.scrollHeight,
+          behavior: reducedMotion ? 'auto' : 'smooth',
+        });
+      });
     });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [yamlLayoutSig, reducedMotion]);
 
   const storyChronWeeks = useMemo(
     () => buildConsecutiveMondayWeekRows(TWIN_STORY_START_MONDAY, STORY_WEEKS),
@@ -646,15 +958,7 @@ export function LandingYamlProjectTwinMock() {
         role="group"
         aria-label="Compare baseline and campaign temperature on the capacity strip, with optional national and school holiday layers"
       >
-        <div
-          ref={yamlCardRef}
-          className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_20px_60px_-14px_rgba(0,0,0,0.75)]"
-          style={
-            yamlCardMinPx != null && yamlCardMinPx > 0
-              ? { minHeight: yamlCardMinPx }
-              : undefined
-          }
-        >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_20px_60px_-14px_rgba(0,0,0,0.75)]">
           <div className="flex items-center gap-2 border-b border-white/[0.06] bg-[#111114] px-3 py-2">
             <div className="flex gap-1" aria-hidden>
               <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]/90" />
@@ -667,10 +971,15 @@ export function LandingYamlProjectTwinMock() {
               <span className="text-cyan-500/75"> — preview</span>
             </span>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto bg-[#0a0a0c] p-3 sm:p-3.5">
+          <div
+            ref={yamlScrollRef}
+            className={cn(
+              'w-full shrink-0 overflow-y-auto scroll-smooth bg-[#0a0a0c] p-3 sm:p-3.5',
+              LANDING_TWIN_VIEWPORT_H
+            )}
+          >
             <div className="rounded-lg border border-white/[0.05] bg-[#08080a]/95 p-2.5 sm:p-3">
-              {Array.from({ length: lineCount }, (_, i) => {
-                const row = activeLines[i];
+              {yamlDocLines.map((row, i) => {
                 if (!row || row.every((t) => t.t === '')) {
                   return <div key={i} className="min-h-[1.35em]" />;
                 }
@@ -680,7 +989,7 @@ export function LandingYamlProjectTwinMock() {
           </div>
           <motion.div
             ref={toolbarRef}
-            className="flex flex-col gap-2 border-t border-white/[0.06] bg-[#0e0e12] px-3 py-2.5"
+            className="mt-auto flex flex-col gap-2 border-t border-white/[0.06] bg-[#0e0e12] px-3 py-2.5"
             role="toolbar"
             aria-label="Preview layers for YAML and 3D strip"
             aria-describedby={`${panelId}-layer-hint`}
@@ -689,55 +998,51 @@ export function LandingYamlProjectTwinMock() {
             whileInView="visible"
             viewport={{ once: true, amount: 0.2, margin: '0px 0px -10% 0px' }}
           >
-            <motion.div variants={layerToolbarVariants.row} className="flex flex-wrap gap-2">
-              <button
+            <motion.div
+              variants={layerToolbarVariants.chipRow}
+              className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden"
+            >
+              <motion.button
                 type="button"
-                onClick={() => setCampaignOn(false)}
+                onClick={() => {
+                  setGridBaseEnabled(true);
+                  setCampaignOn(false);
+                }}
                 aria-pressed={!campaignOn}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
-                  !campaignOn
-                    ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-100'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300',
-                  campaignEverOn && campaignOn && 'ring-1 ring-inset ring-cyan-500/35'
-                )}
+                variants={layerToolbarVariants.chip}
+                initial={false}
+                animate={{ scale: pressKey === 'baseline' ? 0.94 : 1 }}
+                transition={LAYER_PRESS_TRANSITION}
+                className={layerChipBtn(!campaignOn && gridBaseEnabled)}
               >
                 <Layers className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 Baseline
-              </button>
+              </motion.button>
               <motion.button
                 type="button"
-                onClick={() => setCampaignOn(true)}
+                onClick={() => {
+                  setGridBaseEnabled(true);
+                  setCampaignOn(true);
+                }}
                 aria-pressed={campaignOn}
+                variants={layerToolbarVariants.chip}
                 initial={false}
                 animate={{ scale: pressKey === 'campaign' ? 0.94 : 1 }}
                 transition={LAYER_PRESS_TRANSITION}
-                className={cn(
-                  'inline-flex origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
-                  campaignOn
-                    ? 'border-violet-500/45 bg-violet-500/15 text-violet-100'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300',
-                  campaignEverOn && !campaignOn && 'ring-1 ring-inset ring-violet-500/35'
-                )}
+                className={layerChipBtn(campaignOn && gridBaseEnabled)}
               >
                 <Box className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 With campaign
               </motion.button>
-            </motion.div>
-            <motion.div variants={layerToolbarVariants.row} className="flex flex-wrap gap-2">
               <motion.button
                 type="button"
                 onClick={() => setPublicHolidaysOn((v) => !v)}
                 aria-pressed={publicHolidaysOn}
+                variants={layerToolbarVariants.chip}
                 initial={false}
                 animate={{ scale: pressKey === 'national' ? 0.94 : 1 }}
                 transition={LAYER_PRESS_TRANSITION}
-                className={cn(
-                  'inline-flex origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
-                  publicHolidaysOn
-                    ? 'border-red-500/50 bg-red-500/14 text-red-100 shadow-[0_0_16px_-4px_rgba(239,68,68,0.35)]'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300'
-                )}
+                className={layerChipBtn(publicHolidaysOn)}
               >
                 <Landmark className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 National holidays
@@ -746,15 +1051,11 @@ export function LandingYamlProjectTwinMock() {
                 type="button"
                 onClick={() => setSchoolHolidaysOn((v) => !v)}
                 aria-pressed={schoolHolidaysOn}
+                variants={layerToolbarVariants.chip}
                 initial={false}
                 animate={{ scale: pressKey === 'school' ? 0.94 : 1 }}
                 transition={LAYER_PRESS_TRANSITION}
-                className={cn(
-                  'inline-flex origin-center items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-landing text-[11px] font-semibold transition-colors',
-                  schoolHolidaysOn
-                    ? 'border-sky-500/45 bg-sky-500/12 text-sky-100'
-                    : 'border-white/[0.08] bg-white/[0.03] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300'
-                )}
+                className={layerChipBtn(schoolHolidaysOn)}
               >
                 <Trees className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 School holidays
@@ -764,38 +1065,48 @@ export function LandingYamlProjectTwinMock() {
               id={`${panelId}-layer-hint`}
               className="font-landing text-[10px] leading-snug text-zinc-600"
               aria-live="polite"
-              variants={layerToolbarVariants.row}
+              variants={layerToolbarVariants.hint}
             >
               {layerHint}
             </motion.p>
           </motion.div>
         </div>
 
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_20px_60px_-14px_rgba(0,0,0,0.75)]">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_20px_60px_-14px_rgba(0,0,0,0.75)]">
           <div className="border-b border-white/[0.06] bg-[#111114] px-3 py-2">
             <span className="font-landing text-[10px] font-semibold tracking-[0.08em] text-zinc-500">
               Technology Capacity
             </span>
           </div>
-          <div className="relative flex min-h-[220px] flex-1 flex-col items-center justify-center bg-gradient-to-b from-[#0a0a0e] to-[#060608] px-1 py-3 sm:px-2 sm:py-4">
-            <div
-              className="pointer-events-none absolute inset-0 opacity-[0.14]"
-              style={{
-                background:
-                  'radial-gradient(ellipse 70% 55% at 50% 20%, rgba(34, 211, 238, 0.35), transparent 60%), radial-gradient(ellipse 50% 45% at 80% 75%, rgba(139, 92, 246, 0.25), transparent 55%)',
-              }}
-              aria-hidden
-            />
-            <div className="relative w-full max-w-[min(100%,680px)] shrink-0 sm:max-w-[720px]">
-              <QuarterIsoMiniRunway
-                campaignMix={mixCampaign}
-                publicMix={mixPublic}
-                schoolMix={mixSchool}
-                chronWeeks={storyChronWeeks}
-                riskByDate={riskByDateDe}
+          <div
+            className={cn(
+              'relative flex min-h-0 shrink-0 flex-col bg-gradient-to-b from-[#0a0a0e] to-[#060608]',
+              LANDING_TWIN_VIEWPORT_H
+            )}
+          >
+            <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center px-1 py-2 sm:px-2 sm:py-3">
+              <div
+                className="pointer-events-none absolute inset-0 opacity-[0.14]"
+                style={{
+                  background:
+                    'radial-gradient(ellipse 70% 55% at 50% 20%, rgba(34, 211, 238, 0.35), transparent 60%), radial-gradient(ellipse 50% 45% at 80% 75%, rgba(139, 92, 246, 0.25), transparent 55%)',
+                }}
+                aria-hidden
               />
+              <div className="relative flex min-h-0 w-full max-w-[min(100%,680px)] flex-1 items-center justify-center sm:max-w-[720px]">
+                <QuarterIsoMiniRunway
+                  bauMix={mixGrid}
+                  campaignMix={mixCampaign}
+                  publicMix={mixPublic}
+                  schoolMix={mixSchool}
+                  chronWeeks={storyChronWeeks}
+                  riskByDate={riskByDateDe}
+                />
+              </div>
             </div>
-            <PrepLiveTimelineBar mix={mixCampaign} reducedMotion={!!reducedMotion} />
+            <div className="shrink-0 px-1 pb-2 sm:px-0">
+              <PrepLiveTimelineBar mix={mixCampaign} reducedMotion={!!reducedMotion} />
+            </div>
           </div>
         </div>
       </div>
