@@ -555,20 +555,20 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Data driven
+          Same engine as the workbench
         </p>
         <h2 id="iso-mock-heading" className="font-landing text-2xl font-semibold text-white">
-          Familiar Data, new clarity
+          Read the year in height and heat—not another Gantt roll-up
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          The isometric runway is the same technology lens as the workbench — here you read it as{' '}
-          <span className="text-zinc-300">temperature and height</span> along the calendar, not a separate illustration.
-          <strong className="font-medium text-zinc-200"> Taller, warmer towers</strong> mean more delivery load booked
-          into labs and market IT that day — less headroom.{' '}
-          <strong className="font-medium text-zinc-200">Shorter, cooler towers</strong> mean that week is calmer. In
-          campaign <strong className="font-medium text-violet-200/90">prep</strong>, the skyline climbs with readiness,
-          build, and test-integration pressure; in <strong className="font-medium text-cyan-200/90">live</strong>, it
-          usually eases because operational and sustain support sits lighter on the lane than the pre-cutover surge.
+          The isometric runway is the same Technology lens as the live app. Here you scan{' '}
+          <span className="text-zinc-300">temperature and extrusion</span> along real dates—not a marketing-only graphic.
+          <strong className="font-medium text-zinc-200"> Taller, warmer towers</strong> mean more of the lane is
+          committed to labs, test integration, and market IT that day.{' '}
+          <strong className="font-medium text-zinc-200">Shorter, cooler towers</strong> read as breathing room. In
+          campaign <strong className="font-medium text-violet-200/90">prep</strong>, readiness and test load dominate;
+          in <strong className="font-medium text-cyan-200/90">live</strong>, operational sustain is usually lighter than
+          the pre-cutover surge—so the skyline tells the same story your markets would describe.
         </p>
       </div>
 
@@ -637,7 +637,7 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
 
         <div className="relative z-10 flex items-start gap-2 border-b border-white/[0.05] bg-[#0a0a0c] px-3 py-2.5 sm:px-4">
           <h3 className="font-landing text-sm font-semibold tracking-tight text-white sm:text-base">
-            Technology runway · prep vs live
+            Technology runway · prep vs live vs BAU
           </h3>
           <MarketCircleFlag marketId="DE" size={20} className="ring-white/15" />
         </div>

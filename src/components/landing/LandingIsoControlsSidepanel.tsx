@@ -231,7 +231,8 @@ export function LandingIsoControlsSidepanel() {
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-2.5 pt-2">
         <p className="mb-3 font-landing text-[9px] leading-snug text-zinc-500">
-          Use the market picker in the toolbar to compare regions.
+          Trading and seasonal patterns shape how busy stores feel alongside the technology lane—tune weights to match
+          each market.
         </p>
 
         <div className="mb-3">

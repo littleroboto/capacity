@@ -1363,10 +1363,15 @@ export function RunwayGrid({
   const discoMode = discoModePref && !reduceMotion && theme === 'dark';
   const runway3dHeatmap = useAtcStore((s) => s.runway3dHeatmap);
   const setRunway3dHeatmap = useAtcStore((s) => s.setRunway3dHeatmap);
-  const showIso3d = RUNWAY_ISO_3D_ENABLED && runway3dHeatmap;
+  const storeIso3dOn = RUNWAY_ISO_3D_ENABLED && runway3dHeatmap;
+  /** Single-market isometric column only (not LIOM compare). */
+  const showIso3dSingleMarket = !compareAllMarkets && storeIso3dOn;
+  /** LIOM city block: honour 3D toggle in workbench, but never on landing/embed minimal chrome. */
+  const showCompareIsoCityBlock =
+    compareAllMarkets && storeIso3dOn && !landingMinimalChrome;
   const runwaySvgHeatmapPref = useAtcStore((s) => s.runwaySvgHeatmap);
   const setRunwaySvgHeatmap = useAtcStore((s) => s.setRunwaySvgHeatmap);
-  const useSvgHeatmap = runwaySvgHeatmapPref && (compareAllMarkets || !showIso3d);
+  const useSvgHeatmap = runwaySvgHeatmapPref && (compareAllMarkets || !showIso3dSingleMarket);
   const runwayFilterYear = useAtcStore((s) => s.runwayFilterYear);
   const runwayFilterQuarter = useAtcStore((s) => s.runwayFilterQuarter);
   const runwayIncludeFollowingQuarter = useAtcStore((s) => s.runwayIncludeFollowingQuarter);
@@ -1395,11 +1400,11 @@ export function RunwayGrid({
   const cellPx = runwayCellPx;
 
   const runway3dRowTowerPx = useMemo(
-    () => (!compareAllMarkets && showIso3d ? Math.round(cellPx * 1.38) : 0),
-    [compareAllMarkets, showIso3d, cellPx]
+    () => (showIso3dSingleMarket ? Math.round(cellPx * 1.38) : 0),
+    [showIso3dSingleMarket, cellPx]
   );
 
-  const useSideSummary = !compareAllMarkets && !showIso3d;
+  const useSideSummary = !compareAllMarkets && !showIso3dSingleMarket;
 
   const marketsOrdered = useMemo(() => {
     const fromCfg = configs.map((c) => c.market);
@@ -1481,7 +1486,7 @@ export function RunwayGrid({
 
   useLayoutEffect(() => {
     if (!compareAllMarkets || marketsOrdered.length === 0 || countrySwitchLoading) return;
-    if (showIso3d) return;
+    if (showCompareIsoCityBlock) return;
     const el = compareScrollRef.current;
     if (!el) return;
 
@@ -1522,13 +1527,13 @@ export function RunwayGrid({
     marketsFitKey,
     marketsOrdered.length,
     countrySwitchLoading,
-    showIso3d,
+    showCompareIsoCityBlock,
     landingCompareMaxCellPx,
   ]);
 
   useLayoutEffect(() => {
     if (compareAllMarkets || countrySwitchLoading) return;
-    if (showIso3d) return;
+    if (showIso3dSingleMarket) return;
     const el = singleMarketFitRef.current;
     if (!el) return;
 
@@ -1555,7 +1560,7 @@ export function RunwayGrid({
       ro.disconnect();
       window.removeEventListener('resize', applyFit);
     };
-  }, [compareAllMarkets, compareDatesFitKey, countrySwitchLoading, showIso3d]);
+  }, [compareAllMarkets, compareDatesFitKey, countrySwitchLoading, showIso3dSingleMarket]);
 
   const dismissTip = useCallback(() => {
     setTip(null);
@@ -1563,13 +1568,13 @@ export function RunwayGrid({
 
   const calendarLayout = useMemo(() => {
     if (compareAllMarkets) return buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx);
-    if (showIso3d) {
+    if (showIso3dSingleMarket) {
       return buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx, {
         rowTowerPx: runway3dRowTowerPx,
       });
     }
     return buildQuarterGridRunwayLayout(layoutDatesSorted, cellPx);
-  }, [layoutDatesSorted, cellPx, compareAllMarkets, showIso3d, runway3dRowTowerPx]);
+  }, [layoutDatesSorted, cellPx, compareAllMarkets, showIso3dSingleMarket, runway3dRowTowerPx]);
 
   const heatmapOpts: HeatmapColorOpts = useMemo(() => {
     const heatmapSpectrumMode: HeatmapSpectrumMode = heatmapSpectrumContinuous
@@ -1789,7 +1794,7 @@ export function RunwayGrid({
               disabled={countrySwitchLoading}
               aria-pressed={runwaySvgHeatmapPref}
               title={
-                showIso3d && !compareAllMarkets
+                showIso3dSingleMarket
                   ? '3D single-market view is on — turn 3D off to use flat SVG cells'
                   : runwaySvgHeatmapPref
                     ? 'SVG runway cells on (flat heatmap). Off for HTML cells, colour swoosh, disco twinkle.'
@@ -1932,7 +1937,9 @@ export function RunwayGrid({
               </motion.div>
             ) : calendarLayout ? (
               <motion.div
-                key={`grid-${country}-${compareAllMarkets ? 'compare' : 'single'}-${showIso3d ? '3d' : 'flat'}-${useSvgHeatmap ? 'svg' : 'html'}`}
+                key={`grid-${country}-${compareAllMarkets ? 'compare' : 'single'}-${
+                  showIso3dSingleMarket || showCompareIsoCityBlock ? '3d' : 'flat'
+                }-${useSvgHeatmap ? 'svg' : 'html'}`}
                 className="w-full"
                 initial={reduceMotion ? false : { y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1963,8 +1970,8 @@ export function RunwayGrid({
                   discoMode={discoMode}
                   country={country}
                   marketConfig={marketConfig}
-                  heatmap3d={!compareAllMarkets && showIso3d}
-                  runway3dHeatmap={showIso3d}
+                  heatmap3d={showIso3dSingleMarket}
+                  runway3dHeatmap={showCompareIsoCityBlock}
                   rowTowerPx={runway3dRowTowerPx}
                   runwaySvgHeatmap={useSvgHeatmap}
                   makeShowTip={makeShowTip}

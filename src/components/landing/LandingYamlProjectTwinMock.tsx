@@ -532,6 +532,10 @@ export function LandingYamlProjectTwinMock() {
   }, [reducedMotion]);
 
   const yamlBaseline: readonly (readonly YamlToken[])[] = [
+    [
+      { t: '# ', c: 'text-zinc-600' },
+      { t: 'Ongoing programmes (POS, refresh, network) use the same blocks—different weights & durations', c: 'text-zinc-600' },
+    ],
     [{ t: '# ', c: 'text-zinc-600' }, { t: 'Campaign prep pulls Technology load forward', c: 'text-zinc-600' }],
     [{ t: '# ', c: 'text-zinc-600' }, { t: 'Prep ends the day before go-live (testing_prep_duration).', c: 'text-zinc-600' }],
     [{ t: 'campaigns', c: 'text-violet-300/95' }, { t: ':', c: 'text-zinc-500' }],
@@ -618,21 +622,22 @@ export function LandingYamlProjectTwinMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Powerful models
+          Configuration, not a rigid template
         </p>
         <h2
           id={`${panelId}-heading`}
           className="font-landing text-balance text-2xl font-semibold leading-snug text-white sm:text-[1.65rem]"
         >
-          Prep, cutover and run, all in the model
+          Prep, cutover, run—and the long-running programmes underneath
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          Think of the strip as a temperature of pressure across the horizon: calmer, cooler weeks versus stretches where
-          demand and delivery stack up. With a campaign in play, prep shows up as a warmer band on the Technology side
-          while readiness and testing run hot; after cutover, the run phase often eases that lane while support work
-          continues at a steadier, lower heat. National holidays read as the sharpest spikes — capacity feels tightest and
-          store-side pressure is highest. School holidays add sustained pressure in stores whilst tightening capacity on
-          the support side.
+          The strip reads like temperature over the horizon: calm weeks versus stretches where BAU support, retail
+          campaigns, and technology change overlap. When a campaign is in YAML, prep lands as a warmer band while
+          readiness and test integration run hot; after cutover, live support often eases the lane while work continues at
+          a steadier heat. National holidays spike hardest; school breaks add sustained trading-shaped load while support
+          capacity stays tight. Long-running work—hardware refresh, networking maintenance, POS waves—can be expressed the
+          same way: <span className="text-zinc-300">different project types, different draws on labs and people</span>,
+          all in one calendar.
         </p>
       </div>
 

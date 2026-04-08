@@ -131,17 +131,19 @@ export function LandingMultiMarketDeploymentMock() {
           id="multimarket-runway-heading"
           className="font-landing max-w-3xl text-balance text-2xl font-semibold leading-snug text-white sm:text-[1.65rem]"
         >
-          Globally consistent, locally tuned
+          Who has headroom for the next pilot?
         </h2>
       </header>
 
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_min(100%,720px)] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_min(100%,780px)]">
         <p className="max-w-xs text-pretty text-sm leading-relaxed text-zinc-400 sm:max-w-sm lg:max-w-[15.5rem] lg:pt-0.5 xl:max-w-[17rem]">
-          The same <span className="text-zinc-300">deployment risk</span> lens runs across every column in the compare
-          strip — here {RUNWAY_ALL_MARKETS_LABEL} with five bundled markets (Germany, France, the UK, Australia, and
-          Canada). The preview trims to a few months (January–April 2026) and only renders days the model actually emits
-          — no padded empty calendar — with compact cells so all five columns stay on screen without scrolling. Click any
-          cell for the day-detail card you get in the workbench. Opening the app loads your full programme and segment.
+          Strategy leaders often need a fast answer: <span className="text-zinc-300">which markets can absorb</span> a
+          technology pilot or an extra wave without piling onto an already hot quarter. The same{' '}
+          <span className="text-zinc-300">deployment risk</span> lens runs across every column—here{' '}
+          {RUNWAY_ALL_MARKETS_LABEL} with five sample markets (Germany, France, the UK, Australia, and Canada). The
+          preview trims to a few months (January–April 2026), renders only days the model emits, and uses compact cells
+          so every column fits without horizontal scroll. Click a cell for the same day-detail card as the workbench;
+          open the app for your full programme, segment, and configuration.
         </p>
 
         <div className="w-full min-w-0 justify-self-stretch lg:justify-self-end">

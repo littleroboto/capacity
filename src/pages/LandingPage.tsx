@@ -20,17 +20,7 @@ import { LandingMultiMarketDeploymentMock } from '@/components/landing/LandingMu
 import { LandingYamlProjectTwinMock } from '@/components/landing/LandingYamlProjectTwinMock';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 import { heatmapColorDiscrete, heatmapSpectrumLegendGradientCss } from '@/lib/riskHeatmapColors';
-import {
-  ArrowRight,
-  BarChart3,
-  ChevronDown,
-  Columns2,
-  ExternalLink,
-  GitBranch,
-  Globe2,
-  Layers,
-  Radar,
-} from 'lucide-react';
+import { ArrowRight, ChevronDown, ExternalLink } from 'lucide-react';
 
 const DOW = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
 const MONTH_SHORT = [
@@ -272,7 +262,7 @@ function HeroBrowserHeatmap({ reducedMotion }: { reducedMotion: boolean }) {
             <div className="min-w-0 flex-1 overflow-x-auto">
               <div className="mb-2 flex min-w-[min(100%,280px)] flex-wrap items-center gap-2 sm:min-w-0 sm:mb-3">
                 <h3 className="font-landing text-[11px] font-semibold tracking-tight text-zinc-200 sm:text-xs">
-                  Programme pressure
+                  Capacity & programme pressure
                 </h3>
                 <span className="text-zinc-600" aria-hidden>
                   ·
@@ -316,52 +306,21 @@ function HeroBrowserHeatmap({ reducedMotion }: { reducedMotion: boolean }) {
           <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-white/[0.05] pt-3 text-[10px] font-medium uppercase tracking-wider text-zinc-500 sm:mt-4 sm:pt-4 sm:text-[11px]">
             <span className="flex items-center gap-2 text-cyan-400/85">
               <span className="h-2 w-2 rounded-sm bg-cyan-400/90 shadow-[0_0_10px_rgba(34,211,238,0.35)]" />
-              BAU technology
+              BAU support
             </span>
             <span className="flex items-center gap-2 text-rose-400/85">
               <span className="h-2 w-2 rounded-sm bg-rose-500/85 shadow-[0_0_10px_rgba(244,63,94,0.35)]" />
-              Project load
+              Campaigns & tech change
             </span>
-            <span className="text-zinc-600 normal-case tracking-normal">Separate lenses, one timeline</span>
+            <span className="text-zinc-600 normal-case tracking-normal">
+              Lenses in the app; one shared calendar
+            </span>
           </div>
         </div>
       </div>
     </motion.div>
   );
 }
-
-const FEATURES = [
-  {
-    icon: BarChart3,
-    title: 'Data-driven runway',
-    body: 'Capacity as a picture everyone can read — pressure, mix, and time in one surface.',
-  },
-  {
-    icon: GitBranch,
-    title: 'YAML programmes & resourcing',
-    body: 'Programme and resourcing truth stays in structured YAML — the UI is the shared view.',
-  },
-  {
-    icon: Globe2,
-    title: 'Markets & segments',
-    body: 'Zoom from the whole portfolio into individual markets and segments without losing context.',
-  },
-  {
-    icon: Layers,
-    title: 'Tech resourcing',
-    body: 'See how technology capacity is allocated across streams, roles, and the calendar.',
-  },
-  {
-    icon: Columns2,
-    title: 'BAU vs projects',
-    body: 'Distinct visualisations for BAU technology workstream load and project load side by side.',
-  },
-  {
-    icon: Radar,
-    title: 'Air traffic control',
-    body: 'A control tower for technology programmes — what is landing when, and what conflicts.',
-  },
-] as const;
 
 type LandingBomEntry = {
   readonly label: string;
@@ -546,9 +505,11 @@ export function LandingPage() {
   const reducedMotion = useReducedMotion();
   const clerkOn = isClerkConfigured();
   const landingSymbolPatternId = useId().replace(/:/g, '');
+  const landingNoiseFilterId = useId().replace(/:/g, '');
 
   useEffect(() => {
-    document.title = 'MarketZero Workbench · Air traffic control for technology programmes';
+    document.title =
+      'MarketZero Workbench · Global capacity runway for technology programmes';
   }, []);
 
   useEffect(() => {
@@ -558,6 +519,11 @@ export function LandingPage() {
 
   return (
     <div className="landing-root relative min-h-screen bg-[#040506] text-zinc-100 antialiased selection:bg-[#FFC72C]/35">
+      {/*
+        Background stack (back → front): base #040506 on .landing-root; line + crosshatch grid; SVG symbol
+        pattern; film grain (feTurbulence); bottom vignette; soft nebula blobs; top edge fade. All fixed, z-0,
+        pointer-events-none so content stays usable.
+      */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
         <div
           className="absolute inset-0 opacity-[0.5]"
@@ -572,7 +538,7 @@ export function LandingPage() {
           }}
         />
         <svg
-          className="absolute inset-0 h-full w-full opacity-[0.28] sm:opacity-[0.32]"
+          className="absolute inset-0 h-full w-full opacity-[0.2] sm:opacity-[0.24]"
           aria-hidden
         >
           <defs>
@@ -583,7 +549,7 @@ export function LandingPage() {
               patternUnits="userSpaceOnUse"
             >
               <g
-                fill="rgba(255,255,255,0.055)"
+                fill="rgba(255,255,255,0.048)"
                 style={{
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                   fontSize: '11px',
@@ -612,6 +578,26 @@ export function LandingPage() {
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill={`url(#${landingSymbolPatternId})`} />
+        </svg>
+        <svg className="absolute inset-0 h-full w-full opacity-[0.035] mix-blend-soft-light" aria-hidden>
+          <defs>
+            <filter id={landingNoiseFilterId} x="-20%" y="-20%" width="140%" height="140%">
+              <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.9"
+                numOctaves="4"
+                stitchTiles="stitch"
+                result="t"
+              />
+              <feColorMatrix
+                in="t"
+                type="matrix"
+                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.55 0"
+                result="a"
+              />
+            </filter>
+          </defs>
+          <rect width="100%" height="100%" filter={`url(#${landingNoiseFilterId})`} />
         </svg>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_65%_at_50%_115%,rgba(15,23,42,0.9),transparent_58%)]" />
         <div
@@ -684,19 +670,39 @@ export function LandingPage() {
         </header>
 
         <main className="flex flex-1 flex-col gap-16 sm:gap-24">
-          <section className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
+          <section className="grid items-start gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
             <motion.div
               initial={reducedMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             >
               <h1 className="font-landing text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">
-                Air traffic control for technology programmes
+                Air traffic control for global technology programmes
               </h1>
               <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-zinc-400 sm:text-lg">
-                A shared picture of how capacity is consumed — BAU technology streams, project load, markets, and
-                segments — so teams steer before things stack up.
+                Rolled-up Gantt charts in SmartSheets or MS Project rarely explain{' '}
+                <span className="text-zinc-300">how thin market IT, labs, and test capacity</span> will feel when
+                national deployment programmes land together. MarketZero Workbench turns the same programme intent into
+                a <span className="text-zinc-300">year-round runway</span>—so Strategy and Planning can see stacking,
+                sequencing risk, and headroom before commitments harden.
               </p>
+              <ul className="mt-5 flex flex-wrap gap-2" aria-label="Work types modelled in configuration">
+                {(
+                  [
+                    'BAU support',
+                    'Retail campaigns',
+                    'Technology projects',
+                    'POS, hardware refresh, networking — as config',
+                  ] as const
+                ).map((label) => (
+                  <li
+                    key={label}
+                    className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 font-landing text-[11px] font-medium text-zinc-400"
+                  >
+                    {label}
+                  </li>
+                ))}
+              </ul>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
                   to="/app"
@@ -708,47 +714,47 @@ export function LandingPage() {
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
               </div>
+              <p className="mt-6 max-w-xl text-pretty text-sm leading-relaxed text-zinc-400">
+                External calendars matter: public holidays and school breaks tighten the lane; late Q4 and other protected
+                trading windows lift operating risk so the model can reflect “change appetite,” not just task dates.
+                Each market is described in clear configuration—resource pools, campaign shapes, long-running
+                programmes—not a one-size-fits-all template. Built in-house for the workbench:{' '}
+                <span className="text-zinc-300">no per-seat PPM licensing</span>.
+              </p>
             </motion.div>
             <HeroBrowserHeatmap reducedMotion={!!reducedMotion} />
           </section>
 
-          <section aria-labelledby="features-heading">
-            <motion.div
-              className="mb-10 max-w-2xl"
-              initial={reducedMotion ? false : { opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-40px' }}
-              transition={{ duration: 0.45 }}
-            >
-              <h2 id="features-heading" className="font-landing text-2xl font-semibold text-white">
-                What you get
-              </h2>
-              <p className="mt-3 text-pretty text-sm leading-relaxed text-zinc-400">
-                we don&apos;t drown you in formulas. What matters is that the picture reflects how work actually lands:
-                holiday windows and resourcing interact; typical week, month, and year patterns carry through; campaign
-                weightings shape demand; and support load for large campaigns is part of the same calculation — so the
-                heat you see matches the operating reality.
-              </p>
-            </motion.div>
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURES.map(({ icon: Icon, title, body }, i) => (
-                <motion.li
-                  key={title}
-                  initial={reducedMotion ? false : { opacity: 0, y: 14 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-30px' }}
-                  transition={{ duration: 0.4, delay: reducedMotion ? 0 : i * 0.05 }}
-                  className={cn(
-                    'rounded-xl border border-white/[0.06] bg-white/[0.02] p-5',
-                    'shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]'
-                  )}
-                >
-                  <Icon className="mb-3 h-5 w-5 text-[#FFC72C]" strokeWidth={1.75} aria-hidden />
-                  <h3 className="font-landing text-sm font-semibold text-zinc-100">{title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-zinc-500">{body}</p>
-                </motion.li>
-              ))}
-            </ul>
+          <section
+            className="grid gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 sm:grid-cols-3 sm:gap-5 sm:p-6"
+            aria-labelledby="landing-audience-heading"
+          >
+            <h2 id="landing-audience-heading" className="sr-only">
+              Who the runway is for
+            </h2>
+            {(
+              [
+                {
+                  title: 'Programme & centre teams',
+                  body: 'Show how cumulative change and sequencing are managed—so leadership sees risk being actively governed, not buried in another Gantt export.',
+                },
+                {
+                  title: 'Market IT leaders',
+                  body: 'A single visual that mirrors labs, test staff, and local capacity—so the plan acknowledges what teams already see on the ground.',
+                },
+                {
+                  title: 'Strategy & innovation',
+                  body: 'Scan markets for headroom when choosing pilots, roll-out waves, or where to stage the next technology experiment.',
+                },
+              ] as const
+            ).map(({ title, body }) => (
+              <div key={title} className="min-w-0">
+                <p className="font-landing text-xs font-semibold uppercase tracking-[0.14em] text-[#FFC72C]/90">
+                  {title}
+                </p>
+                <p className="mt-2 text-pretty text-sm leading-relaxed text-zinc-400">{body}</p>
+              </div>
+            ))}
           </section>
 
           <LandingIsoBrowserMock />

@@ -94,16 +94,15 @@ export const LandingCellDetailCardMock = memo(function LandingCellDetailCardMock
             Day detail
           </p>
           <h2 id="cell-detail-mock-heading" className="font-landing text-2xl font-semibold text-white">
-            Heatmap detail cards
+            One click from the cell to the narrative
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-            When a day on the runway pulls focus, open it — the detail card is a same-day briefing that turns the heatmap
-            colour into a clear story. Trading rhythm, campaigns, where capacity lands, and the rest of the calendar
-            context are laid out so you can see{' '}
-            <strong className="font-medium text-zinc-300">what is driving the risk and capacity score</strong>. Zoom one
-            market or sweep a whole segment; you stay on the same{' '}
-            <strong className="font-medium text-zinc-300">risk surfaces</strong> in one place, so the narrative always
-            matches the grid.
+            Pick any day on the runway and the detail card becomes a same-day brief: trading shape, campaigns, holiday
+            flags, and how capacity is being consumed—so the colour on the grid is never a mystery. That matters when
+            centre teams need to <strong className="font-medium text-zinc-300">show how risk is governed</strong> and
+            market leaders need proof that <strong className="font-medium text-zinc-300">local operating reality</strong>{' '}
+            is in the model. Zoom one country or compare a segment; the story always matches the surface you were just
+            looking at.
           </p>
         </div>
 
