@@ -665,21 +665,18 @@ const MIX_INITIAL: LayerMixes = { g: 0, c: 0, p: 0, s: 0 };
 export function LandingYamlProjectTwinMock() {
   const reducedMotion = useReducedMotion();
   const panelId = useId();
+  /** Four stackable layers (strip + YAML): BAU first, then campaign on top, then calendars. */
+  const [baselineOn, setBaselineOn] = useState(false);
   const [campaignOn, setCampaignOn] = useState(false);
   const [publicHolidaysOn, setPublicHolidaysOn] = useState(false);
   const [schoolHolidaysOn, setSchoolHolidaysOn] = useState(false);
 
   const [layerMixes, setLayerMixes] = useState<LayerMixes>(MIX_INITIAL);
   const mixRef = useRef<LayerMixes>(MIX_INITIAL);
-  const [gridBaseEnabled, setGridBaseEnabled] = useState(false);
   const [layerDemoDone, setLayerDemoDone] = useState(false);
   const [toolbarSeen, setToolbarSeen] = useState(false);
   const [pressKey, setPressKey] = useState<'baseline' | 'campaign' | 'national' | 'school' | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (campaignOn || publicHolidaysOn || schoolHolidaysOn) setGridBaseEnabled(true);
-  }, [campaignOn, publicHolidaysOn, schoolHolidaysOn]);
 
   useLayoutEffect(() => {
     const el = toolbarRef.current;
@@ -713,7 +710,7 @@ export function LandingYamlProjectTwinMock() {
     };
 
     if (reducedMotion) {
-      setGridBaseEnabled(true);
+      setBaselineOn(true);
       setCampaignOn(true);
       setPublicHolidaysOn(true);
       setSchoolHolidaysOn(true);
@@ -739,7 +736,7 @@ export function LandingYamlProjectTwinMock() {
 
     schedule(INITIAL_DELAY_MS, () => {
       flash('baseline');
-      setGridBaseEnabled(true);
+      setBaselineOn(true);
     });
     schedule(INITIAL_DELAY_MS + STEP_MS, () => {
       flash('campaign');
@@ -765,7 +762,7 @@ export function LandingYamlProjectTwinMock() {
 
   useEffect(() => {
     const target: LayerMixes = {
-      g: gridBaseEnabled ? 1 : 0,
+      g: baselineOn ? 1 : 0,
       c: campaignOn ? 1 : 0,
       p: publicHolidaysOn ? 1 : 0,
       s: schoolHolidaysOn ? 1 : 0,
@@ -796,15 +793,22 @@ export function LandingYamlProjectTwinMock() {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [gridBaseEnabled, campaignOn, publicHolidaysOn, schoolHolidaysOn, reducedMotion]);
+  }, [baselineOn, campaignOn, publicHolidaysOn, schoolHolidaysOn, reducedMotion]);
 
   const { g: mixGrid, c: mixCampaign, p: mixPublic, s: mixSchool } = layerMixes;
 
+  /** Chip matches toggle; optional glow tie-in while the mix eases in (same threshold for all four). */
+  const STRIP_MIX_LIT = 0.12;
+  const baselineChipLit = baselineOn && mixGrid >= STRIP_MIX_LIT;
+  const campaignChipLit = campaignOn && mixCampaign >= STRIP_MIX_LIT;
+  const publicChipLit = publicHolidaysOn && mixPublic >= STRIP_MIX_LIT;
+  const schoolChipLit = schoolHolidaysOn && mixSchool >= STRIP_MIX_LIT;
+
   const layerHint = !toolbarSeen
-    ? 'Use the layer toggles under the preview to blend campaign prep, run, and calendar stress.'
+    ? 'Stack layers on the strip: BAU baseline, then campaign load, then national and school calendars.'
     : !layerDemoDone && !reducedMotion
-      ? 'Watch once: the strip starts empty, then BAU rhythm, then campaign load, then national holidays, then school breaks — then mix freely.'
-      : 'Mix layers freely — one scrollable doc; toggles swap campaign + calendar YAML and smooth-scroll to the tail.';
+      ? 'Watch once: BAU on the runway, then campaign on top, then national holidays, then school breaks — then toggle freely.'
+      : 'Layers stack — BAU first, campaign adds on top, holidays blend into the heatmap. Amber follows each toggle once its mix lands on the strip.';
 
   const layerToolbarVariants = useMemo(() => {
     const instant = !!reducedMotion;
@@ -879,7 +883,7 @@ export function LandingYamlProjectTwinMock() {
   }, [campaignOn, publicHolidaysOn, schoolHolidaysOn]);
 
   const yamlScrollRef = useRef<HTMLDivElement>(null);
-  const yamlLayoutSig = `${campaignOn}|${publicHolidaysOn}|${schoolHolidaysOn}`;
+  const yamlLayoutSig = `${baselineOn}|${campaignOn}|${publicHolidaysOn}|${schoolHolidaysOn}`;
   const yamlScrollBootRef = useRef(true);
   const prevYamlLayoutSigRef = useRef(yamlLayoutSig);
 
@@ -956,7 +960,7 @@ export function LandingYamlProjectTwinMock() {
       <div
         className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] lg:items-stretch lg:gap-5"
         role="group"
-        aria-label="Compare baseline and campaign temperature on the capacity strip, with optional national and school holiday layers"
+        aria-label="Stacked strip preview: baseline BAU, optional campaign load, national and school holiday calendars"
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_20px_60px_-14px_rgba(0,0,0,0.75)]">
           <div className="flex items-center gap-2 border-b border-white/[0.06] bg-[#111114] px-3 py-2">
@@ -991,7 +995,7 @@ export function LandingYamlProjectTwinMock() {
             ref={toolbarRef}
             className="mt-auto flex flex-col gap-2 border-t border-white/[0.06] bg-[#0e0e12] px-3 py-2.5"
             role="toolbar"
-            aria-label="Preview layers for YAML and 3D strip"
+            aria-label="Stack layers — baseline, campaign, national holidays, school holidays"
             aria-describedby={`${panelId}-layer-hint`}
             variants={layerToolbarVariants.container}
             initial="hidden"
@@ -1004,35 +1008,31 @@ export function LandingYamlProjectTwinMock() {
             >
               <motion.button
                 type="button"
-                onClick={() => {
-                  setGridBaseEnabled(true);
-                  setCampaignOn(false);
-                }}
-                aria-pressed={!campaignOn}
+                onClick={() => setBaselineOn((v) => !v)}
+                aria-pressed={baselineOn}
+                title="BAU / runway baseline — enable first"
                 variants={layerToolbarVariants.chip}
                 initial={false}
                 animate={{ scale: pressKey === 'baseline' ? 0.94 : 1 }}
                 transition={LAYER_PRESS_TRANSITION}
-                className={layerChipBtn(!campaignOn && gridBaseEnabled)}
+                className={layerChipBtn(baselineChipLit)}
               >
                 <Layers className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 Baseline
               </motion.button>
               <motion.button
                 type="button"
-                onClick={() => {
-                  setGridBaseEnabled(true);
-                  setCampaignOn(true);
-                }}
+                onClick={() => setCampaignOn((v) => !v)}
                 aria-pressed={campaignOn}
+                title="Adds campaign prep and live load on top of baseline"
                 variants={layerToolbarVariants.chip}
                 initial={false}
                 animate={{ scale: pressKey === 'campaign' ? 0.94 : 1 }}
                 transition={LAYER_PRESS_TRANSITION}
-                className={layerChipBtn(campaignOn && gridBaseEnabled)}
+                className={layerChipBtn(campaignChipLit)}
               >
                 <Box className="h-3.5 w-3.5 opacity-80" aria-hidden />
-                With campaign
+                Campaign
               </motion.button>
               <motion.button
                 type="button"
@@ -1042,7 +1042,7 @@ export function LandingYamlProjectTwinMock() {
                 initial={false}
                 animate={{ scale: pressKey === 'national' ? 0.94 : 1 }}
                 transition={LAYER_PRESS_TRANSITION}
-                className={layerChipBtn(publicHolidaysOn)}
+                className={layerChipBtn(publicChipLit)}
               >
                 <Landmark className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 National holidays
@@ -1055,7 +1055,7 @@ export function LandingYamlProjectTwinMock() {
                 initial={false}
                 animate={{ scale: pressKey === 'school' ? 0.94 : 1 }}
                 transition={LAYER_PRESS_TRANSITION}
-                className={layerChipBtn(schoolHolidaysOn)}
+                className={layerChipBtn(schoolChipLit)}
               >
                 <Trees className="h-3.5 w-3.5 opacity-80" aria-hidden />
                 School holidays
