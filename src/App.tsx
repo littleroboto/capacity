@@ -48,7 +48,7 @@ export default function App() {
   const setViewMode = useAtcStore((s) => s.setViewMode);
   const theme = useAtcStore((s) => s.theme);
 
-  const [dslPanelCollapsed, setDslPanelCollapsed] = useState(true);
+  const [dslPanelCollapsed, setDslPanelCollapsed] = useState(false);
   const lgUp = useMediaMinWidth(1024);
   const dslPanelLayoutCollapsed = dslPanelCollapsed && lgUp;
   const mainGridRef = useRef<HTMLDivElement>(null);

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { normalizeViewModeId, type ViewModeId } from '@/lib/constants';
+import type { ViewModeId } from '@/lib/constants';
 import { parseYamlToConfigs, runPipelineFromDsl } from '@/engine/pipeline';
 import type { RiskRow } from '@/engine/riskModel';
 import {
@@ -21,6 +21,7 @@ import {
   FALLBACK_RUNWAY_MARKET_IDS,
   gammaFocusMarket,
   isRunwayMultiMarketStrip,
+  RUNWAY_ALL_MARKETS_VALUE,
   runwayCompareMarketIds,
 } from '@/lib/markets';
 
@@ -242,8 +243,8 @@ function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) =>
 }
 
 export const useAtcStore = create<AtcState>()((set, get) => ({
-      country: 'DE',
-      viewMode: normalizeViewModeId(null),
+      country: RUNWAY_ALL_MARKETS_VALUE,
+      viewMode: 'in_store',
       theme: 'dark',
       runwayMarketOrder: [...FALLBACK_RUNWAY_MARKET_IDS],
       dslText: '',

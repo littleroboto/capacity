@@ -21,7 +21,7 @@ export function Header() {
 
   const swDisco = toyboxSwitchClasses(discoModePref);
 
-  const [compact, setCompact] = useState(false);
+  const [compact, setCompact] = useState(true);
 
   const toggleCompact = useCallback(() => {
     setCompact((c) => !c);
