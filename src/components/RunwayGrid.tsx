@@ -1772,8 +1772,21 @@ export function RunwayGrid({
     if (!el) return;
 
     let raf = 0;
+    let panScheduleTimer: number | null = null;
+    let compareStripInView = false;
+    let ioPanScheduled = false;
+    let resizeKickOnce = false;
     const easeInOutCubic = (t: number) =>
       t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    const scheduleTryPan = (delayMs: number) => {
+      if (landingComparePanPlayedRef.current) return;
+      if (panScheduleTimer != null) window.clearTimeout(panScheduleTimer);
+      panScheduleTimer = window.setTimeout(() => {
+        panScheduleTimer = null;
+        requestAnimationFrame(() => requestAnimationFrame(tryPan));
+      }, delayMs);
+    };
 
     const tryPan = () => {
       if (landingComparePanPlayedRef.current) return;
@@ -1869,19 +1882,36 @@ export function RunwayGrid({
       raf = requestAnimationFrame(tick);
     };
 
-    const t1 = window.setTimeout(() => {
-      requestAnimationFrame(() => requestAnimationFrame(tryPan));
-    }, 220);
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.some(
+          (e) => e.isIntersecting && e.intersectionRatio >= 0.14
+        );
+        if (hit) {
+          compareStripInView = true;
+          if (!ioPanScheduled) {
+            ioPanScheduled = true;
+            scheduleTryPan(780);
+          }
+        }
+      },
+      { root: null, rootMargin: '0px 0px -12% 0px', threshold: [0, 0.08, 0.14, 0.22, 0.35] }
+    );
+    io.observe(el);
 
     const ro = new ResizeObserver(() => {
       if (landingComparePanPlayedRef.current) return;
-      window.setTimeout(tryPan, 80);
+      if (!compareStripInView) return;
+      if (resizeKickOnce) return;
+      resizeKickOnce = true;
+      scheduleTryPan(780);
     });
     ro.observe(el);
 
     return () => {
-      window.clearTimeout(t1);
+      if (panScheduleTimer != null) window.clearTimeout(panScheduleTimer);
       cancelAnimationFrame(raf);
+      io.disconnect();
       ro.disconnect();
     };
   }, [
