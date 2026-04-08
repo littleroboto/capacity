@@ -15,7 +15,6 @@ import { landingBomSourceHref } from '@/lib/landingBomGithub';
 import { isClerkConfigured } from '@/lib/clerkConfig';
 import { prefetchWorkbenchApp } from '@/lib/prefetchWorkbench';
 import { cn } from '@/lib/utils';
-import { LandingCellDetailCardMock } from '@/components/landing/LandingCellDetailCardMock';
 import { LandingGanttBridgeMock } from '@/components/landing/LandingGanttBridgeMock';
 import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMock';
 import { LandingMultiMarketDeploymentMock } from '@/components/landing/LandingMultiMarketDeploymentMock';
@@ -748,8 +747,6 @@ export function LandingPage() {
           <LandingGanttBridgeMock />
 
           <LandingIsoBrowserMock />
-
-          <LandingCellDetailCardMock />
 
           <LandingYamlProjectTwinMock />
 
