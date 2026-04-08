@@ -71,6 +71,11 @@ import { downloadRunwayHeatmapPng } from '@/lib/runwayPngExport';
 import { RunwayIsoSkyline } from '@/components/RunwayIsoSkyline';
 import { RunwayIsoCityBlock } from '@/components/RunwayIsoCityBlock';
 import { RunwayCompareSvgColumn } from '@/components/RunwayCompareSvgColumn';
+import {
+  compareColumnDateRangeYBounds,
+  compareStripColumnWidthPx,
+  compareStripMarketColumnLeftPx,
+} from '@/lib/runwayCompareSvgLayout';
 import { RunwayQuarterGridSvg } from '@/components/RunwayQuarterGridSvg';
 import { Box, CalendarDays, Download, Grid2x2, Loader2, Sparkles, ZoomIn, ZoomOut } from 'lucide-react';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
@@ -1316,6 +1321,12 @@ type RunwayGridProps = {
   landingCompareMarketOrder?: readonly string[];
   /** Compare strip: clip overflow instead of scrollbars (fit sizing should keep content inside). */
   landingCompareNoScroll?: boolean;
+  /** Compare strip: no cell click / tooltip (e.g. landing preview). */
+  landingCompareDisableCellDetails?: boolean;
+  /** Compare strip: smooth scroll pan once after layout (e.g. landing “find slack” motion). */
+  landingCompareSmoothPan?: boolean;
+  /** Compare strip: soft pulse on day cells in an inclusive date range for one market (e.g. landing AU). */
+  landingCompareColumnHighlight?: { market: string; ymdStart: string; ymdEnd: string };
 };
 
 export function RunwayGrid({
@@ -1327,6 +1338,9 @@ export function RunwayGrid({
   landingCompareMaxCellPx,
   landingCompareMarketOrder,
   landingCompareNoScroll = false,
+  landingCompareDisableCellDetails = false,
+  landingCompareSmoothPan = false,
+  landingCompareColumnHighlight,
 }: RunwayGridProps) {
   const country = useAtcStore((s) => s.country);
   const setCountry = useAtcStore((s) => s.setCountry);
@@ -1336,6 +1350,10 @@ export function RunwayGrid({
       setCountry(marketId, { returnPickerForBack: country });
     },
     [onSlotSelection, setCountry, country]
+  );
+  const noopCompareDayOpen = useCallback(
+    (_a: RunwayTipAnchor, _d: string | null, _w: number) => {},
+    []
   );
   const configs = useAtcStore((s) => s.configs);
   const techWorkloadScope = useAtcStore((s) => s.techWorkloadScope);
@@ -1390,6 +1408,7 @@ export function RunwayGrid({
   const heatmapCaptureRef = useRef<HTMLDivElement>(null);
   /** LIOM compare: horizontal scrollport — measured to pick a cell size that fits the main heatmap column. */
   const compareScrollRef = useRef<HTMLDivElement>(null);
+  const landingComparePanPlayedRef = useRef(false);
   /** Single-market: measured to auto-fit cell size to available space. */
   const singleMarketFitRef = useRef<HTMLDivElement>(null);
   const [pngExporting, setPngExporting] = useState(false);
@@ -1576,6 +1595,14 @@ export function RunwayGrid({
     return buildQuarterGridRunwayLayout(layoutDatesSorted, cellPx);
   }, [layoutDatesSorted, cellPx, compareAllMarkets, showIso3dSingleMarket, runway3dRowTowerPx]);
 
+  const compareStripFirstCalendarMonthKey = useMemo(
+    () =>
+      compareAllMarkets && calendarLayout
+        ? firstCalendarMonthKeyFromSections(calendarLayout.sections)
+        : null,
+    [compareAllMarkets, calendarLayout]
+  );
+
   const heatmapOpts: HeatmapColorOpts = useMemo(() => {
     const heatmapSpectrumMode: HeatmapSpectrumMode = heatmapSpectrumContinuous
       ? 'continuous'
@@ -1732,6 +1759,114 @@ export function RunwayGrid({
   const gap = RUNWAY_CELL_GAP_PX;
   const monthStripW = runwayDayStripWidth(cellPx, gap, RUNWAY_DAY_COLUMNS);
 
+  /** Sticker row (`h-[32px]`) + `mb-1.5` before the compare SVG. */
+  const RUNWAY_COMPARE_STICKER_STACK_PX = 32 + 6;
+
+  useEffect(() => {
+    if (!landingCompareSmoothPan || landingCompareNoScroll || reduceMotion) return;
+    if (!compareAllMarkets || showCompareIsoCityBlock) return;
+    if (!calendarLayout) return;
+    if (landingComparePanPlayedRef.current) return;
+
+    const el = compareScrollRef.current;
+    if (!el) return;
+
+    let raf = 0;
+    const easeInOutCubic = (t: number) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    const tryPan = () => {
+      if (landingComparePanPlayedRef.current) return;
+      if (el.scrollHeight < 24) return;
+      const maxY = Math.max(0, el.scrollHeight - el.clientHeight);
+      const maxX = Math.max(0, el.scrollWidth - el.clientWidth);
+      if (maxY < 4 && maxX < 4) {
+        landingComparePanPlayedRef.current = true;
+        return;
+      }
+
+      landingComparePanPlayedRef.current = true;
+      el.scrollTop = 0;
+      el.scrollLeft = 0;
+
+      let targetY = maxY * 0.4;
+      let targetX = maxX * 0.2;
+
+      const hl = landingCompareColumnHighlight;
+      if (hl) {
+        const idx = marketsOrdered.indexOf(hl.market);
+        const yb = compareColumnDateRangeYBounds(
+          calendarLayout.sections,
+          cellPx,
+          gap,
+          monthStripW,
+          compareStripFirstCalendarMonthKey,
+          hl.ymdStart,
+          hl.ymdEnd
+        );
+        if (idx >= 0) {
+          const colLeft = compareStripMarketColumnLeftPx({
+            marketIndex: idx,
+            monthStripW,
+            gutterInnerWidthPx: CALENDAR_QUARTER_GUTTER_W,
+            columnGapPx: CALENDAR_QUARTER_GRID_COL_GAP_PX,
+            rowPadLeftPx: 2,
+          });
+          const colW = compareStripColumnWidthPx(monthStripW);
+          const colMid = colLeft + colW / 2;
+          targetX = Math.min(maxX, Math.max(0, colMid - el.clientWidth / 2));
+        }
+        if (yb) {
+          const bandMid = RUNWAY_COMPARE_STICKER_STACK_PX + (yb.minY + yb.maxY) / 2;
+          targetY = Math.min(maxY, Math.max(0, bandMid - el.clientHeight / 2));
+        }
+      }
+
+      const duration = 2800;
+      const t0 = performance.now();
+
+      const tick = (now: number) => {
+        const u = Math.min(1, (now - t0) / duration);
+        const e = easeInOutCubic(u);
+        el.scrollTop = targetY * e;
+        el.scrollLeft = targetX * e;
+        if (u < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    };
+
+    const t1 = window.setTimeout(() => {
+      requestAnimationFrame(() => requestAnimationFrame(tryPan));
+    }, 220);
+
+    const ro = new ResizeObserver(() => {
+      if (landingComparePanPlayedRef.current) return;
+      window.setTimeout(tryPan, 80);
+    });
+    ro.observe(el);
+
+    return () => {
+      window.clearTimeout(t1);
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [
+    landingCompareSmoothPan,
+    landingCompareNoScroll,
+    reduceMotion,
+    compareAllMarkets,
+    showCompareIsoCityBlock,
+    compareDatesFitKey,
+    marketsFitKey,
+    cellPx,
+    calendarLayout,
+    gap,
+    monthStripW,
+    marketsOrdered,
+    landingCompareColumnHighlight,
+    compareStripFirstCalendarMonthKey,
+  ]);
+
   const motionEase = [0.22, 1, 0.36, 1] as const;
 
   const pngFilenameBase = useMemo(() => {
@@ -1771,11 +1906,22 @@ export function RunwayGrid({
     );
   }
 
+  const landingCompareFillParent =
+    landingMinimalChrome && landingCompareSmoothPan && compareAllMarkets;
+
   return (
-    <div className="relative flex w-full shrink-0 flex-col overflow-visible bg-transparent">
+    <div
+      className={cn(
+        'relative flex w-full flex-col overflow-visible bg-transparent',
+        landingCompareFillParent ? 'h-full min-h-0' : 'shrink-0'
+      )}
+    >
       <div
         key={`${viewMode}-${country}`}
-        className="mx-auto w-full max-w-full rounded-xl border border-border/45 bg-card/35 px-4 pb-3 pt-3 shadow-sm dark:bg-card/20 sm:px-5 sm:pb-4 sm:pt-3.5"
+        className={cn(
+          'mx-auto w-full max-w-full rounded-xl border border-border/45 bg-card/35 px-4 pb-3 pt-3 shadow-sm dark:bg-card/20 sm:px-5 sm:pb-4 sm:pt-3.5',
+          landingCompareFillParent && 'flex min-h-0 h-full min-w-0 flex-col'
+        )}
       >
         <div className="mb-3 flex flex-col gap-3 sm:mb-4">
           {!landingMinimalChrome ? (
@@ -1918,7 +2064,12 @@ export function RunwayGrid({
           </div>
         </div>
 
-        <div className="relative w-full max-w-full">
+        <div
+          className={cn(
+            'relative w-full max-w-full',
+            landingCompareFillParent && 'flex min-h-0 min-w-0 flex-1 flex-col'
+          )}
+        >
             <AnimatePresence mode="wait">
             {countrySwitchLoading ? (
               <motion.div
@@ -1940,7 +2091,7 @@ export function RunwayGrid({
                 key={`grid-${country}-${compareAllMarkets ? 'compare' : 'single'}-${
                   showIso3dSingleMarket || showCompareIsoCityBlock ? '3d' : 'flat'
                 }-${useSvgHeatmap ? 'svg' : 'html'}`}
-                className="w-full"
+                className={cn('w-full', landingCompareFillParent && 'flex min-h-0 min-w-0 flex-1 flex-col')}
                 initial={reduceMotion ? false : { y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
@@ -1951,6 +2102,10 @@ export function RunwayGrid({
                   singleMarketFitRef={singleMarketFitRef}
                   compareAllMarkets={compareAllMarkets}
                   landingCompareNoScroll={landingCompareNoScroll}
+                  compareCellDetailsDisabled={landingCompareDisableCellDetails}
+                  noopCompareDayOpen={noopCompareDayOpen}
+                  landingCompareStackFill={landingCompareFillParent}
+                  compareColumnDateHighlight={landingCompareColumnHighlight}
                   marketsOrdered={marketsOrdered}
                   riskSurface={riskSurface}
                   configs={configs}
@@ -1996,7 +2151,9 @@ export function RunwayGrid({
       </div>
 
       <RunwayCellTooltip
-        tip={useSideSummary ? null : tip}
+        tip={
+          useSideSummary || (landingCompareDisableCellDetails && compareAllMarkets) ? null : tip
+        }
         reducedMotion={!!reduceMotion}
         onDismiss={dismissTip}
         rootRef={tooltipRootRef}
@@ -2010,6 +2167,11 @@ type RunwayGridBodyProps = {
   singleMarketFitRef: RefObject<HTMLDivElement | null>;
   compareAllMarkets: boolean;
   landingCompareNoScroll?: boolean;
+  compareCellDetailsDisabled?: boolean;
+  noopCompareDayOpen: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
+  /** Landing compare preview: fill parent height so the scrollport can measure and pan. */
+  landingCompareStackFill?: boolean;
+  compareColumnDateHighlight?: { market: string; ymdStart: string; ymdEnd: string };
   marketsOrdered: string[];
   riskSurface: RiskRow[];
   configs: MarketConfig[];
@@ -2060,6 +2222,10 @@ function RunwayGridBody({
   singleMarketFitRef,
   compareAllMarkets,
   landingCompareNoScroll = false,
+  compareCellDetailsDisabled = false,
+  noopCompareDayOpen,
+  landingCompareStackFill = false,
+  compareColumnDateHighlight,
   marketsOrdered,
   riskSurface,
   configs,
@@ -2120,7 +2286,12 @@ function RunwayGridBody({
   );
 
   return (
-    <div className="flex w-full min-w-0 max-w-full justify-start pl-0.5 sm:pl-1">
+    <div
+      className={cn(
+        'flex w-full min-w-0 max-w-full justify-start pl-0.5 sm:pl-1',
+        landingCompareStackFill && 'min-h-0 min-w-0 flex-1 flex-col'
+      )}
+    >
       <div
         ref={heatmapCaptureRef}
         className={cn(
@@ -2155,7 +2326,13 @@ function RunwayGridBody({
         ref={heatmapInteractionRef as Ref<HTMLDivElement>}
         className={cn(
           'flex min-w-0 flex-1 flex-col bg-transparent p-0 shadow-none',
-          heatmap3d ? 'min-h-0 justify-stretch' : compareAllMarkets ? 'min-h-0 justify-stretch' : 'justify-center',
+          heatmap3d
+            ? 'min-h-0 justify-stretch'
+            : compareAllMarkets
+              ? landingCompareStackFill
+                ? 'min-h-0 min-w-0 flex-1 justify-stretch'
+                : 'min-h-0 justify-stretch'
+              : 'justify-center',
           !compareAllMarkets && useSideSummary && 'lg:flex-row lg:items-start'
         )}
       >
@@ -2178,7 +2355,9 @@ function RunwayGridBody({
             ref={compareScrollRef as Ref<HTMLDivElement>}
             className={cn(
               'min-h-0 w-full flex-1 pb-1',
-              landingCompareNoScroll ? 'overflow-hidden' : 'overflow-x-auto overflow-y-auto'
+              landingCompareNoScroll
+                ? 'overflow-hidden'
+                : 'overflow-x-auto overflow-y-auto [scrollbar-gutter:stable]'
             )}
           >
             <div
@@ -2231,7 +2410,20 @@ function RunwayGridBody({
                           todayYmd={todayYmd}
                           dimPastDays={dimPastDays}
                           firstCalendarMonthKey={firstCompareCalendarMonthKey}
-                          openDayDetailsFromCell={makeShowTip(m, map, cfg)}
+                          openDayDetailsFromCell={
+                            compareCellDetailsDisabled ? noopCompareDayOpen : makeShowTip(m, map, cfg)
+                          }
+                          interactionDisabled={compareCellDetailsDisabled}
+                          pulseDateRange={
+                            compareColumnDateHighlight &&
+                            compareColumnDateHighlight.market === m
+                              ? {
+                                  ymdStart: compareColumnDateHighlight.ymdStart,
+                                  ymdEnd: compareColumnDateHighlight.ymdEnd,
+                                }
+                              : undefined
+                          }
+                          preferReducedMotion={reduceMotion}
                         />
                       ) : (
                         <RunwayVerticalHeatmapBody
@@ -2251,7 +2443,9 @@ function RunwayGridBody({
                           enableColorSweep={enableColorSweep}
                           postSweep={postSweep}
                           sweepMarketOffsetSec={colIdx * SWOOSH_MARKET_COLUMN_GAP_SEC}
-                          openDayDetailsFromCell={makeShowTip(m, map, cfg)}
+                          openDayDetailsFromCell={
+                            compareCellDetailsDisabled ? noopCompareDayOpen : makeShowTip(m, map, cfg)
+                          }
                           layout="vertical_strip"
                           showQuarterGutter={false}
                           compareStripLabels

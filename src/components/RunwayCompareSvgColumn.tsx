@@ -29,6 +29,12 @@ export type RunwayCompareSvgColumnProps = {
   /** First month in runway order — that month’s block gets Mo–Su headers (compare-all HTML parity). */
   firstCalendarMonthKey: string | null;
   openDayDetailsFromCell: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
+  /** Landing / embed: visual-only cells (no click, keyboard, or detail popover). */
+  interactionDisabled?: boolean;
+  /** Gentle synced pulse on day cells in this inclusive YYYY-MM-DD range (e.g. landing AU callout). */
+  pulseDateRange?: { ymdStart: string; ymdEnd: string };
+  /** When true, pulse is skipped (matches global reduced-motion preference). */
+  preferReducedMotion?: boolean;
 };
 
 function svgClientPoint(e: React.MouseEvent | React.KeyboardEvent, fallbackW: number, fallbackH: number) {
@@ -52,6 +58,9 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
   dimPastDays,
   firstCalendarMonthKey,
   openDayDetailsFromCell,
+  interactionDisabled = false,
+  pulseDateRange,
+  preferReducedMotion = false,
 }: RunwayCompareSvgColumnProps) {
   const { width, height, cells, monthLabels, weekdayLabels } = useMemo(
     () => layoutCompareMarketColumnSvg(sections, cellPx, gap, monthStripW, firstCalendarMonthKey),
@@ -117,6 +126,12 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
         const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
         const opacity = pastDimmed ? 0.25 * dimOp : dimOp;
         const isToday = typeof dateStr === 'string' && dateStr === todayYmd;
+        const inPulseRange =
+          pulseDateRange != null &&
+          typeof dateStr === 'string' &&
+          dateStr >= pulseDateRange.ymdStart &&
+          dateStr <= pulseDateRange.ymdEnd;
+        const pulseLow = Math.max(0.2, opacity * 0.62);
 
         return (
           <g key={`${marketKey}-svg-${i}-${c.x}-${c.y}`}>
@@ -131,13 +146,36 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
               opacity={opacity}
               className="stroke-border/35"
               strokeWidth={0.5}
-              style={{ cursor: 'pointer' }}
-              role="button"
-              tabIndex={0}
-              aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
-              onClick={(e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)}
-              onKeyDown={(e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)}
-            />
+              style={interactionDisabled ? undefined : { cursor: 'pointer' }}
+              role={interactionDisabled ? 'presentation' : 'button'}
+              tabIndex={interactionDisabled ? undefined : 0}
+              aria-hidden={interactionDisabled ? true : undefined}
+              aria-label={
+                interactionDisabled ? undefined : dateStr ? `Day details for ${dateStr}` : 'Day cell'
+              }
+              onClick={
+                interactionDisabled
+                  ? undefined
+                  : (e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)
+              }
+              onKeyDown={
+                interactionDisabled
+                  ? undefined
+                  : (e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)
+              }
+            >
+              {inPulseRange && !preferReducedMotion ? (
+                <animate
+                  attributeName="opacity"
+                  values={`${opacity};${pulseLow};${opacity}`}
+                  keyTimes="0;0.5;1"
+                  dur="1.65s"
+                  repeatCount="indefinite"
+                  calcMode="spline"
+                  keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+                />
+              ) : null}
+            </rect>
             {isToday ? (
               <circle
                 cx={c.x + c.w * 0.55}

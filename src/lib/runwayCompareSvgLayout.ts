@@ -141,6 +141,65 @@ export function layoutCompareMarketColumnSvg(
   return { width, height: y, cells, monthLabels, weekdayLabels };
 }
 
+/** Width of one compare strip market column (SVG + side month labels). */
+export function compareStripColumnWidthPx(monthStripW: number): number {
+  return monthStripW + CALENDAR_MONTH_SIDE_LABEL_W + CALENDAR_MONTH_SIDE_LABEL_GAP_PX;
+}
+
+/**
+ * Vertical span in SVG coordinates for day cells in `[ymdStart, ymdEnd]` (compare column layout).
+ */
+export function compareColumnDateRangeYBounds(
+  sections: VerticalYearSection[],
+  cellPx: number,
+  gap: number,
+  monthStripW: number,
+  firstCalendarMonthKey: string | null,
+  ymdStart: string,
+  ymdEnd: string
+): { minY: number; maxY: number } | null {
+  const { cells } = layoutCompareMarketColumnSvg(
+    sections,
+    cellPx,
+    gap,
+    monthStripW,
+    firstCalendarMonthKey
+  );
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let any = false;
+  for (const c of cells) {
+    if (c.cell === false) continue;
+    const d = c.cell;
+    if (!d || d < ymdStart || d > ymdEnd) continue;
+    any = true;
+    minY = Math.min(minY, c.y);
+    maxY = Math.max(maxY, c.y + c.h);
+  }
+  return any ? { minY, maxY } : null;
+}
+
+/**
+ * Left edge of market column `marketIndex` (0 = first market) in the compare scroll row content,
+ * matching {@link RunwayGrid} `px-0.5` + gutter + gaps.
+ */
+export function compareStripMarketColumnLeftPx(args: {
+  marketIndex: number;
+  monthStripW: number;
+  gutterInnerWidthPx: number;
+  columnGapPx: number;
+  /** Flex row `pl-0.5` inside the scrollport (px). */
+  rowPadLeftPx: number;
+}): number {
+  const colW = compareStripColumnWidthPx(args.monthStripW);
+  return (
+    args.rowPadLeftPx +
+    args.gutterInnerWidthPx +
+    args.columnGapPx +
+    args.marketIndex * (colW + args.columnGapPx)
+  );
+}
+
 /**
  * Single-market quarter grid (wall-calendar layout): matches {@link buildQuarterGridRunwayLayout} placement.
  */

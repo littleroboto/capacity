@@ -15,9 +15,9 @@ const LANDING_COMPARE_MARKETS = ['DE', 'FR', 'UK', 'AU', 'CA'] as const;
 
 const LANDING_COMPARE_MARKET_SET = new Set<string>(LANDING_COMPARE_MARKETS);
 
-/** ~4 months of ISO dates; grid shows only {@link RiskRow} dates in this band (no full-calendar padding). */
+/** ISO date band for the landing strip (subset of model horizon). */
 const LANDING_COMPARE_DATE_START = '2026-01-01';
-const LANDING_COMPARE_DATE_END = '2026-04-30';
+const LANDING_COMPARE_DATE_END = '2026-09-30';
 
 function filterLandingCompareRiskSurface(rows: RiskRow[]): RiskRow[] {
   return rows.filter(
@@ -177,20 +177,28 @@ export function LandingMultiMarketDeploymentMock() {
               </div>
             </div>
 
-            <div className="w-full overflow-hidden bg-background p-1.5 sm:p-2">
+            <div className="flex h-[min(440px,52vh)] min-h-[280px] w-full flex-col overflow-hidden bg-background p-1.5 sm:p-2">
               {parseError ? (
                 <p className="px-2 py-6 text-center text-sm text-destructive">{parseError}</p>
               ) : landingRiskSurface.length > 0 && viewMode === 'market_risk' ? (
-                <RunwayGrid
-                  riskSurface={landingRiskSurface}
-                  viewMode={viewMode}
-                  onSlotSelection={noopSlot}
-                  disableCompareColumnNavigation
-                  landingMinimalChrome
-                  landingCompareMarketOrder={LANDING_COMPARE_MARKETS}
-                  landingCompareMaxCellPx={12}
-                  landingCompareNoScroll
-                />
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                  <RunwayGrid
+                    riskSurface={landingRiskSurface}
+                    viewMode={viewMode}
+                    onSlotSelection={noopSlot}
+                    disableCompareColumnNavigation
+                    landingMinimalChrome
+                    landingCompareMarketOrder={LANDING_COMPARE_MARKETS}
+                    landingCompareMaxCellPx={9}
+                    landingCompareDisableCellDetails
+                    landingCompareSmoothPan
+                    landingCompareColumnHighlight={{
+                      market: 'AU',
+                      ymdStart: '2026-08-01',
+                      ymdEnd: '2026-09-30',
+                    }}
+                  />
+                </div>
               ) : (
                 <div
                   className="flex min-h-[200px] items-center justify-center font-landing text-sm text-muted-foreground"
