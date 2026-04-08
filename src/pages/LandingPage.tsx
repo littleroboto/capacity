@@ -15,6 +15,7 @@ import { isClerkConfigured } from '@/lib/clerkConfig';
 import { prefetchWorkbenchApp } from '@/lib/prefetchWorkbench';
 import { cn } from '@/lib/utils';
 import { LandingCellDetailCardMock } from '@/components/landing/LandingCellDetailCardMock';
+import { LandingGanttBridgeMock } from '@/components/landing/LandingGanttBridgeMock';
 import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMock';
 import { LandingMultiMarketDeploymentMock } from '@/components/landing/LandingMultiMarketDeploymentMock';
 import { LandingYamlProjectTwinMock } from '@/components/landing/LandingYamlProjectTwinMock';
@@ -508,8 +509,7 @@ export function LandingPage() {
   const landingNoiseFilterId = useId().replace(/:/g, '');
 
   useEffect(() => {
-    document.title =
-      'MarketZero Workbench · Global capacity runway for technology programmes';
+    document.title = 'MarketZero Workbench · Resource runway in the browser';
   }, []);
 
   useEffect(() => {
@@ -677,22 +677,30 @@ export function LandingPage() {
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             >
               <h1 className="font-landing text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">
-                Air traffic control for global technology programmes
+                Air traffic control for shared capacity
               </h1>
               <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-zinc-400 sm:text-lg">
-                Rolled-up Gantt charts in SmartSheets or MS Project rarely explain{' '}
-                <span className="text-zinc-300">how thin market IT, labs, and test capacity</span> will feel when
-                national deployment programmes land together. MarketZero Workbench turns the same programme intent into
-                a <span className="text-zinc-300">year-round runway</span>—so Strategy and Planning can see stacking,
-                sequencing risk, and headroom before commitments harden.
+                In this organisation, <span className="text-zinc-300">communicating load clearly is still missing</span>
+                —not in one shared picture everyone can use, not in a form that travels from centre to markets without
+                turning into another slide deck. Gantt tools sell clarity on <span className="text-zinc-300">who</span> and{' '}
+                <span className="text-zinc-300">when</span>. They are weaker on the only question that bites when plans
+                collide: <span className="text-zinc-300">what is the draw on people, time, and shared resources?</span>{' '}
+                MarketZero Workbench maps that pressure across a <span className="text-zinc-300">single calendar runway</span>
+                —same idea whether your <span className="text-zinc-300">lanes</span> are countries, departments, or product
+                teams. Stacking, risk, headroom—before the date is set in stone. The same idea extends{' '}
+                <span className="text-zinc-300">past the tech department</span>: a{' '}
+                <span className="text-zinc-300">Trading lens</span> models how much{' '}
+                <span className="text-zinc-300">store and restaurant operations</span> can absorb—so you are not
+                scheduling heavy floor or ops change while a major marketing programme already owns the bandwidth.
               </p>
               <ul className="mt-5 flex flex-wrap gap-2" aria-label="Work types modelled in configuration">
                 {(
                   [
-                    'BAU support',
-                    'Retail campaigns',
-                    'Technology projects',
-                    'POS, hardware refresh, networking — as config',
+                    'Run-the-business work',
+                    'Initiatives & campaigns',
+                    'Change programmes',
+                    'Trading & in-store capacity',
+                    'Long-running streams — as config',
                   ] as const
                 ).map((label) => (
                   <li
@@ -715,18 +723,21 @@ export function LandingPage() {
                 </Link>
               </div>
               <p className="mt-6 max-w-xl text-pretty text-sm leading-relaxed text-zinc-400">
-                External calendars matter: public holidays and school breaks tighten the lane; late Q4 and other protected
-                trading windows lift operating risk so the model can reflect “change appetite,” not just task dates.
-                Each market is described in clear configuration—resource pools, campaign shapes, long-running
-                programmes—not a one-size-fits-all template. Built in-house for the workbench:{' '}
-                <span className="text-zinc-300">no per-seat PPM licensing</span>.
+                Real calendars matter—public holidays, busy seasons, change freezes—so the model can reflect{' '}
+                <span className="text-zinc-300">appetite for change</span>, not just task lines. Each{' '}
+                <span className="text-zinc-300">lane</span> is plain configuration: pools of capacity, shapes of work,
+                rhythms you tune—not a one-size-fits-all template. This started as an{' '}
+                <span className="text-zinc-300">internal build</span> sharp enough to ship as its own thing: a{' '}
+                <span className="text-zinc-300">browser-native</span> workbench—beautiful visuals, no PPM vendor rent on
+                the concept, <span className="text-zinc-300">free for any team</span> that wants the picture without another
+                shelf-software invoice.
               </p>
             </motion.div>
             <HeroBrowserHeatmap reducedMotion={!!reducedMotion} />
           </section>
 
           <section
-            className="grid gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 sm:grid-cols-3 sm:gap-5 sm:p-6"
+            className="grid gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 sm:grid-cols-2 sm:gap-5 sm:p-6 lg:grid-cols-4"
             aria-labelledby="landing-audience-heading"
           >
             <h2 id="landing-audience-heading" className="sr-only">
@@ -735,16 +746,20 @@ export function LandingPage() {
             {(
               [
                 {
-                  title: 'Programme & centre teams',
-                  body: 'Show how cumulative change and sequencing are managed—so leadership sees risk being actively governed, not buried in another Gantt export.',
+                  title: 'Segment & business leadership',
+                  body: 'One ecosystem view—technology draw and trading or store capacity on the same calendar—so segment presidents see when the floor and the back office are already spoken for before signing the next wave.',
                 },
                 {
-                  title: 'Market IT leaders',
-                  body: 'A single visual that mirrors labs, test staff, and local capacity—so the plan acknowledges what teams already see on the ground.',
+                  title: 'Portfolio & programme office',
+                  body: 'Show how change stacks and sequencing are governed—so leadership sees risk managed in the open, not smuggled inside another Gantt export.',
                 },
                 {
-                  title: 'Strategy & innovation',
-                  body: 'Scan markets for headroom when choosing pilots, roll-out waves, or where to stage the next technology experiment.',
+                  title: 'Line managers & delivery leads',
+                  body: 'One visual that reflects how thin teams, shared services, and time actually run—so the spreadsheet stops arguing with reality.',
+                },
+                {
+                  title: 'Strategy & planning',
+                  body: 'See where the gap is for the next pilot or bet—whether your grid is regions, departments, or squads.',
                 },
               ] as const
             ).map(({ title, body }) => (
@@ -757,6 +772,8 @@ export function LandingPage() {
             ))}
           </section>
 
+          <LandingGanttBridgeMock />
+
           <LandingIsoBrowserMock />
 
           <LandingCellDetailCardMock />
@@ -768,6 +785,10 @@ export function LandingPage() {
 
         <footer className="mt-20 border-t border-white/[0.06] pt-8 text-center text-xs text-zinc-600 sm:text-left">
           <p className="text-zinc-500">Designed &amp; Engineered by Doug Booth, Segment Architecture</p>
+          <p className="mx-auto mt-3 max-w-2xl text-pretty text-[11px] leading-relaxed text-zinc-600 sm:mx-0">
+            Born inside a large organisation; built like something you could productise—SaaS-grade visuals in the
+            browser, configuration instead of a shelf-software ransom.
+          </p>
           <p className="mx-auto mt-3 max-w-4xl text-pretty text-[11px] font-normal leading-relaxed tracking-normal text-zinc-600 sm:mx-0">
             <span className="sr-only">Release — </span>
             v<span className="text-zinc-500">{APP_VERSION}</span>

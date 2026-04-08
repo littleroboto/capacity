@@ -555,20 +555,26 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Same engine as the workbench
+          Intuitive visualisation
         </p>
         <h2 id="iso-mock-heading" className="font-landing text-2xl font-semibold text-white">
-          Read the year in height and heat—not another Gantt roll-up
+          Monitor the temperature
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          The isometric runway is the same Technology lens as the live app. Here you scan{' '}
-          <span className="text-zinc-300">temperature and extrusion</span> along real dates—not a marketing-only graphic.
-          <strong className="font-medium text-zinc-200"> Taller, warmer towers</strong> mean more of the lane is
-          committed to labs, test integration, and market IT that day.{' '}
-          <strong className="font-medium text-zinc-200">Shorter, cooler towers</strong> read as breathing room. In
-          campaign <strong className="font-medium text-violet-200/90">prep</strong>, readiness and test load dominate;
-          in <strong className="font-medium text-cyan-200/90">live</strong>, operational sustain is usually lighter than
-          the pre-cutover surge—so the skyline tells the same story your markets would describe.
+          Along the year, this preview uses the same <span className="text-zinc-300">Technology</span> lens as the live
+          app—{' '}
+          <span className="text-zinc-300">height and heat</span> on real dates, not a decorative render.{' '}
+          <strong className="font-medium text-zinc-200">Taller, warmer towers</strong> mean more of your constrained
+          stack—specialists, platforms, integration time—is committed that day.{' '}
+          <strong className="font-medium text-zinc-200">Shorter, cooler towers</strong> read as breathing room. In{' '}
+          <strong className="font-medium text-violet-200/90">prep</strong>, readiness and test load dominate; in{' '}
+          <strong className="font-medium text-cyan-200/90">live</strong>, sustain is usually lighter than the pre-cutover
+          surge. Flip to the <span className="text-zinc-300">Trading lens</span> in the workbench and you model{' '}
+          <span className="text-zinc-300">in-store and restaurant operations</span> with the same muscle—{' '}
+          <span className="text-zinc-300">floor attention when campaigns run hot</span>, and why you hold store or ops
+          change when marketing already owns the week. <span className="text-zinc-300">Technology and trading on one
+          calendar</span>—the ecosystem layer segment leadership expects and rarely gets from a shelf of disconnected
+          charts.
         </p>
       </div>
 

@@ -97,12 +97,12 @@ export const LandingCellDetailCardMock = memo(function LandingCellDetailCardMock
             One click from the cell to the narrative
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-            Pick any day on the runway and the detail card becomes a same-day brief: trading shape, campaigns, holiday
-            flags, and how capacity is being consumed—so the colour on the grid is never a mystery. That matters when
-            centre teams need to <strong className="font-medium text-zinc-300">show how risk is governed</strong> and
-            market leaders need proof that <strong className="font-medium text-zinc-300">local operating reality</strong>{' '}
-            is in the model. Zoom one country or compare a segment; the story always matches the surface you were just
-            looking at.
+            Pick any day on the runway and the detail card becomes a same-day brief: rhythms, initiatives, holiday flags,
+            and how <strong className="font-medium text-zinc-300">capacity is being consumed</strong>—so the colour on
+            the grid is never a mystery. That matters when leadership needs to{' '}
+            <strong className="font-medium text-zinc-300">show risk is governed</strong> and delivery leads need proof that{' '}
+            <strong className="font-medium text-zinc-300">operating reality</strong> is in the model. Zoom one lane or
+            compare many; the story always matches the surface you were just looking at.
           </p>
         </div>
 

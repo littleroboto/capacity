@@ -631,13 +631,13 @@ export function LandingYamlProjectTwinMock() {
           Prep, cutover, run—and the long-running programmes underneath
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          The strip reads like temperature over the horizon: calm weeks versus stretches where BAU support, retail
-          campaigns, and technology change overlap. When a campaign is in YAML, prep lands as a warmer band while
-          readiness and test integration run hot; after cutover, live support often eases the lane while work continues at
-          a steadier heat. National holidays spike hardest; school breaks add sustained trading-shaped load while support
-          capacity stays tight. Long-running work—hardware refresh, networking maintenance, POS waves—can be expressed the
-          same way: <span className="text-zinc-300">different project types, different draws on labs and people</span>,
-          all in one calendar.
+          The strip reads like temperature over the horizon: calm weeks versus stretches where run-the-business work,
+          initiatives, and change programmes overlap. When a wave is in YAML, prep lands as a warmer band while readiness
+          and integration run hot; after cutover, sustain often eases the lane while work continues at a steadier heat.
+          Public holidays spike hardest; busy-season patterns add sustained load while support stays tight. Long-running
+          streams—refresh cycles, infrastructure, roll-outs—use the same blocks:{' '}
+          <span className="text-zinc-300">different work types, different draws on people and shared resources</span>, one
+          calendar.
         </p>
       </div>
 

@@ -125,25 +125,26 @@ export function LandingMultiMarketDeploymentMock() {
     >
       <header className="mb-6 sm:mb-8">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Multi-market runway
+          Compare lanes
         </p>
         <h2
           id="multimarket-runway-heading"
           className="font-landing max-w-3xl text-balance text-2xl font-semibold leading-snug text-white sm:text-[1.65rem]"
         >
-          Who has headroom for the next pilot?
+          Where's the gap for the next push?
         </h2>
       </header>
 
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_min(100%,720px)] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_min(100%,780px)]">
         <p className="max-w-xs text-pretty text-sm leading-relaxed text-zinc-400 sm:max-w-sm lg:max-w-[15.5rem] lg:pt-0.5 xl:max-w-[17rem]">
-          Strategy leaders often need a fast answer: <span className="text-zinc-300">which markets can absorb</span> a
-          technology pilot or an extra wave without piling onto an already hot quarter. The same{' '}
-          <span className="text-zinc-300">deployment risk</span> lens runs across every column—here{' '}
-          {RUNWAY_ALL_MARKETS_LABEL} with five sample markets (Germany, France, the UK, Australia, and Canada). The
-          preview trims to a few months (January–April 2026), renders only days the model emits, and uses compact cells
-          so every column fits without horizontal scroll. Click a cell for the same day-detail card as the workbench;
-          open the app for your full programme, segment, and configuration.
+          Planning needs a straight answer: <span className="text-zinc-300">which teams or regions can take</span> the
+          next pilot or wave without landing on an already hot quarter. The same{' '}
+          <span className="text-zinc-300">risk lens</span> runs across every column—here{' '}
+          {RUNWAY_ALL_MARKETS_LABEL} with five sample <span className="text-zinc-300">lanes</span> (Germany, France, the
+          UK, Australia, and Canada). Your config might be departments, products, or geographies; the idea is identical.
+          The preview trims to a few months (January–April 2026), renders only days the model emits, and uses compact
+          cells so every column fits without horizontal scroll. Click a cell for the same day-detail card as the
+          workbench; open the app for your full programme and configuration.
         </p>
 
         <div className="w-full min-w-0 justify-self-stretch lg:justify-self-end">
