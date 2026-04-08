@@ -67,7 +67,11 @@ import { RunwayDaySummaryPanel } from '@/components/RunwayDaySummaryPanel';
 import { useAtcStore } from '@/store/useAtcStore';
 import { SlotOverlay } from '@/components/SlotOverlay';
 import type { MarketConfig } from '@/engine/types';
-import { downloadRunwayHeatmapPng } from '@/lib/runwayPngExport';
+import {
+  clearRunwayPngScrollportStamps,
+  downloadRunwayHeatmapPng,
+  stampRunwayScrollportsForPngExport,
+} from '@/lib/runwayPngExport';
 import { RunwayIsoSkyline } from '@/components/RunwayIsoSkyline';
 import { RunwayIsoCityBlock } from '@/components/RunwayIsoCityBlock';
 import { RunwayCompareSvgColumn } from '@/components/RunwayCompareSvgColumn';
@@ -1944,11 +1948,16 @@ export function RunwayGrid({
     const el = heatmapCaptureRef.current;
     if (!el || !calendarLayout || countrySwitchLoading) return;
     setPngExporting(true);
+    const stamped = stampRunwayScrollportsForPngExport([
+      compareScrollRef.current,
+      singleMarketFitRef.current,
+    ]);
     try {
       await downloadRunwayHeatmapPng(el, { filename: `${pngFilenameBase}.png` });
     } catch (e) {
       console.error(e);
     } finally {
+      clearRunwayPngScrollportStamps(stamped);
       setPngExporting(false);
     }
   }, [calendarLayout, countrySwitchLoading, pngFilenameBase]);
@@ -1970,21 +1979,21 @@ export function RunwayGrid({
     );
   }
 
-  const landingCompareFillParent =
-    landingMinimalChrome && landingCompareSmoothPan && compareAllMarkets;
+  /** Flat LIOM compare (not isometric city block): fill flex height so compare scrollport gets a real clientHeight and cell auto-fit can use the viewport. */
+  const compareStripViewportFill = compareAllMarkets && !showCompareIsoCityBlock;
 
   return (
     <div
       className={cn(
         'relative flex w-full flex-col overflow-visible bg-transparent',
-        landingCompareFillParent ? 'h-full min-h-0' : 'shrink-0'
+        compareStripViewportFill ? 'min-h-0 flex-1 flex-col' : 'shrink-0'
       )}
     >
       <div
         key={`${viewMode}-${country}`}
         className={cn(
           'mx-auto w-full max-w-full rounded-xl border border-border/45 bg-card/35 px-4 pb-3 pt-3 shadow-sm dark:bg-card/20 sm:px-5 sm:pb-4 sm:pt-3.5',
-          landingCompareFillParent && 'flex min-h-0 h-full min-w-0 flex-col'
+          compareStripViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col'
         )}
       >
         <div className="mb-3 flex flex-col gap-3 sm:mb-4">
@@ -2131,7 +2140,7 @@ export function RunwayGrid({
         <div
           className={cn(
             'relative w-full max-w-full',
-            landingCompareFillParent && 'flex min-h-0 min-w-0 flex-1 flex-col'
+            compareStripViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col'
           )}
         >
             <AnimatePresence mode="wait">
@@ -2155,7 +2164,7 @@ export function RunwayGrid({
                 key={`grid-${country}-${compareAllMarkets ? 'compare' : 'single'}-${
                   showIso3dSingleMarket || showCompareIsoCityBlock ? '3d' : 'flat'
                 }-${useSvgHeatmap ? 'svg' : 'html'}`}
-                className={cn('w-full', landingCompareFillParent && 'flex min-h-0 min-w-0 flex-1 flex-col')}
+                className={cn('w-full', compareStripViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col')}
                 initial={reduceMotion ? false : { y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
@@ -2168,7 +2177,7 @@ export function RunwayGrid({
                   landingCompareNoScroll={landingCompareNoScroll}
                   compareCellDetailsDisabled={landingCompareDisableCellDetails}
                   noopCompareDayOpen={noopCompareDayOpen}
-                  landingCompareStackFill={landingCompareFillParent}
+                  landingCompareStackFill={compareStripViewportFill}
                   compareColumnDateHighlight={landingCompareColumnHighlight}
                   marketsOrdered={marketsOrdered}
                   riskSurface={riskSurface}

@@ -278,8 +278,8 @@ export default function App() {
                     {parseError ? (
                       <p className="shrink-0 text-sm text-red-600 dark:text-red-400">{parseError}</p>
                     ) : null}
-                    <div className="flex min-h-0 w-full min-w-0 flex-col">
-                      <div className="min-w-0 overflow-visible">
+                    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+                      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
                         <RunwayGrid riskSurface={riskSurface} viewMode={viewMode} onSlotSelection={onSlotSelection} />
                       </div>
                     </div>
