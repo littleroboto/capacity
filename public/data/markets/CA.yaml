@@ -29,6 +29,25 @@ resources:
       Dec: 2
   testing_capacity: 4
 
+# Collective leave density — summer lighter dip than Europe; Christmas/NY bridge.
+national_leave_bands:
+  - label: Summer leave (Jul–Aug)
+    from: '2026-07-01'
+    to: '2026-08-15'
+    capacity_multiplier: 0.82
+  - label: Christmas/New Year bridge
+    from: '2026-12-23'
+    to: '2027-01-02'
+    capacity_multiplier: 0.45
+  - label: Summer leave (Jul–Aug) 2027
+    from: '2027-07-01'
+    to: '2027-08-15'
+    capacity_multiplier: 0.82
+  - label: Christmas/New Year bridge 2027
+    from: '2027-12-23'
+    to: '2028-01-02'
+    capacity_multiplier: 0.45
+
 # BAU — routine workload + how heavy Market IT / restaurant support is each weekday (0–1).
 # (Not tech_programmes — those are dated change projects.)
 
@@ -53,12 +72,12 @@ bau:
 # 2027 rows repeat the same seasonal pattern (+1 calendar year on month/day).
 
 campaigns:
-  - name: CA Campaign 1 (Easter)
+  - name: Spring breakfast promo
     start_date: '2026-04-07'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -66,12 +85,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA Campaign 1 (Easter) (2027)
+  - name: Spring breakfast promo
     start_date: '2027-04-07'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -79,12 +98,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA Campaign 2 (Summer)
+  - name: Summer BBQ deal
     start_date: '2026-07-08'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -92,12 +111,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA Campaign 2 (Summer) (2027)
+  - name: Summer BBQ deal
     start_date: '2027-07-08'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -105,12 +124,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA Campaign 4 (Monopoly) (School holidays)
+  - name: Back-to-school value meal
     start_date: '2026-08-05'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -118,12 +137,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA Campaign 4 (Monopoly) (School holidays) (2027)
+  - name: Back-to-school value meal
     start_date: '2027-08-05'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -131,12 +150,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA Campaign 3 (Advent)
+  - name: Holiday gift card promo
     start_date: '2026-11-23'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -144,12 +163,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA Campaign 3 (Advent) (2027)
+  - name: Holiday gift card promo
     start_date: '2027-11-23'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -161,7 +180,7 @@ campaigns:
 # Tech programmes — non-campaign engineering. Two ~60d POS rollouts / year (1 lab + 1 Market IT); 2027 rows repeat the same pattern (+1 calendar year).
 
 tech_programmes:
-  - name: CA POS Deployment H1
+  - name: Curbside pickup system
     start_date: '2026-01-08'
     duration: 60
     programme_support:
@@ -170,7 +189,7 @@ tech_programmes:
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA POS Deployment H2
+  - name: Loyalty app integration
     start_date: '2026-09-09'
     duration: 60
     programme_support:
@@ -179,7 +198,7 @@ tech_programmes:
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA POS Deployment H1 (2027)
+  - name: Curbside pickup system
     start_date: '2027-01-08'
     duration: 60
     programme_support:
@@ -188,7 +207,7 @@ tech_programmes:
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: CA POS Deployment H2 (2027)
+  - name: Loyalty app integration
     start_date: '2027-09-09'
     duration: 60
     programme_support:
@@ -221,30 +240,13 @@ public_holidays:
 school_holidays:
   auto: false
   dates:
-    # 2025-12-22 – 2026-01-02 (Christmas break (typical ON boards))
-    - '2025-12-22'
-    - '2025-12-23'
-    - '2025-12-24'
-    - '2025-12-25'
-    - '2025-12-26'
-    - '2025-12-27'
-    - '2025-12-28'
-    - '2025-12-29'
-    - '2025-12-30'
-    - '2025-12-31'
-    - '2026-01-01'
-    - '2026-01-02'
-    # 2026-03-16 – 2026-03-20 (March break)
+    # 2026-03-16 – 2026-03-20 (March Break 2026)
     - '2026-03-16'
     - '2026-03-17'
     - '2026-03-18'
     - '2026-03-19'
     - '2026-03-20'
-    # 2026-06-27 – 2026-09-07 (Summer break (through Labour Day week))
-    - '2026-06-27'
-    - '2026-06-28'
-    - '2026-06-29'
-    - '2026-06-30'
+    # 2026-07-01 – 2026-09-07 (Summer 2026)
     - '2026-07-01'
     - '2026-07-02'
     - '2026-07-03'
@@ -314,6 +316,99 @@ school_holidays:
     - '2026-09-05'
     - '2026-09-06'
     - '2026-09-07'
+    # 2026-12-21 – 2027-01-01 (Winter Break 2026)
+    - '2026-12-21'
+    - '2026-12-22'
+    - '2026-12-23'
+    - '2026-12-24'
+    - '2026-12-25'
+    - '2026-12-26'
+    - '2026-12-27'
+    - '2026-12-28'
+    - '2026-12-29'
+    - '2026-12-30'
+    - '2026-12-31'
+    - '2027-01-01'
+    # 2027-03-15 – 2027-03-19 (March Break 2027)
+    - '2027-03-15'
+    - '2027-03-16'
+    - '2027-03-17'
+    - '2027-03-18'
+    - '2027-03-19'
+    # 2027-03-26 – 2027-03-29 (Good Friday + Easter Monday 2027)
+    - '2027-03-26'
+    - '2027-03-27'
+    - '2027-03-28'
+    - '2027-03-29'
+    # 2027-07-01 – 2027-09-06 (Summer 2027)
+    - '2027-07-01'
+    - '2027-07-02'
+    - '2027-07-03'
+    - '2027-07-04'
+    - '2027-07-05'
+    - '2027-07-06'
+    - '2027-07-07'
+    - '2027-07-08'
+    - '2027-07-09'
+    - '2027-07-10'
+    - '2027-07-11'
+    - '2027-07-12'
+    - '2027-07-13'
+    - '2027-07-14'
+    - '2027-07-15'
+    - '2027-07-16'
+    - '2027-07-17'
+    - '2027-07-18'
+    - '2027-07-19'
+    - '2027-07-20'
+    - '2027-07-21'
+    - '2027-07-22'
+    - '2027-07-23'
+    - '2027-07-24'
+    - '2027-07-25'
+    - '2027-07-26'
+    - '2027-07-27'
+    - '2027-07-28'
+    - '2027-07-29'
+    - '2027-07-30'
+    - '2027-07-31'
+    - '2027-08-01'
+    - '2027-08-02'
+    - '2027-08-03'
+    - '2027-08-04'
+    - '2027-08-05'
+    - '2027-08-06'
+    - '2027-08-07'
+    - '2027-08-08'
+    - '2027-08-09'
+    - '2027-08-10'
+    - '2027-08-11'
+    - '2027-08-12'
+    - '2027-08-13'
+    - '2027-08-14'
+    - '2027-08-15'
+    - '2027-08-16'
+    - '2027-08-17'
+    - '2027-08-18'
+    - '2027-08-19'
+    - '2027-08-20'
+    - '2027-08-21'
+    - '2027-08-22'
+    - '2027-08-23'
+    - '2027-08-24'
+    - '2027-08-25'
+    - '2027-08-26'
+    - '2027-08-27'
+    - '2027-08-28'
+    - '2027-08-29'
+    - '2027-08-30'
+    - '2027-08-31'
+    - '2027-09-01'
+    - '2027-09-02'
+    - '2027-09-03'
+    - '2027-09-04'
+    - '2027-09-05'
+    - '2027-09-06'
   staffing_multiplier: 0.75
   trading_multiplier: 1.0
   load_effects:
@@ -334,32 +429,32 @@ holidays:
 trading:
   campaign_store_boost_prep: 0
   campaign_store_boost_live: 0.28
-  campaign_effect_scale: 2.5
-  payday_month_peak_multiplier: 1.2
+  campaign_effect_scale: 1.2
+  payday_month_peak_multiplier: 1.15
   monthly_pattern:
-    Jan: 0.56
-    Feb: 0.58
-    Mar: 0.69
-    Apr: 0.77
-    May: 0.85
-    Jun: 0.91
-    Jul: 0.97
+    Jan: 0.72
+    Feb: 0.75
+    Mar: 0.82
+    Apr: 0.90
+    May: 0.95
+    Jun: 0.97
+    Jul: 1.0
     Aug: 0.92
-    Sep: 0.84
-    Oct: 0.72
-    Nov: 0.60
-    Dec: 1.0
+    Sep: 0.80
+    Oct: 0.83
+    Nov: 0.78
+    Dec: 0.82
   weekly_pattern:
-    Mon: 0.6
-    Tue: 0.7
-    Wed: 0.8
-    Thu: 0.9
-    Fri: 1.0
+    Mon: 0.65
+    Tue: 0.70
+    Wed: 0.75
+    Thu: 0.78
+    Fri: 0.95
     Sat: 1.0
-    Sun: 0.8
+    Sun: 0.78
   seasonal:
     peak_month: 7
-    amplitude: 0.1
+    amplitude: 0.04
 
 # Deployment Risk lens — dated events / blackouts below; optional deployment_risk_month_curve adds Jan–Dec lift.
 

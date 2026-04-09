@@ -27,6 +27,29 @@ resources:
       Dec: 2
   testing_capacity: 4
 
+# Collective leave density — Bundesländer stagger summer but July–August still sees broad annual leave.
+national_leave_bands:
+  - label: Summer leave density (Jul–Aug)
+    from: '2026-07-01'
+    to: '2026-08-31'
+    capacity_multiplier: 0.78
+  - label: Christmas/New Year bridge
+    from: '2026-12-23'
+    to: '2027-01-02'
+    capacity_multiplier: 0.45
+  - label: May bridge days (Ascension cluster)
+    from: '2026-05-11'
+    to: '2026-05-15'
+    capacity_multiplier: 0.70
+  - label: Summer leave density (Jul–Aug) 2027
+    from: '2027-07-01'
+    to: '2027-08-31'
+    capacity_multiplier: 0.78
+  - label: Christmas/New Year bridge 2027
+    from: '2027-12-23'
+    to: '2028-01-02'
+    capacity_multiplier: 0.45
+
 # BAU — routine workload + how heavy Market IT / restaurant support is each weekday (0–1).
 # (Not tech_programmes — those are dated change projects.)
 
@@ -51,12 +74,12 @@ bau:
 # 2027 rows repeat the same seasonal pattern (+1 calendar year on month/day).
 
 campaigns:
-  - name: DE Campaign 1 (Easter)
+  - name: Easter breakfast launch
     start_date: '2026-04-08'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -64,12 +87,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE Campaign 1 (Easter) (2027)
+  - name: Easter breakfast launch
     start_date: '2027-04-08'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -77,12 +100,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE Campaign 2 (Summer)
+  - name: Summer frozen drinks
     start_date: '2026-07-13'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -90,12 +113,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE Campaign 2 (Summer) (2027)
+  - name: Summer frozen drinks
     start_date: '2027-07-13'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -103,12 +126,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE Campaign 4 (Monopoly) (School holidays)
+  - name: Back-to-school combo
     start_date: '2026-08-11'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -116,12 +139,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE Campaign 4 (Summer) (School holidays) (2027)
+  - name: Back-to-school combo
     start_date: '2027-08-11'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -129,12 +152,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE Campaign 3 (Advent)
+  - name: Advent calendar promo
     start_date: '2026-12-01'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -142,12 +165,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE Campaign 3 (Monopoly) (2027)
+  - name: Flagship festive collectible
     start_date: '2027-12-01'
     duration: 42
     testing_prep_duration: 61
     impact: very_high
-    business_uplift: 1.3
+    promo_weight: 1.3
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -159,7 +182,7 @@ campaigns:
 # Tech programmes — non-campaign engineering. Two ~60d POS rollouts / year (1 lab + 1 Market IT); 2027 rows repeat the same pattern (+1 calendar year).
 
 tech_programmes:
-  - name: DE POS Deployment H1
+  - name: Kitchen display rollout
     start_date: '2026-01-06'
     duration: 60
     programme_support:
@@ -168,7 +191,7 @@ tech_programmes:
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE POS Deployment H2
+  - name: Mobile order integration
     start_date: '2026-09-11'
     duration: 60
     programme_support:
@@ -177,7 +200,7 @@ tech_programmes:
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE POS Deployment H1 (2027)
+  - name: Kitchen display rollout
     start_date: '2027-01-06'
     duration: 60
     programme_support:
@@ -186,7 +209,7 @@ tech_programmes:
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: DE POS Deployment H2 (2027)
+  - name: Mobile order integration
     start_date: '2027-09-11'
     duration: 60
     programme_support:
@@ -219,88 +242,7 @@ public_holidays:
 school_holidays:
   auto: false
   dates:
-    # 2025-04-14 – 2025-04-25 (12 consecutive days)
-    - '2025-04-14'
-    - '2025-04-15'
-    - '2025-04-16'
-    - '2025-04-17'
-    - '2025-04-18'
-    - '2025-04-19'
-    - '2025-04-20'
-    - '2025-04-21'
-    - '2025-04-22'
-    - '2025-04-23'
-    - '2025-04-24'
-    - '2025-04-25'
-    # 2026-02-02 – 2026-02-06 (5 consecutive days)
-    - '2026-02-02'
-    - '2026-02-03'
-    - '2026-02-04'
-    - '2026-02-05'
-    - '2026-02-06'
-    # 2026-03-30 – 2026-04-10 (12 consecutive days)
-    - '2026-03-30'
-    - '2026-03-31'
-    - '2026-04-01'
-    - '2026-04-02'
-    - '2026-04-03'
-    - '2026-04-04'
-    - '2026-04-05'
-    - '2026-04-06'
-    - '2026-04-07'
-    - '2026-04-08'
-    - '2026-04-09'
-    - '2026-04-10'
-    # 2026-07-15 – 2026-08-26 (43 consecutive days)
-    - '2026-07-15'
-    - '2026-07-16'
-    - '2026-07-17'
-    - '2026-07-18'
-    - '2026-07-19'
-    - '2026-07-20'
-    - '2026-07-21'
-    - '2026-07-22'
-    - '2026-07-23'
-    - '2026-07-24'
-    - '2026-07-25'
-    - '2026-07-26'
-    - '2026-07-27'
-    - '2026-07-28'
-    - '2026-07-29'
-    - '2026-07-30'
-    - '2026-07-31'
-    - '2026-08-01'
-    - '2026-08-02'
-    - '2026-08-03'
-    - '2026-08-04'
-    - '2026-08-05'
-    - '2026-08-06'
-    - '2026-08-07'
-    - '2026-08-08'
-    - '2026-08-09'
-    - '2026-08-10'
-    - '2026-08-11'
-    - '2026-08-12'
-    - '2026-08-13'
-    - '2026-08-14'
-    - '2026-08-15'
-    - '2026-08-16'
-    - '2026-08-17'
-    - '2026-08-18'
-    - '2026-08-19'
-    - '2026-08-20'
-    - '2026-08-21'
-    - '2026-08-22'
-    - '2026-08-23'
-    - '2026-08-24'
-    - '2026-08-25'
-    - '2026-08-26'
-    # 2026-10-12 – 2026-10-24 (13 consecutive days)
-    - '2026-10-12'
-    - '2026-10-13'
-    - '2026-10-14'
-    - '2026-10-15'
-    - '2026-10-16'
+    # 2026-10-17 – 2026-10-31 (Herbstferien 2026 (NRW))
     - '2026-10-17'
     - '2026-10-18'
     - '2026-10-19'
@@ -309,7 +251,14 @@ school_holidays:
     - '2026-10-22'
     - '2026-10-23'
     - '2026-10-24'
-    # 2026-12-23 – 2027-01-06 (15 consecutive days)
+    - '2026-10-25'
+    - '2026-10-26'
+    - '2026-10-27'
+    - '2026-10-28'
+    - '2026-10-29'
+    - '2026-10-30'
+    - '2026-10-31'
+    # 2026-12-23 – 2027-01-06 (Weihnachtsferien 2026)
     - '2026-12-23'
     - '2026-12-24'
     - '2026-12-25'
@@ -325,12 +274,67 @@ school_holidays:
     - '2027-01-04'
     - '2027-01-05'
     - '2027-01-06'
-    # 2027-02-01 – 2027-02-05 (5 consecutive days)
-    - '2027-02-01'
-    - '2027-02-02'
-    - '2027-02-03'
-    - '2027-02-04'
-    - '2027-02-05'
+    # 2027-03-22 – 2027-04-03 (Osterferien 2027)
+    - '2027-03-22'
+    - '2027-03-23'
+    - '2027-03-24'
+    - '2027-03-25'
+    - '2027-03-26'
+    - '2027-03-27'
+    - '2027-03-28'
+    - '2027-03-29'
+    - '2027-03-30'
+    - '2027-03-31'
+    - '2027-04-01'
+    - '2027-04-02'
+    - '2027-04-03'
+    # 2027-05-18 – 2027-05-18 (Pfingstferien 2027)
+    - '2027-05-18'
+    # 2027-07-19 – 2027-08-31 (Sommerferien 2027 (NRW))
+    - '2027-07-19'
+    - '2027-07-20'
+    - '2027-07-21'
+    - '2027-07-22'
+    - '2027-07-23'
+    - '2027-07-24'
+    - '2027-07-25'
+    - '2027-07-26'
+    - '2027-07-27'
+    - '2027-07-28'
+    - '2027-07-29'
+    - '2027-07-30'
+    - '2027-07-31'
+    - '2027-08-01'
+    - '2027-08-02'
+    - '2027-08-03'
+    - '2027-08-04'
+    - '2027-08-05'
+    - '2027-08-06'
+    - '2027-08-07'
+    - '2027-08-08'
+    - '2027-08-09'
+    - '2027-08-10'
+    - '2027-08-11'
+    - '2027-08-12'
+    - '2027-08-13'
+    - '2027-08-14'
+    - '2027-08-15'
+    - '2027-08-16'
+    - '2027-08-17'
+    - '2027-08-18'
+    - '2027-08-19'
+    - '2027-08-20'
+    - '2027-08-21'
+    - '2027-08-22'
+    - '2027-08-23'
+    - '2027-08-24'
+    - '2027-08-25'
+    - '2027-08-26'
+    - '2027-08-27'
+    - '2027-08-28'
+    - '2027-08-29'
+    - '2027-08-30'
+    - '2027-08-31'
   staffing_multiplier: 0.75
   trading_multiplier: 1.0
   load_effects:
@@ -351,32 +355,32 @@ holidays:
 trading:
   campaign_store_boost_prep: 0
   campaign_store_boost_live: 0.28
-  payday_month_peak_multiplier: 1.2
-  campaign_effect_scale: 2.5
+  payday_month_peak_multiplier: 1.15
+  campaign_effect_scale: 1.2
   monthly_pattern:
-    Jan: 0.56
-    Feb: 0.58
-    Mar: 0.69
-    Apr: 0.77
-    May: 0.85
-    Jun: 0.91
-    Jul: 0.97
-    Aug: 0.92
-    Sep: 0.84
-    Oct: 0.72
-    Nov: 0.60
-    Dec: 1.0
+    Jan: 0.72
+    Feb: 0.75
+    Mar: 0.82
+    Apr: 0.90
+    May: 0.95
+    Jun: 0.97
+    Jul: 1.0
+    Aug: 0.90
+    Sep: 0.80
+    Oct: 0.83
+    Nov: 0.78
+    Dec: 0.82
   weekly_pattern:
-    Mon: 0.6
-    Tue: 0.7
-    Wed: 0.8
-    Thu: 0.9
-    Fri: 1.0
+    Mon: 0.65
+    Tue: 0.70
+    Wed: 0.75
+    Thu: 0.78
+    Fri: 0.95
     Sat: 1.0
-    Sun: 0.8
+    Sun: 0.55
   seasonal:
-    peak_month: 12
-    amplitude: 0.11
+    peak_month: 7
+    amplitude: 0.04
 
 # Deployment Risk lens — dated events / blackouts below; optional deployment_risk_month_curve adds Jan–Dec lift.
 

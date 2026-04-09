@@ -29,6 +29,25 @@ resources:
       Dec: 2
   testing_capacity: 4
 
+# Collective leave density — Ferragosto shuts most of Italy; Christmas–Epiphany bridge is also heavy.
+national_leave_bands:
+  - label: Ferragosto / chiusura estiva
+    from: '2026-08-01'
+    to: '2026-08-25'
+    capacity_multiplier: 0.40
+  - label: Christmas–Epiphany bridge
+    from: '2026-12-23'
+    to: '2027-01-06'
+    capacity_multiplier: 0.42
+  - label: Ferragosto / chiusura estiva 2027
+    from: '2027-08-01'
+    to: '2027-08-25'
+    capacity_multiplier: 0.40
+  - label: Christmas–Epiphany bridge 2027
+    from: '2027-12-23'
+    to: '2028-01-06'
+    capacity_multiplier: 0.42
+
 # BAU — routine workload + how heavy Market IT / restaurant support is each weekday (0–1).
 # (Not tech_programmes — those are dated change projects.)
 
@@ -53,12 +72,12 @@ bau:
 # 2027 rows repeat the same seasonal pattern (+1 calendar year on month/day).
 
 campaigns:
-  - name: IT Campaign 1 (Easter)
+  - name: Spring menu refresh
     start_date: '2026-04-06'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -66,12 +85,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT Campaign 1 (Easter) (2027)
+  - name: Spring menu refresh
     start_date: '2027-04-06'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -79,12 +98,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT Campaign 2 (Summer)
+  - name: Summer gelato promo
     start_date: '2026-07-20'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -92,12 +111,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT Campaign 2 (Summer) (2027)
+  - name: Summer gelato promo
     start_date: '2027-07-20'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -105,12 +124,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT Campaign 4 (Monopoly) (School holidays)
+  - name: Back-to-school value menu
     start_date: '2026-08-25'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -118,12 +137,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT Campaign 4 (Monopoly) (School holidays) (2027)
+  - name: Back-to-school value menu
     start_date: '2027-08-25'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -131,12 +150,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT Campaign 3 (Advent)
+  - name: Natale family box
     start_date: '2026-12-02'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -144,12 +163,12 @@ campaigns:
     live_campaign_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT Campaign 3 (Advent) (2027)
+  - name: Natale family box
     start_date: '2027-12-02'
     duration: 30
     testing_prep_duration: 28
     impact: medium
-    business_uplift: 1.0
+    promo_weight: 1.0
     live_tech_load_scale: 1
     campaign_support:
       labs_required: 1
@@ -161,7 +180,7 @@ campaigns:
 # Tech programmes — non-campaign engineering. Two ~60d POS rollouts / year (1 lab + 1 Market IT); 2027 rows repeat the same pattern (+1 calendar year).
 
 tech_programmes:
-  - name: IT POS Deployment H1
+  - name: Digital menu board refresh
     start_date: '2026-01-11'
     duration: 60
     programme_support:
@@ -170,7 +189,7 @@ tech_programmes:
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT POS Deployment H2
+  - name: Kitchen automation upgrade
     start_date: '2026-09-15'
     duration: 60
     programme_support:
@@ -179,7 +198,7 @@ tech_programmes:
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT POS Deployment H1 (2027)
+  - name: Digital menu board refresh
     start_date: '2027-01-11'
     duration: 60
     programme_support:
@@ -188,7 +207,7 @@ tech_programmes:
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: IT POS Deployment H2 (2027)
+  - name: Kitchen automation upgrade
     start_date: '2027-09-15'
     duration: 60
     programme_support:
@@ -222,7 +241,7 @@ public_holidays:
 school_holidays:
   auto: false
   dates:
-    # 2025-12-23 – 2026-01-06 (Vacanze natalizie (Lombardia))
+    # 2025-12-23 – 2026-01-06 (Vacanze di Natale 2025)
     - '2025-12-23'
     - '2025-12-24'
     - '2025-12-25'
@@ -238,17 +257,14 @@ school_holidays:
     - '2026-01-04'
     - '2026-01-05'
     - '2026-01-06'
-    # 2026-02-16 – 2026-02-17 (Carnevale)
-    - '2026-02-16'
-    - '2026-02-17'
-    # 2026-04-02 – 2026-04-06 (Pasqua)
+    # 2026-04-02 – 2026-04-07 (Vacanze di Pasqua 2026)
     - '2026-04-02'
     - '2026-04-03'
     - '2026-04-04'
     - '2026-04-05'
     - '2026-04-06'
-    # 2026-06-09 – 2026-09-11 (Vacanze estive (post fine lezioni primaria/secondaria))
-    - '2026-06-09'
+    - '2026-04-07'
+    # 2026-06-10 – 2026-09-14 (Vacanze estive 2026)
     - '2026-06-10'
     - '2026-06-11'
     - '2026-06-12'
@@ -343,6 +359,138 @@ school_holidays:
     - '2026-09-09'
     - '2026-09-10'
     - '2026-09-11'
+    - '2026-09-12'
+    - '2026-09-13'
+    - '2026-09-14'
+    # 2026-10-31 – 2026-11-01 (Tutti i Santi 2026)
+    - '2026-10-31'
+    - '2026-11-01'
+    # 2026-12-23 – 2027-01-07 (Vacanze di Natale 2026)
+    - '2026-12-23'
+    - '2026-12-24'
+    - '2026-12-25'
+    - '2026-12-26'
+    - '2026-12-27'
+    - '2026-12-28'
+    - '2026-12-29'
+    - '2026-12-30'
+    - '2026-12-31'
+    - '2027-01-01'
+    - '2027-01-02'
+    - '2027-01-03'
+    - '2027-01-04'
+    - '2027-01-05'
+    - '2027-01-06'
+    - '2027-01-07'
+    # 2027-02-08 – 2027-02-10 (Carnevale 2027)
+    - '2027-02-08'
+    - '2027-02-09'
+    - '2027-02-10'
+    # 2027-03-25 – 2027-03-30 (Vacanze di Pasqua 2027)
+    - '2027-03-25'
+    - '2027-03-26'
+    - '2027-03-27'
+    - '2027-03-28'
+    - '2027-03-29'
+    - '2027-03-30'
+    # 2027-06-10 – 2027-09-14 (Vacanze estive 2027)
+    - '2027-06-10'
+    - '2027-06-11'
+    - '2027-06-12'
+    - '2027-06-13'
+    - '2027-06-14'
+    - '2027-06-15'
+    - '2027-06-16'
+    - '2027-06-17'
+    - '2027-06-18'
+    - '2027-06-19'
+    - '2027-06-20'
+    - '2027-06-21'
+    - '2027-06-22'
+    - '2027-06-23'
+    - '2027-06-24'
+    - '2027-06-25'
+    - '2027-06-26'
+    - '2027-06-27'
+    - '2027-06-28'
+    - '2027-06-29'
+    - '2027-06-30'
+    - '2027-07-01'
+    - '2027-07-02'
+    - '2027-07-03'
+    - '2027-07-04'
+    - '2027-07-05'
+    - '2027-07-06'
+    - '2027-07-07'
+    - '2027-07-08'
+    - '2027-07-09'
+    - '2027-07-10'
+    - '2027-07-11'
+    - '2027-07-12'
+    - '2027-07-13'
+    - '2027-07-14'
+    - '2027-07-15'
+    - '2027-07-16'
+    - '2027-07-17'
+    - '2027-07-18'
+    - '2027-07-19'
+    - '2027-07-20'
+    - '2027-07-21'
+    - '2027-07-22'
+    - '2027-07-23'
+    - '2027-07-24'
+    - '2027-07-25'
+    - '2027-07-26'
+    - '2027-07-27'
+    - '2027-07-28'
+    - '2027-07-29'
+    - '2027-07-30'
+    - '2027-07-31'
+    - '2027-08-01'
+    - '2027-08-02'
+    - '2027-08-03'
+    - '2027-08-04'
+    - '2027-08-05'
+    - '2027-08-06'
+    - '2027-08-07'
+    - '2027-08-08'
+    - '2027-08-09'
+    - '2027-08-10'
+    - '2027-08-11'
+    - '2027-08-12'
+    - '2027-08-13'
+    - '2027-08-14'
+    - '2027-08-15'
+    - '2027-08-16'
+    - '2027-08-17'
+    - '2027-08-18'
+    - '2027-08-19'
+    - '2027-08-20'
+    - '2027-08-21'
+    - '2027-08-22'
+    - '2027-08-23'
+    - '2027-08-24'
+    - '2027-08-25'
+    - '2027-08-26'
+    - '2027-08-27'
+    - '2027-08-28'
+    - '2027-08-29'
+    - '2027-08-30'
+    - '2027-08-31'
+    - '2027-09-01'
+    - '2027-09-02'
+    - '2027-09-03'
+    - '2027-09-04'
+    - '2027-09-05'
+    - '2027-09-06'
+    - '2027-09-07'
+    - '2027-09-08'
+    - '2027-09-09'
+    - '2027-09-10'
+    - '2027-09-11'
+    - '2027-09-12'
+    - '2027-09-13'
+    - '2027-09-14'
   staffing_multiplier: 0.75
   trading_multiplier: 1.0
   load_effects:
@@ -363,32 +511,32 @@ holidays:
 trading:
   campaign_store_boost_prep: 0
   campaign_store_boost_live: 0.28
-  campaign_effect_scale: 2.5
-  payday_month_peak_multiplier: 1.2
+  campaign_effect_scale: 1.2
+  payday_month_peak_multiplier: 1.15
   monthly_pattern:
-    Jan: 0.56
-    Feb: 0.58
-    Mar: 0.69
-    Apr: 0.77
-    May: 0.85
-    Jun: 0.90
-    Jul: 0.95
-    Aug: 0.70
+    Jan: 0.72
+    Feb: 0.75
+    Mar: 0.82
+    Apr: 0.90
+    May: 0.95
+    Jun: 0.95
+    Jul: 1.0
+    Aug: 0.68
     Sep: 0.80
-    Oct: 0.72
-    Nov: 0.60
-    Dec: 1.0
+    Oct: 0.83
+    Nov: 0.78
+    Dec: 0.82
   weekly_pattern:
-    Mon: 0.6
-    Tue: 0.7
-    Wed: 0.8
-    Thu: 0.9
-    Fri: 1.0
+    Mon: 0.65
+    Tue: 0.70
+    Wed: 0.75
+    Thu: 0.78
+    Fri: 0.95
     Sat: 1.0
-    Sun: 0.8
+    Sun: 0.62
   seasonal:
     peak_month: 8
-    amplitude: 0.12
+    amplitude: 0.04
 
 # Deployment Risk lens — dated events / blackouts below; optional deployment_risk_month_curve adds Jan–Dec lift.
 
