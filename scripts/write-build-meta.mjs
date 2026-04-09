@@ -4,7 +4,7 @@
  * the deployment commit on Vercel (VERCEL_GIT_COMMIT_SHA) and local git otherwise.
  */
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +13,28 @@ const outFile = path.join(root, 'src', 'lib', 'buildMeta.generated.ts');
 
 const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const version = typeof pkg.version === 'string' ? pkg.version : '0.0.0';
+const packageLockPath = path.join(root, 'package-lock.json');
+
+function installedVersionsByPackage() {
+  if (!existsSync(packageLockPath)) return {};
+  try {
+    const lock = JSON.parse(readFileSync(packageLockPath, 'utf8'));
+    const packages = lock?.packages;
+    if (!packages || typeof packages !== 'object') return {};
+    /** package-lock v2/v3 stores installed versions at `packages["node_modules/<name>"].version`. */
+    return Object.entries(packages).reduce((acc, [pkgPath, meta]) => {
+      if (!pkgPath.startsWith('node_modules/')) return acc;
+      const pkgName = pkgPath.slice('node_modules/'.length);
+      const installed = meta?.version;
+      if (typeof installed === 'string' && installed.trim()) acc[pkgName] = installed.trim();
+      return acc;
+    }, {});
+  } catch {
+    return {};
+  }
+}
+
+const installedByPackage = installedVersionsByPackage();
 
 function isHexSha(s) {
   return /^[a-f0-9]{7,40}$/i.test(s);
@@ -73,14 +95,21 @@ function depRange(pkgKey) {
   return typeof r === 'string' ? r : '—';
 }
 
-function bomEntries(spec) {
-  return spec.map(({ label, pkg }) => ({ label, range: depRange(pkg), pkg }));
+function fallbackVersionFromRange(range) {
+  const match = range.match(/\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?/);
+  return match ? match[0] : '—';
+}
+
+function depVersion(pkgKey) {
+  const installed = installedByPackage[pkgKey];
+  if (typeof installed === 'string' && installed.trim()) return installed;
+  return fallbackVersionFromRange(depRange(pkgKey));
 }
 
 /** Optional `bundle` becomes a sub-heading row in the landing BOM table. */
 function bomEntriesWithBundle(spec) {
   return spec.map(({ bundle, label, pkg }) => {
-    const row = { label, range: depRange(pkg), pkg };
+    const row = { label, range: depRange(pkg), version: depVersion(pkg), pkg };
     if (bundle) row.bundle = bundle;
     return row;
   });

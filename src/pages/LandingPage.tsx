@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Show, SignInButton, UserButton } from '@clerk/react';
 import { motion, useReducedMotion } from 'motion/react';
@@ -326,97 +326,63 @@ function HeroBrowserHeatmap({ reducedMotion }: { reducedMotion: boolean }) {
 type LandingBomEntry = {
   readonly label: string;
   readonly range: string;
+  readonly version?: string;
   readonly pkg: string;
-  /** Logical sub-bundle; repeated on consecutive rows — table shows one sub-heading per change. */
+  /** Logical sub-bundle from generated metadata (not shown in simplified table). */
   readonly bundle?: string;
 };
 
-function LandingBomBundleHeader({ title, variant }: { title: string; variant: 'flush' | 'ruled' }) {
-  return (
-    <tr
-      className={cn(
-        'bg-black/[0.18]',
-        variant === 'ruled' && 'border-t border-dashed border-white/[0.06]'
-      )}
-    >
-      <th
-        scope="colgroup"
-        colSpan={2}
-        className={cn(
-          'px-3 pb-1 pl-5 text-left text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-600',
-          variant === 'flush' ? 'pt-2' : 'pt-1.5'
-        )}
-      >
-        {title}
-      </th>
-    </tr>
-  );
+type LandingBomFlatRow = LandingBomEntry & { readonly section: string };
+
+const LANDING_BOM_ROWS: readonly LandingBomFlatRow[] = [
+  ...LANDING_BOM_CLIENT.map((row) => ({ ...row, section: 'Client' })),
+  ...LANDING_BOM_HOSTING.map((row) => ({ ...row, section: 'Hosting' })),
+  ...LANDING_BOM_AUTH.map((row) => ({ ...row, section: 'Auth' })),
+  ...LANDING_BOM_FLAGS.map((row) => ({ ...row, section: 'Market UI' })),
+];
+
+function landingBomVersion(row: LandingBomEntry): string {
+  const declared = row.version?.trim();
+  if (declared) return declared;
+  const fallback = row.range.match(/\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?/);
+  return fallback ? fallback[0] : '—';
 }
 
-function LandingBomSectionHeader({ title }: { title: string }) {
-  return (
-    <tr className="border-y border-white/[0.06] bg-white/[0.03]">
-      <th
-        scope="colgroup"
-        colSpan={2}
-        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-500"
-      >
-        {title}
-      </th>
-    </tr>
-  );
-}
-
-function LandingBomRowView({ row }: { row: LandingBomEntry }) {
+function LandingBomRowView({ row }: { row: LandingBomFlatRow }) {
   const href = landingBomSourceHref(row.pkg);
   return (
     <tr className="border-b border-white/[0.04] transition-colors last:border-b-0 hover:bg-white/[0.02]">
+      <td className="whitespace-nowrap py-2 pl-3 pr-2 align-middle text-[10px] uppercase tracking-[0.1em] text-zinc-600 sm:w-[5.5rem] sm:min-w-[5.5rem]">
+        {row.section}
+      </td>
       <th
         scope="row"
-        className="max-w-[min(100%,16rem)] py-2 pl-3 pr-2 align-middle font-normal sm:max-w-none"
+        className="max-w-[min(100%,16rem)] py-2 pl-2 pr-2 align-middle font-normal sm:max-w-none"
       >
+        <span className="text-pretty text-zinc-300">{row.label}</span>
+        <span className="ml-1.5 font-mono text-[10px] text-zinc-500">{row.pkg}</span>
+      </th>
+      <td className="whitespace-nowrap py-2 pl-2 pr-2 text-right align-middle font-mono text-[10px] leading-none text-zinc-500 tabular-nums sm:w-[5.5rem] sm:min-w-[5.5rem] sm:text-left">
+        {landingBomVersion(row)}
+      </td>
+      <td className="whitespace-nowrap py-2 pl-2 pr-2 text-right align-middle font-mono text-[10px] leading-none text-zinc-500 tabular-nums sm:w-[6rem] sm:min-w-[6rem] sm:text-left">
+        {row.range}
+      </td>
+      <td className="whitespace-nowrap py-2 pl-2 pr-3 align-middle text-right sm:w-[5rem] sm:min-w-[5rem] sm:text-left">
         <a
           href={href}
           target="_blank"
           rel="noreferrer noopener"
-          className="group inline-flex items-center gap-1.5 text-left text-zinc-400 underline decoration-white/[0.08] underline-offset-[3px] transition hover:text-zinc-100 hover:decoration-[#FFC72C]/50"
+          className="group inline-flex items-center gap-1.5 text-zinc-400 underline decoration-white/[0.08] underline-offset-[3px] transition hover:text-zinc-100 hover:decoration-[#FFC72C]/50"
         >
-          <span className="text-pretty">{row.label}</span>
+          Repo
           <ExternalLink
             className="h-3 w-3 shrink-0 opacity-40 transition-opacity group-hover:opacity-80"
             aria-hidden
           />
         </a>
-      </th>
-      <td className="whitespace-nowrap py-2 pl-2 pr-3 text-right align-middle font-mono text-[10px] leading-none text-zinc-500 tabular-nums sm:w-[6.5rem] sm:min-w-[6.5rem] sm:text-left">
-        {row.range}
       </td>
     </tr>
-  );
-}
-
-function LandingBomRows({ rows }: { rows: readonly LandingBomEntry[] }) {
-  let bundleHeadersInSection = 0;
-  return (
-    <>
-      {rows.map((row, i) => {
-        const prev = i > 0 ? rows[i - 1] : undefined;
-        const bundle = row.bundle?.trim();
-        const showBundle = Boolean(bundle && (!prev || prev.bundle?.trim() !== bundle));
-        if (showBundle && bundle) bundleHeadersInSection += 1;
-        return (
-          <Fragment key={row.pkg}>
-            {showBundle && bundle ? (
-              <LandingBomBundleHeader
-                title={bundle}
-                variant={bundleHeadersInSection === 1 ? 'flush' : 'ruled'}
-              />
-            ) : null}
-            <LandingBomRowView row={row} />
-          </Fragment>
-        );
-      })}
-    </>
   );
 }
 
@@ -442,7 +408,7 @@ function LandingBomTable() {
       >
         <span className="min-w-0 text-pretty text-[11px] leading-snug text-zinc-500">
           <span className="font-medium text-zinc-400">Bill of materials</span>
-          <span className="text-zinc-600"> · dependency bundles, semver ranges, upstream links</span>
+          <span className="text-zinc-600"> · simple dependency table with versions and repo links</span>
         </span>
         <ChevronDown
           className={cn('h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-200', open && '-rotate-180')}
@@ -463,39 +429,50 @@ function LandingBomTable() {
           >
             <table className="w-full min-w-[280px] border-collapse text-left text-[11px]">
               <caption className="sr-only">
-                Bill of materials: open-source dependencies with declared semver ranges and links to upstream source
-                repositories on GitHub or GitLab.
+                Bill of materials table: dependency sections, package versions, declared semver ranges, and links to
+                source repositories.
               </caption>
               <thead className="sticky top-0 z-[2] border-b border-white/[0.08] bg-[#06080a]/95 text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500 backdrop-blur-sm">
                 <tr>
+                  <th scope="col" className="py-2.5 pl-3 pr-2 font-medium sm:w-[5.5rem] sm:min-w-[5.5rem]">
+                    Group
+                  </th>
                   <th scope="col" className="py-2.5 pl-3 pr-2 font-medium">
                     Module
                   </th>
                   <th
                     scope="col"
-                    className="py-2.5 pl-2 pr-3 text-right font-medium sm:w-[6.5rem] sm:min-w-[6.5rem] sm:text-left"
+                    className="py-2.5 pl-2 pr-2 text-right font-medium sm:w-[5.5rem] sm:min-w-[5.5rem] sm:text-left"
+                  >
+                    Version
+                  </th>
+                  <th
+                    scope="col"
+                    className="py-2.5 pl-2 pr-2 text-right font-medium sm:w-[6rem] sm:min-w-[6rem] sm:text-left"
                   >
                     Range
+                  </th>
+                  <th
+                    scope="col"
+                    className="py-2.5 pl-2 pr-3 text-right font-medium sm:w-[5rem] sm:min-w-[5rem] sm:text-left"
+                  >
+                    Repo
                   </th>
                 </tr>
               </thead>
               <tbody className="text-zinc-500">
-                <LandingBomSectionHeader title="Client bundle" />
-                <LandingBomRows rows={LANDING_BOM_CLIENT} />
-                <LandingBomSectionHeader title="Hosting & sync" />
-                <LandingBomRows rows={LANDING_BOM_HOSTING} />
-                <LandingBomSectionHeader title="Auth (optional)" />
-                <LandingBomRows rows={LANDING_BOM_AUTH} />
-                <LandingBomSectionHeader title="Market chrome" />
-                <LandingBomRows rows={LANDING_BOM_FLAGS} />
+                {LANDING_BOM_ROWS.map((row) => (
+                  <LandingBomRowView key={`${row.section}:${row.pkg}`} row={row} />
+                ))}
               </tbody>
             </table>
           </div>
         </div>
         <p className="mt-2 max-w-4xl text-pretty text-[10px] leading-relaxed text-zinc-600 sm:mx-0">
-          Ranges are from <code className="rounded bg-white/[0.04] px-1 font-mono text-[9px]">package.json</code> at
-          build. Links open the upstream source repo on GitHub (or GitLab / npm when that is canonical). Deployed on
-          Vercel; no Next.js — Vite SPA only.
+          Versions are resolved from <code className="rounded bg-white/[0.04] px-1 font-mono text-[9px]">package-lock.json</code>{' '}
+          at build with range-based fallback. Ranges come from{' '}
+          <code className="rounded bg-white/[0.04] px-1 font-mono text-[9px]">package.json</code>. Repo links open
+          upstream source on GitHub (or GitLab / npm when canonical).
         </p>
       </div>
     </div>
