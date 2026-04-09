@@ -555,26 +555,23 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Intuitive visualisation
+          Same engine as the workbench
         </p>
         <h2 id="iso-mock-heading" className="font-landing text-2xl font-semibold text-white">
-          Monitor the temperature
+          Read pressure the way ops reads a horizon
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          Along the year, this preview uses the same <span className="text-zinc-300">Technology</span> lens as the live
-          app—{' '}
-          <span className="text-zinc-300">height and heat</span> on real dates, not a decorative render.{' '}
-          <strong className="font-medium text-zinc-200">Taller, warmer towers</strong> mean more of your constrained
-          stack—specialists, platforms, integration time—is committed that day.{' '}
-          <strong className="font-medium text-zinc-200">Shorter, cooler towers</strong> read as breathing room. In{' '}
-          <strong className="font-medium text-violet-200/90">prep</strong>, readiness and test load dominate; in{' '}
-          <strong className="font-medium text-cyan-200/90">live</strong>, sustain is usually lighter than the pre-cutover
-          surge. Flip to the <span className="text-zinc-300">Trading lens</span> in the workbench and you model{' '}
-          <span className="text-zinc-300">in-store and restaurant operations</span> with the same muscle—{' '}
-          <span className="text-zinc-300">floor attention when campaigns run hot</span>, and why you hold store or ops
-          change when marketing already owns the week. <span className="text-zinc-300">Technology and trading on one
-          calendar</span>—the ecosystem layer segment leadership expects and rarely gets from a shelf of disconnected
-          charts.
+          This preview runs the real <span className="text-zinc-300">Technology</span> lens—{' '}
+          <span className="text-zinc-300">tower height and colour</span> on real dates from the pipeline, not a mock
+          graphic. <strong className="font-medium text-zinc-200">Taller, warmer towers</strong> mean more of the
+          constrained stack is committed that day; <strong className="font-medium text-zinc-200">shorter, cooler</strong>{' '}
+          means headroom. <strong className="font-medium text-violet-200/90">Prep</strong> concentrates readiness and test
+          load; <strong className="font-medium text-cyan-200/90">live</strong> is usually lighter than the pre-cutover
+          surge. In the workbench, switch to <span className="text-zinc-300">Restaurant Activity</span> to model{' '}
+          <span className="text-zinc-300">store and trading rhythm</span>—including when campaigns add floor
+          attention—so you can hold heavy ops or deployment work when the trading picture is already loud.{' '}
+          <span className="text-zinc-300">Technology and trading stay on one calendar</span>; you choose which risk
+          question to foreground.
         </p>
       </div>
 

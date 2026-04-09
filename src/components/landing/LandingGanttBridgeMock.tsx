@@ -199,21 +199,19 @@ export const LandingGanttBridgeMock = memo(function LandingGanttBridgeMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Your Gantt is not your runway
+          Roadmaps show sequence; the runway shows draw
         </p>
         <h2 id={`${headingId}-h`} className="font-landing text-2xl font-semibold text-white">
-          The draw on capacity Gantt never quite shows
+          When programmes and campaigns stack, who feels it?
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          Roadmaps own <span className="text-zinc-300">dates and accountability</span>. They almost never own{' '}
-          <span className="text-zinc-300">capacity</span>—the cumulative pull on{' '}
-          <span className="text-zinc-300">people, time, equipment, and shared services</span> when work overlaps. That is
-          the blind spot: <span className="text-zinc-300">stacking</span>, <span className="text-zinc-300">holiday and
-          busy-season windows</span>, and load that stays <span className="text-zinc-300">implicit</span> for the
-          department left holding the bag. The strip below is the same <span className="text-zinc-300">phased-bar
-          vocabulary</span> you already export from PPM, tinted with this page’s{' '}
-          <span className="text-zinc-300">runway heat palette</span> so the thread is obvious. Familiar layout—so what it
-          usually <span className="text-zinc-300">omits</span> is harder to ignore.
+          Gantt bars answer <span className="text-zinc-300">who</span> and <span className="text-zinc-300">when</span>.
+          They rarely answer <span className="text-zinc-300">how thin the lane is</span> when POS, hardware, marketing
+          waves, and holidays overlap—the cumulative pull on{' '}
+          <span className="text-zinc-300">people, time, equipment, and shared services</span>. The illustration keeps the
+          familiar <span className="text-zinc-300">phased-bar shape</span> from portfolio tools, then tints it with the
+          same <span className="text-zinc-300">runway heat palette</span> the workbench uses so{' '}
+          <span className="text-zinc-300">prep, go-live, and sustain</span> read as load, not just milestones.
         </p>
       </div>
 

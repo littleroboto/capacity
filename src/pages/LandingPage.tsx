@@ -263,7 +263,7 @@ function HeroBrowserHeatmap({ reducedMotion }: { reducedMotion: boolean }) {
             <div className="min-w-0 flex-1 overflow-x-auto">
               <div className="mb-2 flex min-w-[min(100%,280px)] flex-wrap items-center gap-2 sm:min-w-0 sm:mb-3">
                 <h3 className="font-landing text-[11px] font-semibold tracking-tight text-zinc-200 sm:text-xs">
-                  Capacity & programme pressure
+                  Trading rhythm, campaigns, and change
                 </h3>
                 <span className="text-zinc-600" aria-hidden>
                   ·
@@ -314,7 +314,7 @@ function HeroBrowserHeatmap({ reducedMotion }: { reducedMotion: boolean }) {
               Campaigns & tech change
             </span>
             <span className="text-zinc-600 normal-case tracking-normal">
-              Lenses in the app; one shared calendar
+              Same calendar; switch what you are measuring
             </span>
           </div>
         </div>
@@ -509,7 +509,7 @@ export function LandingPage() {
   const landingNoiseFilterId = useId().replace(/:/g, '');
 
   useEffect(() => {
-    document.title = 'MarketZero Workbench · Resource runway in the browser';
+    document.title = 'MarketZero Workbench · Multi-market capacity on one runway';
   }, []);
 
   useEffect(() => {
@@ -677,21 +677,21 @@ export function LandingPage() {
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             >
               <h1 className="font-landing text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">
-                Air traffic control for shared capacity
+                Model how each market absorbs change
               </h1>
               <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-zinc-400 sm:text-lg">
-                In this organisation, <span className="text-zinc-300">communicating load clearly is still missing</span>
-                —not in one shared picture everyone can use, not in a form that travels from centre to markets without
-                turning into another slide deck. Gantt tools sell clarity on <span className="text-zinc-300">who</span> and{' '}
-                <span className="text-zinc-300">when</span>. They are weaker on the only question that bites when plans
-                collide: <span className="text-zinc-300">what is the draw on people, time, and shared resources?</span>{' '}
-                MarketZero Workbench maps that pressure across a <span className="text-zinc-300">single calendar runway</span>
-                —same idea whether your <span className="text-zinc-300">lanes</span> are countries, departments, or product
-                teams. Stacking, risk, headroom—before the date is set in stone. The same idea extends{' '}
-                <span className="text-zinc-300">past the tech department</span>: a{' '}
-                <span className="text-zinc-300">Trading lens</span> models how much{' '}
-                <span className="text-zinc-300">store and restaurant operations</span> can absorb—so you are not
-                scheduling heavy floor or ops change while a major marketing programme already owns the bandwidth.
+                Every market has its own <span className="text-zinc-300">trading rhythm</span>,{' '}
+                <span className="text-zinc-300">campaign waves</span>, and{' '}
+                <span className="text-zinc-300">technology programmes</span>—all drawing on the same finite people,
+                platforms, and floor attention. Ordinary roadmaps show <span className="text-zinc-300">who</span> and{' '}
+                <span className="text-zinc-300">when</span>; they rarely show{' '}
+                <span className="text-zinc-300">cumulative load</span> when those stories overlap. MarketZero Workbench is a{' '}
+                <span className="text-zinc-300">communication surface for capacity</span>: one calendar runway, comparable
+                across countries or teams, built from a shared YAML model—not a replacement for PPM, but the picture
+                everyone can read before dates harden. Switch lenses to ask different risk questions:{' '}
+                <span className="text-zinc-300">tech headroom</span>,{' '}
+                <span className="text-zinc-300">restaurant and store pressure</span>, or{' '}
+                <span className="text-zinc-300">deployment fragility</span> when holidays, peaks, and change stack together.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
@@ -719,19 +719,19 @@ export function LandingPage() {
               [
                 {
                   title: 'Segment & business leadership',
-                  body: 'One ecosystem view—technology draw and trading or store capacity on the same calendar—so segment presidents see when the floor and the back office are already spoken for before signing the next wave.',
+                  body: 'One runway for back-office capacity and front-line trading—see when marketing, peaks, or holidays already own the attention budget before you commit the next wave.',
                 },
                 {
                   title: 'Portfolio & programme office',
-                  body: 'Show how change stacks and sequencing are governed—so leadership sees risk managed in the open, not smuggled inside another Gantt export.',
+                  body: 'Make overlap explicit: how programmes and campaigns layer onto the same resources, so sequencing debates start from a shared load picture instead of dueling exports.',
                 },
                 {
                   title: 'Line managers & delivery leads',
-                  body: 'One visual that reflects how thin teams, shared services, and time actually run—so the spreadsheet stops arguing with reality.',
+                  body: 'Ground “are we stretched?” in the same calendar the centre uses—specialists, shared services, and change windows visible together.',
                 },
                 {
                   title: 'Strategy & planning',
-                  body: 'See where the gap is for the next pilot or bet—whether your grid is regions, departments, or squads.',
+                  body: 'Compare markets with the same semantics—where there is slack for a pilot or a bet, and where the model says the system is already tight.',
                 },
               ] as const
             ).map(({ title, body }) => (
@@ -756,8 +756,8 @@ export function LandingPage() {
         <footer className="mt-20 border-t border-white/[0.06] pt-8 text-center text-xs text-zinc-600 sm:text-left">
           <p className="text-zinc-500">Designed &amp; Engineered by Doug Booth, Segment Architecture</p>
           <p className="mx-auto mt-3 max-w-2xl text-pretty text-[11px] leading-relaxed text-zinc-600 sm:mx-0">
-            Born inside a large organisation; built like something you could productise—SaaS-grade visuals in the
-            browser, configuration instead of a shelf-software ransom.
+            A browser-native view of organisational pressure: scenario lives in YAML, the runway stays readable for
+            anyone who needs to reason about risk before the plan is cast in stone.
           </p>
           <p className="mx-auto mt-3 max-w-4xl text-pretty text-[11px] font-normal leading-relaxed tracking-normal text-zinc-600 sm:mx-0">
             <span className="sr-only">Release — </span>
