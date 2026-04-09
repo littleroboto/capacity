@@ -938,22 +938,22 @@ export function LandingYamlProjectTwinMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Configuration, not a rigid template
+          Declarative market model
         </p>
         <h2
           id={`${panelId}-heading`}
           className="font-landing text-balance text-2xl font-semibold leading-snug text-white sm:text-[1.65rem]"
         >
-          Prep, cutover, run—and the long-running programmes underneath
+          Campaigns, BAU, and programmes draw on the same resources
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          The strip reads like temperature over the horizon: calm weeks versus stretches where run-the-business work,
-          initiatives, and change programmes overlap. When a wave is in YAML, prep lands as a warmer band while readiness
-          and integration run hot; after cutover, sustain often eases the lane while work continues at a steadier heat.
-          Public holidays spike hardest; busy-season patterns add sustained load while support stays tight. Long-running
-          streams—refresh cycles, infrastructure, roll-outs—use the same blocks:{' '}
-          <span className="text-zinc-300">different work types, different draws on people and shared resources</span>, one
-          calendar.
+          The YAML encodes what you believe is true in each market: <span className="text-zinc-300">resources</span>,{' '}
+          <span className="text-zinc-300">BAU rhythm</span>, <span className="text-zinc-300">campaign waves</span>,{' '}
+          <span className="text-zinc-300">holidays</span>, <span className="text-zinc-300">trading shape</span>, and tech
+          cadence. Toggle layers here to see how prep and live phases, national and school breaks, and baseline load{' '}
+          <span className="text-zinc-300">compound on one runway</span>—the same blocks for a short campaign or a
+          multi-quarter roll-out, different weights and dates. Change the file, refresh the story; the visual stays the
+          contract with leadership.
         </p>
       </div>
 
