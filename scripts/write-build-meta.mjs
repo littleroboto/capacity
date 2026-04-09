@@ -73,59 +73,64 @@ function depRange(pkgKey) {
   return typeof r === 'string' ? r : '—';
 }
 
-function bomEntries(spec) {
-  return spec.map(({ label, pkg }) => ({ label, range: depRange(pkg), pkg }));
+function installedVersion(pkgKey) {
+  try {
+    const p = path.join(root, 'node_modules', pkgKey, 'package.json');
+    const m = JSON.parse(readFileSync(p, 'utf8'));
+    return typeof m.version === 'string' ? m.version : null;
+  } catch {
+    return null;
+  }
 }
 
-/** Optional `bundle` becomes a sub-heading row in the landing BOM table. */
-function bomEntriesWithBundle(spec) {
-  return spec.map(({ bundle, label, pkg }) => {
-    const row = { label, range: depRange(pkg), pkg };
-    if (bundle) row.bundle = bundle;
-    return row;
-  });
+/** Flat BOM list — each entry carries its section for optional grouping. */
+function bomFlat(section, spec) {
+  return spec.map(({ label, pkg: p }) => ({
+    label,
+    pkg: p,
+    version: installedVersion(p) ?? depRange(p),
+    section,
+  }));
 }
 
 /** Kept in sync with the landing footer BOM — labels are display names; `pkg` is the package.json key. */
-const LANDING_BOM_CLIENT_SPEC = [
-  { bundle: 'Runtime & toolchain', label: 'React', pkg: 'react' },
-  { bundle: 'Runtime & toolchain', label: 'react-dom', pkg: 'react-dom' },
-  { bundle: 'Runtime & toolchain', label: 'TypeScript', pkg: 'typescript' },
-  { bundle: 'Runtime & toolchain', label: 'Vite', pkg: 'vite' },
-  { bundle: 'Styling utilities', label: 'Tailwind CSS', pkg: 'tailwindcss' },
-  { bundle: 'Styling utilities', label: 'clsx', pkg: 'clsx' },
-  { bundle: 'Styling utilities', label: 'tailwind-merge', pkg: 'tailwind-merge' },
-  { bundle: 'Styling utilities', label: 'class-variance-authority', pkg: 'class-variance-authority' },
-  { bundle: 'Routing & client state', label: 'React Router', pkg: 'react-router-dom' },
-  { bundle: 'Routing & client state', label: 'Zustand', pkg: 'zustand' },
-  { bundle: 'UI primitives & icons', label: 'Radix UI (dialog)', pkg: '@radix-ui/react-dialog' },
-  { bundle: 'UI primitives & icons', label: 'Lucide', pkg: 'lucide-react' },
-  { bundle: 'Motion & gestures', label: 'Motion', pkg: 'motion' },
-  { bundle: 'Motion & gestures', label: '@use-gesture/react', pkg: '@use-gesture/react' },
-  { bundle: 'Charts & capture', label: 'Visx (curve)', pkg: '@visx/curve' },
-  { bundle: 'Charts & capture', label: 'html2canvas', pkg: 'html2canvas' },
-  { bundle: 'Authoring & DSL', label: 'Monaco Editor', pkg: '@monaco-editor/react' },
-  { bundle: 'Authoring & DSL', label: 'js-yaml', pkg: 'js-yaml' },
+const LANDING_BOM_SPEC = [
+  { section: 'Client', entries: [
+    { label: 'React', pkg: 'react' },
+    { label: 'react-dom', pkg: 'react-dom' },
+    { label: 'TypeScript', pkg: 'typescript' },
+    { label: 'Vite', pkg: 'vite' },
+    { label: 'Tailwind CSS', pkg: 'tailwindcss' },
+    { label: 'clsx', pkg: 'clsx' },
+    { label: 'tailwind-merge', pkg: 'tailwind-merge' },
+    { label: 'class-variance-authority', pkg: 'class-variance-authority' },
+    { label: 'React Router', pkg: 'react-router-dom' },
+    { label: 'Zustand', pkg: 'zustand' },
+    { label: 'Radix UI (dialog)', pkg: '@radix-ui/react-dialog' },
+    { label: 'Lucide', pkg: 'lucide-react' },
+    { label: 'Motion', pkg: 'motion' },
+    { label: '@use-gesture/react', pkg: '@use-gesture/react' },
+    { label: 'Visx (curve)', pkg: '@visx/curve' },
+    { label: 'html2canvas', pkg: 'html2canvas' },
+    { label: 'Monaco Editor', pkg: '@monaco-editor/react' },
+    { label: 'js-yaml', pkg: 'js-yaml' },
+  ]},
+  { section: 'Hosting & sync', entries: [
+    { label: 'Vercel Blob', pkg: '@vercel/blob' },
+  ]},
+  { section: 'Auth', entries: [
+    { label: 'Clerk React', pkg: '@clerk/react' },
+    { label: 'Clerk Backend', pkg: '@clerk/backend' },
+  ]},
+  { section: 'Market chrome', entries: [
+    { label: 'country-flag-icons', pkg: 'country-flag-icons' },
+    { label: '@sankyu/react-circle-flags', pkg: '@sankyu/react-circle-flags' },
+  ]},
 ];
 
-const LANDING_BOM_HOSTING_SPEC = [
-  { bundle: 'Team workspace storage', label: 'Vercel Blob', pkg: '@vercel/blob' },
-];
-
-const LANDING_BOM_AUTH_SPEC = [
-  { bundle: 'Clerk', label: 'Clerk React', pkg: '@clerk/react' },
-  { bundle: 'Clerk', label: 'Clerk Backend', pkg: '@clerk/backend' },
-];
-
-const LANDING_BOM_FLAGS_SPEC = [
-  { bundle: 'SVG country set', label: 'country-flag-icons', pkg: 'country-flag-icons' },
-  { bundle: 'React circle flags', label: '@sankyu/react-circle-flags', pkg: '@sankyu/react-circle-flags' },
-];
-
-const LANDING_BOM_CLIENT = bomEntriesWithBundle(LANDING_BOM_CLIENT_SPEC);
-const LANDING_BOM_HOSTING = bomEntriesWithBundle(LANDING_BOM_HOSTING_SPEC);
-const LANDING_BOM_AUTH = bomEntriesWithBundle(LANDING_BOM_AUTH_SPEC);
-const LANDING_BOM_FLAGS = bomEntriesWithBundle(LANDING_BOM_FLAGS_SPEC);
+const LANDING_BOM = LANDING_BOM_SPEC.flatMap(({ section, entries }) =>
+  bomFlat(section, entries)
+);
 
 const body = `/* eslint-disable */
 // Generated by scripts/write-build-meta.mjs — do not edit.
@@ -133,10 +138,7 @@ export const APP_VERSION = ${JSON.stringify(version)};
 export const GIT_COMMIT_SHORT = ${JSON.stringify(sha)};
 export const GIT_COMMIT_MESSAGE = ${JSON.stringify(commitMsg)};
 export const BUILD_TIME_ISO = ${JSON.stringify(builtAt)};
-export const LANDING_BOM_CLIENT = ${JSON.stringify(LANDING_BOM_CLIENT, null, 2)} as const;
-export const LANDING_BOM_HOSTING = ${JSON.stringify(LANDING_BOM_HOSTING, null, 2)} as const;
-export const LANDING_BOM_AUTH = ${JSON.stringify(LANDING_BOM_AUTH, null, 2)} as const;
-export const LANDING_BOM_FLAGS = ${JSON.stringify(LANDING_BOM_FLAGS, null, 2)} as const;
+export const LANDING_BOM = ${JSON.stringify(LANDING_BOM, null, 2)} as const;
 `;
 
 writeFileSync(outFile, body, 'utf8');
