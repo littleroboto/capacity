@@ -18,12 +18,27 @@ function isHexSha(s) {
   return /^[a-f0-9]{7,40}$/i.test(s);
 }
 
-function commitShort() {
+function commitFullSha() {
   const vercelSha = process.env.VERCEL_GIT_COMMIT_SHA?.trim();
-  if (vercelSha && isHexSha(vercelSha)) return vercelSha.slice(0, 7);
+  if (vercelSha && isHexSha(vercelSha)) return vercelSha.toLowerCase();
 
   const gh = process.env.GITHUB_SHA?.trim();
-  if (gh && isHexSha(gh)) return gh.slice(0, 7);
+  if (gh && isHexSha(gh)) return gh.toLowerCase();
+
+  try {
+    const line = execSync('git rev-parse HEAD', {
+      cwd: root,
+      encoding: 'utf8',
+    }).trim();
+    return isHexSha(line) ? line.toLowerCase() : '';
+  } catch {
+    return '';
+  }
+}
+
+function commitShort() {
+  const full = commitFullSha();
+  if (full.length >= 7) return full.slice(0, 7);
 
   const dpl = process.env.VERCEL_DEPLOYMENT_ID?.trim();
   if (dpl) {
@@ -41,6 +56,7 @@ function commitShort() {
   }
 }
 
+const shaFull = commitFullSha();
 const sha = commitShort();
 const builtAt = new Date().toISOString();
 
@@ -68,75 +84,135 @@ function normalizeCommitSubject(raw) {
 
 const commitMsg = commitSubject();
 
+function gitRepoUrlFromOrigin() {
+  try {
+    const raw = execSync('git remote get-url origin', {
+      cwd: root,
+      encoding: 'utf8',
+    }).trim();
+    if (!raw) return '';
+    if (raw.startsWith('https://')) {
+      const u = raw.replace(/^https:\/\//, '').replace(/\.git$/, '');
+      const at = u.indexOf('@');
+      if (at !== -1) {
+        const rest = u.slice(at + 1);
+        return rest.startsWith('github.com:')
+          ? `https://github.com/${rest.slice('github.com:'.length)}`
+          : `https://${rest.replace(':', '/')}`;
+      }
+      return `https://${u}`;
+    }
+    if (raw.startsWith('git@')) {
+      const m = raw.match(/^git@([^:]+):(.+?)(\.git)?$/);
+      if (m) return `https://${m[1]}/${m[2]}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return '';
+}
+
+function gitRepoUrl() {
+  const owner = process.env.VERCEL_GIT_REPO_OWNER?.trim();
+  const slug = process.env.VERCEL_GIT_REPO_SLUG?.trim();
+  if (owner && slug) return `https://github.com/${owner}/${slug}`;
+
+  return gitRepoUrlFromOrigin();
+}
+
+const GIT_REPO_URL = gitRepoUrl();
+
+function readLockVersions() {
+  /** @type {Record<string, string>} */
+  const out = {};
+  try {
+    const lockPath = path.join(root, 'package-lock.json');
+    const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+    const packages = lock.packages;
+    if (!packages || typeof packages !== 'object') return out;
+    for (const key of Object.keys(packages)) {
+      if (key === '' || !key.startsWith('node_modules/')) continue;
+      const name = key.slice('node_modules/'.length);
+      const ent = packages[key];
+      const v = ent && typeof ent.version === 'string' ? ent.version : '';
+      if (v && !(name in out)) out[name] = v;
+    }
+  } catch {
+    /* ignore */
+  }
+  return out;
+}
+
+const LOCK_VERSIONS = readLockVersions();
+
+function installedVersion(pkgKey) {
+  return LOCK_VERSIONS[pkgKey] ?? '—';
+}
+
 function depRange(pkgKey) {
   const r = pkg.dependencies?.[pkgKey] ?? pkg.devDependencies?.[pkgKey];
   return typeof r === 'string' ? r : '—';
 }
 
-function bomEntries(spec) {
-  return spec.map(({ label, pkg }) => ({ label, range: depRange(pkg), pkg }));
-}
-
-/** Optional `bundle` becomes a sub-heading row in the landing BOM table. */
-function bomEntriesWithBundle(spec) {
-  return spec.map(({ bundle, label, pkg }) => {
-    const row = { label, range: depRange(pkg), pkg };
-    if (bundle) row.bundle = bundle;
-    return row;
-  });
+function bomRow(label, pkgKey) {
+  return {
+    label,
+    range: depRange(pkgKey),
+    installed: installedVersion(pkgKey),
+    pkg: pkgKey,
+  };
 }
 
 /** Kept in sync with the landing footer BOM — labels are display names; `pkg` is the package.json key. */
 const LANDING_BOM_CLIENT_SPEC = [
-  { bundle: 'Runtime & toolchain', label: 'React', pkg: 'react' },
-  { bundle: 'Runtime & toolchain', label: 'react-dom', pkg: 'react-dom' },
-  { bundle: 'Runtime & toolchain', label: 'TypeScript', pkg: 'typescript' },
-  { bundle: 'Runtime & toolchain', label: 'Vite', pkg: 'vite' },
-  { bundle: 'Styling utilities', label: 'Tailwind CSS', pkg: 'tailwindcss' },
-  { bundle: 'Styling utilities', label: 'clsx', pkg: 'clsx' },
-  { bundle: 'Styling utilities', label: 'tailwind-merge', pkg: 'tailwind-merge' },
-  { bundle: 'Styling utilities', label: 'class-variance-authority', pkg: 'class-variance-authority' },
-  { bundle: 'Routing & client state', label: 'React Router', pkg: 'react-router-dom' },
-  { bundle: 'Routing & client state', label: 'Zustand', pkg: 'zustand' },
-  { bundle: 'UI primitives & icons', label: 'Radix UI (dialog)', pkg: '@radix-ui/react-dialog' },
-  { bundle: 'UI primitives & icons', label: 'Lucide', pkg: 'lucide-react' },
-  { bundle: 'Motion & gestures', label: 'Motion', pkg: 'motion' },
-  { bundle: 'Motion & gestures', label: '@use-gesture/react', pkg: '@use-gesture/react' },
-  { bundle: 'Charts & capture', label: 'Visx (curve)', pkg: '@visx/curve' },
-  { bundle: 'Charts & capture', label: 'html2canvas', pkg: 'html2canvas' },
-  { bundle: 'Authoring & DSL', label: 'Monaco Editor', pkg: '@monaco-editor/react' },
-  { bundle: 'Authoring & DSL', label: 'js-yaml', pkg: 'js-yaml' },
+  { label: 'React', pkg: 'react' },
+  { label: 'react-dom', pkg: 'react-dom' },
+  { label: 'TypeScript', pkg: 'typescript' },
+  { label: 'Vite', pkg: 'vite' },
+  { label: 'Tailwind CSS', pkg: 'tailwindcss' },
+  { label: 'clsx', pkg: 'clsx' },
+  { label: 'tailwind-merge', pkg: 'tailwind-merge' },
+  { label: 'class-variance-authority', pkg: 'class-variance-authority' },
+  { label: 'React Router', pkg: 'react-router-dom' },
+  { label: 'Zustand', pkg: 'zustand' },
+  { label: 'Radix UI (dialog)', pkg: '@radix-ui/react-dialog' },
+  { label: 'Lucide', pkg: 'lucide-react' },
+  { label: 'Motion', pkg: 'motion' },
+  { label: '@use-gesture/react', pkg: '@use-gesture/react' },
+  { label: 'Visx (curve)', pkg: '@visx/curve' },
+  { label: 'html2canvas', pkg: 'html2canvas' },
+  { label: 'Monaco Editor', pkg: '@monaco-editor/react' },
+  { label: 'js-yaml', pkg: 'js-yaml' },
 ];
 
-const LANDING_BOM_HOSTING_SPEC = [
-  { bundle: 'Team workspace storage', label: 'Vercel Blob', pkg: '@vercel/blob' },
-];
+const LANDING_BOM_HOSTING_SPEC = [{ label: 'Vercel Blob', pkg: '@vercel/blob' }];
 
 const LANDING_BOM_AUTH_SPEC = [
-  { bundle: 'Clerk', label: 'Clerk React', pkg: '@clerk/react' },
-  { bundle: 'Clerk', label: 'Clerk Backend', pkg: '@clerk/backend' },
+  { label: 'Clerk React', pkg: '@clerk/react' },
+  { label: 'Clerk Backend', pkg: '@clerk/backend' },
 ];
 
 const LANDING_BOM_FLAGS_SPEC = [
-  { bundle: 'SVG country set', label: 'country-flag-icons', pkg: 'country-flag-icons' },
-  { bundle: 'React circle flags', label: '@sankyu/react-circle-flags', pkg: '@sankyu/react-circle-flags' },
+  { label: 'country-flag-icons', pkg: 'country-flag-icons' },
+  { label: '@sankyu/react-circle-flags', pkg: '@sankyu/react-circle-flags' },
 ];
 
-const LANDING_BOM_CLIENT = bomEntriesWithBundle(LANDING_BOM_CLIENT_SPEC);
-const LANDING_BOM_HOSTING = bomEntriesWithBundle(LANDING_BOM_HOSTING_SPEC);
-const LANDING_BOM_AUTH = bomEntriesWithBundle(LANDING_BOM_AUTH_SPEC);
-const LANDING_BOM_FLAGS = bomEntriesWithBundle(LANDING_BOM_FLAGS_SPEC);
+const LANDING_BOM_ROWS = [
+  ...LANDING_BOM_CLIENT_SPEC.map(({ label, pkg: pkgKey }) => bomRow(label, pkgKey)),
+  ...LANDING_BOM_HOSTING_SPEC.map(({ label, pkg: pkgKey }) => bomRow(label, pkgKey)),
+  ...LANDING_BOM_AUTH_SPEC.map(({ label, pkg: pkgKey }) => bomRow(label, pkgKey)),
+  ...LANDING_BOM_FLAGS_SPEC.map(({ label, pkg: pkgKey }) => bomRow(label, pkgKey)),
+];
 
 const body = `/* eslint-disable */
 // Generated by scripts/write-build-meta.mjs — do not edit.
 export const APP_VERSION = ${JSON.stringify(version)};
+export const GIT_REPO_URL = ${JSON.stringify(GIT_REPO_URL)};
+export const GIT_COMMIT_SHA = ${JSON.stringify(shaFull)};
 export const GIT_COMMIT_SHORT = ${JSON.stringify(sha)};
 export const GIT_COMMIT_MESSAGE = ${JSON.stringify(commitMsg)};
 export const BUILD_TIME_ISO = ${JSON.stringify(builtAt)};
-export const LANDING_BOM_CLIENT = ${JSON.stringify(LANDING_BOM_CLIENT, null, 2)} as const;
-export const LANDING_BOM_HOSTING = ${JSON.stringify(LANDING_BOM_HOSTING, null, 2)} as const;
-export const LANDING_BOM_AUTH = ${JSON.stringify(LANDING_BOM_AUTH, null, 2)} as const;
-export const LANDING_BOM_FLAGS = ${JSON.stringify(LANDING_BOM_FLAGS, null, 2)} as const;
+export const LANDING_BOM_ROWS = ${JSON.stringify(LANDING_BOM_ROWS, null, 2)} as const;
 `;
 
 writeFileSync(outFile, body, 'utf8');
