@@ -35,3 +35,17 @@ export function landingBomSourceHref(pkg: string): string {
   if (v.startsWith('http://') || v.startsWith('https://')) return v;
   return `https://github.com/${v}`;
 }
+
+export function landingBomSourceLabel(pkg: string): string {
+  const v = UPSTREAM_BY_PKG[pkg];
+  if (!v) return 'npm package';
+  if (v.startsWith('http://') || v.startsWith('https://')) {
+    try {
+      const url = new URL(v);
+      return url.pathname.replace(/^\/+/, '') || url.hostname;
+    } catch {
+      return v;
+    }
+  }
+  return v;
+}

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Show, SignInButton, UserButton } from '@clerk/react';
 import { motion, useReducedMotion } from 'motion/react';
@@ -11,7 +11,7 @@ import {
   LANDING_BOM_FLAGS,
   LANDING_BOM_HOSTING,
 } from '@/lib/buildMeta';
-import { landingBomSourceHref } from '@/lib/landingBomGithub';
+import { landingBomSourceHref, landingBomSourceLabel } from '@/lib/landingBomGithub';
 import { isClerkConfigured } from '@/lib/clerkConfig';
 import { prefetchWorkbenchApp } from '@/lib/prefetchWorkbench';
 import { cn } from '@/lib/utils';
@@ -324,104 +324,52 @@ function HeroBrowserHeatmap({ reducedMotion }: { reducedMotion: boolean }) {
 }
 
 type LandingBomEntry = {
+  readonly section: string;
   readonly label: string;
-  readonly range: string;
+  readonly version: string;
   readonly pkg: string;
-  /** Logical sub-bundle; repeated on consecutive rows — table shows one sub-heading per change. */
-  readonly bundle?: string;
 };
 
-function LandingBomBundleHeader({ title, variant }: { title: string; variant: 'flush' | 'ruled' }) {
-  return (
-    <tr
-      className={cn(
-        'bg-black/[0.18]',
-        variant === 'ruled' && 'border-t border-dashed border-white/[0.06]'
-      )}
-    >
-      <th
-        scope="colgroup"
-        colSpan={2}
-        className={cn(
-          'px-3 pb-1 pl-5 text-left text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-600',
-          variant === 'flush' ? 'pt-2' : 'pt-1.5'
-        )}
-      >
-        {title}
-      </th>
-    </tr>
-  );
-}
-
-function LandingBomSectionHeader({ title }: { title: string }) {
-  return (
-    <tr className="border-y border-white/[0.06] bg-white/[0.03]">
-      <th
-        scope="colgroup"
-        colSpan={2}
-        className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-zinc-500"
-      >
-        {title}
-      </th>
-    </tr>
-  );
-}
+const LANDING_BOM_ROWS: readonly LandingBomEntry[] = [
+  ...LANDING_BOM_CLIENT,
+  ...LANDING_BOM_HOSTING,
+  ...LANDING_BOM_AUTH,
+  ...LANDING_BOM_FLAGS,
+];
 
 function LandingBomRowView({ row }: { row: LandingBomEntry }) {
   const href = landingBomSourceHref(row.pkg);
+  const repoLabel = landingBomSourceLabel(row.pkg);
   return (
-    <tr className="border-b border-white/[0.04] transition-colors last:border-b-0 hover:bg-white/[0.02]">
-      <th
-        scope="row"
-        className="max-w-[min(100%,16rem)] py-2 pl-3 pr-2 align-middle font-normal sm:max-w-none"
-      >
+    <tr className="border-b border-white/[0.04] align-top transition-colors last:border-b-0 hover:bg-white/[0.02]">
+      <td className="whitespace-nowrap px-3 py-2 text-[10px] uppercase tracking-[0.08em] text-zinc-600">
+        {row.section}
+      </td>
+      <th scope="row" className="px-3 py-2 text-left font-normal text-zinc-300">
+        <div className="text-pretty">{row.label}</div>
+        <div className="mt-0.5 font-mono text-[10px] text-zinc-600">{row.pkg}</div>
+      </th>
+      <td className="whitespace-nowrap px-3 py-2 font-mono text-[10px] text-zinc-500 tabular-nums">
+        {row.version}
+      </td>
+      <td className="px-3 py-2">
         <a
           href={href}
           target="_blank"
           rel="noreferrer noopener"
-          className="group inline-flex items-center gap-1.5 text-left text-zinc-400 underline decoration-white/[0.08] underline-offset-[3px] transition hover:text-zinc-100 hover:decoration-[#FFC72C]/50"
+          className="group inline-flex items-center gap-1.5 text-[10px] text-zinc-400 underline decoration-white/[0.08] underline-offset-[3px] transition hover:text-zinc-100 hover:decoration-[#FFC72C]/50"
+          title={href}
         >
-          <span className="text-pretty">{row.label}</span>
+          <span className="break-all text-left">{repoLabel}</span>
           <ExternalLink
-            className="h-3 w-3 shrink-0 opacity-40 transition-opacity group-hover:opacity-80"
+            className="mt-[1px] h-3 w-3 shrink-0 opacity-40 transition-opacity group-hover:opacity-80"
             aria-hidden
           />
         </a>
-      </th>
-      <td className="whitespace-nowrap py-2 pl-2 pr-3 text-right align-middle font-mono text-[10px] leading-none text-zinc-500 tabular-nums sm:w-[6.5rem] sm:min-w-[6.5rem] sm:text-left">
-        {row.range}
       </td>
     </tr>
   );
 }
-
-function LandingBomRows({ rows }: { rows: readonly LandingBomEntry[] }) {
-  let bundleHeadersInSection = 0;
-  return (
-    <>
-      {rows.map((row, i) => {
-        const prev = i > 0 ? rows[i - 1] : undefined;
-        const bundle = row.bundle?.trim();
-        const showBundle = Boolean(bundle && (!prev || prev.bundle?.trim() !== bundle));
-        if (showBundle && bundle) bundleHeadersInSection += 1;
-        return (
-          <Fragment key={row.pkg}>
-            {showBundle && bundle ? (
-              <LandingBomBundleHeader
-                title={bundle}
-                variant={bundleHeadersInSection === 1 ? 'flush' : 'ruled'}
-              />
-            ) : null}
-            <LandingBomRowView row={row} />
-          </Fragment>
-        );
-      })}
-    </>
-  );
-}
-
-/** ~5–6 table body lines visible; thead sticks while scrolling. */
-const LANDING_BOM_SCROLL_MAX_H = 'min(13.5rem,42vh)';
 
 function LandingBomTable() {
   const panelId = useId();
@@ -442,7 +390,10 @@ function LandingBomTable() {
       >
         <span className="min-w-0 text-pretty text-[11px] leading-snug text-zinc-500">
           <span className="font-medium text-zinc-400">Bill of materials</span>
-          <span className="text-zinc-600"> · dependency bundles, semver ranges, upstream links</span>
+          <span className="text-zinc-600">
+            {' '}
+            · {LANDING_BOM_ROWS.length} packages, exact versions, upstream repository links
+          </span>
         </span>
         <ChevronDown
           className={cn('h-4 w-4 shrink-0 text-zinc-500 transition-transform duration-200', open && '-rotate-180')}
@@ -457,45 +408,40 @@ function LandingBomTable() {
         hidden={!open}
       >
         <div className="mt-2 overflow-hidden rounded-lg border border-white/[0.07] bg-[#050608]/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-sm">
-          <div
-            className="overflow-x-auto overflow-y-auto overscroll-y-contain [scrollbar-color:rgba(63,63,70,0.55)_transparent] [scrollbar-width:thin]"
-            style={{ maxHeight: LANDING_BOM_SCROLL_MAX_H }}
-          >
-            <table className="w-full min-w-[280px] border-collapse text-left text-[11px]">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] border-collapse text-left text-[11px]">
               <caption className="sr-only">
-                Bill of materials: open-source dependencies with declared semver ranges and links to upstream source
-                repositories on GitHub or GitLab.
+                Bill of materials: open-source dependencies with resolved versions and links to upstream source
+                repositories.
               </caption>
-              <thead className="sticky top-0 z-[2] border-b border-white/[0.08] bg-[#06080a]/95 text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500 backdrop-blur-sm">
+              <thead className="border-b border-white/[0.08] bg-white/[0.03] text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-500">
                 <tr>
-                  <th scope="col" className="py-2.5 pl-3 pr-2 font-medium">
-                    Module
+                  <th scope="col" className="px-3 py-2.5 font-medium">
+                    Area
                   </th>
-                  <th
-                    scope="col"
-                    className="py-2.5 pl-2 pr-3 text-right font-medium sm:w-[6.5rem] sm:min-w-[6.5rem] sm:text-left"
-                  >
-                    Range
+                  <th scope="col" className="px-3 py-2.5 font-medium">
+                    Package
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 font-medium">
+                    Version
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 font-medium">
+                    Repo
                   </th>
                 </tr>
               </thead>
               <tbody className="text-zinc-500">
-                <LandingBomSectionHeader title="Client bundle" />
-                <LandingBomRows rows={LANDING_BOM_CLIENT} />
-                <LandingBomSectionHeader title="Hosting & sync" />
-                <LandingBomRows rows={LANDING_BOM_HOSTING} />
-                <LandingBomSectionHeader title="Auth (optional)" />
-                <LandingBomRows rows={LANDING_BOM_AUTH} />
-                <LandingBomSectionHeader title="Market chrome" />
-                <LandingBomRows rows={LANDING_BOM_FLAGS} />
+                {LANDING_BOM_ROWS.map((row) => (
+                  <LandingBomRowView key={row.pkg} row={row} />
+                ))}
               </tbody>
             </table>
           </div>
         </div>
         <p className="mt-2 max-w-4xl text-pretty text-[10px] leading-relaxed text-zinc-600 sm:mx-0">
-          Ranges are from <code className="rounded bg-white/[0.04] px-1 font-mono text-[9px]">package.json</code> at
-          build. Links open the upstream source repo on GitHub (or GitLab / npm when that is canonical). Deployed on
-          Vercel; no Next.js — Vite SPA only.
+          Versions resolve from the lockfile at build time when available, with a fallback to the declared dependency
+          spec in <code className="rounded bg-white/[0.04] px-1 font-mono text-[9px]">package.json</code>. Links open
+          the upstream source repo on GitHub or GitLab.
         </p>
       </div>
     </div>
