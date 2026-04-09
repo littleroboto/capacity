@@ -555,26 +555,23 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Intuitive visualisation
+          Read the same dates two ways
         </p>
         <h2 id="iso-mock-heading" className="font-landing text-2xl font-semibold text-white">
-          Monitor the temperature
+          Technology pressure you can scan across the year
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          Along the year, this preview uses the same <span className="text-zinc-300">Technology</span> lens as the live
-          app—{' '}
-          <span className="text-zinc-300">height and heat</span> on real dates, not a decorative render.{' '}
-          <strong className="font-medium text-zinc-200">Taller, warmer towers</strong> mean more of your constrained
-          stack—specialists, platforms, integration time—is committed that day.{' '}
-          <strong className="font-medium text-zinc-200">Shorter, cooler towers</strong> read as breathing room. In{' '}
+          This preview is wired to the real <span className="text-zinc-300">Technology</span> lens:{' '}
+          <span className="text-zinc-300">tower height and colour</span> encode scheduled pressure on actual dates—not a
+          mock-up gradient. <strong className="font-medium text-zinc-200">Taller, warmer towers</strong> mean more of the
+          constrained stack—specialists, platforms, lab and integration time—is committed that day.{' '}
+          <strong className="font-medium text-zinc-200">Shorter, cooler towers</strong> read as headroom. In{' '}
           <strong className="font-medium text-violet-200/90">prep</strong>, readiness and test load dominate; in{' '}
-          <strong className="font-medium text-cyan-200/90">live</strong>, sustain is usually lighter than the pre-cutover
-          surge. Flip to the <span className="text-zinc-300">Trading lens</span> in the workbench and you model{' '}
-          <span className="text-zinc-300">in-store and restaurant operations</span> with the same muscle—{' '}
-          <span className="text-zinc-300">floor attention when campaigns run hot</span>, and why you hold store or ops
-          change when marketing already owns the week. <span className="text-zinc-300">Technology and trading on one
-          calendar</span>—the ecosystem layer segment leadership expects and rarely gets from a shelf of disconnected
-          charts.
+          <strong className="font-medium text-cyan-200/90">live</strong>, sustain is often steadier than the pre-cutover
+          spike. In the workbench, switch to the <span className="text-zinc-300">Trading lens</span> and the same calendar
+          reads <span className="text-zinc-300">store and restaurant intensity</span>—so you see why a heavy floor or ops
+          change collides with a week marketing already owns. One timeline;{' '}
+          <span className="text-zinc-300">delivery and commercial reality side by side</span>.
         </p>
       </div>
 

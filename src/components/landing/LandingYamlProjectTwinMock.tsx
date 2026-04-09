@@ -805,10 +805,10 @@ export function LandingYamlProjectTwinMock() {
   const schoolChipLit = schoolHolidaysOn && mixSchool >= STRIP_MIX_LIT;
 
   const layerHint = !toolbarSeen
-    ? 'Stack layers on the strip: BAU baseline, then campaign load, then national and school calendars.'
+    ? 'Build the strip: baseline rhythm, then campaigns, then national and school calendars.'
     : !layerDemoDone && !reducedMotion
-      ? 'Watch once: BAU on the runway, then campaign on top, then national holidays, then school breaks — then toggle freely.'
-      : 'Layers stack — BAU first, campaign adds on top, holidays blend into the heatmap. Amber follows each toggle once its mix lands on the strip.';
+      ? 'Watch once: baseline, then campaign load, then national holidays, then school breaks — then toggle freely.'
+      : 'Layers stack: BAU first, campaigns add load, holidays bend the curve. Amber highlights each layer as it lands on the strip.';
 
   const layerToolbarVariants = useMemo(() => {
     const instant = !!reducedMotion;
@@ -938,22 +938,23 @@ export function LandingYamlProjectTwinMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Configuration, not a rigid template
+          Declared assumptions, visible pressure
         </p>
         <h2
           id={`${panelId}-heading`}
           className="font-landing text-balance text-2xl font-semibold leading-snug text-white sm:text-[1.65rem]"
         >
-          Prep, cutover, run—and the long-running programmes underneath
+          Campaigns, BAU, and calendars—each market in its own words
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          The strip reads like temperature over the horizon: calm weeks versus stretches where run-the-business work,
-          initiatives, and change programmes overlap. When a wave is in YAML, prep lands as a warmer band while readiness
-          and integration run hot; after cutover, sustain often eases the lane while work continues at a steadier heat.
-          Public holidays spike hardest; busy-season patterns add sustained load while support stays tight. Long-running
-          streams—refresh cycles, infrastructure, roll-outs—use the same blocks:{' '}
-          <span className="text-zinc-300">different work types, different draws on people and shared resources</span>, one
-          calendar.
+          Each market file states capacity, weekly rhythm, campaign windows, and holiday behaviour in one place. The
+          engine rolls that forward into a day-by-day strip: quiet weeks versus stretches where{' '}
+          <span className="text-zinc-300">run-the-business work, campaigns, and change programmes overlap</span>. Turn on a
+          campaign in YAML and prep shows up as a warmer band while readiness and integration run hot; after cutover,
+          sustain usually reads cooler while support continues. Public holidays bite hardest; school breaks add sustained
+          trading-shaped load. Long-running streams—refresh, infrastructure, roll-outs—use the same primitives:{' '}
+          <span className="text-zinc-300">different draws on the same resources</span>, honest about what you chose to
+          model.
         </p>
       </div>
 

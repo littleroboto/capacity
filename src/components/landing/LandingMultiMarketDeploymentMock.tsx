@@ -125,21 +125,23 @@ export function LandingMultiMarketDeploymentMock() {
     >
       <header className="mb-6 sm:mb-8">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Compare lanes
+          Same semantics, different markets
         </p>
         <h2
           id="multimarket-runway-heading"
           className="font-landing max-w-3xl text-balance text-2xl font-semibold leading-snug text-white sm:text-[1.65rem]"
         >
-          Where's the gap for the next push?
+          Which market can absorb the next push—and when?
         </h2>
       </header>
 
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_min(100%,720px)] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_min(100%,780px)]">
         <p className="max-w-xs text-pretty text-sm leading-relaxed text-zinc-400 sm:max-w-sm lg:max-w-[15.5rem] lg:pt-0.5 xl:max-w-[17rem]">
-          <span className="text-zinc-300">Which market—or team—gets the pilot?</span> Answer from{' '}
-          <span className="text-zinc-300">visible load</span>, not the loudest ask in the room. Put every lane on one
-          runway with the same risk read, and you see who already owns the quarter before the date is set in stone.
+          Markets are not the same shape—headcount, lab capacity, local calendars, and campaign cadence differ.{' '}
+          <span className="text-zinc-300">Per-market parameters</span> keep each country faithful to how it runs; the
+          runway still <span className="text-zinc-300">lines up for comparison</span>. Lay the columns side by side with
+          the same deployment-risk read and you answer suitability from{' '}
+          <span className="text-zinc-300">visible load and headroom</span>, not the loudest slide in the room.
         </p>
 
         <div className="w-full min-w-0 justify-self-stretch lg:justify-self-end">

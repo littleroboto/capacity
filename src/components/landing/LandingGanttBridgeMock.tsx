@@ -199,21 +199,19 @@ export const LandingGanttBridgeMock = memo(function LandingGanttBridgeMock() {
     >
       <div className="mb-6 max-w-2xl">
         <p className="font-landing mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC72C]">
-          Your Gantt is not your runway
+          Roadmaps answer who and when
         </p>
         <h2 id={`${headingId}-h`} className="font-landing text-2xl font-semibold text-white">
-          The draw on capacity Gantt never quite shows
+          The runway answers what it costs when everything lands together
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          Roadmaps own <span className="text-zinc-300">dates and accountability</span>. They almost never own{' '}
-          <span className="text-zinc-300">capacity</span>—the cumulative pull on{' '}
-          <span className="text-zinc-300">people, time, equipment, and shared services</span> when work overlaps. That is
-          the blind spot: <span className="text-zinc-300">stacking</span>, <span className="text-zinc-300">holiday and
-          busy-season windows</span>, and load that stays <span className="text-zinc-300">implicit</span> for the
-          department left holding the bag. The strip below is the same <span className="text-zinc-300">phased-bar
-          vocabulary</span> you already export from PPM, tinted with this page’s{' '}
-          <span className="text-zinc-300">runway heat palette</span> so the thread is obvious. Familiar layout—so what it
-          usually <span className="text-zinc-300">omits</span> is harder to ignore.
+          Programme bars are good for <span className="text-zinc-300">ownership and sequence</span>. They rarely spell out
+          the <span className="text-zinc-300">cumulative pull</span> on people, labs, integration windows, and shared
+          services when POS, hardware, marketing waves, and holidays overlap. That gap is where risk hides:{' '}
+          <span className="text-zinc-300">stacking</span> you only feel once dates are fixed. The illustration below keeps
+          the familiar <span className="text-zinc-300">phased-bar shape</span> from portfolio tools and tints it with the
+          same <span className="text-zinc-300">runway heat scale</span> the workbench uses—so the missing piece,{' '}
+          <span className="text-zinc-300">load on the system</span>, is visible next to the timeline you already trust.
         </p>
       </div>
 
