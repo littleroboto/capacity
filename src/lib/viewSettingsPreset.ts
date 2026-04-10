@@ -35,6 +35,8 @@ export type ViewSettingsPayloadV1 = {
   runwayIncludeFollowingQuarter?: boolean;
   /** Per runway lens (Technology Teams, Restaurant Activity, Deployment Risk); same tuning for every column. */
   riskHeatmapTuningByLens?: Record<HeatmapTuningLensId, PerLensHeatmapTuning>;
+  /** Single-market runway: last selected calendar day (YYYY-MM-DD) per market id. */
+  runwaySelectedDayByMarket?: Record<string, string>;
 };
 
 export type ViewSettingsFileV1 = {
@@ -64,6 +66,7 @@ export const VIEW_SETTINGS_PAYLOAD_KEYS = [
   'runwayFilterQuarter',
   'runwayIncludeFollowingQuarter',
   'riskHeatmapTuningByLens',
+  'runwaySelectedDayByMarket',
 ] as const satisfies readonly (keyof ViewSettingsPayloadV1)[];
 
 export type ViewSettingsPayloadKey = (typeof VIEW_SETTINGS_PAYLOAD_KEYS)[number];
@@ -317,6 +320,20 @@ export function sanitizeSettingsPayload(raw: Record<string, unknown>): Partial<V
   }
   if (!out.riskHeatmapTuningByLens && rawHasLegacyHeatmapKeys(raw)) {
     out.riskHeatmapTuningByLens = riskHeatmapTuningByLensFromLegacyGlobals(legacyHeatmapGlobalsFromRaw(raw));
+  }
+
+  if (Object.prototype.hasOwnProperty.call(raw, 'runwaySelectedDayByMarket')) {
+    const v = raw.runwaySelectedDayByMarket;
+    if (v !== null && typeof v === 'object') {
+      const ymdRe = /^\d{4}-\d{2}-\d{2}$/;
+      const next: Record<string, string> = {};
+      for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+        const id = typeof k === 'string' && k.trim() ? k.trim() : '';
+        if (!id || typeof val !== 'string' || !ymdRe.test(val)) continue;
+        next[id] = val;
+      }
+      if (Object.keys(next).length) out.runwaySelectedDayByMarket = next;
+    }
   }
 
   return out;

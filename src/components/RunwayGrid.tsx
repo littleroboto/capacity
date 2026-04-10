@@ -1445,6 +1445,8 @@ export function RunwayGrid({
   const runwayFilterYear = useAtcStore((s) => s.runwayFilterYear);
   const runwayFilterQuarter = useAtcStore((s) => s.runwayFilterQuarter);
   const runwayIncludeFollowingQuarter = useAtcStore((s) => s.runwayIncludeFollowingQuarter);
+  const runwaySelectedDayByMarket = useAtcStore((s) => s.runwaySelectedDayByMarket);
+  const setRunwaySelectedDayForMarket = useAtcStore((s) => s.setRunwaySelectedDayForMarket);
 
   const [displayedCountry, setDisplayedCountry] = useState(country);
   const [countrySwitchLoading, setCountrySwitchLoading] = useState(false);
@@ -1649,8 +1651,11 @@ export function RunwayGrid({
   }, [compareAllMarkets, compareDatesFitKey, countrySwitchLoading, showIso3dSingleMarket]);
 
   const dismissTip = useCallback(() => {
+    if (!compareAllMarkets) {
+      setRunwaySelectedDayForMarket(country, null);
+    }
     setTip(null);
-  }, []);
+  }, [compareAllMarkets, country, setRunwaySelectedDayForMarket]);
 
   const calendarLayout = useMemo(() => {
     if (compareAllMarkets) return buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx);
@@ -1827,13 +1832,14 @@ export function RunwayGrid({
           return;
         }
         if (prev && 'payload' in prev && prev.payload.dateStr === dateStr && prev.payload.market === market) {
+          setRunwaySelectedDayForMarket(market, null);
           setTip(null);
           return;
         }
         const next = buildPayloadTipState(market, dateStr, anchor);
         if (next) setTip(next);
       },
-    [buildPayloadTipState]
+    [buildPayloadTipState, setRunwaySelectedDayForMarket]
   );
 
   useEffect(() => {
@@ -1885,6 +1891,14 @@ export function RunwayGrid({
   const todayYmd = formatDateYmd(new Date());
 
   useEffect(() => {
+    if (landingMinimalChrome || compareAllMarkets || !useSideSummary) return;
+    if (!tip || !('payload' in tip)) return;
+    const { dateStr, market } = tip.payload;
+    if (market !== country) return;
+    setRunwaySelectedDayForMarket(market, dateStr);
+  }, [landingMinimalChrome, compareAllMarkets, useSideSummary, tip, country, setRunwaySelectedDayForMarket]);
+
+  useEffect(() => {
     if (landingMinimalChrome) return;
     if (!useSideSummary) return;
     if (viewMode === 'code') return;
@@ -1905,8 +1919,17 @@ export function RunwayGrid({
 
     if (heatmapAutoDayAppliedKeyRef.current === key) return;
 
+    const storedYmd = runwaySelectedDayByMarket[country];
+    const storedOk =
+      typeof storedYmd === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(storedYmd) &&
+      layoutDatesSorted.includes(storedYmd) &&
+      focusMarketRiskByDate.has(storedYmd);
+
     const todayStr = formatDateYmd(new Date());
-    const pick = pickLayoutDayForDefaultSelection(layoutDatesSorted, focusMarketRiskByDate, todayStr);
+    const pick = storedOk
+      ? storedYmd!
+      : pickLayoutDayForDefaultSelection(layoutDatesSorted, focusMarketRiskByDate, todayStr);
     if (!pick) return;
 
     heatmapAutoDayAppliedKeyRef.current = key;
@@ -1925,6 +1948,7 @@ export function RunwayGrid({
     riskSurface.length,
     country,
     buildPayloadTipState,
+    runwaySelectedDayByMarket,
   ]);
 
   const gap = RUNWAY_CELL_GAP_PX;

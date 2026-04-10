@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { ViewModeId } from '@/lib/constants';
 import { parseYamlToConfigs, runPipelineFromDsl } from '@/engine/pipeline';
 import type { RiskRow } from '@/engine/riskModel';
@@ -83,6 +84,7 @@ import {
   buildViewSettingsFile,
   parseViewSettingsFile,
   pickViewSettingsPayload,
+  sliceViewSettingsForPersist,
   type ViewSettingsExportScope,
   type ViewSettingsFileV1,
   type ViewSettingsPayloadKey,
@@ -157,6 +159,8 @@ type AtcState = {
    * LIOM column header). Not persisted.
    */
   runwayReturnPicker: string | null;
+  /** Single-market heatmap: last selected day (YYYY-MM-DD) per market id; device-local. */
+  runwaySelectedDayByMarket: Record<string, string>;
   /** When true, Monaco YAML editor is read-only (DSL assistant is streaming or applying). Not persisted. */
   dslAssistantEditorLock: boolean;
   setDslAssistantEditorLock: (v: boolean) => void;
@@ -178,6 +182,8 @@ type AtcState = {
   setRunwayFilterYear: (y: number | null) => void;
   setRunwayFilterQuarter: (q: RunwayQuarter | null) => void;
   setRunwayIncludeFollowingQuarter: (v: boolean) => void;
+  /** `ymd` null removes the stored day for that market. */
+  setRunwaySelectedDayForMarket: (market: string, ymd: string | null) => void;
   setHeatmapRenderStyle: (v: HeatmapRenderStyle) => void;
   setHeatmapMonoColor: (hex: string) => void;
   setHeatmapSpectrumContinuous: (v: boolean) => void;
@@ -236,7 +242,9 @@ function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) =>
   });
 }
 
-export const useAtcStore = create<AtcState>()((set, get) => ({
+export const useAtcStore = create<AtcState>()(
+  persist(
+    (set, get) => ({
       country: RUNWAY_ALL_MARKETS_VALUE,
       viewMode: 'in_store',
       theme: 'dark',
@@ -259,6 +267,7 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
       parseError: null,
       discoMode: false,
       runwayReturnPicker: null,
+      runwaySelectedDayByMarket: {},
       dslAssistantEditorLock: false,
       dslMutationLocked: false,
       techWorkloadScope: 'all',
@@ -349,7 +358,15 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
 
       setDiscoMode: (v) => set({ discoMode: v }),
 
-      setRunway3dHeatmap: (v) => set({ runway3dHeatmap: v }),
+      setRunway3dHeatmap: (v) => {
+        set({ runway3dHeatmap: v });
+        if (v) {
+          const c = get().country;
+          if (!isRunwayMultiMarketStrip(c)) {
+            get().setRunwaySelectedDayForMarket(c, null);
+          }
+        }
+      },
       setRunwaySvgHeatmap: (v) => set({ runwaySvgHeatmap: v }),
       setDslLlmAssistantEnabled: (v) => set({ dslLlmAssistantEnabled: v }),
       setRunwayFilterYear: (y) =>
@@ -360,6 +377,21 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
         }),
       setRunwayFilterQuarter: (q) => set({ runwayFilterQuarter: q }),
       setRunwayIncludeFollowingQuarter: (v) => set({ runwayIncludeFollowingQuarter: v }),
+
+      setRunwaySelectedDayForMarket: (market, ymd) => {
+        const id = typeof market === 'string' && market.trim() ? market.trim() : '';
+        if (!id) return;
+        const ymdRe = /^\d{4}-\d{2}-\d{2}$/;
+        set((s) => {
+          const next = { ...s.runwaySelectedDayByMarket };
+          if (ymd == null || !ymdRe.test(ymd)) {
+            delete next[id];
+          } else {
+            next[id] = ymd;
+          }
+          return { runwaySelectedDayByMarket: next };
+        });
+      },
 
       setHeatmapRenderStyle: (v) => set({ heatmapRenderStyle: v }),
       setHeatmapMonoColor: (hex) => set({ heatmapMonoColor: normalizeHeatmapMonoHex(hex) }),
@@ -785,4 +817,13 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
         const th = get().theme;
         document.documentElement.classList.toggle('dark', th === 'dark');
       },
-}));
+    }),
+    {
+      name: 'capacity-atc',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (s) => ({
+        ...sliceViewSettingsForPersist(s as unknown as Record<ViewSettingsPayloadKey, unknown>),
+      }),
+    }
+  )
+);
