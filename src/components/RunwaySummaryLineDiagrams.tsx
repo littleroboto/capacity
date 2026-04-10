@@ -1,18 +1,13 @@
-import { useMemo, type ReactNode } from 'react';
+import { useContext, useMemo, type ReactNode } from 'react';
 import type { ViewModeId } from '@/lib/constants';
 import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
 import {
-  buildDemandCapacityGapPaths,
-  pointsForSeries,
-  ribbonPathSmoothTopPolyBottom,
-  smoothAreaToBaseline,
   smoothLineThrough,
   type GapRibbonLayout,
 } from '@/lib/runwayGapRibbonPaths';
 import { runwayPickerLayoutBounds } from '@/lib/runwayDateFilter';
 import {
   buildRunwayMiniTimeAxisMarks,
-  textAnchorForMiniAxisX,
   type MiniTimeAxisMark,
 } from '@/lib/runwayMiniChartTimeAxis';
 import {
@@ -25,8 +20,7 @@ import type { HeatmapColorOpts, HeatmapSpectrumMode } from '@/lib/riskHeatmapCol
 import {
   extractRunwayMiniSeries,
   extractTechMixMonthlyRows,
-  miniChartMonthBarCenterX,
-  miniChartXForDayYmd,
+  miniChartDataIndexForDayYmd,
   techMixMonthlyRowsToShares,
   TECH_MIX_MINI_BAR_GAP_VB,
   type TechMixMonthBar,
@@ -40,211 +34,208 @@ import {
 import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 
-const CAP_LAY: GapRibbonLayout = {
-  padL: 10,
-  padR: 10,
-  padT: 12,
-  padB: 30,
-  vbW: 420,
-  vbH: 112,
+import { ParentSize } from '@visx/responsive';
+import { curveCardinal } from '@visx/curve';
+import {
+  XYChart,
+  LineSeries,
+  Axis,
+  Grid,
+  Tooltip,
+  DataContext,
+} from '@visx/xychart';
+import type { XYChartTheme } from '@visx/xychart';
+
+/* ── datum type for visx series registration ── */
+type IndexedDatum = { x: number; y: number };
+
+function toDatums(vals: number[]): IndexedDatum[] {
+  return vals.map((y, i) => ({ x: i, y }));
+}
+
+const xAcc = (d: IndexedDatum) => d.x;
+const yAcc = (d: IndexedDatum) => d.y;
+
+/* ── chart layout ── */
+const CAP_ASPECT = 140 / 420;
+const DR_ASPECT = 120 / 420;
+const MIX_ASPECT = 140 / 420;
+
+const CHART_MARGIN = { top: 12, right: 6, bottom: 22, left: 28 };
+const DR_CHART_MARGIN = { top: 12, right: 6, bottom: 22, left: 28 };
+
+/* ── theme ── */
+const ZINC_FG = 'var(--color-zinc-950)';
+const ZINC_FG_DIM = 'hsl(var(--muted-foreground))';
+
+const TICK_LABEL_STYLE = { fill: ZINC_FG_DIM, fontSize: 7.5, fontFamily: 'inherit', letterSpacing: '0.01em' };
+const AXIS_LINE_STYLE = { stroke: ZINC_FG_DIM, strokeWidth: 0.5 };
+const TICK_LINE_STYLE = { stroke: ZINC_FG_DIM, strokeWidth: 0.5 };
+const HIDDEN_LINE = { stroke: 'transparent', strokeWidth: 0 };
+
+const miniTheme: XYChartTheme = {
+  backgroundColor: 'transparent',
+  colors: [ZINC_FG, ZINC_FG, ZINC_FG],
+  htmlLabel: { color: ZINC_FG_DIM, fontSize: 8, fontWeight: 400, lineHeight: '1em' },
+  svgLabelBig: { fill: ZINC_FG_DIM, fontSize: 8, fontWeight: 400 },
+  svgLabelSmall: { fill: ZINC_FG_DIM, fontSize: 7.5, fontWeight: 400 },
+  gridStyles: { stroke: ZINC_FG_DIM, strokeWidth: 0.4, strokeOpacity: 0.5, strokeDasharray: '3 4' },
+  axisStyles: {
+    x: {
+      top: { axisLine: AXIS_LINE_STYLE, tickLine: TICK_LINE_STYLE, tickLength: 3, tickLabel: TICK_LABEL_STYLE, axisLabel: TICK_LABEL_STYLE },
+      bottom: { axisLine: AXIS_LINE_STYLE, tickLine: TICK_LINE_STYLE, tickLength: 3, tickLabel: TICK_LABEL_STYLE, axisLabel: TICK_LABEL_STYLE },
+    },
+    y: {
+      left: { axisLine: HIDDEN_LINE, tickLine: HIDDEN_LINE, tickLength: 0, tickLabel: TICK_LABEL_STYLE, axisLabel: TICK_LABEL_STYLE },
+      right: { axisLine: HIDDEN_LINE, tickLine: HIDDEN_LINE, tickLength: 0, tickLabel: TICK_LABEL_STYLE, axisLabel: TICK_LABEL_STYLE },
+    },
+  },
 };
 
-const DR_LAY: GapRibbonLayout = {
-  padL: 10,
-  padR: 10,
-  padT: 12,
-  padB: 30,
-  vbW: 420,
-  vbH: 100,
-};
-
-/**
- * Mini charts: use theme `stroke-zinc-*` / `fill-zinc-*` + opacity (not `fill-[#hex]/xx`) so SVG paints
- * correctly in light mode — arbitrary hex+opacity often resolves to default black fill in practice.
- */
-const MINI_INK_STROKE = 'stroke-zinc-950 dark:stroke-white';
-const MINI_INK_STROKE_DIM = 'stroke-zinc-600/85 dark:stroke-white/48';
-const MINI_INK_STROKE_SOFT = 'stroke-zinc-500/75 dark:stroke-white/30';
-const MINI_INK_FILL_Q = 'fill-zinc-900 dark:fill-white/58';
-const MINI_INK_FILL_Y = 'fill-zinc-800 dark:fill-white/52';
-
-/** 1.5 CSS px for every stroked mini-chart element; non-scaling so sparklines stay legible when the SVG scales. */
-const MINI_STROKE_W = 1.5;
-const MINI_STROKE_VEC = { strokeWidth: MINI_STROKE_W, vectorEffect: 'non-scaling-stroke' as const };
-
-/** Mix segment rim — softer than full-ink so the bars read the same as Store trading / Deployment area outlines. */
-const TECH_MIX_SEG_OUTLINE_CLASS = 'stroke-zinc-600/75 dark:stroke-white/60';
-
-/**
- * Pattern tile fills for Technology mix (`fill="url(#…)"` like Store trading — direct `fill-zinc` on `<rect>`
- * can fail in SVG and paint black).  Dark mode uses mid-dark zinc (600/500) like the scalar area fill so bars
- * sit against the dark background the same way the restaurant/deployment fills do.
- */
+/* ── style constants ── */
+const SCALAR_AREA_FILL_CLASS = 'fill-zinc-400/40 dark:fill-zinc-600/32';
 const TECH_MIX_PAT_BAU_CLASS = 'fill-zinc-400/40 dark:fill-zinc-600/32';
 const TECH_MIX_PAT_CAMP_CLASS = 'fill-zinc-500/45 dark:fill-zinc-500/34';
 const TECH_MIX_PAT_PROJ_CLASS = 'fill-zinc-600/50 dark:fill-zinc-400/36';
-const TECH_MIX_PAT_EMPTY_CLASS = 'fill-zinc-300/28 dark:fill-zinc-700/16';
+const TECH_MIX_SEG_OUTLINE_CLASS = 'stroke-zinc-600/75 dark:stroke-white/60';
+const MINI_INK_STROKE = 'stroke-zinc-950 dark:stroke-white';
+const MINI_INK_STROKE_DIM = 'stroke-zinc-600/85 dark:stroke-white/48';
+const MINI_INK_STROKE_SOFT = 'stroke-zinc-500/75 dark:stroke-white/30';
+const MINI_STROKE_W = 1.5;
+const MINI_STROKE_VEC = { strokeWidth: MINI_STROKE_W, vectorEffect: 'non-scaling-stroke' as const };
 
-/** Solid demand trace (capacity mini chart). */
-const MINI_SOLID_TRACE_CLASS = MINI_INK_STROKE;
-const MINI_SOLID_TRACE_PROPS = {
-  ...MINI_STROKE_VEC,
-  strokeLinejoin: 'round' as const,
-  strokeLinecap: 'round' as const,
-};
+type ScaleFn = (v: number) => number;
+type Pt = { x: number; y: number };
 
-/** Scalar charts (deployment / store) and capacity headroom: area fill — applied directly, no stroke (strokes
- *  on multi-segment gap ribbons create visible internal edges that read as hatching). */
-const SCALAR_AREA_FILL_CLASS = 'fill-zinc-400/40 dark:fill-zinc-600/32';
+/** Map data values to pixel coordinates using the XYChart's own scales. */
+function scalePoints(vals: number[], xScale: ScaleFn, yScale: ScaleFn): Pt[] {
+  return vals.map((v, i) => ({
+    x: xScale(i),
+    y: yScale(Math.min(1, Math.max(0, v))),
+  }));
+}
 
-/** Stacked tech workload mix — same plot box as {@link CAP_LAY} so paired sparklines scale consistently. */
-const MIX_LAY: GapRibbonLayout = {
-  padL: 10,
-  padR: 10,
-  padT: 12,
-  padB: 30,
-  vbW: 420,
-  vbH: 112,
-};
+/** Close a smooth line path down to the y-baseline (yScale(0)). */
+function smoothAreaToBaselineScaled(pts: Pt[], baselineY: number): string {
+  const line = smoothLineThrough(pts);
+  if (!line) return '';
+  const f = (n: number) => n.toFixed(2);
+  return `${line} L ${f(pts[pts.length - 1]!.x)} ${f(baselineY)} L ${f(pts[0]!.x)} ${f(baselineY)} Z`;
+}
 
-function plotInnerBounds(lay: GapRibbonLayout) {
-  const innerH = lay.vbH - lay.padT - lay.padB;
-  return {
-    xl: lay.padL,
-    xr: lay.vbW - lay.padR,
-    yt: lay.padT,
-    yb: lay.padT + innerH,
+/** Ribbon between two series – smooth cubic upper edge, polyline lower edge. */
+function ribbonScaled(vTop: Pt[], vBottom: Pt[]): string {
+  const n = vTop.length;
+  if (n < 2 || vBottom.length !== n) return '';
+  const top = smoothLineThrough(vTop);
+  if (!top) return '';
+  const f = (p: Pt) => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`;
+  let d = top;
+  d += ` L ${f(vBottom[n - 1]!)}`;
+  for (let i = n - 2; i >= 0; i--) d += ` L ${f(vBottom[i]!)}`;
+  return d + ' Z';
+}
+
+/** Build gap-fill quads between demand and capacity using scale-derived points. */
+function gapPathsScaled(
+  demandVals: number[], capVals: number[],
+  dPts: Pt[], cPts: Pt[],
+): { over: string; under: string } {
+  const n = demandVals.length;
+  if (n < 2) return { over: '', under: '' };
+  const eps = 1e-9;
+  const sign = (i: number) => {
+    const s = demandVals[i]! - capVals[i]!;
+    return Math.abs(s) <= eps ? 0 : s > 0 ? 1 : -1;
   };
-}
-
-const MINI_X_AXIS_TICK_PX = 3.75;
-/** First text row below ticks: leave gap so quarter glyphs don’t crowd tick ends (~yb + 3.75). */
-const MINI_AXIS_QUARTER_LABEL_DY = 13;
-/** Second row: farther from axis; keep ~12px baseline step from quarter row. */
-const MINI_AXIS_YEAR_LABEL_DY = 25;
-
-function uniqueTimeAxisTickXs(years: MiniTimeAxisMark[], quarters: MiniTimeAxisMark[]): number[] {
-  const seen = new Set<string>();
-  const xs: number[] = [];
-  for (const m of [...years, ...quarters]) {
-    const k = m.x.toFixed(2);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    xs.push(m.x);
+  const fmtPt = (p: Pt) => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`;
+  const quad = (a: Pt, b: Pt, c: Pt, d: Pt) => `M ${fmtPt(a)} L ${fmtPt(b)} L ${fmtPt(c)} L ${fmtPt(d)} Z`;
+  const tri = (a: Pt, b: Pt, c: Pt) => `M ${fmtPt(a)} L ${fmtPt(b)} L ${fmtPt(c)} Z`;
+  const segIntersect = (a: Pt, b: Pt, c: Pt, d: Pt): Pt | null => {
+    const x1 = a.x, y1 = a.y, x2 = b.x, y2 = b.y;
+    const x3 = c.x, y3 = c.y, x4 = d.x, y4 = d.y;
+    const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(den) < 1e-12) return null;
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+    const u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / den;
+    if (t < -1e-4 || t > 1.0001 || u < -1e-4 || u > 1.0001) return null;
+    return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
+  };
+  const partsOver: string[] = [];
+  const partsUnder: string[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const k0 = sign(i), k1 = sign(i + 1);
+    if (k0 === 0 && k1 === 0) continue;
+    const d0 = dPts[i]!, d1 = dPts[i + 1]!;
+    const c0 = cPts[i]!, c1 = cPts[i + 1]!;
+    if (k0 >= 0 && k1 >= 0) { partsOver.push(quad(d0, d1, c1, c0)); }
+    else if (k0 <= 0 && k1 <= 0) { partsUnder.push(quad(c0, c1, d1, d0)); }
+    else {
+      const P = segIntersect(d0, d1, c0, c1);
+      if (P) {
+        if (k0 > 0) { partsOver.push(tri(d0, P, c0)); partsUnder.push(tri(d1, P, c1)); }
+        else { partsUnder.push(tri(c0, P, d0)); partsOver.push(tri(d1, P, c1)); }
+      } else if (k0 > 0 || k1 > 0) { partsOver.push(quad(d0, d1, c1, c0)); }
+      else { partsUnder.push(quad(c0, c1, d1, d0)); }
+    }
   }
-  return xs.sort((a, b) => a - b);
+  return { over: partsOver.join(' '), under: partsUnder.join(' ') };
 }
 
-function TimeAxisLabelsG({
-  lay,
-  years,
-  quarters,
-}: {
-  lay: GapRibbonLayout;
-  years: MiniTimeAxisMark[];
-  quarters: MiniTimeAxisMark[];
-}) {
-  const { yb } = plotInnerBounds(lay);
-  const tickXs = useMemo(() => uniqueTimeAxisTickXs(years, quarters), [years, quarters]);
+/* ── Y-axis tick config ── */
+const Y_TICK_VALUES = [0, 0.5, 1];
+const pctFormat = (v: number) => `${Math.round(v * 100)}%`;
 
-  return (
-    <g className="select-none">
-      {tickXs.map((x, i) => (
-        <line
-          key={`xtick-${i}-${x.toFixed(2)}`}
-          x1={x}
-          y1={yb}
-          x2={x}
-          y2={yb + MINI_X_AXIS_TICK_PX}
-          className={MINI_INK_STROKE_DIM}
-          {...MINI_STROKE_VEC}
-          strokeLinecap="square"
-        />
-      ))}
-      {quarters.map((m, i) => (
-        <text
-          key={`q-${i}-${m.x}-${m.text}`}
-          x={m.x}
-          y={yb + MINI_AXIS_QUARTER_LABEL_DY}
-          textAnchor={textAnchorForMiniAxisX(m.x, lay)}
-          className={MINI_INK_FILL_Q}
-          fontSize={9}
-        >
-          {m.text}
-        </text>
-      ))}
-      {years.map((m, i) => (
-        <text
-          key={`y-${i}-${m.x}-${m.text}`}
-          x={m.x}
-          y={yb + MINI_AXIS_YEAR_LABEL_DY}
-          textAnchor={textAnchorForMiniAxisX(m.x, lay)}
-          className={MINI_INK_FILL_Y}
-          fontSize={8.5}
-          fontWeight={500}
-        >
-          {m.text}
-        </text>
-      ))}
-    </g>
-  );
-}
+const CROSSHAIR_STYLE = { stroke: ZINC_FG_DIM, strokeWidth: 0.75, strokeDasharray: '4 3' };
 
-/** Plain L-shaped axes; x-axis tick marks for labels live in {@link TimeAxisLabelsG}. */
-function PlotAxes({ lay }: { lay: GapRibbonLayout }) {
-  const { xl, xr, yt, yb } = plotInnerBounds(lay);
-  return (
-    <path
-      d={`M ${xl} ${yt} L ${xl} ${yb} L ${xr} ${yb}`}
-      className={cn('fill-none', MINI_INK_STROKE_SOFT)}
-      {...MINI_STROKE_VEC}
-      strokeLinecap="square"
-      strokeLinejoin="miter"
-    />
-  );
-}
+/* ──────────────────────────────────────────────────────────────
+ * Custom child components rendered INSIDE <XYChart>
+ * ────────────────────────────────────────────────────────────── */
 
-/** Dashed top + dotted mid — same language as {@link ScalarTraceMiniChart} / Store trading. */
-function MiniPlotScaleGuideLines({ lay }: { lay: GapRibbonLayout }) {
-  const { xl, xr, yt, yb } = plotInnerBounds(lay);
-  const yMid = yt + (yb - yt) * 0.5;
+function CapacityDemandOverlay({ demand, capacity }: { demand: number[]; capacity: number[] }) {
+  const ctx = useContext(DataContext);
+  if (!ctx?.xScale || !ctx?.yScale) return null;
+  const xs = ctx.xScale as ScaleFn;
+  const ys = ctx.yScale as ScaleFn;
+  const dPts = scalePoints(demand, xs, ys);
+  const cPts = scalePoints(capacity, xs, ys);
+  const gap = gapPathsScaled(demand, capacity, dPts, cPts);
+  const demandLine = smoothLineThrough(dPts);
+  const capacityLine = smoothLineThrough(cPts);
   return (
     <>
-      <line
-        x1={xl}
-        y1={yt}
-        x2={xr}
-        y2={yt}
+      {gap.under && <path d={gap.under} className={SCALAR_AREA_FILL_CLASS} stroke="none" />}
+      {gap.over && <path d={gap.over} className="fill-red-500/50 dark:fill-red-400/48" stroke="none" />}
+      <path
+        d={capacityLine}
+        fill="none"
         className={MINI_INK_STROKE}
-        strokeOpacity={0.88}
+        strokeOpacity={0.9}
         {...MINI_STROKE_VEC}
         strokeDasharray="5 3"
         strokeLinecap="round"
       />
-      <line
-        x1={xl}
-        y1={yMid}
-        x2={xr}
-        y2={yMid}
-        className={MINI_INK_STROKE_SOFT}
+      <path
+        d={demandLine}
+        fill="none"
+        className={MINI_INK_STROKE}
         {...MINI_STROKE_VEC}
-        strokeDasharray="2 4"
+        strokeLinejoin="round"
+        strokeLinecap="round"
       />
     </>
   );
 }
 
-/** Vertical rule for the heatmap-selected day (same week bucket as mini-series). */
-function SelectedDayPlotMarker({ lay, x }: { lay: GapRibbonLayout; x: number | null }) {
-  if (x == null) return null;
-  const { yt, yb } = plotInnerBounds(lay);
-  const xi = Math.round(x * 100) / 100;
+function SelectedDayLine({ dataIndex }: { dataIndex: number | null }) {
+  const ctx = useContext(DataContext);
+  if (!ctx || dataIndex == null) return null;
+  const { xScale, innerHeight } = ctx;
+  if (!xScale || !innerHeight) return null;
+  const x = (xScale as (v: number) => number)(dataIndex);
   return (
     <line
-      x1={xi}
-      x2={xi}
-      y1={yt}
-      y2={yb}
+      x1={x} x2={x} y1={0} y2={innerHeight}
       className={cn('pointer-events-none', MINI_INK_STROKE)}
       {...MINI_STROKE_VEC}
       strokeOpacity={0.78}
@@ -252,46 +243,80 @@ function SelectedDayPlotMarker({ lay, x }: { lay: GapRibbonLayout; x: number | n
   );
 }
 
-/** 100% stacked columns per calendar month (Technology mix, combined scope). */
-function TechMixMonthlyStackedBars({
-  months,
-  lay,
-}: {
-  months: TechMixMonthBar[];
-  lay: GapRibbonLayout;
-}) {
-  const { xl, xr, yt, yb } = plotInnerBounds(lay);
-  const innerW = xr - xl;
-  const innerH = yb - yt;
+function ScalarAreaFill({ vals, fillClassName }: { vals: number[]; fillClassName: string }) {
+  const ctx = useContext(DataContext);
+  if (!ctx?.xScale || !ctx?.yScale) return null;
+  const xs = ctx.xScale as ScaleFn;
+  const ys = ctx.yScale as ScaleFn;
+  const pts = scalePoints(vals, xs, ys);
+  const baselineY = ys(0);
+  const area = smoothAreaToBaselineScaled(pts, baselineY);
+  if (!area) return null;
+  return (
+    <path d={area} className={cn(fillClassName, MINI_INK_STROKE_SOFT)} {...MINI_STROKE_VEC} paintOrder="fill stroke" />
+  );
+}
+
+function ScalarLinePath({ vals }: { vals: number[] }) {
+  const ctx = useContext(DataContext);
+  if (!ctx?.xScale || !ctx?.yScale) return null;
+  const xs = ctx.xScale as ScaleFn;
+  const ys = ctx.yScale as ScaleFn;
+  const pts = scalePoints(vals, xs, ys);
+  const line = smoothLineThrough(pts);
+  if (!line) return null;
+  return (
+    <path d={line} fill="none" className={MINI_INK_STROKE} {...MINI_STROKE_VEC} strokeLinejoin="round" strokeLinecap="round" />
+  );
+}
+
+function TechMixRibbonPaths({ bauShare, campaignShare }: { bauShare: number[]; campaignShare: number[] }) {
+  const ctx = useContext(DataContext);
+  if (!ctx?.xScale || !ctx?.yScale) return null;
+  const xs = ctx.xScale as ScaleFn;
+  const ys = ctx.yScale as ScaleFn;
+  const n = bauShare.length;
+  if (n < 2) return null;
+  const z = Array.from({ length: n }, () => 0);
+  const one = Array.from({ length: n }, () => 1);
+  const cumCampTop = bauShare.map((b, i) => b + campaignShare[i]!);
+
+  const bauPts = scalePoints(bauShare, xs, ys);
+  const zPts = scalePoints(z, xs, ys);
+  const onePts = scalePoints(one, xs, ys);
+  const campPts = scalePoints(cumCampTop, xs, ys);
+
+  return (
+    <>
+      <path d={ribbonScaled(bauPts, zPts)} className={cn(TECH_MIX_PAT_BAU_CLASS, TECH_MIX_SEG_OUTLINE_CLASS)} {...MINI_STROKE_VEC} strokeLinejoin="round" paintOrder="fill stroke" />
+      <path d={ribbonScaled(campPts, bauPts)} className={cn(TECH_MIX_PAT_CAMP_CLASS, TECH_MIX_SEG_OUTLINE_CLASS)} {...MINI_STROKE_VEC} strokeLinejoin="round" paintOrder="fill stroke" />
+      <path d={ribbonScaled(onePts, campPts)} className={cn(TECH_MIX_PAT_PROJ_CLASS, TECH_MIX_SEG_OUTLINE_CLASS)} {...MINI_STROKE_VEC} strokeLinejoin="round" paintOrder="fill stroke" />
+      <path d={smoothLineThrough(bauPts)} fill="none" className={MINI_INK_STROKE} {...MINI_STROKE_VEC} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={smoothLineThrough(campPts)} fill="none" className={MINI_INK_STROKE_DIM} {...MINI_STROKE_VEC} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={smoothLineThrough(onePts)} fill="none" className={MINI_INK_STROKE_SOFT} {...MINI_STROKE_VEC} strokeLinejoin="round" strokeLinecap="round" />
+    </>
+  );
+}
+
+function TechMixMonthlyStackedBars({ months }: { months: TechMixMonthBar[] }) {
+  const ctx = useContext(DataContext);
+  if (!ctx) return null;
+  const { innerWidth, innerHeight } = ctx;
+  const iW = innerWidth!;
+  const iH = innerHeight!;
   const n = months.length;
   const gap = TECH_MIX_MINI_BAR_GAP_VB;
-  const bw = (innerW - (n - 1) * gap) / n;
+  const bw = (iW - (n - 1) * gap) / n;
 
   return (
     <g>
       {months.map((m, i) => {
-        const barX = xl + i * (bw + gap);
-        if (!m.hasData) {
-          return (
-            <rect
-              key={m.monthKey}
-              x={barX}
-              y={yt}
-              width={bw}
-              height={innerH}
-              rx={0.85}
-              ry={0.85}
-              className={cn(TECH_MIX_PAT_EMPTY_CLASS, TECH_MIX_SEG_OUTLINE_CLASS)}
-              {...MINI_STROKE_VEC}
-              strokeLinejoin="round"
-              paintOrder="fill stroke"
-            />
-          );
-        }
-        const hB = Math.max(0, m.bauShare * innerH);
-        const hC = Math.max(0, m.campaignShare * innerH);
-        const hP = Math.max(0, m.projectShare * innerH);
-        let yCursor = yb;
+        const barX = i * (bw + gap);
+        if (!m.hasData) return null;
+        const hB = Math.max(0, m.bauShare * iH);
+        const hC = Math.max(0, m.campaignShare * iH);
+        const hP = Math.max(0, m.projectShare * iH);
+        let yCursor = iH;
         const segs: { h: number; cls: string }[] = [
           { h: hB, cls: TECH_MIX_PAT_BAU_CLASS },
           { h: hC, cls: TECH_MIX_PAT_CAMP_CLASS },
@@ -303,19 +328,9 @@ function TechMixMonthlyStackedBars({
               if (s.h < 1e-4) return null;
               yCursor -= s.h;
               return (
-                <rect
-                  key={j}
-                  x={barX}
-                  y={yCursor}
-                  width={bw}
-                  height={s.h}
-                  rx={0.85}
-                  ry={0.85}
+                <rect key={j} x={barX} y={yCursor} width={bw} height={s.h} rx={0.85} ry={0.85}
                   className={cn(s.cls, TECH_MIX_SEG_OUTLINE_CLASS)}
-                  {...MINI_STROKE_VEC}
-                  strokeLinejoin="round"
-                  paintOrder="fill stroke"
-                />
+                  {...MINI_STROKE_VEC} strokeLinejoin="round" paintOrder="fill stroke" />
               );
             })}
           </g>
@@ -325,173 +340,113 @@ function TechMixMonthlyStackedBars({
   );
 }
 
-/** One bar per month: height scales to the active workload slice (max month in view = full column). */
 function TechMixMonthlyScopeBars({
-  rows,
-  lay,
-  scope,
-  fillClassName,
+  rows, scope, fillClassName,
 }: {
   rows: TechMixMonthlyRow[];
-  lay: GapRibbonLayout;
   scope: 'bau' | 'campaign' | 'project';
   fillClassName: string;
 }) {
-  const { xl, xr, yt, yb } = plotInnerBounds(lay);
-  const innerW = xr - xl;
-  const innerH = yb - yt;
+  const ctx = useContext(DataContext);
+  if (!ctx) return null;
+  const { innerWidth, innerHeight } = ctx;
+  const iW = innerWidth!;
+  const iH = innerHeight!;
   const n = rows.length;
   const gap = TECH_MIX_MINI_BAR_GAP_VB;
-  const bw = (innerW - (n - 1) * gap) / n;
-
+  const bw = (iW - (n - 1) * gap) / n;
   const val = (r: TechMixMonthlyRow) =>
-    scope === 'bau'
-      ? r.bauMean
-      : scope === 'campaign'
-        ? r.campMean
-        : r.projectScopeMean;
+    scope === 'bau' ? r.bauMean : scope === 'campaign' ? r.campMean : r.projectScopeMean;
   const vmax = Math.max(1e-9, ...rows.filter((r) => r.hasData).map(val));
 
   return (
     <g>
       {rows.map((r, i) => {
-        const barX = xl + i * (bw + gap);
-        if (!r.hasData) {
-          return (
-            <rect
-              key={r.monthKey}
-              x={barX}
-              y={yt}
-              width={bw}
-              height={innerH}
-              rx={0.85}
-              ry={0.85}
-              className={cn(TECH_MIX_PAT_EMPTY_CLASS, TECH_MIX_SEG_OUTLINE_CLASS)}
-              {...MINI_STROKE_VEC}
-              strokeLinejoin="round"
-              paintOrder="fill stroke"
-            />
-          );
-        }
+        const barX = i * (bw + gap);
+        if (!r.hasData) return null;
         const v = val(r);
-        const h = Math.max(0, (v / vmax) * innerH);
-        const yTop = yb - h;
+        const h = Math.max(0, (v / vmax) * iH);
+        const yTop = iH - h;
         return (
-          <rect
-            key={r.monthKey}
-            x={barX}
-            y={yTop}
-            width={bw}
-            height={Math.max(h, 1e-4)}
-            rx={0.85}
-            ry={0.85}
+          <rect key={r.monthKey} x={barX} y={yTop} width={bw} height={Math.max(h, 1e-4)} rx={0.85} ry={0.85}
             className={cn(fillClassName, TECH_MIX_SEG_OUTLINE_CLASS)}
-            {...MINI_STROKE_VEC}
-            strokeLinejoin="round"
-            paintOrder="fill stroke"
-          />
+            {...MINI_STROKE_VEC} strokeLinejoin="round" paintOrder="fill stroke" />
         );
       })}
     </g>
   );
 }
 
-type MiniChartProps = {
-  title: string;
-  caption: ReactNode;
-  vbW: number;
-  vbH: number;
-  children: ReactNode;
-  /** Quarter / year text under the x-axis (same calendar span as the heatmap). */
-  timeAxisLabels?: ReactNode;
-  /** Optional overlay (e.g. selected-day marker); rendered on top of `children`. */
-  overlay?: ReactNode | null;
-};
+function TechMixSelectedDayLine({
+  months, selectedDayYmd, innerW, innerH,
+}: {
+  months: TechMixMonthlyRow[] | TechMixMonthBar[];
+  selectedDayYmd: string;
+  innerW: number;
+  innerH: number;
+}) {
+  const n = months.length;
+  if (n === 0) return null;
+  const monthKey = selectedDayYmd.slice(0, 7);
+  const idx = months.findIndex((m) => m.monthKey === monthKey);
+  if (idx < 0) return null;
+  const gap = TECH_MIX_MINI_BAR_GAP_VB;
+  const bw = (innerW - (n - 1) * gap) / n;
+  const x = idx * (bw + gap) + bw / 2;
+  return (
+    <line x1={x} x2={x} y1={0} y2={innerH}
+      className={cn('pointer-events-none', MINI_INK_STROKE)}
+      {...MINI_STROKE_VEC} strokeOpacity={0.78} />
+  );
+}
 
-function MiniChartFrame({
-  title,
-  caption,
-  vbW,
-  vbH,
-  children,
-  timeAxisLabels,
-  overlay,
-}: MiniChartProps) {
+/* ── axis tick helpers ── */
+
+function buildTickConfig(
+  marks: { years: MiniTimeAxisMark[]; quarters: MiniTimeAxisMark[] } | null,
+  n: number,
+  lay: GapRibbonLayout,
+) {
+  if (!marks) return { tickValues: [] as number[], tickFormat: () => '' };
+  const innerW = lay.vbW - lay.padL - lay.padR;
+  const denom = Math.max(n - 1, 1);
+  const allMarks = [
+    ...marks.quarters.map((m) => ({ ...m, tier: 'quarter' as const })),
+    ...marks.years.map((m) => ({ ...m, tier: 'year' as const })),
+  ].sort((a, b) => a.x - b.x);
+
+  const tickValues: number[] = [];
+  const labelMap = new Map<string, string>();
+  for (const m of allMarks) {
+    const frac = (m.x - lay.padL) / innerW;
+    const dataIdx = frac * denom;
+    const key = dataIdx.toFixed(2);
+    if (!labelMap.has(key)) tickValues.push(dataIdx);
+    const existing = labelMap.get(key);
+    if (!existing || m.tier === 'year') labelMap.set(key, m.text);
+  }
+  const tickFormat = (v: number) => labelMap.get(v.toFixed(2)) ?? '';
+  return { tickValues, tickFormat };
+}
+
+/* ── section wrapper ── */
+
+function MiniChartSection({ title, caption, children }: { title: string; caption: ReactNode; children: ReactNode }) {
   return (
     <div className="w-full">
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </p>
-      <svg
-        viewBox={`0 0 ${vbW} ${vbH}`}
-        className="block w-full text-zinc-950 dark:text-white"
-        preserveAspectRatio="xMidYMid meet"
-        aria-hidden
-      >
-        {children}
-        {overlay}
-        {timeAxisLabels}
-      </svg>
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</p>
+      {children}
       <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{caption}</p>
     </div>
   );
 }
 
-type ScalarTraceGeom = {
-  area: string | null;
-  line: string;
-  yHalf: number;
-  yFull: number;
-};
+/* ── reference layout for tick computation ── */
+const CAP_LAY: GapRibbonLayout = { padL: 10, padR: 10, padT: 12, padB: 30, vbW: 420, vbH: 112 };
 
-/** 0–1 trace with grey-filled area, dashed full-scale line, dotted mid — shared by deployment risk and store trading. */
-function ScalarTraceMiniChart({
-  title,
-  caption,
-  lay,
-  geom,
-  fillClassName,
-  timeAxisLabels,
-  selectedDayX,
-}: {
-  title: string;
-  caption: string;
-  lay: GapRibbonLayout;
-  geom: ScalarTraceGeom;
-  fillClassName: string;
-  timeAxisLabels?: ReactNode;
-  selectedDayX?: number | null;
-}) {
-  return (
-    <MiniChartFrame
-      title={title}
-      caption={caption}
-      vbW={lay.vbW}
-      vbH={lay.vbH}
-      timeAxisLabels={timeAxisLabels}
-      overlay={<SelectedDayPlotMarker lay={lay} x={selectedDayX ?? null} />}
-    >
-      <PlotAxes lay={lay} />
-      <MiniPlotScaleGuideLines lay={lay} />
-      {geom.area && (
-        <path
-          d={geom.area}
-          className={cn(fillClassName, MINI_INK_STROKE_SOFT)}
-          {...MINI_STROKE_VEC}
-          paintOrder="fill stroke"
-        />
-      )}
-      <path
-        d={geom.line}
-        fill="none"
-        className={MINI_INK_STROKE}
-        {...MINI_STROKE_VEC}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </MiniChartFrame>
-  );
-}
+/* ══════════════════════════════════════════════════════════════
+ * Main component
+ * ══════════════════════════════════════════════════════════════ */
 
 export function RunwaySummaryLineDiagrams({
   className,
@@ -500,7 +455,6 @@ export function RunwaySummaryLineDiagrams({
 }: {
   className?: string;
   viewMode: ViewModeId;
-  /** ISO `YYYY-MM-DD` from the heatmap day summary; draws a vertical marker on the sparklines. */
   selectedDayYmd?: string | null;
 }) {
   const riskSurface = useAtcStore((s) => s.riskSurface);
@@ -518,52 +472,27 @@ export function RunwaySummaryLineDiagrams({
   const techWorkloadScope = useAtcStore((s) => s.techWorkloadScope);
 
   const market = useMemo(() => {
-    if (isRunwayMultiMarketStrip(country)) {
-      return gammaFocusMarket(country, configs, runwayMarketOrder);
-    }
+    if (isRunwayMultiMarketStrip(country)) return gammaFocusMarket(country, configs, runwayMarketOrder);
     return country;
   }, [country, configs, runwayMarketOrder]);
 
-  /** Same span as `layoutDatesSorted` in {@link RunwayGrid} (heatmap columns). */
   const heatmapVisibleRange = useMemo(() => {
     if (runwayFilterYear != null) {
-      const { start, end } = runwayPickerLayoutBounds(
-        runwayFilterYear,
-        runwayFilterQuarter,
-        runwayIncludeFollowingQuarter,
-      );
+      const { start, end } = runwayPickerLayoutBounds(runwayFilterYear, runwayFilterQuarter, runwayIncludeFollowingQuarter);
       return { start, end };
     }
     const dates = [...new Set(riskSurface.map((r) => r.date))].sort();
     if (dates.length === 0) return null;
     return { start: dates[0]!, end: dates[dates.length - 1]! };
-  }, [
-    riskSurface,
-    runwayFilterYear,
-    runwayFilterQuarter,
-    runwayIncludeFollowingQuarter,
-  ]);
+  }, [riskSurface, runwayFilterYear, runwayFilterQuarter, runwayIncludeFollowingQuarter]);
 
   const inStoreShapeOptsForAuto = useMemo(
-    () =>
-      lensHeatmapShapeOptsForAutoCalibrate({
-        lensTuning: riskHeatmapTuningByLens.in_store,
-        heatmapRenderStyle,
-        heatmapMonoColor,
-        heatmapSpectrumContinuous,
-      }),
-    [riskHeatmapTuningByLens.in_store, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous]
+    () => lensHeatmapShapeOptsForAutoCalibrate({ lensTuning: riskHeatmapTuningByLens.in_store, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous }),
+    [riskHeatmapTuningByLens.in_store, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous],
   );
-
   const marketRiskShapeOptsForAuto = useMemo(
-    () =>
-      lensHeatmapShapeOptsForAutoCalibrate({
-        lensTuning: riskHeatmapTuningByLens.market_risk,
-        heatmapRenderStyle,
-        heatmapMonoColor,
-        heatmapSpectrumContinuous,
-      }),
-    [riskHeatmapTuningByLens.market_risk, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous]
+    () => lensHeatmapShapeOptsForAutoCalibrate({ lensTuning: riskHeatmapTuningByLens.market_risk, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous }),
+    [riskHeatmapTuningByLens.market_risk, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous],
   );
 
   const inStoreAutoPressureOffset = useMemo(() => {
@@ -572,12 +501,7 @@ export function RunwaySummaryLineDiagrams({
     const cfg = configs.find((c) => c.market === market);
     const yamlRaw = cfg?.riskHeatmapBusinessPressureOffset;
     const y = yamlRaw != null && Number.isFinite(yamlRaw) ? yamlRaw : 0;
-    return computeRestaurantAutoPressureOffset({
-      rawMetrics: raws,
-      shapeOpts: inStoreShapeOptsForAuto,
-      globalPressureOffset: t.pressureOffset,
-      yamlPressureDelta: y,
-    });
+    return computeRestaurantAutoPressureOffset({ rawMetrics: raws, shapeOpts: inStoreShapeOptsForAuto, globalPressureOffset: t.pressureOffset, yamlPressureDelta: y });
   }, [riskSurface, market, configs, riskHeatmapTuningByLens.in_store, inStoreShapeOptsForAuto]);
 
   const marketRiskAutoPressureOffset = useMemo(() => {
@@ -586,79 +510,27 @@ export function RunwaySummaryLineDiagrams({
     const cfg = configs.find((c) => c.market === market);
     const yamlRaw = cfg?.riskHeatmapMarketRiskPressureOffset;
     const y = yamlRaw != null && Number.isFinite(yamlRaw) ? yamlRaw : 0;
-    return computeAutoHeatmapPressureOffset({
-      viewMode: 'market_risk',
-      rawMetrics: raws,
-      shapeOpts: marketRiskShapeOptsForAuto,
-      globalPressureOffset: t.pressureOffset,
-      yamlPressureDelta: y,
-    });
+    return computeAutoHeatmapPressureOffset({ viewMode: 'market_risk', rawMetrics: raws, shapeOpts: marketRiskShapeOptsForAuto, globalPressureOffset: t.pressureOffset, yamlPressureDelta: y });
   }, [riskSurface, market, configs, riskHeatmapTuningByLens.market_risk, marketRiskShapeOptsForAuto]);
 
-  /** Same offset + transfer as Restaurant Activity runway cells for this market (YAML + auto calibration). */
   const inStoreHeatmapColorOpts = useMemo((): HeatmapColorOpts => {
-    const heatmapSpectrumMode: HeatmapSpectrumMode = heatmapSpectrumContinuous
-      ? 'continuous'
-      : 'discrete';
+    const heatmapSpectrumMode: HeatmapSpectrumMode = heatmapSpectrumContinuous ? 'continuous' : 'discrete';
     const t = riskHeatmapTuningByLens.in_store;
-    const base: HeatmapColorOpts = {
-      riskHeatmapCurve: t.curve,
-      riskHeatmapGamma: t.gamma,
-      riskHeatmapTailPower: t.tailPower,
-      businessHeatmapPressureOffset: t.pressureOffset,
-      renderStyle: heatmapRenderStyle,
-      monoColor: heatmapMonoColor,
-      heatmapSpectrumMode,
-    };
+    const base: HeatmapColorOpts = { riskHeatmapCurve: t.curve, riskHeatmapGamma: t.gamma, riskHeatmapTailPower: t.tailPower, businessHeatmapPressureOffset: t.pressureOffset, renderStyle: heatmapRenderStyle, monoColor: heatmapMonoColor, heatmapSpectrumMode };
     const cfg = configs.find((c) => c.market === market);
     return heatmapColorOptsWithMarketYaml('in_store', base, cfg, inStoreAutoPressureOffset, 0);
-  }, [
-    riskHeatmapTuningByLens,
-    heatmapRenderStyle,
-    heatmapMonoColor,
-    heatmapSpectrumContinuous,
-    configs,
-    market,
-    inStoreAutoPressureOffset,
-  ]);
+  }, [riskHeatmapTuningByLens, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous, configs, market, inStoreAutoPressureOffset]);
 
-  /** Same offset + transfer as Deployment Risk runway cells (YAML + auto calibration). */
   const marketRiskHeatmapColorOpts = useMemo((): HeatmapColorOpts => {
-    const heatmapSpectrumMode: HeatmapSpectrumMode = heatmapSpectrumContinuous
-      ? 'continuous'
-      : 'discrete';
+    const heatmapSpectrumMode: HeatmapSpectrumMode = heatmapSpectrumContinuous ? 'continuous' : 'discrete';
     const t = riskHeatmapTuningByLens.market_risk;
-    const base: HeatmapColorOpts = {
-      riskHeatmapCurve: t.curve,
-      riskHeatmapGamma: t.gamma,
-      riskHeatmapTailPower: t.tailPower,
-      businessHeatmapPressureOffset: t.pressureOffset,
-      renderStyle: heatmapRenderStyle,
-      monoColor: heatmapMonoColor,
-      heatmapSpectrumMode,
-    };
+    const base: HeatmapColorOpts = { riskHeatmapCurve: t.curve, riskHeatmapGamma: t.gamma, riskHeatmapTailPower: t.tailPower, businessHeatmapPressureOffset: t.pressureOffset, renderStyle: heatmapRenderStyle, monoColor: heatmapMonoColor, heatmapSpectrumMode };
     const cfg = configs.find((c) => c.market === market);
     return heatmapColorOptsWithMarketYaml('market_risk', base, cfg, 0, marketRiskAutoPressureOffset);
-  }, [
-    riskHeatmapTuningByLens,
-    heatmapRenderStyle,
-    heatmapMonoColor,
-    heatmapSpectrumContinuous,
-    configs,
-    market,
-    marketRiskAutoPressureOffset,
-  ]);
+  }, [riskHeatmapTuningByLens, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous, configs, market, marketRiskAutoPressureOffset]);
 
   const seriesOpts = useMemo(
-    () =>
-      heatmapVisibleRange
-        ? {
-            tuning: riskTuning,
-            visibleDateRange: heatmapVisibleRange,
-            inStoreHeatmapColorOpts,
-            marketRiskHeatmapColorOpts,
-          }
-        : null,
+    () => heatmapVisibleRange ? { tuning: riskTuning, visibleDateRange: heatmapVisibleRange, inStoreHeatmapColorOpts, marketRiskHeatmapColorOpts } : null,
     [riskTuning, heatmapVisibleRange, inStoreHeatmapColorOpts, marketRiskHeatmapColorOpts],
   );
 
@@ -677,139 +549,119 @@ export function RunwaySummaryLineDiagrams({
     [techMixRows],
   );
 
-  const selectedXCap = useMemo(() => {
+  const selectedDataIdx = useMemo(() => {
     if (!selectedDayYmd || !seriesOpts) return null;
-    return miniChartXForDayYmd(selectedDayYmd, riskSurface, market, CAP_LAY, seriesOpts);
+    return miniChartDataIndexForDayYmd(selectedDayYmd, riskSurface, market, seriesOpts);
   }, [selectedDayYmd, riskSurface, market, seriesOpts]);
-
-  const selectedXDr = useMemo(() => {
-    if (!selectedDayYmd || !seriesOpts) return null;
-    return miniChartXForDayYmd(selectedDayYmd, riskSurface, market, DR_LAY, seriesOpts);
-  }, [selectedDayYmd, riskSurface, market, seriesOpts]);
-
-  const selectedXMix = useMemo(() => {
-    if (!selectedDayYmd || !heatmapVisibleRange) return null;
-    return miniChartMonthBarCenterX(
-      selectedDayYmd,
-      riskSurface,
-      market,
-      MIX_LAY,
-      heatmapVisibleRange,
-    );
-  }, [selectedDayYmd, riskSurface, market, heatmapVisibleRange]);
 
   const timeAxisMarks = useMemo(() => {
     if (!heatmapVisibleRange) return null;
-    return buildRunwayMiniTimeAxisMarks(
-      heatmapVisibleRange.start,
-      heatmapVisibleRange.end,
-      CAP_LAY,
-    );
+    return buildRunwayMiniTimeAxisMarks(heatmapVisibleRange.start, heatmapVisibleRange.end, CAP_LAY);
   }, [heatmapVisibleRange]);
 
-  const capGeom = useMemo(() => {
-    if (!series) return null;
-    const gap = buildDemandCapacityGapPaths(series.demand, series.capacity, CAP_LAY);
-    const dPts = pointsForSeries(series.demand, CAP_LAY);
-    const cPts = pointsForSeries(series.capacity, CAP_LAY);
-    return {
-      gap,
-      lineD: smoothLineThrough(dPts),
-      lineC: smoothLineThrough(cPts),
-    };
-  }, [series]);
+  const n = series?.demand.length ?? 0;
 
-  const techMixGeom = useMemo(() => {
-    if (!series?.techWorkloadMix) return null;
-    const { bauShare, campaignShare } = series.techWorkloadMix;
-    const n = bauShare.length;
-    if (n < 2) return null;
-    const ptsBau = pointsForSeries(bauShare, MIX_LAY);
-    const z = Array.from({ length: n }, () => 0);
-    const one = Array.from({ length: n }, () => 1);
-    const cumCampTop = bauShare.map((b, i) => b + campaignShare[i]!);
-    const ptsCumCampTop = pointsForSeries(cumCampTop, MIX_LAY);
-    const ptsOne = pointsForSeries(one, MIX_LAY);
-    return {
-      lineBau: smoothLineThrough(ptsBau),
-      lineCumCampTop: smoothLineThrough(ptsCumCampTop),
-      lineStackTop: smoothLineThrough(ptsOne),
-      stackBau: ribbonPathSmoothTopPolyBottom(bauShare, z, MIX_LAY),
-      stackCampaign: ribbonPathSmoothTopPolyBottom(cumCampTop, bauShare, MIX_LAY),
-      stackProject: ribbonPathSmoothTopPolyBottom(one, cumCampTop, MIX_LAY),
-    };
+  const demandDatums = useMemo(() => (series ? toDatums(series.demand) : []), [series]);
+  const capacityDatums = useMemo(() => (series ? toDatums(series.capacity) : []), [series]);
+  const bauDatums = useMemo(() => (series ? toDatums(series.techWorkloadMix.bauShare) : []), [series]);
+  const campDatums = useMemo(() => {
+    if (!series) return [];
+    return series.techWorkloadMix.bauShare.map((b, i) => ({ x: i, y: b + series.techWorkloadMix.campaignShare[i]! }));
   }, [series]);
+  const drDatums = useMemo(() => (series ? toDatums(series.deploymentRisk) : []), [series]);
+  const storeDatums = useMemo(() => (series ? toDatums(series.storeTrading01) : []), [series]);
 
-  const drGeom = useMemo(() => {
-    if (!series) return null;
-    const pts = pointsForSeries(series.deploymentRisk, DR_LAY);
-    const innerH = DR_LAY.vbH - DR_LAY.padT - DR_LAY.padB;
-    const yHalf = DR_LAY.padT + innerH * 0.5;
-    const yFull = DR_LAY.padT;
-    return {
-      area: smoothAreaToBaseline(pts, DR_LAY),
-      line: smoothLineThrough(pts),
-      yHalf,
-      yFull,
-    };
-  }, [series]);
-
-  const storeGeom = useMemo(() => {
-    if (!series) return null;
-    const pts = pointsForSeries(series.storeTrading01, DR_LAY);
-    const innerH = DR_LAY.vbH - DR_LAY.padT - DR_LAY.padB;
-    const yHalf = DR_LAY.padT + innerH * 0.5;
-    const yFull = DR_LAY.padT;
-    return {
-      area: smoothAreaToBaseline(pts, DR_LAY),
-      line: smoothLineThrough(pts),
-      yHalf,
-      yFull,
-    };
-  }, [series]);
+  const capTickConfig = useMemo(() => buildTickConfig(timeAxisMarks, n, CAP_LAY), [timeAxisMarks, n]);
 
   if (viewMode === 'code') {
     return (
-      <div
-        className={cn(
-          'rounded-md bg-transparent px-0 py-2 text-[11px] leading-relaxed text-muted-foreground',
-          className,
-        )}
-      >
+      <div className={cn('rounded-md bg-transparent px-0 py-2 text-[11px] leading-relaxed text-muted-foreground', className)}>
         Lens trend charts are hidden in Code view. Switch to Technology Teams, Restaurant Activity, or
         Deployment Risk to see the matching runway trace.
       </div>
     );
   }
 
-  if (!series || !capGeom || !techMixGeom || !drGeom || !storeGeom) {
+  if (!series || n < 2) {
     return (
-      <div
-        className={cn(
-          'rounded-md bg-transparent px-0 py-2 text-[11px] text-muted-foreground',
-          className,
-        )}
-      >
+      <div className={cn('rounded-md bg-transparent px-0 py-2 text-[11px] text-muted-foreground', className)}>
         Diagrams appear when the runway has enough days modelled for this market.
       </div>
     );
   }
 
   const cardClass = cn('flex w-full flex-col gap-4 px-0 py-2 sm:px-0', className);
-
-  const timeAxisCap =
-    timeAxisMarks && (
-      <TimeAxisLabelsG lay={CAP_LAY} years={timeAxisMarks.years} quarters={timeAxisMarks.quarters} />
-    );
-  const timeAxisDr =
-    timeAxisMarks && (
-      <TimeAxisLabelsG lay={DR_LAY} years={timeAxisMarks.years} quarters={timeAxisMarks.quarters} />
-    );
-
   const mixScope: TechWorkloadScope = techWorkloadScope;
 
+  /* ── Capacity vs Demand ── */
+  const capacityBlock = (
+    <MiniChartSection
+      title="Capacity vs demand"
+      caption="Dashed line is capacity, solid is demand. Grey fill where demand is below capacity; red where it exceeds."
+    >
+      <ParentSize className="block w-full" debounceTime={32}>
+        {({ width }) => {
+          if (width < 20) return null;
+          const height = Math.max(64, Math.round(width * CAP_ASPECT));
+          return (
+            <XYChart
+              theme={miniTheme}
+              xScale={{ type: 'linear', domain: [0, n - 1], zero: false, nice: false }}
+              yScale={{ type: 'linear', domain: [0, 1], zero: true, nice: false }}
+              width={width}
+              height={height}
+              margin={CHART_MARGIN}
+            >
+              <Grid rows columns={false} numTicks={2} />
+              <CapacityDemandOverlay demand={series!.demand} capacity={series!.capacity} />
+              <LineSeries dataKey="Capacity" data={capacityDatums} xAccessor={xAcc} yAccessor={yAcc} curve={curveCardinal} strokeOpacity={0} />
+              <LineSeries dataKey="Demand" data={demandDatums} xAccessor={xAcc} yAccessor={yAcc} curve={curveCardinal} strokeOpacity={0} />
+              <Axis orientation="left" tickValues={Y_TICK_VALUES} tickFormat={pctFormat} hideAxisLine />
+              <Axis
+                orientation="bottom"
+                numTicks={capTickConfig.tickValues.length}
+                tickValues={capTickConfig.tickValues}
+                tickFormat={capTickConfig.tickFormat}
+                hideTicks={false}
+                hideAxisLine
+              />
+              <Tooltip<IndexedDatum>
+                snapTooltipToDatumX
+                snapTooltipToDatumY
+                showVerticalCrosshair
+                showHorizontalCrosshair
+                showDatumGlyph
+                showSeriesGlyphs
+                verticalCrosshairStyle={CROSSHAIR_STYLE}
+                horizontalCrosshairStyle={CROSSHAIR_STYLE}
+                glyphStyle={{ radius: 3, fill: ZINC_FG, strokeWidth: 0 }}
+                renderTooltip={({ tooltipData }) => (
+                  <div style={{ fontSize: 10, lineHeight: 1.4, minWidth: 80 }}>
+                    {(Object.keys(tooltipData?.datumByKey ?? {}) as string[]).map((key) => {
+                      const entry = tooltipData?.datumByKey?.[key];
+                      if (!entry) return null;
+                      const isNearest = tooltipData?.nearestDatum?.key === key;
+                      return (
+                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: isNearest ? 600 : 400 }}>
+                          <span style={{ color: 'var(--color-zinc-500)' }}>{key}</span>
+                          <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{(entry.datum.y * 100).toFixed(0)}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              />
+              <SelectedDayLine dataIndex={selectedDataIdx} />
+            </XYChart>
+          );
+        }}
+      </ParentSize>
+    </MiniChartSection>
+  );
+
+  /* ── Technology Load Mix ── */
   const techMixBlock = (
-    <MiniChartFrame
+    <MiniChartSection
       title="Technology load mix"
       caption={
         <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -827,167 +679,208 @@ export function RunwaySummaryLineDiagrams({
           </span>
         </span>
       }
-      vbW={MIX_LAY.vbW}
-      vbH={MIX_LAY.vbH}
-      timeAxisLabels={
-        timeAxisMarks && (
-          <TimeAxisLabelsG lay={MIX_LAY} years={timeAxisMarks.years} quarters={timeAxisMarks.quarters} />
-        )
-      }
-      overlay={<SelectedDayPlotMarker lay={MIX_LAY} x={selectedXMix} />}
     >
-      {(() => {
-        const { xl, xr, yt, yb } = plotInnerBounds(MIX_LAY);
-        return (
-          <rect
-            x={xl}
-            y={yt}
-            width={xr - xl}
-            height={yb - yt}
-            rx={3}
-            className="fill-zinc-200/30 dark:fill-zinc-800/15"
-          />
-        );
-      })()}
-      <PlotAxes lay={MIX_LAY} />
-      <MiniPlotScaleGuideLines lay={MIX_LAY} />
-      {techMixRows && techMixRows.length > 0 && techMixMonths ? (
-        mixScope === 'all' ? (
-          <TechMixMonthlyStackedBars
-            months={techMixMonths}
-            lay={MIX_LAY}
-          />
-        ) : (
-          <TechMixMonthlyScopeBars
-            rows={techMixRows}
-            lay={MIX_LAY}
-            scope={mixScope}
-            fillClassName={
-              mixScope === 'bau'
-                ? TECH_MIX_PAT_BAU_CLASS
-                : mixScope === 'campaign'
-                  ? TECH_MIX_PAT_CAMP_CLASS
-                  : TECH_MIX_PAT_PROJ_CLASS
-            }
-          />
-        )
-      ) : (
-        <>
-          <path
-            d={techMixGeom.stackBau}
-            className={cn(TECH_MIX_PAT_BAU_CLASS, TECH_MIX_SEG_OUTLINE_CLASS)}
-            {...MINI_STROKE_VEC}
-            strokeLinejoin="round"
-            paintOrder="fill stroke"
-          />
-          <path
-            d={techMixGeom.stackCampaign}
-            className={cn(TECH_MIX_PAT_CAMP_CLASS, TECH_MIX_SEG_OUTLINE_CLASS)}
-            {...MINI_STROKE_VEC}
-            strokeLinejoin="round"
-            paintOrder="fill stroke"
-          />
-          <path
-            d={techMixGeom.stackProject}
-            className={cn(TECH_MIX_PAT_PROJ_CLASS, TECH_MIX_SEG_OUTLINE_CLASS)}
-            {...MINI_STROKE_VEC}
-            strokeLinejoin="round"
-            paintOrder="fill stroke"
-          />
-          <path
-            d={techMixGeom.lineBau}
-            fill="none"
-            className={MINI_INK_STROKE}
-            {...MINI_STROKE_VEC}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-          <path
-            d={techMixGeom.lineCumCampTop}
-            fill="none"
-            className={MINI_INK_STROKE_DIM}
-            {...MINI_STROKE_VEC}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-          <path
-            d={techMixGeom.lineStackTop}
-            fill="none"
-            className={MINI_INK_STROKE_SOFT}
-            {...MINI_STROKE_VEC}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-        </>
-      )}
-    </MiniChartFrame>
+      <ParentSize className="block w-full" debounceTime={32}>
+        {({ width }) => {
+          if (width < 20) return null;
+          const height = Math.max(64, Math.round(width * MIX_ASPECT));
+          return (
+            <XYChart
+              theme={miniTheme}
+              xScale={{ type: 'linear', domain: [0, n - 1], zero: false, nice: false }}
+              yScale={{ type: 'linear', domain: [0, 1], zero: true, nice: false }}
+              width={width}
+              height={height}
+              margin={CHART_MARGIN}
+            >
+              <Grid rows columns={false} numTicks={2} />
+              {techMixRows && techMixRows.length > 0 && techMixMonths ? (
+                mixScope === 'all' ? (
+                  <TechMixMonthlyStackedBars months={techMixMonths} />
+                ) : (
+                  <TechMixMonthlyScopeBars
+                    rows={techMixRows}
+                    scope={mixScope}
+                    fillClassName={
+                      mixScope === 'bau' ? TECH_MIX_PAT_BAU_CLASS
+                        : mixScope === 'campaign' ? TECH_MIX_PAT_CAMP_CLASS
+                          : TECH_MIX_PAT_PROJ_CLASS
+                    }
+                  />
+                )
+              ) : series!.techWorkloadMix.bauShare.length >= 2 ? (
+                <TechMixRibbonPaths
+                  bauShare={series!.techWorkloadMix.bauShare}
+                  campaignShare={series!.techWorkloadMix.campaignShare}
+                />
+              ) : null}
+              <LineSeries dataKey="BAU" data={bauDatums} xAccessor={xAcc} yAccessor={yAcc} curve={curveCardinal} strokeOpacity={0} />
+              <LineSeries dataKey="BAU + Campaign" data={campDatums} xAccessor={xAcc} yAccessor={yAcc} curve={curveCardinal} strokeOpacity={0} />
+              <Axis orientation="left" tickValues={Y_TICK_VALUES} tickFormat={pctFormat} hideAxisLine />
+              <Axis
+                orientation="bottom"
+                numTicks={capTickConfig.tickValues.length}
+                tickValues={capTickConfig.tickValues}
+                tickFormat={capTickConfig.tickFormat}
+                hideTicks={false}
+                hideAxisLine
+              />
+              <Tooltip<IndexedDatum>
+                snapTooltipToDatumX
+                showVerticalCrosshair
+                showDatumGlyph
+                showSeriesGlyphs
+                verticalCrosshairStyle={CROSSHAIR_STYLE}
+                glyphStyle={{ radius: 3, fill: ZINC_FG, strokeWidth: 0 }}
+                renderTooltip={({ tooltipData }) => (
+                  <div style={{ fontSize: 10, lineHeight: 1.4, minWidth: 80 }}>
+                    {(Object.keys(tooltipData?.datumByKey ?? {}) as string[]).map((key) => {
+                      const entry = tooltipData?.datumByKey?.[key];
+                      if (!entry) return null;
+                      const isNearest = tooltipData?.nearestDatum?.key === key;
+                      return (
+                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: isNearest ? 600 : 400 }}>
+                          <span style={{ color: 'var(--color-zinc-500)' }}>{key}</span>
+                          <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{(entry.datum.y * 100).toFixed(0)}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              />
+              {selectedDayYmd && techMixRows && techMixRows.length > 0 ? (
+                <TechMixSelectedDayLine
+                  months={techMixMonths ?? techMixRows}
+                  selectedDayYmd={selectedDayYmd}
+                  innerW={width - CHART_MARGIN.left - CHART_MARGIN.right}
+                  innerH={height - CHART_MARGIN.top - CHART_MARGIN.bottom}
+                />
+              ) : (
+                <SelectedDayLine dataIndex={selectedDataIdx} />
+              )}
+            </XYChart>
+          );
+        }}
+      </ParentSize>
+    </MiniChartSection>
   );
 
-  const capacityBlock = (
-    <MiniChartFrame
-      title="Capacity vs demand"
-      caption="Dashed line is capacity, solid is demand. Grey fill where demand is below capacity; red where it exceeds."
-      vbW={CAP_LAY.vbW}
-      vbH={CAP_LAY.vbH}
-      timeAxisLabels={timeAxisCap}
-      overlay={<SelectedDayPlotMarker lay={CAP_LAY} x={selectedXCap} />}
-    >
-      <PlotAxes lay={CAP_LAY} />
-      <MiniPlotScaleGuideLines lay={CAP_LAY} />
-      {capGeom.gap.under && (
-        <path
-          d={capGeom.gap.under}
-          className={SCALAR_AREA_FILL_CLASS}
-          stroke="none"
-        />
-      )}
-      {capGeom.gap.over && (
-        <path
-          d={capGeom.gap.over}
-          className="fill-red-500/50 dark:fill-red-400/48"
-          stroke="none"
-        />
-      )}
-      <path
-        d={capGeom.lineC}
-        fill="none"
-        className={MINI_INK_STROKE}
-        strokeOpacity={0.9}
-        {...MINI_STROKE_VEC}
-        strokeDasharray="5 3"
-        strokeLinecap="round"
-      />
-      <path
-        d={capGeom.lineD}
-        fill="none"
-        className={MINI_SOLID_TRACE_CLASS}
-        {...MINI_SOLID_TRACE_PROPS}
-      />
-    </MiniChartFrame>
-  );
-
+  /* ── Deployment Risk ── */
   const deploymentBlock = (
-    <ScalarTraceMiniChart
+    <MiniChartSection
       title="Deployment risk"
       caption="Weekly deployment-risk score. Higher values mean more fragile release windows."
-      lay={DR_LAY}
-      geom={drGeom}
-      fillClassName={SCALAR_AREA_FILL_CLASS}
-      timeAxisLabels={timeAxisDr}
-      selectedDayX={selectedXDr}
-    />
+    >
+      <ParentSize className="block w-full" debounceTime={32}>
+        {({ width }) => {
+          if (width < 20) return null;
+          const height = Math.max(52, Math.round(width * DR_ASPECT));
+          return (
+            <XYChart
+              theme={miniTheme}
+              xScale={{ type: 'linear', domain: [0, n - 1], zero: false, nice: false }}
+              yScale={{ type: 'linear', domain: [0, 1], zero: true, nice: false }}
+              width={width}
+              height={height}
+              margin={DR_CHART_MARGIN}
+            >
+              <Grid rows columns={false} numTicks={2} />
+              <ScalarAreaFill vals={series!.deploymentRisk} fillClassName={SCALAR_AREA_FILL_CLASS} />
+              <ScalarLinePath vals={series!.deploymentRisk} />
+              <LineSeries dataKey="Risk" data={drDatums} xAccessor={xAcc} yAccessor={yAcc} curve={curveCardinal} strokeOpacity={0} />
+              <Axis orientation="left" tickValues={Y_TICK_VALUES} tickFormat={pctFormat} hideAxisLine />
+              <Axis
+                orientation="bottom"
+                numTicks={capTickConfig.tickValues.length}
+                tickValues={capTickConfig.tickValues}
+                tickFormat={capTickConfig.tickFormat}
+                hideTicks={false}
+                hideAxisLine
+              />
+              <Tooltip<IndexedDatum>
+                snapTooltipToDatumX
+                snapTooltipToDatumY
+                showVerticalCrosshair
+                showHorizontalCrosshair
+                showDatumGlyph
+                verticalCrosshairStyle={CROSSHAIR_STYLE}
+                horizontalCrosshairStyle={CROSSHAIR_STYLE}
+                glyphStyle={{ radius: 3, fill: ZINC_FG, strokeWidth: 0 }}
+                renderTooltip={({ tooltipData }) => {
+                  const d = tooltipData?.nearestDatum;
+                  if (!d) return null;
+                  return (
+                    <div style={{ fontSize: 10, lineHeight: 1.4, fontVariantNumeric: 'tabular-nums' }}>
+                      Risk {(d.datum.y * 100).toFixed(0)}%
+                    </div>
+                  );
+                }}
+              />
+              <SelectedDayLine dataIndex={selectedDataIdx} />
+            </XYChart>
+          );
+        }}
+      </ParentSize>
+    </MiniChartSection>
   );
 
+  /* ── Store Trading ── */
   const storeBlock = (
-    <ScalarTraceMiniChart
+    <MiniChartSection
       title="Store trading"
       caption="Weekly restaurant trading intensity. Higher values mean busier trading periods."
-      lay={DR_LAY}
-      geom={storeGeom}
-      fillClassName={SCALAR_AREA_FILL_CLASS}
-      timeAxisLabels={timeAxisDr}
-      selectedDayX={selectedXDr}
-    />
+    >
+      <ParentSize className="block w-full" debounceTime={32}>
+        {({ width }) => {
+          if (width < 20) return null;
+          const height = Math.max(52, Math.round(width * DR_ASPECT));
+          return (
+            <XYChart
+              theme={miniTheme}
+              xScale={{ type: 'linear', domain: [0, n - 1], zero: false, nice: false }}
+              yScale={{ type: 'linear', domain: [0, 1], zero: true, nice: false }}
+              width={width}
+              height={height}
+              margin={DR_CHART_MARGIN}
+            >
+              <Grid rows columns={false} numTicks={2} />
+              <ScalarAreaFill vals={series!.storeTrading01} fillClassName={SCALAR_AREA_FILL_CLASS} />
+              <ScalarLinePath vals={series!.storeTrading01} />
+              <LineSeries dataKey="Trading" data={storeDatums} xAccessor={xAcc} yAccessor={yAcc} curve={curveCardinal} strokeOpacity={0} />
+              <Axis orientation="left" tickValues={Y_TICK_VALUES} tickFormat={pctFormat} hideAxisLine />
+              <Axis
+                orientation="bottom"
+                numTicks={capTickConfig.tickValues.length}
+                tickValues={capTickConfig.tickValues}
+                tickFormat={capTickConfig.tickFormat}
+                hideTicks={false}
+                hideAxisLine
+              />
+              <Tooltip<IndexedDatum>
+                snapTooltipToDatumX
+                snapTooltipToDatumY
+                showVerticalCrosshair
+                showHorizontalCrosshair
+                showDatumGlyph
+                verticalCrosshairStyle={CROSSHAIR_STYLE}
+                horizontalCrosshairStyle={CROSSHAIR_STYLE}
+                glyphStyle={{ radius: 3, fill: ZINC_FG, strokeWidth: 0 }}
+                renderTooltip={({ tooltipData }) => {
+                  const d = tooltipData?.nearestDatum;
+                  if (!d) return null;
+                  return (
+                    <div style={{ fontSize: 10, lineHeight: 1.4, fontVariantNumeric: 'tabular-nums' }}>
+                      Trading {(d.datum.y * 100).toFixed(0)}%
+                    </div>
+                  );
+                }}
+              />
+              <SelectedDayLine dataIndex={selectedDataIdx} />
+            </XYChart>
+          );
+        }}
+      </ParentSize>
+    </MiniChartSection>
   );
 
   if (viewMode === 'combined') {

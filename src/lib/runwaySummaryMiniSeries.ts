@@ -356,11 +356,14 @@ export function miniChartMonthBarCenterX(
   return Math.min(xr, Math.max(xl + bw / 2, xCenter));
 }
 
-export function miniChartXForDayYmd(
+/**
+ * Resampled data-space index (0 … targetPts-1) for the week bucket containing `dayYmd`.
+ * Used by XYChart-based charts where the x scale maps data indices to pixels.
+ */
+export function miniChartDataIndexForDayYmd(
   dayYmd: string,
   rows: RiskRow[],
   market: string,
-  lay: { padL: number; padR: number; vbW: number },
   opts?: ExtractRunwayMiniSeriesOpts,
 ): number | null {
   const targetPts = opts?.targetPts ?? DEFAULT_PTS;
@@ -384,11 +387,24 @@ export function miniChartXForDayYmd(
   }
   if (weekIdx < 0 || numWeeks < 4) return null;
 
-  const innerW = lay.vbW - lay.padL - lay.padR;
   const denomW = Math.max(numWeeks - 1, 1);
   const denomJ = Math.max(targetPts - 1, 1);
-  const jFloat = (weekIdx / denomW) * denomJ;
-  const x = lay.padL + (innerW * jFloat) / denomJ;
+  return (weekIdx / denomW) * denomJ;
+}
+
+export function miniChartXForDayYmd(
+  dayYmd: string,
+  rows: RiskRow[],
+  market: string,
+  lay: { padL: number; padR: number; vbW: number },
+  opts?: ExtractRunwayMiniSeriesOpts,
+): number | null {
+  const idx = miniChartDataIndexForDayYmd(dayYmd, rows, market, opts);
+  if (idx == null) return null;
+  const targetPts = opts?.targetPts ?? DEFAULT_PTS;
+  const innerW = lay.vbW - lay.padL - lay.padR;
+  const denomJ = Math.max(targetPts - 1, 1);
+  const x = lay.padL + (innerW * idx) / denomJ;
   const xl = lay.padL;
   const xr = lay.vbW - lay.padR;
   return Math.min(xr, Math.max(xl, x));
