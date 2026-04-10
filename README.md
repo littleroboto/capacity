@@ -20,11 +20,11 @@ Projects live in one place. Promotions in another. Holidays and school breaks in
 
 Think in three layers. All three are **encoded** (today as **YAML per market**) so they stay **inspectable** and **comparable** across regions without forcing identical numbers.
 
-| Layer | Plain question | Role in the model |
-| ----- | -------------- | ----------------- |
-| **Supply** | How much room exists, and **when does the calendar eat it?** | Named caps (people, labs, slots) plus multipliers for holidays, leave bands, and similar. This is your **denominator** — and it changes by day. |
-| **Demand** | What **pulls** on that envelope? | BAU, dated campaigns (prep + live), technology programmes, and other consumers. Each has **timing** and **how much** of the finite resources it asks for. |
-| **Risk & context** | If we ship here, **how exposed are we?** | Trading rhythm, promotion weight, deployment norms, named fragile windows. **Guidance**, not a second hidden spreadsheet — combined with utilisation so “hot” means something you can **unpack**. |
+| Layer              | Plain question                                               | Role in the model                                                                                                                                                                                 |
+| ------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Supply**         | How much room exists, and **when does the calendar eat it?** | Named caps (people, labs, slots) plus multipliers for holidays, leave bands, and similar. This is your **denominator** — and it changes by day.                                                   |
+| **Demand**         | What **pulls** on that envelope?                             | BAU, dated campaigns (prep + live), technology programmes, and other consumers. Each has **timing** and **how much** of the finite resources it asks for.                                         |
+| **Risk & context** | If we ship here, **how exposed are we?**                     | Trading rhythm, promotion weight, deployment norms, named fragile windows. **Guidance**, not a second hidden spreadsheet — combined with utilisation so “hot” means something you can **unpack**. |
 
 **Commercial moments are not binary.** A flagship promotion and a light promo can sit in the same schema; **intensity** (for example `promo_weight`) scales how hard they hit the **commercial** and **risk** surfaces without pretending every box on the calendar is the same size.
 
@@ -191,12 +191,12 @@ Screenshots live under [`docs/images/`](docs/images/) and use **repo-relative** 
 
 ## Why this is a step change
 
-| Before | After |
-| ------ | ----- |
-| Busy = anecdotes and disconnected lists | Busy = **summed load** on **named caps** on **named days** |
-| “Biggest” mistaken for “tightest” | **Declared headroom** — volume of work and **room to absorb it** can diverge, on the page |
-| Experts-only dashboards | A surface **built to be read in the room** — colour, runway, drill-down to **which inputs** moved the cell |
-| Trade-offs argued from memory | Trade-offs argued from a **single inspectable model** you can change and recompute |
+| Before                                  | After                                                                                                      |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Busy = anecdotes and disconnected lists | Busy = **summed load** on **named caps** on **named days**                                                 |
+| “Biggest” mistaken for “tightest”       | **Declared headroom** — volume of work and **room to absorb it** can diverge, on the page                  |
+| Experts-only dashboards                 | A surface **built to be read in the room** — colour, runway, drill-down to **which inputs** moved the cell |
+| Trade-offs argued from memory           | Trade-offs argued from a **single inspectable model** you can change and recompute                         |
 
 It is still **judgment-led**. The model does not remove leadership; it **grounds** timing, pilots, and sequencing in **one shared picture** instead of three reconciled afterward.
 
@@ -206,10 +206,10 @@ It is still **judgment-led**. The model does not remove leadership; it **grounds
 
 ## Repository map
 
-| Path | Role |
-| ---- | ---- |
-| `public/data/markets/` | Per-market scenario YAML |
-| `src/` | UI, engine, heatmap and runway |
-| `api/` | Optional shared workspace and server routes |
-| `docs/` | Product and technical documentation |
-| `docs/images/` | PNGs referenced inline from the README (and other docs) |
+| Path                   | Role                                                    |
+| ---------------------- | ------------------------------------------------------- |
+| `public/data/markets/` | Per-market scenario YAML                                |
+| `src/`                 | UI, engine, heatmap and runway                          |
+| `api/`                 | Optional shared workspace and server routes             |
+| `docs/`                | Product and technical documentation                     |
+| `docs/images/`         | PNGs referenced inline from the README (and other docs) |

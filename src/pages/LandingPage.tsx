@@ -28,6 +28,9 @@ import {
 } from '@/lib/riskHeatmapColors';
 import { ArrowRight, ChevronDown, ExternalLink } from 'lucide-react';
 
+/** “Same engine as the workbench” iso preview (`LandingIsoBrowserMock`). Re-enable when ready. */
+const LANDING_SHOW_ISO_ENGINE_PREVIEW = false;
+
 const DOW = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
 const MONTH_SHORT = [
   'Jan',
@@ -811,7 +814,7 @@ export function LandingPage() {
 
           <LandingCapacityProfilesMock />
 
-          <LandingIsoBrowserMock />
+          {LANDING_SHOW_ISO_ENGINE_PREVIEW ? <LandingIsoBrowserMock /> : null}
 
           <LandingYamlProjectTwinMock />
 
