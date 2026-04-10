@@ -20,7 +20,11 @@ import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMoc
 import { LandingMultiMarketDeploymentMock } from '@/components/landing/LandingMultiMarketDeploymentMock';
 import { LandingYamlProjectTwinMock } from '@/components/landing/LandingYamlProjectTwinMock';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
-import { heatmapColorDiscrete, heatmapSpectrumLegendGradientCss } from '@/lib/riskHeatmapColors';
+import {
+  heatmapColorContinuous,
+  heatmapColorDiscrete,
+  heatmapSpectrumLegendGradientCss,
+} from '@/lib/riskHeatmapColors';
 import { ArrowRight, ChevronDown, ExternalLink } from 'lucide-react';
 
 const DOW = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
@@ -115,17 +119,45 @@ const HERO_BLOCKS = buildHeroBlocks();
 /** First real day of Apr 2026 (Wed) — selection dot like the reference. */
 const HERO_SELECTED = { year: 2026, month: 4, day: 1 };
 
-function HeatLegend() {
+/** Empty / pad cells — heat animation starts here before walking the spectrum. */
+const HERO_CELL_NEUTRAL = '#2a2a2e';
+
+/** Grey first, then sample the temperature ramp 0 → target so each cell “builds” its heat. */
+function buildHeroHeatColorKeyframes(targetMetric01: number): { keyframes: string[]; times: number[] } {
+  const innerSteps = 11;
+  const keyframes: string[] = [HERO_CELL_NEUTRAL];
+  for (let k = 0; k < innerSteps; k += 1) {
+    const span = innerSteps <= 1 ? 1 : innerSteps - 1;
+    const m = (k / span) * targetMetric01;
+    keyframes.push(heatmapColorContinuous(m));
+  }
+  const n = keyframes.length;
+  const times = keyframes.map((_, i) => (n <= 1 ? 0 : i / (n - 1)));
+  return { keyframes, times };
+}
+
+function HeatLegend({ reducedMotion }: { reducedMotion: boolean }) {
   return (
     <div className="flex shrink-0 flex-col items-center gap-1.5 self-stretch pt-6 sm:pt-8">
       <span className="font-landing text-[7px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
         High
       </span>
-      <div
-        className="min-h-[100px] w-2 flex-1 max-h-[200px] rounded-full border border-white/[0.08] shadow-inner shadow-black/40 sm:min-h-[140px]"
-        style={{ background: heatmapSpectrumLegendGradientCss() }}
+      <motion.div
+        className="min-h-[100px] w-2 flex-1 max-h-[200px] overflow-hidden rounded-full border border-white/[0.08] shadow-inner shadow-black/40 sm:min-h-[140px]"
+        initial={reducedMotion ? false : { clipPath: 'inset(0 0 100% 0)' }}
+        animate={{ clipPath: 'inset(0 0 0% 0)' }}
+        transition={{
+          delay: reducedMotion ? 0 : 0.12,
+          duration: reducedMotion ? 0 : 0.75,
+          ease: [0.22, 1, 0.36, 1],
+        }}
         aria-hidden
-      />
+      >
+        <div
+          className="h-full min-h-[100px] w-full sm:min-h-[140px]"
+          style={{ background: heatmapSpectrumLegendGradientCss() }}
+        />
+      </motion.div>
       <span className="font-landing text-[7px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
         Low
       </span>
@@ -191,19 +223,50 @@ function MonthMini({ year, month, reducedMotion, animIndex }: MonthMiniProps) {
           const fill = heatmapColorDiscrete(c.t);
           const sel =
             HERO_SELECTED.year === year && HERO_SELECTED.month === month && HERO_SELECTED.day === c.day;
+          /** Stagger so the heatmap “fills in” with a slight per-cell offset after each month starts. */
+          const colorDelay = reducedMotion ? 0 : animIndex * 0.022 + i * 0.0035;
+          const colorEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
+          const { keyframes: heatKeyframes, times: heatTimes } = buildHeroHeatColorKeyframes(c.t);
+
+          if (reducedMotion) {
+            return (
+              <div
+                key={`d-${c.day}`}
+                className="relative size-[9px] shrink-0 rounded-[2px] ring-1 ring-black/20 sm:size-[10px] sm:rounded-[3px]"
+                style={{ backgroundColor: fill }}
+              >
+                {sel ? (
+                  <span
+                    className="absolute left-1/2 top-1/2 z-[1] block size-[2.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_5px_rgba(255,255,255,0.95)] sm:size-[3px]"
+                    aria-hidden
+                  />
+                ) : null}
+              </div>
+            );
+          }
+
           return (
-            <div
+            <motion.div
               key={`d-${c.day}`}
               className="relative size-[9px] shrink-0 rounded-[2px] ring-1 ring-black/20 sm:size-[10px] sm:rounded-[3px]"
-              style={{ backgroundColor: fill }}
+              initial={{ backgroundColor: heatKeyframes[0] }}
+              animate={{ backgroundColor: heatKeyframes }}
+              transition={{
+                backgroundColor: {
+                  delay: colorDelay,
+                  duration: 0.95,
+                  ease: colorEase,
+                  times: heatTimes,
+                },
+              }}
             >
               {sel ? (
                 <span
-                  className="absolute left-1/2 top-1/2 block size-[2.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_5px_rgba(255,255,255,0.95)] sm:size-[3px]"
+                  className="absolute left-1/2 top-1/2 z-[1] block size-[2.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_5px_rgba(255,255,255,0.95)] sm:size-[3px]"
                   aria-hidden
                 />
               ) : null}
-            </div>
+            </motion.div>
           );
         })}
       </div>
@@ -259,7 +322,7 @@ function HeroBrowserHeatmap({ reducedMotion }: { reducedMotion: boolean }) {
         </div>
         <div className="p-3 sm:p-4">
           <div className="flex gap-2 rounded-xl border border-white/[0.06] bg-[#070708] p-2 sm:gap-3 sm:p-3">
-            <HeatLegend />
+            <HeatLegend reducedMotion={reducedMotion} />
             <div className="min-w-0 flex-1 overflow-x-auto">
               <div className="mb-2 flex min-w-[min(100%,280px)] flex-wrap items-center gap-2 sm:min-w-0 sm:mb-3">
                 <h3 className="font-landing text-[11px] font-semibold tracking-tight text-zinc-200 sm:text-xs">

@@ -206,6 +206,20 @@ export function heatmapColorForViewMode(
 }
 
 /**
+ * Face **base** colour at transformed heat `t` ∈ [0, 1] — same space as {@link transformedHeatmapMetric} /
+ * extrusion height (after lens stress flip and transfer curve). Used for iso intro animation between grey and final.
+ */
+export function heatmapAppearanceAtTransformedT(opts: HeatmapColorOpts | undefined, t: number): string {
+  const u = Math.min(1, Math.max(0, t));
+  if (opts?.renderStyle === 'mono') {
+    const hex = normalizeHeatmapMonoHex(opts.monoColor ?? '');
+    return hexToRgba(hex, MONO_ALPHA_MIN + u * (1 - MONO_ALPHA_MIN));
+  }
+  const spectrumMode = opts?.heatmapSpectrumMode ?? 'discrete';
+  return spectrumMode === 'continuous' ? heatmapColorContinuous(u) : heatmapColorDiscrete(u);
+}
+
+/**
  * Legend swatch for discrete band `bandFromLow` (0 = lowest, n−1 = highest). Matches runway cell colours:
  * **spectrum** — {@link heatmapColorDiscrete} at the bin centre (same as a cell whose transformed metric falls in that bin).
  * **mono** — alpha from that same transformed-space bin centre (curve/γ are **not** applied again; they only apply to raw cell metrics via {@link heatmapColorForViewMode}).

@@ -1,7 +1,8 @@
 import { animate, useReducedMotion } from 'motion/react';
 import { useEffect, useState } from 'react';
 
-const DURATION_SEC = 0.68;
+/** Slightly longer so staggered iso cells + colour walk read clearly after the clip reveal. */
+const DURATION_SEC = 0.92;
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 export type IsoRunwayGrowOpts = {

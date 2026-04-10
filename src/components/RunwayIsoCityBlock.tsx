@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react';
+import { useReducedMotion } from 'motion/react';
 import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
 import { RUNWAY_EMERGE_PAUSE_MS } from '@/hooks/useRunwayHeatmapEmergence';
 import { useIsoRunwayGrowFactor } from '@/hooks/useIsoRunwayGrowFactor';
@@ -35,9 +36,12 @@ import {
   SKYLINE_MONTH_ISO_GAP_STEPS,
 } from '@/lib/runwayIsoSkylineLayout';
 import {
+  isoRunwayIntroCellProgress,
+  isoRunwayIntroContribPanels,
+} from '@/lib/runwayIsoIntroCell';
+import {
   IsoColumnAtOrigin,
   calHeightFromMetric,
-  contribPanelFill,
   isoLayoutCore,
   EMPTY_TOP,
   EMPTY_LEFT,
@@ -86,6 +90,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
   todayYmd,
   dimPastDays,
 }: RunwayIsoCityBlockProps) {
+  const reduceMotion = useReducedMotion();
   const grow = useIsoRunwayGrowFactor(growResetKey, {
     delaySec: RUNWAY_EMERGE_PAUSE_MS / 1000,
   });
@@ -129,7 +134,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
     return map;
   }, [markets, riskSurface]);
 
-  /** All cells sorted by depth for painter-order rendering. */
+  /** All cells sorted by depth for painter-order rendering + iso intro stagger. */
   const cells = useMemo(() => {
     const out: {
       li: number;
@@ -150,8 +155,17 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
         }
       }
     }
-    out.sort((a, b) => a.depth - b.depth);
-    return out;
+    out.sort((a, b) => a.depth - b.depth || a.li - b.li || a.mi - b.mi || a.dayCol - b.dayCol);
+    const paintable = out.filter((c) => c.cell !== false);
+    const nPaint = paintable.length;
+    const rankMap = new Map<string, number>();
+    paintable.forEach((c, i) => {
+      rankMap.set(`${c.li}:${c.mi}:${c.dayCol}`, nPaint <= 1 ? 0 : i / (nPaint - 1));
+    });
+    return out.map((c) => ({
+      ...c,
+      stagger01: c.cell === false ? 0 : rankMap.get(`${c.li}:${c.mi}:${c.dayCol}`) ?? 0,
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutWeeks, nWeeks, nMarkets, monthStartChronWeeks]);
 
@@ -407,7 +421,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
             ))}
           </g>
         ) : null}
-        {cells.map(({ li, mi, di, dayCol, cell, isoW }) => {
+        {cells.map(({ li, mi, di, dayCol, cell, isoW, stagger01 }) => {
           const { ax, ay } = isoCellTopLeft(isoW, di, stepX, stepY);
           const gx = ax - minX;
           const gy = ay - minY;
@@ -442,11 +456,22 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
           const height01 = transformedHeatmapMetric(viewMode, metric, optsM);
           const calHTarget = calHeightFromMetric(height01, towerPx, isPad);
           const calH0 = calHeightFromMetric(0, towerPx, isPad);
-          const calH = calH0 + (calHTarget - calH0) * grow;
+          const introP = reduceMotion ? 1 : isoRunwayIntroCellProgress(grow, stagger01);
+          const calH = calH0 + (calHTarget - calH0) * introP;
           const columnTy = deckAndColumnY(L, calH, runwayBandH);
-          const topC = isPad ? ISO_PAD_TOP : contribPanelFill(fill, 'top');
-          const leftC = isPad ? ISO_PAD_LEFT : contribPanelFill(fill, 'left');
-          const rightC = isPad ? ISO_PAD_RIGHT : contribPanelFill(fill, 'right');
+          const padStyleDataCell = !isPad && fill === HEATMAP_RUNWAY_PAD_FILL;
+          const introPanes = !isPad
+            ? isoRunwayIntroContribPanels({
+                heatmapOpts: optsM,
+                finalFill: fill,
+                tFinal: height01,
+                introP,
+                introStyle: padStyleDataCell ? 'solid' : 'spectrum',
+              })
+            : null;
+          const topC = isPad ? ISO_PAD_TOP : introPanes!.topC;
+          const leftC = isPad ? ISO_PAD_LEFT : introPanes!.leftC;
+          const rightC = isPad ? ISO_PAD_RIGHT : introPanes!.rightC;
           const dot =
             !isPad && typeof dateStr === 'string' && dateStr === todayYmd && mi === 0
               ? { x: L.dxx * 0.48, y: L.dyy * 0.42 }

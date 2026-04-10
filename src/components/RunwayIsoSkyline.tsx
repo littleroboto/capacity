@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo } from 'react';
+import { useReducedMotion } from 'motion/react';
 import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
 import { RUNWAY_EMERGE_PAUSE_MS } from '@/hooks/useRunwayHeatmapEmergence';
 import { useIsoRunwayGrowFactor } from '@/hooks/useIsoRunwayGrowFactor';
@@ -29,9 +30,12 @@ import {
   SKYLINE_MONTH_ISO_GAP_STEPS,
 } from '@/lib/runwayIsoSkylineLayout';
 import {
+  isoRunwayIntroCellProgress,
+  isoRunwayIntroContribPanels,
+} from '@/lib/runwayIsoIntroCell';
+import {
   IsoColumnAtOrigin,
   calHeightFromMetric,
-  contribPanelFill,
   EMPTY_LEFT,
   EMPTY_RIGHT,
   EMPTY_TOP,
@@ -104,6 +108,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
   dimPastDays,
   openDayDetailsFromCell,
 }: RunwayIsoSkylineProps) {
+  const reduceMotion = useReducedMotion();
   const grow = useIsoRunwayGrowFactor(growResetKey, {
     delaySec: RUNWAY_EMERGE_PAUSE_MS / 1000,
   });
@@ -270,8 +275,17 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
         out.push({ li, di, cell, depth: isoW + di });
       }
     }
-    out.sort((a, b) => a.depth - b.depth);
-    return out;
+    out.sort((a, b) => a.depth - b.depth || a.li - b.li || a.di - b.di);
+    const paintable = out.filter((c) => c.cell !== false);
+    const nPaint = paintable.length;
+    const rankMap = new Map<string, number>();
+    paintable.forEach((c, i) => {
+      rankMap.set(`${c.li}:${c.di}`, nPaint <= 1 ? 0 : i / (nPaint - 1));
+    });
+    return out.map((c) => ({
+      ...c,
+      stagger01: c.cell === false ? 0 : rankMap.get(`${c.li}:${c.di}`) ?? 0,
+    }));
   }, [layoutWeeks, nWeeks, monthStartChronWeeks]);
 
   const stubH = Math.max(2.5, L.dyy * 0.55);
@@ -319,7 +333,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
             })}
           </g>
         )}
-        {cells.map(({ li, di, cell }) => {
+        {cells.map(({ li, di, cell, stagger01 }) => {
           const { ax, ay } = isoCellTopLeft(layoutToIsoWi(li), di, stepX, stepY);
           const gx = ax - minX;
           const gy = ay - minY;
@@ -357,11 +371,22 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           const height01 = transformedHeatmapMetric(viewMode, metric, heatmapOpts);
           const calHTarget = calHeightFromMetric(height01, rowTowerPx, isPad);
           const calH0 = calHeightFromMetric(0, rowTowerPx, isPad);
-          const calH = calH0 + (calHTarget - calH0) * grow;
+          const introP = reduceMotion ? 1 : isoRunwayIntroCellProgress(grow, stagger01);
+          const calH = calH0 + (calHTarget - calH0) * introP;
           const columnTy = deckAndColumnY(L, calH, runwayBandH);
-          const topC = isPad ? ISO_PAD_TOP : contribPanelFill(fill, 'top');
-          const leftC = isPad ? ISO_PAD_LEFT : contribPanelFill(fill, 'left');
-          const rightC = isPad ? ISO_PAD_RIGHT : contribPanelFill(fill, 'right');
+          const padStyleDataCell = !isPad && fill === HEATMAP_RUNWAY_PAD_FILL;
+          const introPanes = !isPad
+            ? isoRunwayIntroContribPanels({
+                heatmapOpts,
+                finalFill: fill,
+                tFinal: height01,
+                introP,
+                introStyle: padStyleDataCell ? 'solid' : 'spectrum',
+              })
+            : null;
+          const topC = isPad ? ISO_PAD_TOP : introPanes!.topC;
+          const leftC = isPad ? ISO_PAD_LEFT : introPanes!.leftC;
+          const rightC = isPad ? ISO_PAD_RIGHT : introPanes!.rightC;
           const dot =
             !isPad && typeof dateStr === 'string' && dateStr === todayYmd
               ? { x: L.dxx * 0.48, y: L.dyy * 0.42 }
