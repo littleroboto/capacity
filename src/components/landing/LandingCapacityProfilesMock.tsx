@@ -16,15 +16,57 @@ const LANDING_MARKET = 'DE';
 /** One vertex per ISO-ish week in the year view (smoother BAU than 12× monthly). */
 const N_PTS = 52;
 const VB_W = 520;
-const VB_H = 190;
-const PAD = { l: 12, r: 12, t: 22, b: 28 } as const;
+/** Bottom band: BAU month row + campaign + programmes + month labels. */
+const VB_H = 216;
+const PAD = { l: 12, r: 12, t: 22, b: 50 } as const;
 const INNER_W = VB_W - PAD.l - PAD.r;
 const INNER_H = VB_H - PAD.t - PAD.b;
 const DENOM = N_PTS - 1;
 
-const CYCLE_MS = 4500;
-const ANIM_MS = 900;
+/** Time between auto-advance steps when section enters view (faster than early landing drafts). */
+const CYCLE_MS = 2000;
+/** Per-stage curve / fill morph duration. */
+const ANIM_MS = 480;
 const N_STAGES = 4;
+
+const GANTT_BAR_H = 5;
+/** Fixed lane height for per-month BAU bars (bar height scales inside). */
+const BAU_MONTH_LANE_H = 5;
+const GANTT_LANE_GAP = 3;
+
+/** Mean BAU (0–1) per calendar month from weekly points. */
+function avgBauPerMonth(bau: number[]): number[] {
+  const out: number[] = [];
+  for (let mi = 0; mi < 12; mi++) {
+    const i0 = Math.min(N_PTS - 1, Math.floor((mi * N_PTS) / 12));
+    const i1 = Math.min(N_PTS, Math.floor(((mi + 1) * N_PTS) / 12));
+    let s = 0;
+    let n = 0;
+    for (let i = i0; i < i1; i++) {
+      s += bau[i] ?? 0;
+      n++;
+    }
+    out.push(n > 0 ? s / n : 0);
+  }
+  return out;
+}
+
+function monthColumnRect(mi: number): { x1: number; w: number } {
+  const x1 = PAD.l + (INNER_W * mi) / 12;
+  const x2 = PAD.l + (INNER_W * (mi + 1)) / 12;
+  return { x1: x1 + 0.4, w: Math.max(x2 - x1 - 0.8, 0.8) };
+}
+
+/** Stagger Gantt bar width growth as layer opacity ramps (master ∈ [0,1]). */
+function ganttBarWidth(
+  fullW: number,
+  barIndex: number,
+  master: number,
+  stagger = 0.09,
+  ramp = 0.38
+): number {
+  return fullW * clamp01((master - barIndex * stagger) / ramp);
+}
 
 /** Solid fill only where demand exceeds capacity (gap between the two curves). */
 const GAP_FILL_OVER = 'rgba(239, 68, 68, 0.55)';
@@ -283,6 +325,7 @@ function smoothLine(pts: Pt[]): string {
   return d;
 }
 
+/** Closed path: smooth BAU curve down to chart baseline. */
 function smoothArea(pts: Pt[]): string {
   const line = smoothLine(pts);
   if (!line) return '';
@@ -410,8 +453,7 @@ function buildOverCapacityGapPath(demandVals: number[], capVals: number[]): stri
 
 export function LandingCapacityProfilesMock() {
   const reducedMotion = useReducedMotion();
-  const hatchId = useId().replace(/:/g, '');
-  const gradId = useId().replace(/:/g, '');
+  const hatchUid = useId().replace(/:/g, '');
 
   /* ── real pipeline data (state 4) ── */
 
@@ -504,6 +546,9 @@ export function LandingCapacityProfilesMock() {
     }
     return buildSynthStack();
   }, [realYear]);
+
+  const bauMonthAvgs = useMemo(() => avgBauPerMonth(stack.bau), [stack.bau]);
+  const maxBauMonth = useMemo(() => Math.max(...bauMonthAvgs, 1e-6), [bauMonthAvgs]);
 
   const capacityData = stack.capacity;
   const capPts = useMemo(() => toPoints(capacityData), [capacityData]);
@@ -624,6 +669,11 @@ export function LandingCapacityProfilesMock() {
   const pts = toPoints(a.top);
   const lineD = smoothLine(pts);
   const baseY = PAD.t + INNER_H;
+  /** BAU lane first, then campaign, then programmes — padding band below curve. */
+  const bauMonthY = baseY + 4;
+  const ganttY0 = bauMonthY + BAU_MONTH_LANE_H + GANTT_LANE_GAP;
+  const ganttY1 = ganttY0 + GANTT_BAR_H + GANTT_LANE_GAP;
+  const monthLabelY = VB_H - 9;
   const profile = STAGE_META[activeIdx];
   const capOp = a.capOp;
   const demandLineOp = Math.max(...a.top, 0) > 0.004 ? 1 : 0;
@@ -637,7 +687,7 @@ export function LandingCapacityProfilesMock() {
       initial={reducedMotion ? false : { opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
     >
       {/* ── section heading ── */}
       <div className="mb-6 sm:mb-8">
@@ -679,7 +729,7 @@ export function LandingCapacityProfilesMock() {
                 initial={reducedMotion ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.22 }}
+                transition={{ duration: 0.14 }}
                 className="flex items-baseline gap-2"
               >
                 <span className="font-landing text-sm font-semibold text-zinc-200 sm:text-base">
@@ -702,23 +752,58 @@ export function LandingCapacityProfilesMock() {
               aria-label={`Capacity profile: ${profile.label}`}
             >
               <defs>
+                {/* Subtle hatch + whisper tint (replaces flat fills on stacked areas). */}
                 <pattern
-                  id={`hatch-${hatchId}`}
-                  width="5"
-                  height="5"
+                  id={`hatch-bau-${hatchUid}`}
+                  width="7"
+                  height="7"
                   patternUnits="userSpaceOnUse"
-                  patternTransform="rotate(45)"
+                  patternTransform="rotate(42)"
                 >
+                  <rect width="7" height="7" fill="rgba(16, 185, 129, 0.06)" />
                   <line
-                    x1="0" y1="0" x2="0" y2="5"
-                    stroke="rgba(255,255,255,0.10)"
-                    strokeWidth="0.6"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="7"
+                    stroke="rgba(110, 231, 183, 0.18)"
+                    strokeWidth="0.45"
                   />
                 </pattern>
-                <linearGradient id={`grad-${gradId}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgb(255,255,255)" stopOpacity="0.07" />
-                  <stop offset="100%" stopColor="rgb(255,255,255)" stopOpacity="0" />
-                </linearGradient>
+                <pattern
+                  id={`hatch-camp-${hatchUid}`}
+                  width="6"
+                  height="6"
+                  patternUnits="userSpaceOnUse"
+                  patternTransform="rotate(-38)"
+                >
+                  <rect width="6" height="6" fill="rgba(167, 139, 250, 0.05)" />
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="6"
+                    stroke="rgba(196, 181, 253, 0.2)"
+                    strokeWidth="0.4"
+                  />
+                </pattern>
+                <pattern
+                  id={`hatch-tech-${hatchUid}`}
+                  width="8"
+                  height="8"
+                  patternUnits="userSpaceOnUse"
+                  patternTransform="rotate(36)"
+                >
+                  <rect width="8" height="8" fill="rgba(34, 211, 238, 0.045)" />
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="8"
+                    stroke="rgba(103, 232, 249, 0.18)"
+                    strokeWidth="0.4"
+                  />
+                </pattern>
               </defs>
 
               {/* horizontal grid */}
@@ -754,63 +839,99 @@ export function LandingCapacityProfilesMock() {
                 );
               })}
 
-              {/* campaign calendar blocks (from modelled live windows) */}
-              <g opacity={a.campReg}>
+              {/* BAU load — hatched band under the operational curve */}
+              {bandPaths.areaBau && (
+                <path
+                  d={bandPaths.areaBau}
+                  fill={`url(#hatch-bau-${hatchUid})`}
+                  className="pointer-events-none"
+                  opacity={a.bauFill}
+                />
+              )}
+
+              {/* One BAU bar per calendar month (mean weekly BAU in that slice) */}
+              <g
+                opacity={a.bauFill > 0.02 ? 1 : 0}
+                style={{ pointerEvents: 'none' as const }}
+              >
+                {bauMonthAvgs.map((avg, mi) => {
+                  const { x1, w } = monthColumnRect(mi);
+                  const bw = ganttBarWidth(w, mi, a.bauFill, 0.055, 0.32);
+                  if (bw < 0.5) return null;
+                  const rel = avg / maxBauMonth;
+                  const bh = Math.max(2.2, BAU_MONTH_LANE_H * (0.4 + 0.6 * rel));
+                  const by = bauMonthY + (BAU_MONTH_LANE_H - bh) / 2;
+                  return (
+                    <rect
+                      key={`bau-mo-${mi}`}
+                      x={x1}
+                      y={by}
+                      width={bw}
+                      height={bh}
+                      fill="rgba(16, 185, 129, 0.42)"
+                      stroke="rgba(110, 231, 183, 0.55)"
+                      strokeWidth={0.4}
+                      rx={1.5}
+                    />
+                  );
+                })}
+              </g>
+
+              {/* Campaign Gantt bars (horizontal lanes — same runs as former full-height blocks) */}
+              <g
+                opacity={a.campReg > 0.02 ? 1 : 0}
+                style={{ pointerEvents: 'none' as const }}
+              >
                 {stack.campaignRuns.map((run, ri) => {
                   const { x1, w } = runToRect(run);
+                  const bw = ganttBarWidth(w, ri, a.campReg);
+                  if (bw < 0.5) return null;
                   return (
                     <rect
-                      key={`camp-run-${ri}`}
+                      key={`camp-gantt-${ri}`}
                       x={x1}
-                      y={PAD.t}
-                      width={w}
-                      height={INNER_H}
-                      fill="rgba(139,92,246,0.10)"
-                      rx={3}
+                      y={ganttY0}
+                      width={bw}
+                      height={GANTT_BAR_H}
+                      fill="rgba(167,139,250,0.55)"
+                      stroke="rgba(196,181,253,0.35)"
+                      strokeWidth={0.45}
+                      rx={2}
                     />
                   );
                 })}
               </g>
 
-              {/* tech / programme & change calendar blocks */}
-              <g opacity={a.techReg}>
+              {/* Programme / change Gantt bars */}
+              <g
+                opacity={a.techReg > 0.02 ? 1 : 0}
+                style={{ pointerEvents: 'none' as const }}
+              >
                 {stack.changeRuns.map((run, ri) => {
                   const { x1, w } = runToRect(run);
+                  const bw = ganttBarWidth(w, ri, a.techReg);
+                  if (bw < 0.5) return null;
                   return (
                     <rect
-                      key={`chg-run-${ri}`}
+                      key={`chg-gantt-${ri}`}
                       x={x1}
-                      y={PAD.t}
-                      width={w}
-                      height={INNER_H}
-                      fill="rgba(34,211,238,0.09)"
-                      rx={3}
+                      y={ganttY1}
+                      width={bw}
+                      height={GANTT_BAR_H}
+                      fill="rgba(34,211,238,0.5)"
+                      stroke="rgba(103,232,249,0.4)"
+                      strokeWidth={0.45}
+                      rx={2}
                     />
                   );
                 })}
               </g>
-
-              {/* BAU band — hatched fill under operational load */}
-              {bandPaths.areaBau && (
-                <g opacity={a.bauFill}>
-                  <path
-                    d={bandPaths.areaBau}
-                    fill={`url(#hatch-${hatchId})`}
-                    className="pointer-events-none"
-                  />
-                  <path
-                    d={bandPaths.areaBau}
-                    fill={`url(#grad-${gradId})`}
-                    className="pointer-events-none"
-                  />
-                </g>
-              )}
 
               {/* Campaign increment (between BAU and BAU+campaign) */}
               {bandPaths.bandCamp && (
                 <path
                   d={bandPaths.bandCamp}
-                  fill="rgba(167,139,250,0.14)"
+                  fill={`url(#hatch-camp-${hatchUid})`}
                   className="pointer-events-none"
                   opacity={a.campFill}
                 />
@@ -820,7 +941,7 @@ export function LandingCapacityProfilesMock() {
               {bandPaths.bandTech && (
                 <path
                   d={bandPaths.bandTech}
-                  fill="rgba(34,211,238,0.12)"
+                  fill={`url(#hatch-tech-${hatchUid})`}
                   className="pointer-events-none"
                   opacity={a.techFill}
                 />
@@ -871,8 +992,9 @@ export function LandingCapacityProfilesMock() {
                 <text
                   key={`m-${mi}`}
                   x={PAD.l + INNER_W * (mi + 0.5) / 12}
-                  y={VB_H - 6}
+                  y={monthLabelY}
                   textAnchor="middle"
+                  dominantBaseline="middle"
                   fill="rgba(161,161,170,0.55)"
                   fontSize={9}
                   fontFamily="Outfit, system-ui, sans-serif"
@@ -943,20 +1065,29 @@ export function LandingCapacityProfilesMock() {
                 <span className="text-[#FFC72C]/70">Capacity</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <svg width="12" height="10" className="shrink-0" aria-hidden>
-                  <rect width="12" height="10" rx="1" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+                <svg width="14" height="6" className="shrink-0" aria-hidden>
+                  <rect
+                    x="0"
+                    y="1"
+                    width="14"
+                    height="4"
+                    rx="1.5"
+                    fill="rgba(16, 185, 129, 0.42)"
+                    stroke="rgba(110, 231, 183, 0.55)"
+                    strokeWidth="0.4"
+                  />
                 </svg>
-                <span className="text-zinc-400">BAU</span>
+                <span className="text-emerald-300/75">BAU</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <svg width="12" height="10" className="shrink-0" aria-hidden>
-                  <rect width="12" height="10" rx="1" fill="rgba(139,92,246,0.2)" stroke="rgba(167,139,250,0.35)" strokeWidth="0.5" />
+                <svg width="14" height="6" className="shrink-0" aria-hidden>
+                  <rect x="0" y="1" width="14" height="4" rx="1.5" fill="rgba(167,139,250,0.55)" stroke="rgba(196,181,253,0.35)" strokeWidth="0.4" />
                 </svg>
                 <span className="text-violet-300/70">Campaign</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <svg width="12" height="10" className="shrink-0" aria-hidden>
-                  <rect width="12" height="10" rx="1" fill="rgba(34,211,238,0.15)" stroke="rgba(34,211,238,0.35)" strokeWidth="0.5" />
+                <svg width="14" height="6" className="shrink-0" aria-hidden>
+                  <rect x="0" y="1" width="14" height="4" rx="1.5" fill="rgba(34,211,238,0.5)" stroke="rgba(103,232,249,0.4)" strokeWidth="0.4" />
                 </svg>
                 <span className="text-cyan-300/70">Programmes</span>
               </span>
@@ -987,7 +1118,7 @@ export function LandingCapacityProfilesMock() {
                 type="button"
                 onClick={() => handleTab(i)}
                 className={cn(
-                  'flex items-center gap-2 rounded-full px-3 py-1.5 font-landing text-xs font-medium transition-all duration-300',
+                  'flex items-center gap-2 rounded-full px-3 py-1.5 font-landing text-xs font-medium transition-all duration-200',
                   i === activeIdx
                     ? 'bg-white/[0.1] text-zinc-200 ring-1 ring-white/[0.15]'
                     : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300',
@@ -995,7 +1126,7 @@ export function LandingCapacityProfilesMock() {
               >
                 <span
                   className={cn(
-                    'h-1.5 w-1.5 rounded-full transition-all duration-300',
+                    'h-1.5 w-1.5 rounded-full transition-all duration-200',
                     i === activeIdx
                       ? 'bg-white shadow-[0_0_6px_rgba(255,255,255,0.5)]'
                       : 'bg-zinc-600',
