@@ -112,7 +112,7 @@ export type HeatmapColorOpts = {
    */
   riskHeatmapTailPower?: number;
   /**
-   * Global linear shift added to each lens’s heatmap input (0–1, after any headroom→stress flip) before clamp and
+   * Global linear shift added to each lens’s heatmap input (0–1) before clamp and
    * transfer — same value for single- and multi-market views (not YAML).
    */
   businessHeatmapPressureOffset?: number;
@@ -176,18 +176,15 @@ export function heatmapTransformedMetric01(metric: number | undefined, opts?: He
 
 /**
  * Maps a view’s heatmap metric through optional γ into discrete temperature-band colours.
- * **Technology** (`combined`, `code`) passes **headroom** 0–1; colour uses **stress** = 1 − headroom so
- * tighter capacity reads hotter. **Global pressure offset** (see opts) shifts that 0–1 input (all lenses) before transfer.
+ * **Technology** (`combined`, `code`) passes **capacity consumed** 0–1 (tighter lane); higher use reads hotter, same as other lenses.
+ * **Global pressure offset** (see opts) shifts that 0–1 input (all lenses) before transfer.
  */
 export function heatmapColorForViewMode(
-  mode: ViewModeId,
+  _mode: ViewModeId,
   metric: number | undefined,
   opts?: HeatmapColorOpts
 ): string {
   let colorMetric = metric;
-  if ((mode === 'combined' || mode === 'code') && metric != null && !Number.isNaN(metric)) {
-    colorMetric = Math.min(1, Math.max(0, 1 - metric));
-  }
   if (colorMetric != null && !Number.isNaN(colorMetric)) {
     const d = opts?.businessHeatmapPressureOffset ?? 0;
     colorMetric = Math.min(1, Math.max(0, colorMetric + d));
@@ -265,14 +262,11 @@ export function heatmapSpectrumLegendGradientCss(opts?: HeatmapColorOpts): strin
  * (for extrusion height, sparklines, etc.) instead of a discrete band colour.
  */
 export function transformedHeatmapMetric(
-  mode: ViewModeId,
+  _mode: ViewModeId,
   metric: number | undefined,
   opts?: HeatmapColorOpts
 ): number {
   let colorMetric = metric;
-  if ((mode === 'combined' || mode === 'code') && metric != null && !Number.isNaN(metric)) {
-    colorMetric = Math.min(1, Math.max(0, 1 - metric));
-  }
   if (colorMetric != null && !Number.isNaN(colorMetric)) {
     const d = opts?.businessHeatmapPressureOffset ?? 0;
     colorMetric = Math.min(1, Math.max(0, colorMetric + d));

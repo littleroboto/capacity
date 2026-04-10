@@ -314,11 +314,13 @@ function fillMetricLeadCompactForView(mode: ViewModeId, techWorkloadScope: TechW
     case 'combined':
       switch (techWorkloadScope) {
         case 'bau':
-          return 'BAU-only headroom on lab and Market IT (0–1); backend not in this headline.';
+          return 'BAU-only share of lab and Market IT capacity consumed (0–1); backend not in this headline.';
+        case 'campaign':
+          return 'Campaign-only share of lab and Market IT capacity consumed (0–1); backend not in this headline.';
         case 'project':
-          return 'Project-work headroom on lab and Market IT (0–1); backend not in this headline.';
+          return 'Project-work share of lab and Market IT capacity consumed (0–1); backend not in this headline.';
         default:
-          return 'Combined headroom on lab and Market IT (0–1); backend not in this headline.';
+          return 'Combined share of lab and Market IT capacity consumed (0–1); backend not in this headline.';
       }
     case 'in_store':
       return 'Store trading intensity from the curve—rhythm, holidays, and store boosts (0–1).';

@@ -279,7 +279,12 @@ export function sanitizeSettingsPayload(raw: Record<string, unknown>): Partial<V
   }
 
   if (Object.prototype.hasOwnProperty.call(raw, 'techWorkloadScope')) {
-    if (raw.techWorkloadScope === 'bau' || raw.techWorkloadScope === 'project' || raw.techWorkloadScope === 'all') {
+    if (
+      raw.techWorkloadScope === 'bau' ||
+      raw.techWorkloadScope === 'campaign' ||
+      raw.techWorkloadScope === 'project' ||
+      raw.techWorkloadScope === 'all'
+    ) {
       out.techWorkloadScope = raw.techWorkloadScope;
     }
   }

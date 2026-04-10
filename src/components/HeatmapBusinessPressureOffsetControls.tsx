@@ -48,7 +48,7 @@ export function HeatmapBusinessPressureOffsetControls({
         <p className="text-xs font-semibold text-foreground">Pressure offset — {lensLabel}</p>
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           <strong className="font-medium text-foreground/90">Same Δ for every market column</strong> in this lens (single
-          market or compare strip). Add to the lens heatmap input (0–1) after any Technology headroom→stress flip, then
+          market or compare strip). Add to the lens heatmap input (0–1), then
           clamp, then <strong className="font-medium text-foreground/90">Heatmap transfer</strong> (curve, γ, tail).{' '}
           <span className="font-medium text-foreground/85">Technology Teams / Code</span>: stress;{' '}
           <span className="font-medium text-foreground/85">Restaurant Activity</span>: store intensity;{' '}

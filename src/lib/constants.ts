@@ -18,9 +18,9 @@ export const VIEW_MODES = [
     id: 'combined',
     label: 'Technology Teams',
     /** Short heading above the main runway heatmap. */
-    runwayHeatmapTitle: 'Tech capacity headroom',
+    runwayHeatmapTitle: 'Tech capacity consumed',
     title:
-      'Available lab and Market IT capacity (headroom): how much room is left versus scheduled work on those lanes (headline excludes backend). Cooler tiles mean more slack; hotter tiles mean less team/lab capacity still free. Store-trading rhythm does not change this heatmap. γ_tech and transfer curve shape load on those lanes before headroom and colour mapping.',
+      'Lab and Market IT capacity consumed (0–1 on the tighter lane): how much of that capacity is already scheduled versus caps (headline excludes backend). Cooler tiles mean lighter use; hotter tiles mean more of lab and Market IT capacity is in play. Store-trading rhythm does not change this heatmap. γ_tech and transfer curve shape load on those lanes before the tile value and colour mapping.',
   },
   {
     id: 'in_store',

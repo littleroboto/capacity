@@ -62,20 +62,13 @@ export function HeatmapLegend({
     []
   );
 
-  const techHeadroom = viewMode === 'combined';
-  const topLabel = techHeadroom ? 'Less free' : 'High';
-  const bottomLabel = techHeadroom ? 'More free' : 'Low';
+  const topLabel = 'High';
+  const bottomLabel = 'Low';
   const ariaLabel = monoLegend
-    ? techHeadroom
-      ? `Heat map legend: less delivery capacity free at top, more at bottom, ${legendSteps} opacity steps (single colour).`
-      : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} opacity steps (single colour).`
+    ? `Heat map legend: higher at top, lower at bottom, ${legendSteps} opacity steps (single colour).`
     : continuousSpectrum
-      ? techHeadroom
-        ? 'Heat map legend: less delivery capacity free at top, more at bottom, smooth colour ramp with faint lines at the ten-band boundaries.'
-        : 'Heat map legend: higher pressure at top, lower at bottom, smooth colour ramp with faint lines at the ten-band boundaries.'
-      : techHeadroom
-        ? `Heat map legend: less delivery capacity free at top, more at bottom, ${legendSteps} colour steps.`
-        : `Heat map legend: higher pressure at top, lower at bottom, ${legendSteps} colour steps from cool to warm.`;
+      ? 'Heat map legend: higher at top, lower at bottom, smooth colour ramp with faint lines at the ten-band boundaries.'
+      : `Heat map legend: higher at top, lower at bottom, ${legendSteps} colour steps from cool to warm.`;
 
   return (
     <div

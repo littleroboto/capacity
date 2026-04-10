@@ -126,7 +126,7 @@ Optional **Market IT–only** baseline readiness, **additive** to **`weekday_int
 
 The phase engine adds one extra row: **`TechRhythm` / `support_pattern`** with `{ labs: 0, teams: (support_teams_scale ?? 1) × weekly × monthly, backend: 0 }` (the **`teams`** field is Market IT capacity in the model), classification **readiness** / **bau** (same channel as the main weekly tech rhythm). The **Technology** heatmap and runway tooling pick this up through the normal phase expansion path.
 
-**UI:** Under **Heatmap adjustments**, the **Support Patterns** tab is shown only in the **Technology Teams** lens. It includes **Daily Business Weightings** (Mon–Sun) and support workload with matching sparklines for the focused market. DSL patches write **`bau.market_it_weekly_load`** when the document uses that shape (else legacy **`tech:`**). They do **not** change **`trading`** or the Restaurant Activity heatmap. **Technology load** on the runway is **Combined**, **BAU only**, or **Project work** (no separate Market-IT-only slice).
+**UI:** Under **Heatmap adjustments**, the **Support Patterns** tab is shown only in the **Technology Teams** lens. It includes **Daily Business Weightings** (Mon–Sun) and support workload with matching sparklines for the focused market. DSL patches write **`bau.market_it_weekly_load`** when the document uses that shape (else legacy **`tech:`**). They do **not** change **`trading`** or the Restaurant Activity heatmap. **Technology load** on the runway is **Combined**, **BAU only**, **Campaign support** (campaign surface only), or **Project work** (no separate Market-IT-only slice).
 
 **Aliases (parser):** `supportWeeklyPattern`, `supportMonthlyPattern`, `supportTeamsScale`.
 

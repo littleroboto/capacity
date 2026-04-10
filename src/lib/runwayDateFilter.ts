@@ -59,6 +59,31 @@ export function runwayPickerLayoutBounds(
   return { start: base.start, end: endYmdAfterFollowingQuarter(base.end) };
 }
 
+/**
+ * Sorted `YYYY-MM` keys for each calendar month that intersects `[start, end]` (inclusive ISO dates).
+ * Matches the set of month columns implied by {@link enumerateIsoDatesInclusive}.
+ */
+export function monthKeysOverlappingIsoRangeInclusive(start: string, end: string): string[] {
+  if (start > end) return [];
+  const out: string[] = [];
+  let y = parseInt(start.slice(0, 4), 10);
+  let m = parseInt(start.slice(5, 7), 10);
+  const endY = parseInt(end.slice(0, 4), 10);
+  const endM = parseInt(end.slice(5, 7), 10);
+  if (![y, m, endY, endM].every((n) => Number.isFinite(n))) return [];
+  for (;;) {
+    const key = `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}`;
+    out.push(key);
+    if (y === endY && m === endM) break;
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return out;
+}
+
 /** Every calendar day from `start` through `end` (inclusive ISO `YYYY-MM-DD`). */
 export function enumerateIsoDatesInclusive(start: string, end: string): string[] {
   const out: string[] = [];

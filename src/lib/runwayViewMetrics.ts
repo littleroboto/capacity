@@ -13,11 +13,14 @@ import {
  * Technology heatmap slice:
  * - `all` — max of lab / Market IT demand (default; backend loads still in YAML but excluded from headline)
  * - `bau` — BAU planning surface only (same max formula)
+ * - `campaign` — campaign engineering surface only (prep/live sustain on the campaign lane)
  * - `project` — change / campaign / coordination / carryover surfaces only (no separate “Market IT only” slice)
  */
-export type TechWorkloadScope = 'all' | 'bau' | 'project';
+export type TechWorkloadScope = 'all' | 'bau' | 'campaign' | 'project';
 
 const TECH_BAU_SURFACES: readonly PressureSurfaceId[] = ['bau'];
+
+const TECH_CAMPAIGN_SURFACES: readonly PressureSurfaceId[] = ['campaign'];
 
 const TECH_PROJECT_SURFACES: readonly PressureSurfaceId[] = [
   'change',
@@ -54,11 +57,13 @@ export function technologyHeatmapMetricForSurfaces(
 export function technologyRunwayTitleForWorkloadScope(scope: TechWorkloadScope): string {
   switch (scope) {
     case 'bau':
-      return 'BAU headroom';
+      return 'BAU capacity consumed';
+    case 'campaign':
+      return 'Campaign support capacity consumed';
     case 'project':
-      return 'Project-work headroom';
+      return 'Project-work capacity consumed';
     default:
-      return 'Combined tech headroom';
+      return 'Combined tech capacity consumed';
   }
 }
 
@@ -66,11 +71,13 @@ export function technologyRunwayTitleForWorkloadScope(scope: TechWorkloadScope):
 export function technologyFillMetricHeadline(scope: TechWorkloadScope): string {
   switch (scope) {
     case 'bau':
-      return 'BAU headroom';
+      return 'BAU capacity consumed';
+    case 'campaign':
+      return 'Campaign support capacity consumed';
     case 'project':
-      return 'Project-work headroom';
+      return 'Project-work capacity consumed';
     default:
-      return 'Combined tech headroom';
+      return 'Combined tech capacity consumed';
   }
 }
 
@@ -78,11 +85,13 @@ export function technologyFillMetricHeadline(scope: TechWorkloadScope): string {
 export function technologyFillMetricLabel(scope: TechWorkloadScope): string {
   switch (scope) {
     case 'bau':
-      return 'Share of lab and Market IT capacity still available for BAU-only scheduled work (0–1; headline excludes backend).';
+      return 'Share of lab and Market IT capacity used by BAU-only scheduled work (0–1 on the tighter lane, capped at 100%; headline excludes backend).';
+    case 'campaign':
+      return 'Share of lab and Market IT capacity used when only the campaign engineering surface counts (0–1, capped at 100%; headline excludes backend).';
     case 'project':
-      return 'Share of lab and Market IT capacity still available when only project surfaces count (campaigns, change, coordination, carryover).';
+      return 'Share of lab and Market IT capacity used when only project surfaces count (campaigns, change, coordination, carryover).';
     default:
-      return 'Share of lab and Market IT capacity still available versus all scheduled work on those lanes (0–1; headline excludes backend). Switch to Restaurant Activity for store trading intensity.';
+      return 'Share of lab and Market IT capacity used versus caps on those lanes (0–1 on the tighter lane, capped at 100%; headline excludes backend). Hotter tiles mean more of that capacity is already scheduled. Switch to Restaurant Activity for store trading intensity.';
   }
 }
 
@@ -95,14 +104,27 @@ export function technologyHeatmapMetric(row: RiskRow, scope: TechWorkloadScope =
   if (scope === 'bau') {
     return technologyHeatmapMetricForSurfaces(row, TECH_BAU_SURFACES);
   }
+  if (scope === 'campaign') {
+    return technologyHeatmapMetricForSurfaces(row, TECH_CAMPAIGN_SURFACES);
+  }
   return technologyHeatmapMetricForSurfaces(row, TECH_PROJECT_SURFACES);
 }
 
-/** Technology heatmap cell: **headroom** 0–1 (1 = empty lanes, 0 = at/above cap on the tighter lane). */
-export function technologyHeadroomHeatmapMetric(row: RiskRow, scope: TechWorkloadScope = 'all'): number {
+/**
+ * Technology heatmap cell: **capacity consumed** 0–1 on the tighter lab / Market IT lane (demand ÷ cap, clamped).
+ * 0 ≈ empty lanes; 1 = at or above cap on that lane. Uncapped demand ratios above 1 still map to 1 here.
+ */
+export function technologyCapacityConsumedHeatmapMetric(
+  row: RiskRow,
+  scope: TechWorkloadScope = 'all'
+): number {
   const u = technologyHeatmapMetric(row, scope);
-  const capped = Math.min(1, Math.max(0, u));
-  return Math.min(1, Math.max(0, 1 - capped));
+  return Math.min(1, Math.max(0, u));
+}
+
+/** @deprecated Use {@link technologyCapacityConsumedHeatmapMetric} (heatmap now shows consumed, not remaining). */
+export function technologyHeadroomHeatmapMetric(row: RiskRow, scope: TechWorkloadScope = 'all'): number {
+  return Math.min(1, Math.max(0, 1 - technologyCapacityConsumedHeatmapMetric(row, scope)));
 }
 
 /** **Deployment Risk** heatmap: `deployment_risk_01` clamped to [0, 1]. */
@@ -111,7 +133,7 @@ export function deploymentRiskHeatmapMetric(row: RiskRow): number {
 }
 
 /**
- * Runway cell value per view: **Technology** = {@link technologyHeadroomHeatmapMetric}; **Business** = {@link inStoreHeatmapMetric}.
+ * Runway cell value per view: **Technology** = {@link technologyCapacityConsumedHeatmapMetric}; **Business** = {@link inStoreHeatmapMetric}.
  */
 export function heatmapCellMetric(
   row: RiskRow,
@@ -121,32 +143,42 @@ export function heatmapCellMetric(
 ): number {
   switch (mode) {
     case 'combined':
-      return technologyHeadroomHeatmapMetric(row, techWorkloadScope);
+      return technologyCapacityConsumedHeatmapMetric(row, techWorkloadScope);
     case 'in_store':
       return inStoreHeatmapMetric(row, tuning);
     case 'market_risk':
       return deploymentRiskHeatmapMetric(row);
     default:
-      return technologyHeadroomHeatmapMetric(row, techWorkloadScope);
+      return technologyCapacityConsumedHeatmapMetric(row, techWorkloadScope);
   }
 }
 
-/** Technology Teams lens + **Project work** scope with no project-surface demand. */
+/**
+ * Technology Teams lens + **slice** scope with no demand on that slice (pad-style inactive cell).
+ * Applies to **Project work** and **Campaign support** when the relevant surfaces sum to zero.
+ */
 export function techProjectWorkUsesDimmedCellStyle(
   viewMode: ViewModeId,
   techWorkloadScope: TechWorkloadScope,
   row: RiskRow
 ): boolean {
-  if (viewMode !== 'combined' || techWorkloadScope !== 'project') return false;
-  const u = technologyHeatmapMetricForSurfaces(row, TECH_PROJECT_SURFACES);
-  return !Number.isNaN(u) && u <= 0;
+  if (viewMode !== 'combined') return false;
+  if (techWorkloadScope === 'project') {
+    const u = technologyHeatmapMetricForSurfaces(row, TECH_PROJECT_SURFACES);
+    return !Number.isNaN(u) && u <= 0;
+  }
+  if (techWorkloadScope === 'campaign') {
+    const u = technologyHeatmapMetricForSurfaces(row, TECH_CAMPAIGN_SURFACES);
+    return !Number.isNaN(u) && u <= 0;
+  }
+  return false;
 }
 
 const PROJECT_WORK_ZERO_DIM_OPACITY = 0.5;
 
 /**
- * Runway cell colour + inner dim multiplier. For Project work at **0**, uses pad-style fill and reduced opacity
- * so zeros read inactive — not the same as the lowest heatmap band after curve/γ.
+ * Runway cell colour + inner dim multiplier. For **Project work** or **Campaign support** at **0** slice demand,
+ * uses pad-style fill and reduced opacity so zeros read inactive — not the same as the lowest heatmap band after curve/γ.
  */
 export function runwayHeatmapCellFillAndDim(
   viewMode: ViewModeId,

@@ -7,7 +7,7 @@ import type { BauEntry, MarketConfig } from '@/engine/types';
 import type { ViewModeId } from '@/lib/constants';
 import {
   inStoreHeatmapMetric,
-  technologyHeadroomHeatmapMetric,
+  technologyCapacityConsumedHeatmapMetric,
   type TechWorkloadScope,
 } from '@/lib/runwayViewMetrics';
 import { STORE_PRESSURE_MAX } from '@/engine/riskModelTuning';
@@ -256,7 +256,7 @@ export type RiskBlendTerm = {
   contribution: number;
 };
 
-/** Tooltip “blend” rows match the active runway lens (Technology = tech headroom / availability). */
+/** Tooltip “blend” rows match the active runway lens (Technology = capacity consumed on lab / Market IT). */
 export function buildLensRiskBlendTerms(
   viewMode: ViewModeId,
   row: RiskRow,
@@ -264,14 +264,14 @@ export function buildLensRiskBlendTerms(
   techWorkloadScope: TechWorkloadScope = 'all'
 ): RiskBlendTerm[] {
   if (viewMode === 'combined') {
-    const headroom = technologyHeadroomHeatmapMetric(row, techWorkloadScope);
+    const consumed = technologyCapacityConsumedHeatmapMetric(row, techWorkloadScope);
     return [
       {
-        key: 'tech_headroom',
+        key: 'tech_capacity_consumed',
         label: lensHeatmapBlendCaption('combined'),
-        factor: headroom,
+        factor: consumed,
         weight: 1,
-        contribution: headroom,
+        contribution: consumed,
       },
     ];
   }
@@ -416,16 +416,16 @@ export type RunwayTooltipPayload = {
   techReadinessSustainLine: string | null;
   riskTerms: RiskBlendTerm[];
   riskBand: string;
-  /** Short card title (e.g. Combined tech headroom / Trading pressure). */
+  /** Short card title (e.g. Combined tech capacity consumed / Trading pressure). */
   fillMetricHeadline: string;
   fillMetricLabel: string;
   /** One scannable sentence for popover; panel may use {@link fillMetricLabel}. */
   fillMetricLeadCompact: string;
-  /** Raw lens metric from {@link heatmapCellMetric} (e.g. tech headroom, store 0–1, deployment risk 0–1). */
+  /** Raw lens metric from {@link heatmapCellMetric} (e.g. tech capacity consumed 0–1, store 0–1, deployment risk 0–1). */
   fillMetricValue: number;
   /**
-   * Large % tile and fill-score digits: matches runway cell colour path — Restaurant Activity and Deployment Risk use
-   * pressure offset + heatmap transfer on the raw lens metric; Technology Teams uses raw headroom (same as fillMetricValue).
+   * Large % tile and fill-score digits: matches runway cell colour path — pressure offset + heatmap transfer on the raw lens metric;
+   * Technology Teams raw value is capacity consumed (same as fillMetricValue).
    */
   fillMetricDisplayValue: number;
   /** Heatmap cell fill (hex) for KPI pill background. */

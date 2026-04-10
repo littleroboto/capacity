@@ -6,6 +6,7 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAtcStore } from '@/store/useAtcStore';
 import { Button } from '@/components/ui/button';
+import { SegmentWorkbenchMark } from '@/components/SegmentWorkbenchMark';
 import { Atom, ChevronDown, ChevronUp, GitBranch, Moon, Sparkles, Sun } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 
@@ -45,8 +46,14 @@ export function Header() {
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-1.5">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <h1 className="text-sm font-bold leading-tight tracking-tight text-foreground sm:text-[0.9375rem]">
-                <Link to="/" className={titleLinkClass} title="Landing page" aria-label="Go to landing page">
-                  MarketZero Workbench
+                <Link
+                  to="/"
+                  className={cn(titleLinkClass, 'inline-flex items-center gap-2')}
+                  title="Landing page"
+                  aria-label="Go to landing page"
+                >
+                  <SegmentWorkbenchMark className="h-5 w-5 text-foreground sm:h-[1.125rem] sm:w-[1.125rem]" />
+                  Segment Workbench
                 </Link>
               </h1>
               <span
@@ -128,11 +135,15 @@ export function Header() {
                     <h1 className="text-foreground">
                       <Link
                         to="/"
-                        className={cn(titleLinkClass, 'text-lg font-bold tracking-tight md:text-xl')}
+                        className={cn(
+                          titleLinkClass,
+                          'inline-flex items-center gap-2.5 text-lg font-bold tracking-tight md:text-xl'
+                        )}
                         title="Landing page"
                         aria-label="Go to landing page"
                       >
-                        MarketZero Workbench
+                        <SegmentWorkbenchMark className="h-7 w-7 text-foreground md:h-8 md:w-8" />
+                        Segment Workbench
                       </Link>
                     </h1>
                   </div>

@@ -22,6 +22,11 @@ const TECH_WORKLOAD_OPTIONS: { value: TechWorkloadScope; label: string; title: s
     title: 'Routine BAU and weekly tech rhythm only (bau surface in the model)',
   },
   {
+    value: 'campaign',
+    label: 'Campaign support',
+    title: 'Campaign engineering surface only (prep, live, sustain on the campaign lane—excludes change, coordination, carryover)',
+  },
+  {
     value: 'project',
     label: 'Project work',
     title: 'Campaign, tech programme, release, coordination, and carryover engineering load only',
@@ -95,7 +100,7 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
                   value={techWorkloadScope}
                   onValueChange={(v) => setTechWorkloadScope(v as TechWorkloadScope)}
                   aria-labelledby="workbench-tech-load-hint"
-                  className="grid grid-cols-2 gap-1 overflow-hidden sm:grid-cols-3"
+                  className="grid grid-cols-2 gap-1 overflow-hidden lg:grid-cols-4"
                 >
                   {TECH_WORKLOAD_OPTIONS.map((opt) => {
                     const on = techWorkloadScope === opt.value;

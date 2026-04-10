@@ -39,15 +39,14 @@ export function syntheticStressToIsoColumnStyle(stress: number): {
   height01: number;
 } {
   const s = Math.min(1, Math.max(0, stress));
-  const fakeHeadroom = 1 - s;
   const height01 = transformedHeatmapMetric(
     LANDING_ISO_SKYLINE_VIEW,
-    fakeHeadroom,
+    s,
     LANDING_ISO_SKYLINE_HEATMAP_OPTS
   );
   const fill = heatmapColorForViewMode(
     LANDING_ISO_SKYLINE_VIEW,
-    fakeHeadroom,
+    s,
     LANDING_ISO_SKYLINE_HEATMAP_OPTS
   );
   return {

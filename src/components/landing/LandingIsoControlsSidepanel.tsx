@@ -242,7 +242,7 @@ export function LandingIsoControlsSidepanel() {
           <div
             className="flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/[0.08] px-2 py-1.5"
             role="status"
-            aria-label="Runway lens: Technology — combined tech headroom (fixed for this preview)"
+            aria-label="Runway lens: Technology — combined tech capacity consumed (fixed for this preview)"
           >
             <span
               className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-400/20"

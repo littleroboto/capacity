@@ -20,6 +20,7 @@ import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMoc
 import { LandingMultiMarketDeploymentMock } from '@/components/landing/LandingMultiMarketDeploymentMock';
 import { LandingYamlProjectTwinMock } from '@/components/landing/LandingYamlProjectTwinMock';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
+import { SegmentWorkbenchMark } from '@/components/SegmentWorkbenchMark';
 import {
   heatmapColorContinuous,
   heatmapColorDiscrete,
@@ -572,7 +573,7 @@ export function LandingPage() {
   const landingNoiseFilterId = useId().replace(/:/g, '');
 
   useEffect(() => {
-    document.title = 'MarketZero Workbench · Multi-market capacity on one runway';
+    document.title = 'Segment Workbench · Multi-market capacity on one runway';
   }, []);
 
   useEffect(() => {
@@ -688,12 +689,13 @@ export function LandingPage() {
       <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-5 pb-20 pt-6 sm:px-8 sm:pt-10">
         <header className="mb-16 flex flex-wrap items-center justify-between gap-4 sm:mb-20">
           <motion.div
-            className="min-w-0 max-w-[min(100%,18rem)] font-landing text-balance text-base font-extrabold leading-snug tracking-[-0.02em] text-[#FFC72C] sm:max-w-none sm:text-xl"
+            className="flex min-w-0 max-w-[min(100%,20rem)] items-center gap-2.5 font-landing text-balance text-base font-extrabold leading-snug tracking-[-0.02em] text-[#FFC72C] sm:max-w-none sm:gap-3 sm:text-xl"
             initial={reducedMotion ? false : { opacity: 0, filter: 'blur(10px)', y: 5 }}
             animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
           >
-            MarketZero Workbench
+            <SegmentWorkbenchMark className="h-8 w-8 shrink-0 sm:h-9 sm:w-9" />
+            <span>Segment Workbench</span>
           </motion.div>
           <nav className="flex flex-wrap items-center gap-3">
             {clerkOn ? (
@@ -748,11 +750,11 @@ export function LandingPage() {
                 <span className="text-zinc-300">technology programmes</span>—all drawing on the same finite people,
                 platforms, and floor attention. Ordinary roadmaps show <span className="text-zinc-300">who</span> and{' '}
                 <span className="text-zinc-300">when</span>; they rarely show{' '}
-                <span className="text-zinc-300">cumulative load</span> when those stories overlap. MarketZero Workbench is a{' '}
+                <span className="text-zinc-300">cumulative load</span> when those stories overlap. Segment Workbench is a{' '}
                 <span className="text-zinc-300">communication surface for capacity</span>: one calendar runway, comparable
                 across countries or teams, built from a shared YAML model—not a replacement for PPM, but the picture
                 everyone can read before dates harden. Switch lenses to ask different risk questions:{' '}
-                <span className="text-zinc-300">tech headroom</span>,{' '}
+                <span className="text-zinc-300">tech capacity consumed</span>,{' '}
                 <span className="text-zinc-300">restaurant and store pressure</span>, or{' '}
                 <span className="text-zinc-300">deployment fragility</span> when holidays, peaks, and change stack together.
               </p>
@@ -816,13 +818,12 @@ export function LandingPage() {
           <LandingMultiMarketDeploymentMock />
         </main>
 
-        <footer className="mt-20 border-t border-white/[0.06] pt-8 text-center text-xs text-zinc-600 sm:text-left">
-          <p className="text-zinc-500">Designed &amp; Engineered by Doug Booth, Segment Architecture</p>
-          <p className="mx-auto mt-3 max-w-2xl text-pretty text-[11px] leading-relaxed text-zinc-600 sm:mx-0">
+        <footer className="mt-20 border-t border-white/[0.06] pt-8 text-xs text-zinc-600">
+          <p className="mx-auto max-w-2xl text-pretty text-center text-[11px] leading-relaxed text-zinc-600 sm:mx-0 sm:text-left">
             A browser-native view of organisational pressure: scenario lives in YAML, the runway stays readable for
             anyone who needs to reason about risk before the plan is cast in stone.
           </p>
-          <p className="mx-auto mt-3 max-w-4xl text-pretty text-[11px] font-normal leading-relaxed tracking-normal text-zinc-600 sm:mx-0">
+          <p className="mx-auto mt-3 max-w-4xl text-pretty text-center text-[11px] font-normal leading-relaxed tracking-normal text-zinc-600 sm:mx-0 sm:text-left">
             <span className="sr-only">Release — </span>
             v<span className="text-zinc-500">{APP_VERSION}</span>
             <span aria-hidden> · </span>
@@ -835,6 +836,9 @@ export function LandingPage() {
             </span>
           </p>
           <LandingBomTable />
+          <p className="mt-8 text-center text-zinc-500">
+            Designed &amp; Engineered by Doug Booth, Segment Architecture
+          </p>
         </footer>
       </div>
     </div>

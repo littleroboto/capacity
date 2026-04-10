@@ -299,7 +299,7 @@ export const useAtcStore = create<AtcState>()(
       setDslMutationLocked: (v) => set({ dslMutationLocked: Boolean(v) }),
       setTechWorkloadScope: (v) => {
         const next: TechWorkloadScope =
-          v === 'bau' || v === 'project' || v === 'all' ? v : 'all';
+          v === 'bau' || v === 'campaign' || v === 'project' || v === 'all' ? v : 'all';
         set({ techWorkloadScope: next });
       },
 

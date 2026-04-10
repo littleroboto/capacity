@@ -133,3 +133,28 @@ export function smoothAreaToBaseline(pts: Pt[], lay: GapRibbonLayout): string {
   const f = (n: number) => n.toFixed(2);
   return `${line} L ${f(pts[pts.length - 1].x)} ${f(base)} L ${f(pts[0].x)} ${f(base)} Z`;
 }
+
+/**
+ * Closed band between two 0–1 series (same x sampling): smooth cubic along the **upper** edge (`vTop`),
+ * polyline along the **lower** edge (`vBottom`) right-to-left. Requires `vTop[i] >= vBottom[i]`.
+ */
+export function ribbonPathSmoothTopPolyBottom(
+  vTop: number[],
+  vBottom: number[],
+  lay: GapRibbonLayout,
+): string {
+  const n = vTop.length;
+  if (n < 2 || vBottom.length !== n) return '';
+  const ptsT = toPoints(vTop, lay);
+  const ptsB = toPoints(vBottom, lay);
+  const top = smoothLineThrough(ptsT);
+  if (!top) return '';
+  const f = (p: Pt) => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`;
+  let d = top;
+  d += ` L ${f(ptsB[n - 1]!)}`;
+  for (let i = n - 2; i >= 0; i--) {
+    d += ` L ${f(ptsB[i]!)}`;
+  }
+  d += ' Z';
+  return d;
+}

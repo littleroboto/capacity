@@ -1,142 +1,200 @@
-# Market Capacity Surface
+# Segment Workbench
 
-**A communication tool for visualising how capacity is consumed** — not a replacement for your planning systems, but a shared picture everyone can read: where pressure is building, what kind of work is driving it, and how **business rhythm** connects to **maintenance and transformation** (technology delivery).
+**One calendar. Declared supply. Declared demand. A runway you can read in seconds.**
 
----
-
-## Live app (Vercel)
-
-Deployment target is **[Vercel](https://vercel.com)** (Vite + serverless `api/` routes, e.g. shared workspace YAML).
-
-1. Import this repo in Vercel (framework preset: **Vite**).
-2. Production URL: **Project → Deployments → Production** (or your custom domain).
-
-GitHub Actions **does not** auto-deploy the site on push. **Vercel only auto-builds on push if the project is connected to Git** (Vercel dashboard → **Project → Settings → Git**): correct repository, **Production Branch** (usually `main`), and GitHub App access to that repo. If the project was created with **`vercel link`** / CLI-only deploys, connect Git there or deploy manually with **`vercel deploy --prod`** (from a linked directory) after each push. An optional, **manual** GitHub Pages workflow still exists at [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) if you ever want a static mirror (it does **not** run `api/*`).
-
-#### Production with editable shared YAML (one path)
-
-1. **Connect the repo** to Vercel (**Add New → Project → Import**). Framework: **Vite**. Root/build defaults are usually fine (`pnpm run build` / `dist` or auto-detected).
-2. **Create Blob** (**Storage → Blob → Create**) and **connect** it to this project so **`BLOB_READ_WRITE_TOKEN`** appears under **Settings → Environment Variables** for **Production**.
-3. Add **`CAPACITY_SHARED_DSL_SECRET`** (long random string) for **Production**, **Sensitive**.
-4. Add **`VITE_SHARED_DSL`** = **`1`** for **Production** (turns on client calls to `/api/shared-dsl`).
-5. **Deploy** (first deploy or **Deployments → … → Redeploy**). Required so the bundle includes `VITE_*` and functions see the server secrets.
-6. Open your **production URL**. **Controls** (right sidebar) → **Workspace** → **Team workspace**: paste `CAPACITY_SHARED_DSL_SECRET` → **Save secret & upload** (uploads immediately). Use **Save to cloud now** after later edits, or wait ~3s for auto-save. If **Cloud sync is off** appears, set **`VITE_SHARED_DSL=1`** at build time and **redeploy**.
-
-Until someone saves once, the app uses bundled `public/data/markets/*.yaml`; the first successful upload creates the blob copy everyone then shares.
-
-#### Optional sign-in gate ([Clerk](https://clerk.com))
-
-1. Create a Clerk application and copy the **publishable key**.
-2. Add **`VITE_CLERK_PUBLISHABLE_KEY`** to Vercel (and Preview if needed) and **redeploy** so Vite embeds it.
-3. After deploy, the workbench shows **Clerk sign-in** until the user authenticates. Omit the variable (or set **`VITE_AUTH_DISABLED=1`**) to keep the previous anonymous behaviour.
-
-**If production shows no sign-in:** the most common cause is that **`VITE_CLERK_PUBLISHABLE_KEY` was never set for the Production environment in Vercel**, or you have not **redeployed** since adding it. Vite inlines `VITE_*` only at **build** time; `.env.local` on your laptop does not affect the hosted build. The live app also shows an amber banner when the key is missing.
-
-**API reads:** When **`CLERK_SECRET_KEY`** is set on Vercel, **`GET /api/shared-dsl`** requires a valid Clerk session JWT. Without it, reads follow the legacy open behaviour. See [docs/HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](docs/HANDOFF_EPIC_USER_ORG_ENTERPRISE.md).
-
-**Org roles (viewer vs editor)** — do these in order:
-
-1. **Clerk Dashboard** → **Configure** → **Organizations** → enable **Organizations** for this application.
-2. **Clerk Dashboard** → **Organizations** → open your org → **Members** → assign roles. Create or use roles whose **keys** match what you will allow (e.g. `admin`, `member`, `editor`). Users who must **not** save YAML get a role you will **omit** from the env list (e.g. `viewer`).
-3. Open the live app. In the **header**, use the **organization switcher** (to the left of your avatar). **Choose the organization** for this workspace. Saving with role checks **requires** an active org so the session token includes organization role claims.
-4. **Vercel** → your project → **Settings** → **Environment Variables** → **Production**:
-   - `CAPACITY_CLERK_DSL_WRITE_ROLES` = `admin,member,editor` (same tokens Clerk puts in the JWT for those roles; no spaces required).
-5. Add **`VITE_CLERK_DSL_WRITE_ROLES`** = `admin,member,editor` for **Production** (and Preview if you use it).
-6. **Deployments** → **Redeploy** the production deployment so Vite embeds `VITE_*`.
-
-Omit both role env vars to keep **any signed-in user can PUT** (no org role filter).
+This app does not replace your planning tools. It **replaces the argument about what “busy” means** by making capacity **finite, dated, and visible** — then rolling it forward so crunch shows up **before** the week arrives.
 
 ---
 
-## What you’re looking at
+## The problem it solves
 
-The interface is a **dynamic visual of system pressure**. Colour and summaries encode load and risk in a single glance:
+Organisations rarely lack *data*. They lack a **single, honest stack** of truth on the **same timeline**.
 
-- **Restaurant Activity** — restaurant trading curve (**`store_pressure`**) as the heatmap; the planning blend still mixes tech and campaigns for banding.
-- **Technology Teams** — lab and Market IT **capacity headroom** (0–1 tile; headline excludes backend); cooler tiles mean more slack versus scheduled work.
-- **Deployment Risk** — deployment/calendar fragility (**`deployment_risk_01`**) as the heatmap; banding still uses the full planning blend.
+Projects live in one place. Promotions in another. Holidays and school breaks in a third. “How thin is tech?” lives in slide decks and hallway lore. Each slice optimises locally; **the cost is paid in meetings** — reconciling three versions of reality after the decision was already half-made.
 
-The same **YAML-driven model** powers every market. Parameters are named and scaled **consistently** so you can **compare regions and countries** side by side without reconciling different spreadsheets or definitions.
-
-**Scenario vs this browser:** Multi-market YAML on **Vercel Blob** (or bundled files) is what the team shares. **Workspace → View on this device** stores personal heatmap and UI choices (curves, filters, palette, 3D runway, etc.) in local storage; use export/import JSON there if two machines should match — that is separate from **Save to cloud** for YAML.
+**Segment Workbench** closes that gap with one idea: **put supply and demand in the same file, on the same days**, and let software **add the load, shrink the envelope where the calendar says so, and paint where it hurts.**
 
 ---
 
-## Why YAML?
+## The core move: capacity as physics, not opinion
 
-The visual is **fully driven** by a detailed **YAML schema**: resources, BAU, campaigns, holiday behaviour, store trading patterns, and technology cadence. That means:
+Think in three layers. All three are **encoded** (today as **YAML per market**) so they stay **inspectable** and **comparable** across regions without forcing identical numbers.
 
-- **One language** for “what we believe is true” about a market.
-- **Repeatable** scenarios — change the file, refresh the story.
-- **Comparable** markets — same fields, same semantics, different numbers and dates.
+| Layer | Plain question | Role in the model |
+| ----- | -------------- | ----------------- |
+| **Supply** | How much room exists, and **when does the calendar eat it?** | Named caps (people, labs, slots) plus multipliers for holidays, leave bands, and similar. This is your **denominator** — and it changes by day. |
+| **Demand** | What **pulls** on that envelope? | BAU, dated campaigns (prep + live), technology programmes, and other consumers. Each has **timing** and **how much** of the finite resources it asks for. |
+| **Risk & context** | If we ship here, **how exposed are we?** | Trading rhythm, promotion weight, deployment norms, named fragile windows. **Guidance**, not a second hidden spreadsheet — combined with utilisation so “hot” means something you can **unpack**. |
 
-Authoring help: **[docs/CAPACITY-RUNWAY.md](docs/CAPACITY-RUNWAY.md)** (pipeline and field reference), **[docs/MARKET_DSL_AND_PIPELINE.md](docs/MARKET_DSL_AND_PIPELINE.md)** (DSL and data flow). **Current POC scope** (Vercel, Blob, date-scoped runway): **[docs/PRODUCT_BASELINE.md](docs/PRODUCT_BASELINE.md)**.
+**Commercial moments are not binary.** A flagship promotion and a light promo can sit in the same schema; **intensity** (for example `promo_weight`) scales how hard they hit the **commercial** and **risk** surfaces without pretending every box on the calendar is the same size.
 
 ---
 
-## Run locally
+## What the scenario file actually says
 
-```bash
-npm install
-npm run dev
+Below are **illustrative fragments**. They are simplified for reading; real markets live under `public/data/markets/` with the same **field meanings** everywhere. Full pipeline order and schema: [docs/MARKET_DSL_AND_PIPELINE.md](docs/MARKET_DSL_AND_PIPELINE.md).
+
+### 1. Finite resources — the hard ceiling
+
+```yaml
+# What exists before programmes and campaigns argue over it.
+resources:
+  labs:
+    capacity: 6
+  staff:
+    capacity: 4
+    monthly_pattern_basis: absolute
+    monthly_pattern:
+      Jan: 4
+      May: 3
+      Aug: 2
+  testing_capacity: 4
 ```
 
-Or with pnpm:
+These numbers are **not** decoration. They are the **caps** the engine compares against once all the day’s asks are summed.
 
-```bash
-pnpm install
-pnpm dev
+### 2. The calendar shrinks the envelope
+
+Same market, thinner weeks: **effective** supply drops even when headcount on paper does not.
+
+```yaml
+national_leave_bands:
+  - label: August collective leave (illustrative)
+    from: '2026-08-01'
+    to: '2026-08-31'
+    capacity_multiplier: 0.72
+
+public_holidays:
+  auto: false
+  dates:
+    - '2026-05-01'
+    - '2026-12-25'
+  staffing_multiplier: 0.25
+  trading_multiplier: 1.0
 ```
 
-The dev server runs Vite (see `package.json`). Market definitions load from `**public/data/markets/*.yaml**`.
+So **utilisation** is always **load ÷ that day’s effective supply** — not “busy” as a mood and not a single static FTE count.
 
-### Build
+### 3. Demand stacks on the same grid
 
-```bash
-npm run build
+**Baseline** (always drawing breath):
+
+```yaml
+bau:
+  days_in_use: [mo, tu, we, th, fr, sa, su]
+  weekly_cycle:
+    labs_required: 1
+    staff_required: 1
+  market_it_weekly_load:
+    weekday_intensity:
+      Mon: 0.87
+      Tue: 0.75
+      Wed: 0.34
 ```
 
-Output: `**dist/**`.
+**Dated commercial work** — prep, then live — with an explicit **size** knob:
 
-### Shared workspace (Vercel Blob; no redeploy for team YAML edits)
+```yaml
+campaigns:
+  - name: Spring promotion
+    start_date: '2026-04-10'
+    duration: 30
+    testing_prep_duration: 28
+    promo_weight: 1.0
+    campaign_support:
+      labs_required: 1
+      tech_staff: 1
+    live_campaign_support:
+      labs_required: 1
+      tech_staff: 1
+```
 
-The app stores **one team workspace** in [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) using **`access: private`** by default. The serverless handler **`api/shared-dsl.js`** (pre-bundled from `api/_sharedDslImpl.ts`) uses **`BLOB_READ_WRITE_TOKEN`** to read and write **`capacity-shared/workspace.yaml`**.
+**Dated change programmes** — same **time shape**, but **technology load only** (no store uplift from this block):
 
-**With Clerk (recommended for production):** set **`CLERK_SECRET_KEY`** on Vercel. Then **GET/HEAD** require a **Clerk session JWT** (the SPA sends it automatically after sign-in). **PUT** uses the same JWT; optional **`CAPACITY_CLERK_DSL_WRITE_ROLES`** / **`VITE_CLERK_DSL_WRITE_ROLES`** restrict which **org membership roles** may save. Scoped users can use session claims **`cap_segs`**, **`cap_mkts`**, **`cap_ed`**, **`cap_admin`** — see **[docs/AUTH_PROVIDER.md](docs/AUTH_PROVIDER.md)**. Set **`CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE=1`** to stop accepting the old shared secret for PUT.
+```yaml
+tech_programmes:
+  - name: POS channel refresh
+    start_date: '2026-01-07'
+    duration: 60
+    programme_support:
+      labs_required: 1
+      tech_staff: 1
+    live_programme_support:
+      labs_required: 1
+      tech_staff: 1
+```
 
-**Legacy / bootstrap:** **`CAPACITY_SHARED_DSL_SECRET`** can still authorize **PUT** when Clerk is off or during migration; it is **not** accepted for **GET** when **`CLERK_SECRET_KEY`** is set. The Workspace UI can still paste the secret for that legacy write path.
+When prep windows overlap live windows overlap August, you see **compound pressure** because the model **adds** contributions the way the real week does — not the way three separate decks do.
 
-#### Enable Blob on Vercel (step by step)
+### 4. Trading rhythm and named risk — why “full” and “fragile” differ
 
-1. **Open the project** in the [Vercel dashboard](https://vercel.com/dashboard) (the one connected to this repo).
-2. Go to **Storage** → **Create** (or **Browse Marketplace**) → choose **Blob**.
-3. **Create** a Blob store and, when prompted, **connect it to this project** so Vercel can inject env vars.
-4. Open **Project → Settings → Environment Variables** and confirm **`BLOB_READ_WRITE_TOKEN`** exists for **Production** (and Preview if previews should use Blob). If the store was not linked, use the Blob store’s **Connect Project** flow, or add **`BLOB_READ_WRITE_TOKEN`** manually from the store (mark **Sensitive**).
-5. **Clerk (recommended):** add **`CLERK_SECRET_KEY`** (server) and **`VITE_CLERK_PUBLISHABLE_KEY`** (build). Optionally **`CAPACITY_CLERK_AUTHORIZED_PARTIES`** listing your production (and preview) origins. **Or legacy-only:** add **`CAPACITY_SHARED_DSL_SECRET`** — long random string (e.g. `openssl rand -hex 32`); users may paste it in Workspace for writes when not using Clerk for PUT.
-6. **Turn on the feature in the built app:** **`VITE_SHARED_DSL`** = **`1`** (Production, and Preview if you want it there). Redeploy after any **`VITE_*`** change so Vite embeds the new values.
-7. **Redeploy** so the serverless function picks up Blob + auth env vars.
+**Commercial heat** (weekly and seasonal shape, plus how campaigns lift the floor):
 
-**Local:** `vercel link`, then `vercel env pull` (or copy vars into `.env.local`) and run **`vercel dev`** — plain **`pnpm dev`** does not serve `/api/*`.
+```yaml
+trading:
+  weekly_pattern:
+    Mon: 0.65
+    Tue: 0.70
+    Wed: 0.80
+    Thu: 0.78
+    Fri: 0.95
+    Sat: 1.0
+    Sun: 0.72
+  monthly_pattern:
+    Jan: 0.72
+    Jul: 1.0
+    Dec: 0.82
+  campaign_store_boost_live: 0.28
+```
 
-**Troubleshooting — `Cannot use public access on a private store`:** Production may be running an **old** shared-dsl bundle. **Redeploy** the latest commit (optionally clear build cache). Optional **`CAPACITY_BLOB_ACCESS`**: omit or `private` for private stores; use `public` only if the Blob store is public.
+**Explicit fragile periods** (earnings, freeze windows, major events — whatever you name):
 
-#### Versioning and visibility (later)
+```yaml
+deployment_risk_events:
+  - id: results_window_q1
+    start: '2026-05-13'
+    end: '2026-05-15'
+    severity: 0.52
+```
 
-- **Today:** Blob **ETags** / **`ifMatch`** on **PUT**; **409** conflict banner; **Pull from cloud** in Workspace. **GET** is **not** world-readable when **`CLERK_SECRET_KEY`** protects the API.
-- **Next:** **Named snapshots** or audit trail → Postgres (or **per-org** blob paths). **Deployment Protection** on previews.
+**Capacity pressure** answers: *are we using the envelope?*  
+**Risk** answers: *if we slip here, what else is true about that moment?*  
+The UI keeps those **honest** — different lenses, same underlying scenario.
 
-Handler: `api/shared-dsl.js` + `api/_shared-dsl.runtime.cjs` (built in `prebuild`).
+---
+
+## What you see: three lenses, one truth
+
+The runway and heatmaps read the **same YAML** through different questions:
+
+- **Commercial / store intensity** — How hard is the **trading and promotional** environment, given `trading` and campaigns?
+- **Technology teams** — How much of the **declared** tech envelope is committed, including BAU, programmes, and campaign-driven lab and staff asks (and where modeled, **people versus parallel lab lanes** — headcount alone often lies)?
+- **Deployment risk** — **Guidance** that blends **how full things are** with **context** (trade, events, norms) for cutover conversations.
+
+**Compare several markets** and the **colour contract stays consistent per lens** — the same hue band means the same kind of pressure from column to column, so side-by-side views stay fair.
+
+---
+
+## Why this is a step change
+
+| Before | After |
+| ------ | ----- |
+| Busy = anecdotes and disconnected lists | Busy = **summed load** on **named caps** on **named days** |
+| “Biggest” mistaken for “tightest” | **Declared headroom** — volume of work and **room to absorb it** can diverge, on the page |
+| Experts-only dashboards | A surface **built to be read in the room** — colour, runway, drill-down to **which inputs** moved the cell |
+| Trade-offs argued from memory | Trade-offs argued from a **single inspectable model** you can change and recompute |
+
+It is still **judgment-led**. The model does not remove leadership; it **grounds** timing, pilots, and sequencing in **one shared picture** instead of three reconciled afterward.
+
+**Not** your system of record for projects or finance. **Yes** the layer you want **before** you lock dates — the map everyone points at.
 
 ---
 
 ## Repository map
 
-
-| Area                   | Role                                                        |
-| ---------------------- | ----------------------------------------------------------- |
-| `public/data/markets/` | Per-country YAML — the source of truth for the demo markets |
-| `src/`                 | React UI, pipeline wiring, heatmap and summary components   |
-| `api/`                 | Vercel serverless routes (e.g. shared workspace YAML)      |
-| `docs/`                | Index: [docs/README.md](docs/README.md); baseline: [docs/PRODUCT_BASELINE.md](docs/PRODUCT_BASELINE.md) |
-
-
+| Path | Role |
+| ---- | ---- |
+| `public/data/markets/` | Per-market scenario YAML |
+| `src/` | UI, engine, heatmap and runway |
+| `api/` | Optional shared workspace and server routes |
+| `docs/` | Product and technical documentation |

@@ -6,7 +6,7 @@ export const HEATMAP_TUNING_LENS_IDS = ['combined', 'in_store', 'market_risk'] a
 export type HeatmapTuningLensId = (typeof HEATMAP_TUNING_LENS_IDS)[number];
 
 export type PerLensHeatmapTuning = {
-  /** Linear shift on 0–1 heatmap input before transfer (after tech headroom→stress flip where applicable). */
+  /** Linear shift on 0–1 heatmap input before transfer. */
   pressureOffset: number;
   curve: RiskHeatmapCurveId;
   gamma: number;

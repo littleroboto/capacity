@@ -93,7 +93,7 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    document.title = 'MarketZero Workbench';
+    document.title = 'Segment Workbench';
   }, []);
 
   useEffect(() => {

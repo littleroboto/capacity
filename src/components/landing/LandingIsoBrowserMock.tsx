@@ -161,13 +161,13 @@ const LANDING_ISO_DECOR_SEASONAL_WEIGHT = 0.12;
 function landingIsoTechnologyPhaseExtrusionStress(row: RiskRow): number {
   const prep = row.tech_readiness_pressure ?? 0;
   const sus = row.tech_sustain_pressure ?? 0;
-  const headroom = heatmapCellMetric(
+  const techConsumed = heatmapCellMetric(
     row,
     LANDING_ISO_VIEW,
     DEFAULT_RISK_TUNING,
     LANDING_ISO_TECH_SCOPE
   );
-  const combined = landingRealDisplayStress(headroom, LANDING_ISO_SKYLINE_HEATMAP_OPTS);
+  const combined = landingRealDisplayStress(techConsumed, LANDING_ISO_SKYLINE_HEATMAP_OPTS);
 
   if (row.holiday_flag) {
     return clamp01(combined * 0.78 + prep * 0.11 + sus * 0.11);
@@ -456,17 +456,17 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
                 seasonal * LANDING_ISO_DECOR_SEASONAL_WEIGHT +
                   phaseStress * (1 - LANDING_ISO_DECOR_SEASONAL_WEIGHT)
               );
-              const fakeHeadroom = clamp01(1 - blendedStress);
+              const blendedConsumed = clamp01(blendedStress);
               const { fill, dimOpacity } = runwayHeatmapCellFillAndDim(
                 LANDING_ISO_VIEW,
                 LANDING_ISO_TECH_SCOPE,
-                fakeHeadroom,
+                blendedConsumed,
                 LANDING_ISO_SKYLINE_HEATMAP_OPTS,
                 row
               );
               height01 = transformedHeatmapMetric(
                 LANDING_ISO_VIEW,
-                fakeHeadroom,
+                blendedConsumed,
                 LANDING_ISO_SKYLINE_HEATMAP_OPTS
               );
               topC = contribPanelFill(fill, 'top');
@@ -565,7 +565,8 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
           <span className="text-zinc-300">tower height and colour</span> on real dates from the pipeline, not a mock
           graphic. <strong className="font-medium text-zinc-200">Taller, warmer towers</strong> mean more of the
           constrained stack is committed that day; <strong className="font-medium text-zinc-200">shorter, cooler</strong>{' '}
-          means headroom. <strong className="font-medium text-violet-200/90">Prep</strong> concentrates readiness and test
+          means lower capacity consumed on those lanes. <strong className="font-medium text-violet-200/90">Prep</strong>{' '}
+          concentrates readiness and test
           load; <strong className="font-medium text-cyan-200/90">live</strong> is usually lighter than the pre-cutover
           surge. In the workbench, switch to <span className="text-zinc-300">Restaurant Activity</span> to model{' '}
           <span className="text-zinc-300">store and trading rhythm</span>—including when campaigns add floor

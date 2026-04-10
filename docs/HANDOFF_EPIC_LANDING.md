@@ -23,7 +23,7 @@ This document is a **design + build-ready handoff**: it inventories today’s en
 
 | Piece | Role |
 | --- | --- |
-| [`index.html`](../index.html) | Document title: **“Experiment: Market Capacity Surface”**; theme boot script; single `#root`. |
+| [`index.html`](../index.html) | Document title / OG: **Segment Workbench**; favicon; theme boot script; single `#root`. |
 | [`src/main.tsx`](../src/main.tsx) | `SignInGate` → `ClerkProvider` (if key) → `ClerkSharedDslBridge` → **`App`** (full workbench). No intermediate marketing screen. |
 | [`src/App.tsx`](../src/App.tsx) | Header, runway grid / DSL panel, bootstrap of markets + optional shared DSL. |
 
@@ -34,7 +34,7 @@ This document is a **design + build-ready handoff**: it inventories today’s en
 The same experiment title appears in multiple places (keep in mind for a single “brand line” later):
 
 - `index.html` `<title>`
-- [`Header.tsx`](../src/components/Header.tsx) — `<h1>` (compact and default layouts): **“Experiment: Market Capacity Surface”**
+- [`Header.tsx`](../src/components/Header.tsx) — `<h1>` (compact and default layouts): **Segment Workbench** + `SegmentWorkbenchMark`
 
 ### 2.3 Auth and “entry”
 

@@ -147,7 +147,7 @@ function ContributorsBlock({
   const blendSum = terms.reduce((acc, t) => acc + t.contribution, 0);
   const denom = blendSum > 1e-9 ? blendSum : 1;
   const techLens = p.viewMode === 'combined';
-  const headroomPct =
+  const capacityConsumedPct =
     techLens && terms[0] ? Math.min(100, Math.round(Math.max(0, terms[0].factor) * 100)) : null;
 
   const wrap = (inner: ReactNode) =>
@@ -189,14 +189,14 @@ function ContributorsBlock({
           >
             {p.techExplanation}
           </p>
-          {headroomPct != null ? (
+          {capacityConsumedPct != null ? (
             <p
               className={cn(
                 'tabular-nums text-muted-foreground',
                 presentation === 'markdown' ? 'mt-2 text-sm' : 'mt-1.5 text-[11px]'
               )}
             >
-              Capacity headroom in this cell: ~{headroomPct}%
+              Capacity consumed in this cell: ~{capacityConsumedPct}%
             </p>
           ) : null}
           {p.techReadinessSustainLine ? (
@@ -344,8 +344,8 @@ function ContributorsBlock({
         >
           {techLens ? (
             <>
-              Band uses the full planning blend (tech, stores, campaigns, holidays)—not the same as tech headroom in the
-              tile.
+              Band uses the full planning blend (tech, stores, campaigns, holidays)—not the same as tech capacity consumed in
+              the tile.
             </>
           ) : p.viewMode === 'market_risk' ? (
             <>Band uses the full planning blend; this heatmap is deployment risk only.</>
@@ -375,7 +375,7 @@ function LensScoreFootnote({
   if (viewMode === 'combined') {
     return (
       <p className={cls}>
-        Tile shows tech capacity headroom (0–1).{' '}
+        Tile shows tech capacity consumed (0–1).{' '}
         <span className="font-medium text-foreground">Planning blend</span> below mixes tech, stores, campaigns, and
         holidays for the band—different construct.
       </p>

@@ -3,7 +3,7 @@ import type { ViewModeId } from '@/lib/constants';
 /** Align with `docs/LENS_GLOSSARY.md` — side panel / markdown (full). */
 export function glossaryFillScore(mode: ViewModeId): string {
   if (mode === 'combined') {
-    return 'Headroom on lab and Market IT lanes (0–1 before colour transfer and γ): more free capacity vs scheduled work on those lanes; backend is excluded from the headline. The tile % is this value × 100%.';
+    return 'Capacity consumed on lab and Market IT lanes (0–1 before colour transfer and γ): scheduled load versus caps on the tighter lane; backend is excluded from the headline. The tile % is this value × 100%.';
   }
   if (mode === 'market_risk') {
     return 'Deployment risk: model score (0–1) shaped by holidays, Q4/month curve, trading, campaigns, YAML events—then the same pressure offset and heatmap transfer as the runway cells. Tile % is that display value × 100%.';
@@ -16,7 +16,7 @@ export function glossaryPlanningBlend(mode: ViewModeId): string {
   const base =
     'Separate 0–1 planning blend: tech + store + campaign + holiday weights (your risk tuning). Drives the Low / Medium / High band—not the tile percentage.';
   if (mode === 'combined') {
-    return `${base} The Technology Teams tile shows tech capacity headroom only.`;
+    return `${base} The Technology Teams tile shows tech capacity consumed only.`;
   }
   if (mode === 'market_risk') {
     return `${base} The Deployment Risk tile % matches heatmap display (offset + transfer on the risk score); the band still reflects the full operational mix.`;
@@ -27,7 +27,7 @@ export function glossaryPlanningBlend(mode: ViewModeId): string {
 /** Popover `TermWithDefinition` (compact). */
 export function glossaryFillScorePopover(mode: ViewModeId): string {
   if (mode === 'combined') {
-    return 'Lab + Market IT headroom (0–1) before γ and transfer. Tile % = this × 100. Cooler = more capacity free.';
+    return 'Lab + Market IT capacity consumed (0–1) before γ and transfer. Tile % = this × 100. Cooler = lighter use.';
   }
   if (mode === 'market_risk') {
     return 'Deployment risk after heatmap offset + transfer (same as cell colour). Tile % = this × 100.';
@@ -39,7 +39,7 @@ export function glossaryFillScorePopover(mode: ViewModeId): string {
 export function glossaryPlanningBlendPopover(mode: ViewModeId): string {
   const core = '0–1 mix (tech, store, campaigns, holidays) from your weights. Sets the band.';
   if (mode === 'combined') {
-    return `${core} Not the tile headroom %.`;
+    return `${core} Not the tile capacity-consumed %.`;
   }
   if (mode === 'market_risk') {
     return `${core} Tile is deployment risk only.`;
@@ -50,7 +50,7 @@ export function glossaryPlanningBlendPopover(mode: ViewModeId): string {
 /** Popover footnote — closed by default; avoids repeating header glossary. */
 export function glossaryTileVsBandCollapse(mode: ViewModeId): string {
   if (mode === 'combined') {
-    return 'The band uses the full planning blend. The large percentage is Technology Teams headroom on lab + Market IT only—backend excluded from that headline.';
+    return 'The band uses the full planning blend. The large percentage is Technology Teams capacity consumed on lab + Market IT only—backend excluded from that headline.';
   }
   if (mode === 'market_risk') {
     return 'The band uses the full planning blend. The tile % matches Deployment Risk heatmap display (offset + transfer).';

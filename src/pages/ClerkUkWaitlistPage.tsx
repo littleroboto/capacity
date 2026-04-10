@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Waitlist } from '@clerk/react';
 import { Loader2 } from 'lucide-react';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
+import { SegmentWorkbenchMark } from '@/components/SegmentWorkbenchMark';
 import { clerkPublishableKey } from '@/lib/clerkConfig';
 import { cn } from '@/lib/utils';
 
@@ -51,9 +52,10 @@ export function ClerkUkWaitlistPage() {
         <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <Link
             to="/"
-            className="font-landing text-base font-extrabold tracking-[-0.02em] text-zinc-50 sm:text-lg"
+            className="inline-flex items-center gap-2.5 font-landing text-base font-extrabold tracking-[-0.02em] text-zinc-50 sm:text-lg"
           >
-            MarketZero Workbench
+            <SegmentWorkbenchMark className="h-7 w-7 shrink-0 text-zinc-50 sm:h-8 sm:w-8" />
+            Segment Workbench
           </Link>
           <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-semibold text-zinc-300">
             <MarketCircleFlag marketId="UK" size={18} className="ring-white/15" />
