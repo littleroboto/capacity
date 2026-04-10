@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { ViewModeId } from '@/lib/constants';
 import { parseYamlToConfigs, runPipelineFromDsl } from '@/engine/pipeline';
 import type { RiskRow } from '@/engine/riskModel';
@@ -79,10 +80,12 @@ import {
 } from '@/lib/riskHeatmapColors';
 import type { TechWorkloadScope } from '@/lib/runwayViewMetrics';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
+import { CAPACITY_ATC_PERSIST_KEY, CAPACITY_ATC_PERSIST_VERSION } from '@/lib/capacityAtcPersist';
 import {
   buildViewSettingsFile,
   parseViewSettingsFile,
   pickViewSettingsPayload,
+  sliceViewSettingsForPersist,
   type ViewSettingsExportScope,
   type ViewSettingsFileV1,
   type ViewSettingsPayloadKey,
@@ -143,6 +146,11 @@ type AtcState = {
    * after the selected span (e.g. full 2026 + Q1 2027). Persisted.
    */
   runwayIncludeFollowingQuarter: boolean;
+  /**
+   * Single-market runway: selected heatmap day (`YYYY-MM-DD`) for highlight + day summary. Persisted;
+   * cleared when switching market or entering LIOM compare.
+   */
+  runwaySelectedDayYmd: string | null;
   /** Runway cell fill: multi-band temperature ramp vs one hue with alpha by intensity. */
   heatmapRenderStyle: HeatmapRenderStyle;
   /** `#rrggbb` when {@link heatmapRenderStyle} is `mono`. */
@@ -178,6 +186,7 @@ type AtcState = {
   setRunwayFilterYear: (y: number | null) => void;
   setRunwayFilterQuarter: (q: RunwayQuarter | null) => void;
   setRunwayIncludeFollowingQuarter: (v: boolean) => void;
+  setRunwaySelectedDayYmd: (ymd: string | null) => void;
   setHeatmapRenderStyle: (v: HeatmapRenderStyle) => void;
   setHeatmapMonoColor: (hex: string) => void;
   setHeatmapSpectrumContinuous: (v: boolean) => void;
@@ -236,7 +245,29 @@ function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) =>
   });
 }
 
-export const useAtcStore = create<AtcState>()((set, get) => ({
+function mergePersistedViewSettings(
+  persistedState: unknown,
+  currentState: AtcState
+): AtcState {
+  if (persistedState === undefined) {
+    return currentState;
+  }
+  if (persistedState === null || typeof persistedState !== 'object') {
+    return currentState;
+  }
+  const p = persistedState as Partial<Record<ViewSettingsPayloadKey, unknown>>;
+  const next = { ...currentState };
+  for (const key of Object.keys(p) as ViewSettingsPayloadKey[]) {
+    if (!Object.prototype.hasOwnProperty.call(p, key)) continue;
+    const v = p[key];
+    (next as unknown as Record<string, unknown>)[key] = v;
+  }
+  return next;
+}
+
+export const useAtcStore = create<AtcState>()(
+  persist(
+    (set, get) => ({
       country: RUNWAY_ALL_MARKETS_VALUE,
       viewMode: 'in_store',
       theme: 'dark',
@@ -251,6 +282,7 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
       runwayFilterYear: null,
       runwayFilterQuarter: null,
       runwayIncludeFollowingQuarter: false,
+      runwaySelectedDayYmd: null,
       heatmapRenderStyle: 'spectrum',
       heatmapMonoColor: DEFAULT_HEATMAP_MONO_COLOR,
       heatmapSpectrumContinuous: true,
@@ -283,7 +315,20 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
         if (!isRunwayMultiMarketStrip(prev)) {
           dslByMarket[prev] = get().dslText.trim();
         }
-        set({ country: c, dslByMarket, runwayReturnPicker: nextRunwayReturnPicker });
+        let runwaySelectedDayYmdPatch: string | null | undefined;
+        if (isRunwayMultiMarketStrip(c)) {
+          runwaySelectedDayYmdPatch = null;
+        } else if (!isRunwayMultiMarketStrip(prev) && prev !== c) {
+          runwaySelectedDayYmdPatch = null;
+        }
+        set({
+          country: c,
+          dslByMarket,
+          runwayReturnPicker: nextRunwayReturnPicker,
+          ...(runwaySelectedDayYmdPatch !== undefined
+            ? { runwaySelectedDayYmd: runwaySelectedDayYmdPatch }
+            : {}),
+        });
 
         const order = get().runwayMarketOrder;
         const riskTuning = get().riskTuning;
@@ -360,6 +405,18 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
         }),
       setRunwayFilterQuarter: (q) => set({ runwayFilterQuarter: q }),
       setRunwayIncludeFollowingQuarter: (v) => set({ runwayIncludeFollowingQuarter: v }),
+      setRunwaySelectedDayYmd: (ymd) => {
+        if (ymd != null) {
+          const t = String(ymd).trim();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+            set({ runwaySelectedDayYmd: null });
+            return;
+          }
+          set({ runwaySelectedDayYmd: t });
+          return;
+        }
+        set({ runwaySelectedDayYmd: null });
+      },
 
       setHeatmapRenderStyle: (v) => set({ heatmapRenderStyle: v }),
       setHeatmapMonoColor: (hex) => set({ heatmapMonoColor: normalizeHeatmapMonoHex(hex) }),
@@ -785,4 +842,20 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
         const th = get().theme;
         document.documentElement.classList.toggle('dark', th === 'dark');
       },
-}));
+    }),
+    {
+      name: CAPACITY_ATC_PERSIST_KEY,
+      version: CAPACITY_ATC_PERSIST_VERSION,
+      partialize: (s) =>
+        sliceViewSettingsForPersist(s as unknown as Record<ViewSettingsPayloadKey, unknown>),
+      merge: (persistedState, currentState) =>
+        mergePersistedViewSettings(persistedState, currentState as AtcState),
+      onRehydrateStorage: () => (state) => {
+        const th = state?.theme;
+        if (th === 'light' || th === 'dark') {
+          document.documentElement.classList.toggle('dark', th === 'dark');
+        }
+      },
+    }
+  )
+);

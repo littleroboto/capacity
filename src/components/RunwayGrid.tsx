@@ -1445,6 +1445,8 @@ export function RunwayGrid({
   const runwayFilterYear = useAtcStore((s) => s.runwayFilterYear);
   const runwayFilterQuarter = useAtcStore((s) => s.runwayFilterQuarter);
   const runwayIncludeFollowingQuarter = useAtcStore((s) => s.runwayIncludeFollowingQuarter);
+  const runwaySelectedDayYmd = useAtcStore((s) => s.runwaySelectedDayYmd);
+  const setRunwaySelectedDayYmd = useAtcStore((s) => s.setRunwaySelectedDayYmd);
 
   const [displayedCountry, setDisplayedCountry] = useState(country);
   const [countrySwitchLoading, setCountrySwitchLoading] = useState(false);
@@ -1650,7 +1652,8 @@ export function RunwayGrid({
 
   const dismissTip = useCallback(() => {
     setTip(null);
-  }, []);
+    if (!compareAllMarkets) setRunwaySelectedDayYmd(null);
+  }, [compareAllMarkets, setRunwaySelectedDayYmd]);
 
   const calendarLayout = useMemo(() => {
     if (compareAllMarkets) return buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx);
@@ -1882,6 +1885,14 @@ export function RunwayGrid({
     };
   }, [tip, dismissTip, layoutDatesSorted, buildPayloadTipState]);
 
+  useEffect(() => {
+    if (compareAllMarkets) return;
+    const t = tip;
+    if (t && 'payload' in t && t.payload.market === country) {
+      setRunwaySelectedDayYmd(t.payload.dateStr);
+    }
+  }, [tip, country, compareAllMarkets, setRunwaySelectedDayYmd]);
+
   const todayYmd = formatDateYmd(new Date());
 
   useEffect(() => {
@@ -1906,7 +1917,14 @@ export function RunwayGrid({
     if (heatmapAutoDayAppliedKeyRef.current === key) return;
 
     const todayStr = formatDateYmd(new Date());
-    const pick = pickLayoutDayForDefaultSelection(layoutDatesSorted, focusMarketRiskByDate, todayStr);
+    const persisted =
+      runwaySelectedDayYmd &&
+      layoutDatesSorted.includes(runwaySelectedDayYmd) &&
+      focusMarketRiskByDate.has(runwaySelectedDayYmd)
+        ? runwaySelectedDayYmd
+        : null;
+    const pick =
+      persisted ?? pickLayoutDayForDefaultSelection(layoutDatesSorted, focusMarketRiskByDate, todayStr);
     if (!pick) return;
 
     heatmapAutoDayAppliedKeyRef.current = key;
@@ -1924,6 +1942,7 @@ export function RunwayGrid({
     runwayIncludeFollowingQuarter,
     riskSurface.length,
     country,
+    runwaySelectedDayYmd,
     buildPayloadTipState,
   ]);
 
