@@ -112,18 +112,47 @@ export function pointsForSeries(vals: number[], lay: GapRibbonLayout): Pt[] {
   return toPoints(vals, lay);
 }
 
-export function smoothLineThrough(pts: Pt[]): string {
+/**
+ * Linear segments through points (no Bezier overshoot). Prefer for small runway minis where
+ * {@link smoothLineThrough} reads as overly “floaty” vs the sampled data.
+ */
+export function polylineThrough(pts: Pt[]): string {
   if (pts.length < 2) return '';
   const f = (n: number) => n.toFixed(2);
   let d = `M ${f(pts[0].x)} ${f(pts[0].y)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[Math.max(0, i - 1)];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[Math.min(pts.length - 1, i + 2)];
-    d += ` C ${f(p1.x + (p2.x - p0.x) / 6)},${f(p1.y + (p2.y - p0.y) / 6)} ${f(p2.x - (p3.x - p1.x) / 6)},${f(p2.y - (p3.y - p1.y) / 6)} ${f(p2.x)},${f(p2.y)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i]!;
+    d += ` L ${f(p.x)} ${f(p.y)}`;
   }
   return d;
+}
+
+function smoothLineThroughWithDivisor(pts: Pt[], divisor: number): string {
+  if (pts.length < 2) return '';
+  const dvn = Math.max(2, divisor);
+  const f = (n: number) => n.toFixed(2);
+  let d = `M ${f(pts[0].x)} ${f(pts[0].y)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)]!;
+    const p1 = pts[i]!;
+    const p2 = pts[i + 1]!;
+    const p3 = pts[Math.min(pts.length - 1, i + 2)]!;
+    d += ` C ${f(p1.x + (p2.x - p0.x) / dvn)},${f(p1.y + (p2.y - p0.y) / dvn)} ${f(p2.x - (p3.x - p1.x) / dvn)},${f(p2.y - (p3.y - p1.y) / dvn)} ${f(p2.x)},${f(p2.y)}`;
+  }
+  return d;
+}
+
+/** Full Catmull-style cubic smoothing (control offset ÷6). */
+export function smoothLineThrough(pts: Pt[]): string {
+  return smoothLineThroughWithDivisor(pts, 6);
+}
+
+/**
+ * Same curve family as {@link smoothLineThrough} but weaker control pulls (÷12 vs ÷6) — sits between
+ * that and {@link polylineThrough} for small charts.
+ */
+export function smoothLineThroughMild(pts: Pt[]): string {
+  return smoothLineThroughWithDivisor(pts, 12);
 }
 
 export function smoothAreaToBaseline(pts: Pt[], lay: GapRibbonLayout): string {

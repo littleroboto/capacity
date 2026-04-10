@@ -10,8 +10,6 @@ import {
 } from '@/lib/heatmapTuningPerLens';
 import { parseRiskHeatmapCurve } from '@/lib/riskHeatmapTransfer';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
-import type { TechWorkloadScope } from '@/lib/runwayViewMetrics';
-
 /** File wrapper for export/import (JSON). */
 export const VIEW_SETTINGS_FILE_KIND = 'capacity-view-settings-v1' as const;
 
@@ -28,7 +26,6 @@ export type ViewSettingsPayloadV1 = {
   heatmapRenderStyle?: HeatmapRenderStyle;
   heatmapMonoColor?: string;
   heatmapSpectrumContinuous?: boolean;
-  techWorkloadScope?: TechWorkloadScope;
   dslLlmAssistantEnabled?: boolean;
   runwayFilterYear?: number | null;
   runwayFilterQuarter?: RunwayQuarter | null;
@@ -63,7 +60,6 @@ export const VIEW_SETTINGS_PAYLOAD_KEYS = [
   'heatmapRenderStyle',
   'heatmapMonoColor',
   'heatmapSpectrumContinuous',
-  'techWorkloadScope',
   'dslLlmAssistantEnabled',
   'runwayFilterYear',
   'runwayFilterQuarter',
@@ -276,17 +272,6 @@ export function sanitizeSettingsPayload(raw: Record<string, unknown>): Partial<V
     typeof raw.heatmapSpectrumContinuous === 'boolean'
   ) {
     out.heatmapSpectrumContinuous = raw.heatmapSpectrumContinuous;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(raw, 'techWorkloadScope')) {
-    if (
-      raw.techWorkloadScope === 'bau' ||
-      raw.techWorkloadScope === 'campaign' ||
-      raw.techWorkloadScope === 'project' ||
-      raw.techWorkloadScope === 'all'
-    ) {
-      out.techWorkloadScope = raw.techWorkloadScope;
-    }
   }
 
   if (

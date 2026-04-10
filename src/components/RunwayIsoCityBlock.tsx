@@ -11,11 +11,7 @@ import {
   transformedHeatmapMetric,
   type HeatmapColorOpts,
 } from '@/lib/riskHeatmapColors';
-import {
-  heatmapCellMetric,
-  runwayHeatmapCellFillAndDim,
-  type TechWorkloadScope,
-} from '@/lib/runwayViewMetrics';
+import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
 import type { RunwayCalendarCellValue, VerticalYearSection } from '@/lib/calendarQuarterLayout';
 import {
   flattenRunwayWeeksFromSections,
@@ -63,7 +59,6 @@ export type RunwayIsoCityBlockProps = {
   heatmapOptsForMarket: (marketId: string) => HeatmapColorOpts;
   riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
-  techWorkloadScope: TechWorkloadScope;
   todayYmd: string;
   dimPastDays: boolean;
 };
@@ -86,7 +81,6 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
   heatmapOptsForMarket,
   riskTuning,
   viewMode,
-  techWorkloadScope,
   todayYmd,
   dimPastDays,
 }: RunwayIsoCityBlockProps) {
@@ -446,11 +440,11 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
           const mk = markets[mi]!;
           const riskByDate = riskByMarket.get(mk)!;
           const row = dateStr ? riskByDate.get(dateStr) : undefined;
-          const metric = row ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope) : undefined;
+          const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
           const optsM = heatmapOptsForMarket(mk);
           const { fill, dimOpacity } = !dateStr
             ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
-            : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, optsM, row);
+            : runwayHeatmapCellFillAndDim(viewMode, metric, optsM, row);
           const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
           const isPad = !dateStr;
           const height01 = transformedHeatmapMetric(viewMode, metric, optsM);

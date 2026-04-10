@@ -3,11 +3,7 @@ import { emptySurfaceSlice, emptySurfaceTotals, mergeSurfaceSlices } from '@/dom
 import type { RiskRow } from '@/engine/riskModel';
 import { DEFAULT_RISK_TUNING, STORE_PRESSURE_MAX, type RiskModelTuning } from '@/engine/riskModelTuning';
 import type { ViewModeId } from '@/lib/constants';
-import {
-  heatmapColorForViewMode,
-  HEATMAP_RUNWAY_PAD_FILL,
-  type HeatmapColorOpts,
-} from '@/lib/riskHeatmapColors';
+import { heatmapColorForViewMode, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 
 /**
  * Technology heatmap slice:
@@ -139,58 +135,29 @@ export function heatmapCellMetric(
   row: RiskRow,
   mode: ViewModeId,
   tuning: RiskModelTuning = DEFAULT_RISK_TUNING,
-  techWorkloadScope: TechWorkloadScope = 'all'
 ): number {
   switch (mode) {
     case 'combined':
-      return technologyCapacityConsumedHeatmapMetric(row, techWorkloadScope);
+      return technologyCapacityConsumedHeatmapMetric(row, 'all');
     case 'in_store':
       return inStoreHeatmapMetric(row, tuning);
     case 'market_risk':
       return deploymentRiskHeatmapMetric(row);
     default:
-      return technologyCapacityConsumedHeatmapMetric(row, techWorkloadScope);
+      return technologyCapacityConsumedHeatmapMetric(row, 'all');
   }
 }
 
 /**
- * Technology Teams lens + **slice** scope with no demand on that slice (pad-style inactive cell).
- * Applies to **Project work** and **Campaign support** when the relevant surfaces sum to zero.
- */
-export function techProjectWorkUsesDimmedCellStyle(
-  viewMode: ViewModeId,
-  techWorkloadScope: TechWorkloadScope,
-  row: RiskRow
-): boolean {
-  if (viewMode !== 'combined') return false;
-  if (techWorkloadScope === 'project') {
-    const u = technologyHeatmapMetricForSurfaces(row, TECH_PROJECT_SURFACES);
-    return !Number.isNaN(u) && u <= 0;
-  }
-  if (techWorkloadScope === 'campaign') {
-    const u = technologyHeatmapMetricForSurfaces(row, TECH_CAMPAIGN_SURFACES);
-    return !Number.isNaN(u) && u <= 0;
-  }
-  return false;
-}
-
-const PROJECT_WORK_ZERO_DIM_OPACITY = 0.5;
-
-/**
- * Runway cell colour + inner dim multiplier. For **Project work** or **Campaign support** at **0** slice demand,
- * uses pad-style fill and reduced opacity so zeros read inactive — not the same as the lowest heatmap band after curve/γ.
+ * Runway cell colour + inner dim multiplier.
  */
 export function runwayHeatmapCellFillAndDim(
   viewMode: ViewModeId,
-  techWorkloadScope: TechWorkloadScope,
   metric: number | undefined,
   opts?: HeatmapColorOpts,
-  row?: RiskRow
+  _row?: RiskRow
 ): { fill: string; dimOpacity: number } {
   const fill = heatmapColorForViewMode(viewMode, metric, opts);
-  if (row && techProjectWorkUsesDimmedCellStyle(viewMode, techWorkloadScope, row)) {
-    return { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: PROJECT_WORK_ZERO_DIM_OPACITY };
-  }
   return { fill, dimOpacity: 1 };
 }
 

@@ -78,7 +78,6 @@ import {
   normalizeHeatmapMonoHex,
   type HeatmapRenderStyle,
 } from '@/lib/riskHeatmapColors';
-import type { TechWorkloadScope } from '@/lib/runwayViewMetrics';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
 import { CAPACITY_ATC_PERSIST_KEY, CAPACITY_ATC_PERSIST_VERSION } from '@/lib/capacityAtcPersist';
 import {
@@ -171,11 +170,6 @@ type AtcState = {
   /** When true, YAML-backed store actions no-op (cloud viewers). Not persisted. */
   dslMutationLocked: boolean;
   setDslMutationLocked: (v: boolean) => void;
-  /**
-   * Technology lens only: heatmap + slot selection use total tech load, BAU surface only, or project surfaces only.
-   */
-  techWorkloadScope: TechWorkloadScope;
-  setTechWorkloadScope: (v: TechWorkloadScope) => void;
   setCountry: (c: string, options?: SetCountryOptions) => void;
   setViewMode: (v: ViewModeId) => void;
   setTheme: (t: 'light' | 'dark') => void;
@@ -293,15 +287,9 @@ export const useAtcStore = create<AtcState>()(
       runwayReturnPicker: null,
       dslAssistantEditorLock: false,
       dslMutationLocked: false,
-      techWorkloadScope: 'all',
 
       setDslAssistantEditorLock: (v) => set({ dslAssistantEditorLock: v }),
       setDslMutationLocked: (v) => set({ dslMutationLocked: Boolean(v) }),
-      setTechWorkloadScope: (v) => {
-        const next: TechWorkloadScope =
-          v === 'bau' || v === 'campaign' || v === 'project' || v === 'all' ? v : 'all';
-        set({ techWorkloadScope: next });
-      },
 
       setCountry: (c, options?: SetCountryOptions) => {
         const nextRunwayReturnPicker =

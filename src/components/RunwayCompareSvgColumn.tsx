@@ -6,11 +6,7 @@ import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import { layoutCompareMarketColumnSvg } from '@/lib/runwayCompareSvgLayout';
 import type { VerticalYearSection } from '@/lib/calendarQuarterLayout';
-import {
-  heatmapCellMetric,
-  runwayHeatmapCellFillAndDim,
-  type TechWorkloadScope,
-} from '@/lib/runwayViewMetrics';
+import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
 
 type RunwayTipAnchor = { clientX: number; clientY: number };
 
@@ -24,7 +20,6 @@ export type RunwayCompareSvgColumnProps = {
   heatmapOpts: HeatmapColorOpts;
   riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
-  techWorkloadScope: TechWorkloadScope;
   todayYmd: string;
   dimPastDays: boolean;
   /** First month in runway order — that month’s block gets Mo–Su headers (compare-all HTML parity). */
@@ -58,7 +53,6 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
   heatmapOpts,
   riskTuning,
   viewMode,
-  techWorkloadScope,
   todayYmd,
   dimPastDays,
   firstCalendarMonthKey,
@@ -133,10 +127,10 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
         if (c.cell === false) return null;
         const dateStr = c.cell;
         const row = dateStr ? riskByDate.get(dateStr) : undefined;
-        const metric = row ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope) : undefined;
+        const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
         const { fill, dimOpacity: dimOp } = !dateStr
           ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
-          : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts, row);
+          : runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
         const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
         const opacity = pastDimmed ? 0.25 * dimOp : dimOp;
         const isToday = typeof dateStr === 'string' && dateStr === todayYmd;

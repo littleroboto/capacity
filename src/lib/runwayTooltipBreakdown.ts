@@ -5,11 +5,7 @@ import type { RiskRow } from '@/engine/riskModel';
 import { normalizedRiskWeights, type RiskModelTuning } from '@/engine/riskModelTuning';
 import type { BauEntry, MarketConfig } from '@/engine/types';
 import type { ViewModeId } from '@/lib/constants';
-import {
-  inStoreHeatmapMetric,
-  technologyCapacityConsumedHeatmapMetric,
-  type TechWorkloadScope,
-} from '@/lib/runwayViewMetrics';
+import { inStoreHeatmapMetric, technologyCapacityConsumedHeatmapMetric } from '@/lib/runwayViewMetrics';
 import { STORE_PRESSURE_MAX } from '@/engine/riskModelTuning';
 import { TRADING_MONTH_KEYS } from '@/lib/tradingMonthlyDsl';
 import { parseTechRhythmScalar } from '@/engine/techWeeklyPattern';
@@ -260,11 +256,10 @@ export type RiskBlendTerm = {
 export function buildLensRiskBlendTerms(
   viewMode: ViewModeId,
   row: RiskRow,
-  tuning: RiskModelTuning,
-  techWorkloadScope: TechWorkloadScope = 'all'
+  tuning: RiskModelTuning
 ): RiskBlendTerm[] {
   if (viewMode === 'combined') {
-    const consumed = technologyCapacityConsumedHeatmapMetric(row, techWorkloadScope);
+    const consumed = technologyCapacityConsumedHeatmapMetric(row, 'all');
     return [
       {
         key: 'tech_capacity_consumed',
@@ -463,8 +458,6 @@ export function buildRunwayTooltipPayload(input: {
   fillMetricValue: number;
   fillMetricDisplayValue: number;
   cellFillHex: string;
-  /** Technology lens workload slice (combined load, BAU, or project surfaces). */
-  techWorkloadScope?: TechWorkloadScope;
 }): RunwayTooltipPayload {
   const {
     dateStr,
@@ -480,7 +473,6 @@ export function buildRunwayTooltipPayload(input: {
     fillMetricValue,
     fillMetricDisplayValue,
     cellFillHex,
-    techWorkloadScope = 'all',
   } = input;
   const activeCampaigns = activeCampaignNames(config, dateStr);
   const activeTechProgrammes = activeTechProgrammeNames(config, dateStr);
@@ -502,7 +494,7 @@ export function buildRunwayTooltipPayload(input: {
     storeTradingLine: storeTradingLineResolved,
     techExplanation,
     techReadinessSustainLine: techReadinessSustainExplanation(row),
-    riskTerms: buildLensRiskBlendTerms(viewMode, row, tuning, techWorkloadScope),
+    riskTerms: buildLensRiskBlendTerms(viewMode, row, tuning),
     riskBand: row.risk_band,
     fillMetricHeadline,
     fillMetricLabel,

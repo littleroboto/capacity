@@ -8,7 +8,7 @@ import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import type { HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import { HEATMAP_RUNWAY_PAD_FILL, transformedHeatmapMetric } from '@/lib/riskHeatmapColors';
-import { heatmapCellMetric, runwayHeatmapCellFillAndDim, type TechWorkloadScope } from '@/lib/runwayViewMetrics';
+import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
 import {
   skylineChronologyGroups,
   type RunwayCalendarCellValue,
@@ -63,7 +63,6 @@ export type RunwayIsoSkylineProps = {
   heatmapOpts: HeatmapColorOpts;
   riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
-  techWorkloadScope: TechWorkloadScope;
   todayYmd: string;
   dimPastDays: boolean;
   openDayDetailsFromCell: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
@@ -103,7 +102,6 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
   heatmapOpts,
   riskTuning,
   viewMode,
-  techWorkloadScope,
   todayYmd,
   dimPastDays,
   openDayDetailsFromCell,
@@ -362,10 +360,10 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
 
           const dateStr = cell;
           const row = dateStr ? riskByDate.get(dateStr) : undefined;
-          const metric = row ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope) : undefined;
+          const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
           const { fill, dimOpacity } = !dateStr
             ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
-            : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts, row);
+            : runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
           const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
           const isPad = !dateStr;
           const height01 = transformedHeatmapMetric(viewMode, metric, heatmapOpts);

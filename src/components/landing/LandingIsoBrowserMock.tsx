@@ -80,7 +80,6 @@ function enumerateYmd(startYmd: string, endYmd: string): string[] {
 }
 
 const LANDING_ISO_VIEW = 'combined' as const;
-const LANDING_ISO_TECH_SCOPE = 'all' as const;
 
 /**
  * Month-to-month “story” stress (0 = cool blues/greens, 1 = hot reds) for the marketing strip only.
@@ -161,12 +160,7 @@ const LANDING_ISO_DECOR_SEASONAL_WEIGHT = 0.12;
 function landingIsoTechnologyPhaseExtrusionStress(row: RiskRow): number {
   const prep = row.tech_readiness_pressure ?? 0;
   const sus = row.tech_sustain_pressure ?? 0;
-  const techConsumed = heatmapCellMetric(
-    row,
-    LANDING_ISO_VIEW,
-    DEFAULT_RISK_TUNING,
-    LANDING_ISO_TECH_SCOPE
-  );
+  const techConsumed = heatmapCellMetric(row, LANDING_ISO_VIEW, DEFAULT_RISK_TUNING);
   const combined = landingRealDisplayStress(techConsumed, LANDING_ISO_SKYLINE_HEATMAP_OPTS);
 
   if (row.holiday_flag) {
@@ -459,7 +453,6 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
               const blendedConsumed = clamp01(blendedStress);
               const { fill, dimOpacity } = runwayHeatmapCellFillAndDim(
                 LANDING_ISO_VIEW,
-                LANDING_ISO_TECH_SCOPE,
                 blendedConsumed,
                 LANDING_ISO_SKYLINE_HEATMAP_OPTS,
                 row

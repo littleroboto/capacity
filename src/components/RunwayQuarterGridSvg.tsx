@@ -6,11 +6,7 @@ import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import { layoutQuarterGridRunwaySvg } from '@/lib/runwayCompareSvgLayout';
 import type { VerticalYearSection } from '@/lib/calendarQuarterLayout';
-import {
-  heatmapCellMetric,
-  runwayHeatmapCellFillAndDim,
-  type TechWorkloadScope,
-} from '@/lib/runwayViewMetrics';
+import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
 
 type RunwayTipAnchor = { clientX: number; clientY: number };
 
@@ -24,7 +20,6 @@ export type RunwayQuarterGridSvgProps = {
   heatmapOpts: HeatmapColorOpts;
   riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
-  techWorkloadScope: TechWorkloadScope;
   todayYmd: string;
   dimPastDays: boolean;
   /** Matches side-summary selection (e.g. default “today” on load). */
@@ -50,7 +45,6 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
   heatmapOpts,
   riskTuning,
   viewMode,
-  techWorkloadScope,
   todayYmd,
   dimPastDays,
   selectedDayYmd = null,
@@ -146,10 +140,10 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
         if (c.cell === false) return null;
         const dateStr = c.cell;
         const row = dateStr ? riskByDate.get(dateStr) : undefined;
-        const metric = row ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope) : undefined;
+        const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
         const { fill, dimOpacity: dimOp } = !dateStr
           ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
-          : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts, row);
+          : runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
         const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
         const opacity = pastDimmed ? 0.25 * dimOp : dimOp;
         const isToday = typeof dateStr === 'string' && dateStr === todayYmd;
