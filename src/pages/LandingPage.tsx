@@ -16,7 +16,6 @@ import { isClerkConfigured } from '@/lib/clerkConfig';
 import { prefetchWorkbenchApp } from '@/lib/prefetchWorkbench';
 import { cn } from '@/lib/utils';
 import { LandingCapacityProfilesMock } from '@/components/landing/LandingCapacityProfilesMock';
-import { LandingGanttBridgeMock } from '@/components/landing/LandingGanttBridgeMock';
 import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMock';
 import { LandingMultiMarketDeploymentMock } from '@/components/landing/LandingMultiMarketDeploymentMock';
 import { LandingYamlProjectTwinMock } from '@/components/landing/LandingYamlProjectTwinMock';
@@ -746,8 +745,6 @@ export function LandingPage() {
           </section>
 
           <LandingCapacityProfilesMock />
-
-          <LandingGanttBridgeMock />
 
           <LandingIsoBrowserMock />
 

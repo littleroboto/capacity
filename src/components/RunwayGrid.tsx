@@ -2777,6 +2777,8 @@ function RunwayGridBody({
                               : undefined
                           }
                           preferReducedMotion={reduceMotion}
+                          emergeResetKey={`${isoGrowResetKey}-${m}`}
+                          emergeStaggerMs={colIdx * 52}
                         />
                       ) : (
                         <RunwayVerticalHeatmapBody
@@ -2874,6 +2876,7 @@ function RunwayGridBody({
                     dimPastDays={dimPastDays}
                     selectedDayYmd={singleMarketSelectedDayYmd}
                     openDayDetailsFromCell={makeShowTip(country, singleRiskByDate!, marketConfig)}
+                    emergeResetKey={isoGrowResetKey}
                   />
                 ) : (
                   <RunwayVerticalHeatmapBody

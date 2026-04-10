@@ -698,9 +698,12 @@ export function LandingCapacityProfilesMock() {
           Not all demand looks the same
         </h2>
         <p className="mt-3 max-w-2xl text-pretty text-sm leading-relaxed text-zinc-400 sm:text-base">
-          BAU support, campaign waves, and technology programmes each draw on your teams
-          differently. The runway shows all three on one calendar—so&nbsp;you see where the
-          pressure really stacks.
+          <span className="text-zinc-300">Roadmaps show sequence; the runway shows draw.</span> Gantt bars answer{' '}
+          <span className="text-zinc-300">who</span> and <span className="text-zinc-300">when</span>—they rarely show{' '}
+          <span className="text-zinc-300">how thin the lane is</span> when BAU support, campaign waves, and technology
+          programmes overlap with holidays, peaks, and shared services. Here, all three kinds of demand share one
+          calendar, so you see <span className="text-zinc-300">cumulative pull</span>—people, time, and
+          equipment—where it actually stacks.
         </p>
       </div>
 

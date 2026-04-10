@@ -1,4 +1,6 @@
 import { memo, useMemo } from 'react';
+import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
+import { RUNWAY_EMERGE_PAUSE_MS } from '@/hooks/useRunwayHeatmapEmergence';
 import { useIsoRunwayGrowFactor } from '@/hooks/useIsoRunwayGrowFactor';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
@@ -84,7 +86,9 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
   todayYmd,
   dimPastDays,
 }: RunwayIsoCityBlockProps) {
-  const grow = useIsoRunwayGrowFactor(growResetKey);
+  const grow = useIsoRunwayGrowFactor(growResetKey, {
+    delaySec: RUNWAY_EMERGE_PAUSE_MS / 1000,
+  });
   const towerPx = Math.round(cellPx * 1.4);
 
   const flatWeeks = useMemo(
@@ -371,6 +375,10 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
       className="relative flex h-[min(86dvh,calc(100dvh-6.5rem))] min-h-0 w-full max-w-full flex-1 flex-col overflow-visible bg-background"
       data-runway-iso-city-block
     >
+      <RunwayHeatmapEmergenceClip
+        resetKey={growResetKey}
+        className="flex h-full min-h-0 w-full flex-1 flex-col"
+      >
       <svg
         viewBox={`0 0 ${vbW} ${vbH}`}
         width="100%"
@@ -526,6 +534,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
           ))}
         </g>
       </svg>
+      </RunwayHeatmapEmergenceClip>
     </div>
   );
 });

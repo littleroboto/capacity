@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, type KeyboardEvent, type MouseEvent } from 'react';
+import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
@@ -29,6 +30,8 @@ export type RunwayQuarterGridSvgProps = {
   /** Matches side-summary selection (e.g. default “today” on load). */
   selectedDayYmd?: string | null;
   openDayDetailsFromCell: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
+  /** Remounts emergence when runway identity changes; defaults to `marketKey`. */
+  emergeResetKey?: string;
 };
 
 function svgClientPoint(e: MouseEvent | KeyboardEvent, fallbackW: number, fallbackH: number) {
@@ -52,6 +55,7 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
   dimPastDays,
   selectedDayYmd = null,
   openDayDetailsFromCell,
+  emergeResetKey,
 }: RunwayQuarterGridSvgProps) {
   const { width, height, cells, monthLabels, weekdayLabels, yearLabels, quarterLabels } = useMemo(
     () => layoutQuarterGridRunwaySvg(sections, cellPx, gap, monthStripW),
@@ -68,7 +72,10 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
     [openDayDetailsFromCell]
   );
 
+  const emergeKey = emergeResetKey ?? marketKey;
+
   return (
+    <RunwayHeatmapEmergenceClip resetKey={emergeKey} className="block shrink-0">
     <svg
       className="block shrink-0 text-foreground"
       width={width}
@@ -183,5 +190,6 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
         );
       })}
     </svg>
+    </RunwayHeatmapEmergenceClip>
   );
 });

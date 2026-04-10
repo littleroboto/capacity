@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo } from 'react';
+import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
@@ -35,6 +36,10 @@ export type RunwayCompareSvgColumnProps = {
   pulseDateRange?: { ymdStart: string; ymdEnd: string };
   /** When true, pulse is skipped (matches global reduced-motion preference). */
   preferReducedMotion?: boolean;
+  /** Remounts emergence when runway identity changes; defaults to `marketKey`. */
+  emergeResetKey?: string;
+  /** Extra delay before this column’s reveal (compare-all wave). */
+  emergeStaggerMs?: number;
 };
 
 function svgClientPoint(e: React.MouseEvent | React.KeyboardEvent, fallbackW: number, fallbackH: number) {
@@ -61,6 +66,8 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
   interactionDisabled = false,
   pulseDateRange,
   preferReducedMotion = false,
+  emergeResetKey,
+  emergeStaggerMs = 0,
 }: RunwayCompareSvgColumnProps) {
   const { width, height, cells, monthLabels, weekdayLabels } = useMemo(
     () => layoutCompareMarketColumnSvg(sections, cellPx, gap, monthStripW, firstCalendarMonthKey),
@@ -77,7 +84,14 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
     [openDayDetailsFromCell]
   );
 
+  const emergeKey = emergeResetKey ?? marketKey;
+
   return (
+    <RunwayHeatmapEmergenceClip
+      resetKey={emergeKey}
+      staggerMs={emergeStaggerMs}
+      className="block shrink-0"
+    >
     <svg
       className="block shrink-0 text-foreground"
       width={width}
@@ -190,5 +204,6 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
         );
       })}
     </svg>
+    </RunwayHeatmapEmergenceClip>
   );
 });

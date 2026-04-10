@@ -1,4 +1,6 @@
 import { memo, useCallback, useMemo } from 'react';
+import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
+import { RUNWAY_EMERGE_PAUSE_MS } from '@/hooks/useRunwayHeatmapEmergence';
 import { useIsoRunwayGrowFactor } from '@/hooks/useIsoRunwayGrowFactor';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
@@ -102,7 +104,9 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
   dimPastDays,
   openDayDetailsFromCell,
 }: RunwayIsoSkylineProps) {
-  const grow = useIsoRunwayGrowFactor(growResetKey);
+  const grow = useIsoRunwayGrowFactor(growResetKey, {
+    delaySec: RUNWAY_EMERGE_PAUSE_MS / 1000,
+  });
 
   /** Earliest model dates sit nearest (front); latest recede — reverse chronological week order for layout. */
   const layoutWeeks = useMemo(() => [...weeks].reverse(), [weeks]);
@@ -277,6 +281,10 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
       className="relative flex h-[min(86dvh,calc(100dvh-6.5rem))] min-h-0 w-full max-w-full flex-1 flex-col overflow-visible bg-background"
       data-runway-iso-skyline
     >
+      <RunwayHeatmapEmergenceClip
+        resetKey={growResetKey}
+        className="flex h-full min-h-0 w-full flex-1 flex-col"
+      >
       <svg
         viewBox={`0 0 ${adjVbW} ${adjVbH}`}
         width="100%"
@@ -430,6 +438,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           ))}
         </g>
       </svg>
+      </RunwayHeatmapEmergenceClip>
     </div>
   );
 });
