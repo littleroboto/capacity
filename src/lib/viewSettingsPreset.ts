@@ -33,6 +33,11 @@ export type ViewSettingsPayloadV1 = {
   runwayFilterYear?: number | null;
   runwayFilterQuarter?: RunwayQuarter | null;
   runwayIncludeFollowingQuarter?: boolean;
+  /**
+   * Single-market heatmap: last selected calendar day (`YYYY-MM-DD`) for cell highlight + side summary.
+   * Cleared when the runway focus market changes.
+   */
+  runwaySelectedDayYmd?: string | null;
   /** Per runway lens (Technology Teams, Restaurant Activity, Deployment Risk); same tuning for every column. */
   riskHeatmapTuningByLens?: Record<HeatmapTuningLensId, PerLensHeatmapTuning>;
 };
@@ -63,6 +68,7 @@ export const VIEW_SETTINGS_PAYLOAD_KEYS = [
   'runwayFilterYear',
   'runwayFilterQuarter',
   'runwayIncludeFollowingQuarter',
+  'runwaySelectedDayYmd',
   'riskHeatmapTuningByLens',
 ] as const satisfies readonly (keyof ViewSettingsPayloadV1)[];
 
@@ -307,6 +313,15 @@ export function sanitizeSettingsPayload(raw: Record<string, unknown>): Partial<V
     typeof raw.runwayIncludeFollowingQuarter === 'boolean'
   ) {
     out.runwayIncludeFollowingQuarter = raw.runwayIncludeFollowingQuarter;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(raw, 'runwaySelectedDayYmd')) {
+    const d = raw.runwaySelectedDayYmd;
+    if (d === null) {
+      out.runwaySelectedDayYmd = null;
+    } else if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.trim())) {
+      out.runwaySelectedDayYmd = d.trim();
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapTuningByLens')) {
