@@ -173,6 +173,20 @@ The runway and heatmaps read the **same YAML** through different questions:
 
 **Compare several markets** and the **colour contract stays consistent per lens** — the same hue band means the same kind of pressure from column to column, so side-by-side views stay fair.
 
+### Workbench at a glance
+
+The live UI is a **three-column read**: **runway heatmap** (months as grids, one colour per day for the active lens), a **day-summary column** (capacity vs demand and technology load mix mini-charts with inline visual legends, plus the **selected-day** headline **%**, **Low / Medium / High** band, and separate **Planning blend** vs **Fill score** figures with glossary tooltips), and a **controls rail** (focus market, year/quarter, lens radios, YAML-backed support-week shape, supply notes). The calendar **highlights the selected day**; the vertical marker on the minis tracks that same day on the modelled timeline.
+
+<p align="center">
+  <img
+    src="./docs/images/segment-workbench-overview.png"
+    width="920"
+    alt="Segment Workbench — UK Technology Teams lens: heatmap, minis, selected-day metrics, and controls"
+  />
+</p>
+
+Screenshots live under [`docs/images/`](docs/images/) and use **repo-relative** paths so they render inline on GitHub and in most Markdown previews.
+
 ---
 
 ## Why this is a step change
@@ -198,3 +212,4 @@ It is still **judgment-led**. The model does not remove leadership; it **grounds
 | `src/` | UI, engine, heatmap and runway |
 | `api/` | Optional shared workspace and server routes |
 | `docs/` | Product and technical documentation |
+| `docs/images/` | PNGs referenced inline from the README (and other docs) |
