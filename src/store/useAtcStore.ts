@@ -80,6 +80,7 @@ import {
 } from '@/lib/riskHeatmapColors';
 import type { TechWorkloadScope } from '@/lib/runwayViewMetrics';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
+import { CAPACITY_ATC_PERSIST_KEY, CAPACITY_ATC_PERSIST_VERSION } from '@/lib/capacityAtcPersist';
 import {
   buildViewSettingsFile,
   parseViewSettingsFile,
@@ -90,9 +91,6 @@ import {
   type ViewSettingsPayloadKey,
   type ViewSettingsPayloadV1,
 } from '@/lib/viewSettingsPreset';
-
-const CAPACITY_ATC_PERSIST_KEY = 'capacity_atc';
-const CAPACITY_ATC_PERSIST_VERSION = 1;
 
 /** Last bundle/server multi-doc passed to hydrateFromStorage (session only; not localStorage). */
 let lastBootstrapMultiDoc: string | undefined;
@@ -852,6 +850,12 @@ export const useAtcStore = create<AtcState>()(
         sliceViewSettingsForPersist(s as unknown as Record<ViewSettingsPayloadKey, unknown>),
       merge: (persistedState, currentState) =>
         mergePersistedViewSettings(persistedState, currentState as AtcState),
+      onRehydrateStorage: () => (state) => {
+        const th = state?.theme;
+        if (th === 'light' || th === 'dark') {
+          document.documentElement.classList.toggle('dark', th === 'dark');
+        }
+      },
     }
   )
 );

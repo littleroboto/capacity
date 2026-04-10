@@ -9,6 +9,7 @@ import { FullCapacityAccessProvider } from '@/lib/capacityAccessContext';
 import { clerkPublishableKey, isClerkConfigured } from '@/lib/clerkConfig';
 import { ClerkUkWaitlistPage } from '@/pages/ClerkUkWaitlistPage';
 import { LandingPage } from '@/pages/LandingPage';
+import { applyPersistedWorkbenchThemeClass } from '@/lib/syncPersistedWorkbenchTheme';
 import './index.css';
 
 const App = lazy(() => import('./App'));
@@ -27,6 +28,16 @@ function clerkWaitlistUrlPath(): string {
   const b = workbenchBasename();
   const path = '/uk/waitlist';
   return b === '/' ? path : `${b}${path}`;
+}
+
+function pathnameLooksLikeWorkbench(): boolean {
+  if (typeof window === 'undefined') return false;
+  const p = window.location.pathname.replace(/\/+$/, '') || '/';
+  return p.endsWith('/app');
+}
+
+if (pathnameLooksLikeWorkbench()) {
+  applyPersistedWorkbenchThemeClass();
 }
 
 function WorkbenchLoading() {
