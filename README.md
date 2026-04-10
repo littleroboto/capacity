@@ -4,6 +4,14 @@
 
 This app does not replace your planning tools. It **replaces the argument about what “busy” means** by making capacity **finite, dated, and visible** — then rolling it forward so crunch shows up **before** the week arrives.
 
+<p align="center">
+  <img
+    src="./docs/images/segment-workbench-hero-es.png"
+    width="920"
+    alt="Segment Workbench — Spain (ES): runway heatmap, capacity vs demand and technology load mix, selected-day metrics, and controls"
+  />
+</p>
+
 ---
 
 ## The problem it solves
