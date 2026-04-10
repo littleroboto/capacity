@@ -66,7 +66,12 @@ import {
 import { patchDslHolidayStaffingMultiplier, type HolidayStaffingBlockKind } from '@/lib/dslHolidayStaffingPatch';
 import { patchDslTechWeeklyPattern, type TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import type { PaydayKnotTuple } from '@/engine/paydayMonthShape';
-import type { RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
+import {
+  clampPerLensHeatmapTuning,
+  defaultRiskHeatmapTuningByLens,
+  type HeatmapTuningLensId,
+  type PerLensHeatmapTuning,
+} from '@/lib/heatmapTuningPerLens';
 import {
   DEFAULT_HEATMAP_MONO_COLOR,
   normalizeHeatmapMonoHex,
@@ -105,22 +110,11 @@ type AtcState = {
   dslText: string;
   dslByMarket: Record<string, string>;
   riskTuning: RiskModelTuning;
-  /** Combined γ (Technology Teams / Code); kept in sync with tech/business when using the shared slider. */
-  riskHeatmapGamma: number;
-  riskHeatmapGammaTech: number;
-  riskHeatmapGammaBusiness: number;
   /**
-   * Pressure → colour transfer curve (persisted locally; all lenses and columns share this; not market YAML).
+   * Heatmap transfer + pressure Δ per runway lens (Technology Teams, Restaurant Activity, Deployment Risk).
+   * Same values for every market column; not YAML.
    */
-  riskHeatmapCurve: RiskHeatmapCurveId;
-  /**
-   * Second stage: `transfer(t)^p` for p≥1 after curve+γ; persisted. Restaurant Activity runway uses p = 1 in rendering.
-   */
-  riskHeatmapTailPower: number;
-  /**
-   * Global linear shift on each lens’s 0–1 heatmap input before transfer; same for all columns; not YAML.
-   */
-  riskHeatmapBusinessPressureOffset: number;
+  riskHeatmapTuningByLens: Record<HeatmapTuningLensId, PerLensHeatmapTuning>;
   riskSurface: RiskRow[];
   configs: MarketConfig[];
   parseError: string | null;
@@ -192,10 +186,10 @@ type AtcState = {
   setDslByMarket: (m: Record<string, string>) => void;
   setRiskTuning: (patch: Partial<RiskModelTuning>) => void;
   resetRiskTuning: () => void;
-  setRiskHeatmapGamma: (gamma: number) => void;
-  setRiskHeatmapCurve: (curve: RiskHeatmapCurveId) => void;
-  setRiskHeatmapTailPower: (power: number) => void;
-  setRiskHeatmapBusinessPressureOffset: (delta: number) => void;
+  patchRiskHeatmapTuningForLens: (
+    lens: HeatmapTuningLensId,
+    patch: Partial<PerLensHeatmapTuning>
+  ) => void;
   /** Writes explicit Mon–Sun `weekday_intensity` (bundled YAML) for the focused market and re-runs the pipeline. */
   setTechWeeklyPattern: (pattern: TechWeeklyPatternPatch) => void;
   /** Writes explicit Jan–Dec `trading.monthly_pattern` (0–1) for the focused market and re-runs the pipeline. */
@@ -250,12 +244,7 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
       dslText: '',
       dslByMarket: {},
       riskTuning: DEFAULT_RISK_TUNING,
-      riskHeatmapGamma: 1,
-      riskHeatmapGammaTech: 1,
-      riskHeatmapGammaBusiness: 1,
-      riskHeatmapCurve: 'power',
-      riskHeatmapTailPower: 1,
-      riskHeatmapBusinessPressureOffset: 0,
+      riskHeatmapTuningByLens: defaultRiskHeatmapTuningByLens(),
       runway3dHeatmap: false,
       runwaySvgHeatmap: true,
       dslLlmAssistantEnabled: false,
@@ -441,23 +430,13 @@ export const useAtcStore = create<AtcState>()((set, get) => ({
         rerunPipeline(get, set);
       },
 
-      setRiskHeatmapGamma: (gamma) => {
-        const g = Math.min(3, Math.max(0.35, Math.round(gamma * 100) / 100));
-        set({ riskHeatmapGamma: g, riskHeatmapGammaTech: g, riskHeatmapGammaBusiness: g });
-      },
-
-      setRiskHeatmapCurve: (curve) => {
-        set({ riskHeatmapCurve: curve });
-      },
-
-      setRiskHeatmapTailPower: (power) => {
-        const p = Math.min(2.75, Math.max(1, Math.round(power * 100) / 100));
-        set({ riskHeatmapTailPower: p });
-      },
-
-      setRiskHeatmapBusinessPressureOffset: (delta) => {
-        const d = Math.min(0.5, Math.max(-0.5, Math.round(delta * 100) / 100));
-        set({ riskHeatmapBusinessPressureOffset: d });
+      patchRiskHeatmapTuningForLens: (lens, patch) => {
+        set((s) => ({
+          riskHeatmapTuningByLens: {
+            ...s.riskHeatmapTuningByLens,
+            [lens]: clampPerLensHeatmapTuning({ ...s.riskHeatmapTuningByLens[lens], ...patch }),
+          },
+        }));
       },
 
       setTechWeeklyPattern: (pattern) => {

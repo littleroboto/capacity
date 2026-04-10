@@ -18,7 +18,7 @@
 | `epic-heatmap-continuous-spectrum` | Interpolated heatmap ramp | Visual-only; see `riskHeatmapColors.ts` |
 | `epic-iso-runway-polish` | 3D iso labels / light mode | `RunwayIsoSkyline`, `RunwayIsoCityBlock` |
 
-**Out of scope for this handoff:** auto-plan, corporate calendar risk *features*, auth, PartyKit, versioning, landing page (those are other epics).
+**Out of scope for this handoff:** auto-plan, corporate calendar risk *features*, auth, versioning, landing page (those are other epics).
 
 ---
 

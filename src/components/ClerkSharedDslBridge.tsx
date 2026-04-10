@@ -8,8 +8,6 @@ import {
   parseViteCapacityOrgAdminRoles,
 } from '@/lib/capacityAccess';
 import { membershipAllowsSharedDslWrite, parseViteClerkDslWriteRoles } from '@/lib/clerkDslRoles';
-import { isCollabBuildEnabled, partykitHost } from '@/lib/collab/collabBuildFlags';
-import { ClerkCollabSessionRoot } from '@/lib/collab/collabSessionContext';
 import {
   setSharedDslClerkOrgWriteAllowed,
   setSharedDslClerkTokenGetter,
@@ -66,11 +64,7 @@ export function ClerkSharedDslBridge({ children }: { children: ReactNode }) {
     access.canEditYaml,
   ]);
 
-  const collabParty = isCollabBuildEnabled() && Boolean(partykitHost());
-
   return (
-    <CapacityAccessBridgeProvider value={access}>
-      {collabParty ? <ClerkCollabSessionRoot>{children}</ClerkCollabSessionRoot> : children}
-    </CapacityAccessBridgeProvider>
+    <CapacityAccessBridgeProvider value={access}>{children}</CapacityAccessBridgeProvider>
   );
 }

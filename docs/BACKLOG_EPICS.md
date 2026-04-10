@@ -20,19 +20,24 @@ Epics appear in **suggested dependency order**. Items in the same phase can ofte
 | | `epic-day-summary-ia` | [Day summary & cell detail — IA](#epic-day-summary-ia--day-summary--cell-detail--information-architecture) |
 | | `epic-iso-runway-polish` | [Isometric runway (3D) — polish](#epic-iso-runway-polish--isometric-runway-3d--visual-polish--label-stability) |
 | | `epic-view-settings-presets` | [View settings vs scenario — presets](#epic-view-settings-presets--view-settings-vs-scenario-data--clarity--presets) |
+| | `epic-heatmap-tuning-per-lens` | [Heatmap tuning — per lens, global across markets](#epic-heatmap-tuning-per-lens--heatmap-tuning--per-lens-global-across-markets) |
 | **2 — Planning intelligence** | `epic-runway-autoplan` | [Runway auto-plan (initiative slot finder)](#epic-runway-autoplan--runway-auto-plan-initiative-slot-finder) |
 | | `epic-corporate-calendar-risk` | [Corporate calendar & deployment risk](#epic-corporate-calendar-risk--corporate-calendar--deployment-risk-windows) |
+| | `epic-restaurant-ops-calendar` | [Restaurant Trading — ops & change calendar](#epic-restaurant-ops-calendar--restaurant-trading--ops--change-calendar-non-tech-work) |
 | **3 — Identity & access** | `epic-auth-org` | [User, org, and permissions (foundation)](#epic-auth-org--user-org-and-permissions-foundation) |
 | | `epic-market-acl` | [Market & segment authoring permissions](#epic-market-acl--market--segment-authoring-permissions) |
-| **4 — Collab core** | `epic-partykit-yjs` | [Real-time collaborative editing (Yjs + PartyKit)](#epic-partykit-yjs--real-time-collaborative-editing-yjs--partykit) |
-| **5 — History** | `epic-versioning` | [Workspace version control & history](#epic-versioning--workspace-version-control--history) |
-| **6 — Comms** | `epic-comments` | [Comments (contextual annotations)](#epic-comments--comments-contextual-annotations) |
+| **3b — Canonical workspace (pilot)** | `epic-canonical-workspace-postgres` | [Canonical workspace — Postgres (Supabase)](#epic-canonical-workspace-postgres--canonical-workspace--postgres-supabase) |
+| | `epic-workspace-bundle-cache` | [Workspace bundle read cache (Upstash / KV)](#epic-workspace-bundle-cache--workspace-bundle-read-cache-upstash--kv) |
+| **4 — History** | `epic-versioning` | [Workspace version control & history](#epic-versioning--workspace-version-control--history) |
+| **5 — Comms** | `epic-comments` | [Comments (contextual annotations)](#epic-comments--comments-contextual-annotations) |
 | | `epic-chat` | [In-app chat](#epic-chat--in-app-chat) |
-| **7 — Enterprise quality** | `epic-enterprise-readiness` | [Enterprise readiness — quality, access, trust](#epic-enterprise-readiness--enterprise-readiness--quality-access-and-trust-cross-cutting) |
+| **6 — Enterprise quality** | `epic-enterprise-readiness` | [Enterprise readiness — quality, access, trust](#epic-enterprise-readiness--enterprise-readiness--quality-access-and-trust-cross-cutting) |
 
 **Handoffs:** [HANDOFF_EPIC_MARKETS.md](./HANDOFF_EPIC_MARKETS.md) (`epic-markets`). [HANDOFF_EPIC_LANDING.md](./HANDOFF_EPIC_LANDING.md) (`epic-landing`). [HANDOFF_EPIC_USER_ORG_ENTERPRISE.md](./HANDOFF_EPIC_USER_ORG_ENTERPRISE.md) (`epic-auth-org`). Runway UX (naming + day-summary): [HANDOFF_PHASE_1B_RUNWAY_UX.md](./HANDOFF_PHASE_1B_RUNWAY_UX.md). Remaining runway UX notes (mostly addressed; see **Phase 1b snapshot** below): [HANDOFF_RUNWAY_UX_REMAINING.md](./HANDOFF_RUNWAY_UX_REMAINING.md).
 
 **Shelved (backlog):** **`epic-dsl-llm-assistant`** — OpenAI YAML coding assistant under Code view (former header Toybox toggle + `?llm` URL). **Header entry points removed** (Apr 2026) until a rebuild. Residual code: `useAtcStore.dslLlmAssistantEnabled`, `DslAssistantPanel`, `MainDslWorkspace` (`?llm` query can still open the dock for local dev).
+
+**Removed from tree:** **`epic-partykit-yjs`** — PartyKit + Yjs + `y-monaco` real-time Code editor sync **deleted** (Apr 2026); it was unreliable in practice. Use **Pull from cloud**, **409 / etag** on save, and (planned) **Supabase** canonical store — not a second WebSocket host. Revisit realtime only as a **new** epic if product requires it (different provider or architecture).
 
 ### Phase 1b — progress snapshot (Apr 2026)
 
@@ -45,8 +50,9 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 | `epic-day-summary-ia` | **Mostly shipped** — progressive disclosure + lead metric; repetitive tooltip copy reduced (shared footnote, shorter readiness line). Optional: compact surface **table** still backlog. |
 | `epic-iso-runway-polish` | **Mostly shipped** — themed empty/pad tokens, label halo, compare-all **market-strip seams**, SVG `geometricPrecision`, light-mode label tweak. Optional: HTML chronology band if breakpoints still misbehave. |
 | `epic-view-settings-presets` | **Shipped** — scenario vs device copy in Workspace; JSON export/import; **named on-device presets**; README / PRODUCT_BASELINE. Blob `ui_state` defaults still future. |
+| `epic-heatmap-tuning-per-lens` | **Shipped (browser)** — `riskHeatmapTuningByLens` + per-lens controls in Settings and Business Patterns; view-settings JSON uses the new shape with **legacy flat keys migrated on import**. Team **`ui_state` on server** still future. |
 
-**All epic ids (copy-paste):** `epic-markets`, `epic-landing`, `epic-shared-dsl-hardening`, `epic-runway-lens-naming`, `epic-heatmap-continuous-spectrum`, `epic-day-summary-ia`, `epic-iso-runway-polish`, `epic-view-settings-presets`, `epic-runway-autoplan`, `epic-corporate-calendar-risk`, `epic-auth-org`, `epic-market-acl`, `epic-partykit-yjs`, `epic-versioning`, `epic-comments`, `epic-chat`, `epic-enterprise-readiness`, `epic-dsl-llm-assistant` (shelved).
+**All epic ids (copy-paste):** `epic-markets`, `epic-landing`, `epic-shared-dsl-hardening`, `epic-runway-lens-naming`, `epic-heatmap-continuous-spectrum`, `epic-day-summary-ia`, `epic-iso-runway-polish`, `epic-view-settings-presets`, `epic-heatmap-tuning-per-lens`, `epic-runway-autoplan`, `epic-corporate-calendar-risk`, `epic-restaurant-ops-calendar`, `epic-auth-org`, `epic-market-acl`, `epic-canonical-workspace-postgres`, `epic-workspace-bundle-cache`, `epic-versioning`, `epic-comments`, `epic-chat`, `epic-enterprise-readiness`, `epic-dsl-llm-assistant` (shelved), `epic-partykit-yjs` (removed — see **Shelved** note above).
 
 ---
 
@@ -102,7 +108,7 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 
 ### epic-shared-dsl-hardening — Shared workspace hardening (current Blob path)
 
-**Goal:** Keep **non-collab** Blob save/load trustworthy until Postgres + PartyKit (or version API) own the story.
+**Goal:** Keep Blob save/load trustworthy until **Postgres / Supabase** (or version API) own the story.
 
 **Repo status:** **PUT** returns **`version`** (duplicate of Blob `etag`); **409** surfaces a **dismissible app banner** plus Workspace copy; **PRODUCT_BASELINE** updated for limits and Clerk/Blob behaviour.
 
@@ -111,7 +117,7 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 - Optional migration to **integer version** in DB; richer conflict UX — see **Version control** (`epic-versioning`).
 - No realtime multi-tab presence; users **Pull from cloud** when needed.
 
-**Dependencies:** Overlaps **Collaborative editing** (`epic-partykit-yjs`) and **Version control** (`epic-versioning`).
+**Dependencies:** Overlaps **Version control** (`epic-versioning`). **Superseded for pilot** by **Canonical workspace — Postgres** (`epic-canonical-workspace-postgres`) once orgs read/write the DB path; Blob path may remain **fallback** or **bootstrap** until cutover.
 
 **Outcomes:** Predictable saves, honest 409 handling, documented limits.
 
@@ -224,6 +230,28 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 
 ---
 
+### epic-heatmap-tuning-per-lens — Heatmap tuning — per lens, global across markets
+
+**Goal:** **Heatmap transfer and pressure adjustments are authoritative per lens** (Technology / Code, Restaurant Activity, Deployment Risk, etc.) and **identical for every market column** in single-market and compare-all views — so leadership sees one consistent visual language and **downstream KPIs / exports cite a single team-wide tuning profile**, not per-browser drift.
+
+**Repo status:** **Shipped (browser slice)** — `useAtcStore.riskHeatmapTuningByLens` keys **Technology Teams** (`combined`), **Restaurant Activity** (`in_store`), **Deployment Risk** (`market_risk`); `RunwayGrid` picks tuning via `heatmapTuningLensForViewMode`. Settings and pattern panels pass an explicit **lens** into heatmap controls. **View settings export/import** persists `riskHeatmapTuningByLens`; **`sanitizeSettingsPayload`** migrates older flat `riskHeatmapGamma*`, `riskHeatmapCurve`, `riskHeatmapTailPower`, `riskHeatmapBusinessPressureOffset`, and `marketRiskHeatmap*` keys. **Not shipped:** team-default **`ui_state`** / sidecar (still per epic scope).
+
+**Scope (indicative):**
+
+- **Data model:** Map each canonical **view mode / lens id** (`VIEW_MODES` in `constants.ts`) to its own **pressure offset** (and, if product wants full parity, **per-lens transfer**: curve id, γ, tail power — or a deliberate decision that transfer stays shared and only offset is per-lens).
+- **Engine / pipeline:** Thread per-lens tuning into the path that builds heatmap input → transfer → palette (`riskHeatmapColors.ts`, runway cell renderers) so compare strips use the **same** tuning object for every column.
+- **UI:** Replace or extend the Settings panel so sliders are **grouped by lens**, with copy that stresses **global across countries**, not per-market.
+- **Persistence & governance (production):** Optional **`ui_state` / `heatmap_tuning` sidecar** in team storage (Blob JSON next to YAML, or Postgres row keyed by `org_id`) with **version + `updated_by`** so changes are auditable; align with **View settings presets** (`epic-view-settings-presets`) and **Workspace version control** (`epic-versioning`) for rollback narrative.
+- **Export / narrative:** Screenshots and CSV-style exports should record **tuning schema version + hashes** where applicable (`epic-enterprise-readiness` overlap).
+
+**Dependencies:** **Lens naming** (`epic-runway-lens-naming`) for stable ids; **User & org** (`epic-auth-org`) if server-persisted; optional **Shared workspace hardening** for Blob sidecar layout.
+
+**Outcomes:** Heatmaps and derived summaries are **comparable across markets**; tuning changes are **explainable and optionally team-owned**, not anonymous local sliders.
+
+**Tags:** `heatmap`, `runway`, `kpi`, `governance`, `settings`
+
+---
+
 ### epic-runway-autoplan — Runway auto-plan (initiative slot finder)
 
 **Goal:** The user gives the system a **project / initiative type** (and rough shape—duration, prep, constraints). The system uses **runway heatmap analysis, pressure, and resourcing** to propose **where to drop it on the calendar**—not just “find a gap,” but a **suggested slot** that respects how tight tech and business load already are.
@@ -268,11 +296,33 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 
 ---
 
+### epic-restaurant-ops-calendar — Restaurant Trading — ops & change calendar (non-tech work)
+
+**Goal:** Extend **Restaurant Trading / store-intensity** thinking beyond **tech-shaped** initiatives: model **operational change** in restaurants — refurbs, equipment trials, networking upgrades, **crew procedure rollouts** (no code deploy) — as **first-class scheduled events** that **compete for calendar attention** and must **avoid live campaign / high-trading windows** where the product policy says so.
+
+**Repo status:** **Concept** — Restaurant lens exists in the runway stack; there is no dedicated **ops programme** entity distinct from campaigns and tech deployment rows. Overlap with **Corporate calendar** (`epic-corporate-calendar-risk`) and **Auto-plan** (`epic-runway-autoplan`) as consumers.
+
+**Scope (indicative):**
+
+- **Conceptual split:** Distinguish **store ops / change programmes** from **marketing campaigns** and from **technology deployment** in DSL or sidecar (fields: type, duration, prep buffer, optional “hard avoid” campaign overlap flag).
+- **Engine:** Feed ops windows into **Restaurant Activity** or a **combined planning score** so heatmaps and tooltips can say *why* a week is sensitive (campaign vs refit vs training push).
+- **UI:** Restaurant Trading panel (or runway overlays) to add/edit **ops programmes**; optional Gantt-style or band overlay; clear legend vs existing campaign shading.
+- **Scheduling rules:** Configurable **“do not land during”** rules (e.g. active `campaign_effect` weeks, blackout YAML, corporate events) — shared logic with auto-plan scorer where possible.
+- **Non-goals for v1:** Full project-management replacement; fine-grained crew rostering.
+
+**Dependencies:** **Data model / markets** (`epic-markets`); **Corporate calendar** (`epic-corporate-calendar-risk`) for shared blackout vocabulary; **Auto-plan** (`epic-runway-autoplan`) as the natural place to **propose** ops slots once constraints exist.
+
+**Outcomes:** Ops leaders can **schedule human / physical change** with the same **calendar discipline** as tech and campaigns; fewer “we didn’t know the promo was live” clashes.
+
+**Tags:** `restaurant`, `operations`, `planning`, `calendar`, `dsl`, `runway`
+
+---
+
 ### epic-auth-org — User, org, and permissions (foundation)
 
 **Goal:** **Identity and tenancy** so shared workspaces, billing, and audit are sane later.
 
-**Repo status:** **Advanced POC** — **Clerk** sign-in (`SignInGate`, `VITE_AUTH_DISABLED` bypass); **GET/HEAD/PUT** verify session JWT when `CLERK_SECRET_KEY` is set; optional legacy write secret; **org write allow list** (`CAPACITY_CLERK_DSL_WRITE_ROLES` / `VITE_*`); **viewer vs editor** via `cap_*` session claims + org admin roles; **UserButton** / **OrganizationSwitcher** in shell. **Remaining:** per-org Blob paths, formal SSO/SCIM ops guides, optional `CAPACITY_AUTH_MODE`-style migration flag if you need an explicit legacy toggle beyond env presence. See [AUTH_PROVIDER.md](./AUTH_PROVIDER.md).
+**Repo status:** **Advanced POC** — **Clerk** sign-in (`SignInGate`, `VITE_AUTH_DISABLED` bypass); **GET/HEAD/PUT** verify session JWT when `CLERK_SECRET_KEY` is set; optional legacy write secret; **org write allow list** (`CAPACITY_CLERK_DSL_WRITE_ROLES` / `VITE_*`); **viewer vs editor** via `cap_*` session claims + org admin roles; **UserButton** / **OrganizationSwitcher** in shell. **Remaining:** **per-org canonical storage** (see **`epic-canonical-workspace-postgres`** — Postgres rows vs per-org Blob paths), formal SSO/SCIM ops guides, optional `CAPACITY_AUTH_MODE`-style migration flag if you need an explicit legacy toggle beyond env presence. See [AUTH_PROVIDER.md](./AUTH_PROVIDER.md).
 
 **Scope (indicative):**
 
@@ -280,7 +330,7 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 - Org/team entity, membership, role (viewer / editor / admin).
 - Map “team workspace” to `workspace_id` / org; retire or wrap shared secret as bootstrap only.
 
-**Dependencies:** None for MVP auth shell; **blocks** secure PartyKit, comments attribution, version history “who,” and **market ACL** enforcement on the server.
+**Dependencies:** None for MVP auth shell; **blocks** comments attribution, version history “who,” and **market ACL** enforcement on the server.
 
 **Outcomes:** `userId`, `orgId` available in client and API; protected routes pattern.
 
@@ -301,10 +351,10 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 - **Claims / metadata model** — session claims `cap_admin`, `cap_segs`, `cap_ed`, **`cap_mkts`** (see [AUTH_PROVIDER.md](./AUTH_PROVIDER.md)); extend if product needs richer rules.
 - **Clerk (or provider)** — document how ops assign segment vs per-market access (user/org metadata + session token template).
 - **Client** — Monaco / runway / header: hide, disable, or read-only for disallowed markets; align with `filterManifestOrderForAccess` / `runwayFocusAllowed`.
-- **Server** — **`/api/shared-dsl`** filters GET YAML and merges scoped PUT bodies (implemented); **org-scoped blob paths** when combined with `epic-auth-org` multi-tenancy.
+- **Server** — **`/api/shared-dsl`** filters GET YAML and merges scoped PUT bodies (implemented); **org-scoped storage** — Blob path today; **Postgres workspace** with same filter/merge semantics under **`epic-canonical-workspace-postgres`**.
 - **Tests / matrix** — roles × markets × PUT accept/reject (automated coverage still backlog).
 
-**Dependencies:** **`epic-auth-org`** for verified JWT; **org-scoped storage paths** remain backlog. Server-side market ACL for shared-dsl **ships** with claim parsing in `api/_sharedDslImpl.ts`.
+**Dependencies:** **`epic-auth-org`** for verified JWT. **Org-scoped canonical storage** is **`epic-canonical-workspace-postgres`** (Postgres rows per org/workspace). Server-side market ACL for shared-dsl **ships** with claim parsing in `api/_sharedDslImpl.ts`.
 
 **Outcomes:** Documented role matrix; no saving disallowed markets through the API; procurement-credible “who can edit what.”
 
@@ -312,24 +362,51 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 
 ---
 
-### epic-partykit-yjs — Real-time collaborative editing (Yjs + PartyKit)
+### epic-canonical-workspace-postgres — Canonical workspace — Postgres (Supabase)
 
-**Goal:** **Multiple editors** in the same workspace without last-write-wins over HTTP Blob alone.
+**Goal:** Move the **system of record** for team workspace YAML from **Vercel Blob** to **Postgres** (recommended: **Supabase**) so pilot-scale **tenancy**, **per-market rows**, **transactions**, **optimistic locking**, and **revision history** are **first-class** — without changing **Clerk** as the identity provider.
 
-**Repo status:** **MVP shipped in tree** — PartyKit server `party/collab.ts` (per-market rooms, Clerk JWT + `cap_*` ACL), client `src/lib/collab/*` + `DslEditorCore` `y-monaco` when `VITE_COLLAB_ENABLED=1` and `VITE_PARTYKIT_HOST` set. Deploy PartyKit (`pnpm party:deploy`), set `CLERK_SECRET_KEY` on the PartyKit project. Spec: [docs/superpowers/specs/2026-04-06-partykit-yjs-collaborative-dsl-design.md](./superpowers/specs/2026-04-06-partykit-yjs-collaborative-dsl-design.md).
+**Repo status:** **Backlog** — design and SQL direction in [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md); `supabase/migrations/` exists for schema work; app still uses **`/api/shared-dsl`** + Blob when enabled.
 
 **Scope (indicative):**
 
-- PartyKit project, `y-partykit` server, deploy + env (`VITE_PARTYKIT_HOST`, room id strategy).
-- Client: `Y.Doc`, provider lifecycle, feature flag.
-- `y-monaco` (or chosen binding) for workspace YAML; single `Y.Text` MVP then optional split by market.
-- Hydration from current load path (Blob/local); define single writer to Zustand for collab buffer.
+- **Schema** — `workspaces` (keyed by Clerk `org_id`), `market_documents` (`workspace_id`, `market_id`, `yaml_body`, integer `version`), triggers or columns for **`workspaces.revision`** bundle bump; optional **`market_document_revisions`** append-only table (or defer to `epic-versioning`).
+- **API** — New routes (e.g. `GET/PUT /api/workspace/...`) **or** evolve `_sharedDslImpl` behind **`STORAGE_BACKEND=postgres`** (feature flag / env); preserve **filtered GET**, **scoped PUT merge**, **409** on version mismatch, same **`cap_*`** ACL as today.
+- **Server access** — `SUPABASE_SERVICE_ROLE_KEY` / `DATABASE_URL` **server-only**; no service role in browser; pooler-friendly client for Vercel Fluid.
+- **Cutover** — Per-org **import** from existing Blob object (one-time) + **flip** env for pilot orgs; document **rollback** (Blob still in account until retired).
+- **Docs** — `.env.example`, README pilot section, **PRODUCT_BASELINE** when prod path exists.
 
-**Dependencies:** **User & org** (`epic-auth-org`) (or interim shared secret) for **connection auth** on PartyKit; optional coexistence with Blob checkpoint.
+**Dependencies:** **`epic-auth-org`** (Clerk JWT + org context); **`epic-market-acl`** (server-side filter/merge semantics must **match** Blob behaviour). Builds on **`epic-shared-dsl-hardening`** conflict UX.
 
-**Outcomes:** Two browsers see live edits; reconnect behavior documented.
+**Outcomes:** Pilot orgs **not** blocked by Blob limits; **one row per market**; **transactional** multi-market saves; foundation for **`epic-versioning`** and audit.
 
-**Tags:** `collab`, `partykit`, `yjs`, `monaco`
+**Tags:** `postgres`, `supabase`, `workspace`, `multi-tenant`, `pilot`
+
+**Design:** [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md)
+
+---
+
+### epic-workspace-bundle-cache — Workspace bundle read cache (Upstash / KV)
+
+**Goal:** After Postgres owns YAML, keep **`GET` bundle** latency and server CPU predictable for **large multi-market** payloads by caching the **merged** bundle in **serverless-friendly** Redis (**Upstash**) or **Vercel KV** — **revision-keyed** so correctness does not depend on TTL alone.
+
+**Repo status:** **Backlog** — pattern documented in [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md#read-path-snappy).
+
+**Scope (indicative):**
+
+- Env: `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (or KV equivalents).
+- **Key** `cap:v1:bundle:{workspace_id}:{revision}` (or similar); **miss** → DB merge → **SETEX**; **hit** → return cached body (gzip optional).
+- **Invalidation** — rely on **revision** in key (no `KEYS`/`SCAN` on every write); TTL **60–300s** as safety only.
+- **Optional** per-market keys later if product needs **partial load**; **v1** can be **bundle-only**.
+- **Feature flag** — cache **off** in dev unless needed; metrics to prove value before requiring Redis in all envs.
+
+**Dependencies:** **`epic-canonical-workspace-postgres`** (revision bump + bundle merge contract). **Optional** for first pilot wave if Postgres read path is **fast enough** alone.
+
+**Outcomes:** Snappy compare-all / full manifest loads under **50–500** intermittent users without over-provisioning Postgres.
+
+**Tags:** `redis`, `upstash`, `cache`, `performance`, `workspace`
+
+**Design:** [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md)
 
 ---
 
@@ -344,7 +421,7 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 - UI: timeline or list, diff view (Monaco diff or textual).
 - Policy: auto-save snapshot debounce vs manual “Save version.”
 
-**Dependencies:** **User & org** (`epic-auth-org`) for attribution; **Collaborative editing** (`epic-partykit-yjs`) defines whether snapshots capture Yjs export or merged YAML from server.
+**Dependencies:** **User & org** (`epic-auth-org`) for attribution; **`epic-canonical-workspace-postgres`** strongly recommended so snapshots live in **Postgres** (`market_document_revisions` or dedicated table) rather than Blob key sprawl. Snapshots are **merged YAML** from the server (or per-market rows), not a separate CRDT layer.
 
 **Outcomes:** Users can roll back and audit “what changed when.”
 
@@ -377,7 +454,7 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 **Scope (indicative):**
 
 - Product choice: embed (e.g. provider) vs custom (channels, messages table, realtime).
-- Realtime transport (PartyKit channel, Ably, Supabase Realtime, etc.).
+- Realtime transport (Ably, Supabase Realtime, managed chat embed, etc.).
 - Persistence, search, notifications (stretch).
 
 **Dependencies:** **User & org** (`epic-auth-org`) strongly; rooms keyed by `workspace_id` or `org_id`.
@@ -398,7 +475,7 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 - **Observability:** client error reporting / RUM for heavy runway views; serverless route health for `api/*`.
 - **Identity extensions (after `epic-auth-org`):** SSO / SAML where provider supports it; SCIM stretch.
 - **Trust:** export bundle includes **engine / schema version** narrative for reproducibility; security FAQ pointers (Blob read path until auth, etc.).
-- **Data lifecycle hooks:** retention / delete story documented for when Postgres + orgs exist (may overlap **Version control**).
+- **Data lifecycle hooks:** retention / delete story documented for **Postgres-backed** workspaces (`epic-canonical-workspace-postgres`); may overlap **Version control** (`epic-versioning`).
 
 **Dependencies:** **User & org** (`epic-auth-org`) for SSO and tenant delete; some items can start earlier (a11y, client errors).
 
@@ -424,12 +501,15 @@ flowchart TD
   U3[epic-day-summary-ia]
   U4[epic-iso-runway-polish]
   U5[epic-view-settings-presets]
+  U6[epic-heatmap-tuning-per-lens]
   P[epic-runway-autoplan]
   R[epic-corporate-calendar-risk]
+  RO[epic-restaurant-ops-calendar]
   D[epic-auth-org]
   M[epic-market-acl]
+  W[epic-canonical-workspace-postgres]
+  K[epic-workspace-bundle-cache]
   Q[epic-enterprise-readiness]
-  E[epic-partykit-yjs]
   F[epic-versioning]
   G[epic-comments]
   H[epic-chat]
@@ -437,14 +517,22 @@ flowchart TD
   A --> P
   A --> R
   R --> P
+  R --> RO
+  RO --> P
+  A --> RO
+  U1 -.-> U6
+  U5 -.-> U6
   D --> M
-  D --> E
+  D --> W
+  M --> W
+  W --> K
+  W --> F
   D --> F
   D --> G
   D --> H
   D --> Q
-  E --> F
-  C --> E
+  C -.-> F
+  C -.-> W
   U1 -.-> U3
 ```
 

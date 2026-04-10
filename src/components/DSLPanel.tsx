@@ -3,6 +3,8 @@ import { DslPanelClerkSignOut } from '@/components/DslPanelClerkSignOut';
 import { HeatmapSettingsPanel } from '@/components/HeatmapSettingsPanel';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
 import { RiskModelPanel } from '@/components/RiskModelPanel';
+import { RunwayFocusSelect } from '@/components/RunwayFocusSelect';
+import { RunwayRangeSelect } from '@/components/RunwayRangeSelect';
 import { WorkbenchRunwayControls } from '@/components/WorkbenchRunwayControls';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,9 +15,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
 import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { OPEN_WORKSPACE_EVENT } from '@/lib/sharedDslSync';
 import { useAtcStore } from '@/store/useAtcStore';
+import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Database, FileCode2, SlidersHorizontal } from 'lucide-react';
 
 type DSLPanelProps = {
@@ -25,6 +29,7 @@ type DSLPanelProps = {
 
 /** Sits in a split layout: runway/heatmap left, controls + workbench right. */
 export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
+  const lgUp = useMediaMinWidth(1024);
   const [localDataOpen, setLocalDataOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -46,15 +51,16 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="text-pretty">
-            Runway palette and campaign overlay.             Global heatmap (pressure offset, curve, γ, tail power) is the same here and under{' '}
-            <strong className="font-medium text-foreground">Business Patterns</strong> for every lens and column.{' '}
-            <strong className="font-medium text-foreground">Deployment Risk</strong> also has mix scalers in Business Patterns.
+            Runway palette and campaign overlay.             Heatmap pressure offset, curve, γ, and tail are{' '}
+            <strong className="font-medium text-foreground">per lens</strong> (Technology Teams, Restaurant Activity,
+            Deployment Risk) and <strong className="font-medium text-foreground">the same for every country column</strong>.
+            Business Patterns panels edit the same persisted values for the active lens where shown.
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">
           <HeatmapSettingsPanel
             showCampaignBoost={viewMode !== 'combined'}
-            showHeatmapTransferTuning={viewMode !== 'in_store'}
+            showHeatmapTransferTuning={viewMode !== 'code'}
           />
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
@@ -102,7 +108,12 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
   if (collapsed) {
     return (
       <>
-        <aside className="flex h-full min-h-0 w-full min-w-0 shrink-0 flex-col items-center gap-1 border-l border-border bg-card py-2">
+        <aside
+          className={cn(
+            'flex h-full min-h-0 w-full min-w-0 shrink-0 flex-col items-center gap-1 bg-background py-2',
+            lgUp ? 'border-l border-border' : 'border-t border-border'
+          )}
+        >
           <Button
             type="button"
             variant="ghost"
@@ -175,26 +186,59 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
     <>
       <aside
         id="dsl-controls-panel"
-        className="flex h-full min-h-0 min-w-0 shrink-0 flex-col gap-3 overflow-hidden border-l border-border bg-card p-4"
+        className={cn(
+          'flex h-full min-h-0 min-w-0 w-full shrink-0 flex-col overflow-hidden bg-background',
+          lgUp ? '' : 'border-t border-border'
+        )}
       >
-        <div className="flex shrink-0 items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold tracking-tight">Controls</h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="hidden h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground lg:flex"
-            onClick={() => onCollapsedChange(true)}
-            aria-expanded={true}
-            aria-controls="dsl-controls-panel"
-            aria-label="Collapse controls panel"
-            title="Collapse controls"
-          >
-            <ChevronRight className="h-5 w-5" aria-hidden />
-          </Button>
+        <div className="flex shrink-0 items-center gap-2 px-3 py-2">
+          <h2 className="min-w-0 truncate text-sm font-semibold tracking-tight">Controls</h2>
+          <div className="min-w-0 flex-1" />
+          <div className="flex shrink-0 items-center gap-0.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setLocalDataOpen(true)}
+              title="Workspace — team cloud and reset"
+              aria-label="Open workspace — cloud and local data"
+            >
+              <Database className="h-4 w-4 opacity-85" aria-hidden />
+            </Button>
+            <DslPanelClerkSignOut iconOnly />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setSettingsOpen(true)}
+              title="Settings — heatmap curve, γ, campaign, palette"
+              aria-label="Open settings — heatmap and display"
+            >
+              <SlidersHorizontal className="h-4 w-4 opacity-85" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="hidden h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground lg:flex"
+              onClick={() => onCollapsedChange(true)}
+              aria-expanded={true}
+              aria-controls="dsl-controls-panel"
+              aria-label="Collapse controls panel"
+              title="Collapse controls"
+            >
+              <ChevronRight className="h-5 w-5" aria-hidden />
+            </Button>
+          </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col justify-start gap-3 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-0.5 [scrollbar-gutter:stable]">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 py-2.5 pr-2 [scrollbar-gutter:stable]">
+          <div className="flex min-w-0 flex-col gap-3">
+            <RunwayFocusSelect className="min-w-0 w-full" />
+            <RunwayRangeSelect className="min-w-0 w-full" />
+          </div>
           <WorkbenchRunwayControls compareAllMarkets={compareAllMarkets} />
           {!compareAllMarkets && parseError ? (
             <div
@@ -211,41 +255,13 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
             </div>
           ) : null}
           {compareAllMarkets ? (
-            <p className="text-pretty text-xs leading-relaxed text-muted-foreground">
-              <span className="font-medium text-foreground/85">Focus</span> a single market for YAML editing, the DSL
-              assistant, <span className="font-medium text-foreground/85">Code</span> view, business patterns, and{' '}
+            <p className="text-pretty text-[11px] leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground/85">Focus</span> a single market for YAML, the DSL assistant,{' '}
+              <span className="font-medium text-foreground/85">Code</span>, business patterns, and toolbar{' '}
               <span className="font-medium text-foreground/85">Settings</span>.
             </p>
           ) : null}
           <RiskModelPanel />
-        </div>
-
-        <div className="flex shrink-0 flex-wrap justify-end gap-1.5 border-t border-border/60 bg-card/40 px-0 pt-1.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1.5 px-2 text-[11px] font-normal leading-none"
-            onClick={() => setLocalDataOpen(true)}
-            title="Team cloud sync and reset"
-            aria-label="Open workspace — cloud and local data"
-          >
-            <Database className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
-            Workspace
-          </Button>
-          <DslPanelClerkSignOut />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1.5 px-2 text-[11px] font-normal leading-none"
-            onClick={() => setSettingsOpen(true)}
-            title="Heatmap curve, γ, campaign boost, palette"
-            aria-label="Open settings — heatmap and display"
-          >
-            <SlidersHorizontal className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
-            Settings
-          </Button>
         </div>
       </aside>
       {localDataDialog}

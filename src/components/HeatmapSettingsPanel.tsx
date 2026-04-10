@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { HeatmapBusinessPressureOffsetControls } from '@/components/HeatmapBusinessPressureOffsetControls';
 import { HeatmapTransferControls } from '@/components/HeatmapTransferControls';
 import { Label } from '@/components/ui/label';
+import { HEATMAP_TUNING_LENS_IDS, labelForHeatmapTuningLens } from '@/lib/heatmapTuningPerLens';
 import { HEATMAP_MONO_COLOR_PRESETS } from '@/lib/riskHeatmapColors';
 import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
@@ -74,12 +75,20 @@ export function HeatmapSettingsPanel({ showCampaignBoost, showHeatmapTransferTun
     <div className="space-y-6">
       <div className="space-y-4">
         {showHeatmapTransferTuning ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Global heatmap — pressure offset, then curve, γ, and tail power
+              Heatmap tuning per lens — same values for every country column
             </p>
-            <HeatmapBusinessPressureOffsetControls idPrefix="settings" />
-            <HeatmapTransferControls idPrefix="settings" className="border-t border-border/40 pt-3" />
+            {HEATMAP_TUNING_LENS_IDS.map((lens) => (
+              <div
+                key={lens}
+                className="space-y-4 rounded-lg border border-border/40 bg-muted/10 p-3 dark:bg-muted/5"
+              >
+                <p className="text-[11px] font-semibold text-foreground">{labelForHeatmapTuningLens(lens)}</p>
+                <HeatmapBusinessPressureOffsetControls idPrefix="settings" lens={lens} />
+                <HeatmapTransferControls idPrefix="settings" lens={lens} className="border-t border-border/40 pt-3" />
+              </div>
+            ))}
           </div>
         ) : null}
 

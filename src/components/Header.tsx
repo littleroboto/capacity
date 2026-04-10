@@ -30,11 +30,11 @@ export function Header() {
   const titleLinkClass = cn(
     'text-inherit no-underline decoration-transparent transition-colors',
     'hover:underline hover:decoration-foreground/50',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card rounded-sm'
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm'
   );
 
   return (
-    <header className="border-b border-border bg-card shadow-sm">
+    <header className="border-b border-border bg-background">
       <div
         className={cn(
           'px-4 md:px-5',

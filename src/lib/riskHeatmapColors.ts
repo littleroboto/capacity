@@ -167,7 +167,7 @@ export function hexToRgba(hex: string, alpha: number): string {
 export function heatmapTransformedMetric01(metric: number | undefined, opts?: HeatmapColorOpts): number | null {
   if (metric == null || Number.isNaN(metric)) return null;
   let v = Math.min(1, Math.max(0, metric));
-  const curve = opts?.riskHeatmapCurve ?? 'power';
+  const curve = opts?.riskHeatmapCurve ?? 'sigmoid';
   const gamma = opts?.riskHeatmapGamma ?? 1;
   v = applyRiskHeatmapTransfer(v, curve, gamma);
   v = applyRiskHeatmapTailPower(v, opts?.riskHeatmapTailPower ?? 1);

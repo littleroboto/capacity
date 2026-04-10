@@ -19,7 +19,7 @@ This document is a **build-ready handoff**: it assumes the reader will implement
 
 **Recommendation:** Treat **`epic-auth-org` as the next enterprise-critical epic.** Run Phase 1b in parallel only if you have a second builder; otherwise do auth first, then polish.
 
-**Blocks unlocked:** PartyKit room auth, version history attribution, comments, secure Blob reads, Deployment Protection alignment, SSO later.
+**Blocks unlocked:** Version history attribution, comments, secure Blob reads, Deployment Protection alignment, SSO later, canonical **Supabase** workspace (see [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md)).
 
 ---
 
@@ -68,7 +68,7 @@ This document is a **build-ready handoff**: it assumes the reader will implement
 
 ### Non-goals (defer)
 
-- **Yjs / PartyKit** (separate epic; needs this auth first).
+- **Realtime multi-cursor YAML** — not in repo (former PartyKit path removed); revisit only if product mandates a new provider.
 - **Postgres version history** (separate epic).
 - **Full SCIM / SAML** — can be Phase 2 of auth via provider (Clerk/Auth0 org SSO).
 - **Multi-workspace / multi-blob paths** — v1 can stay **one blob per deployment** or **one blob per org** once org exists.
@@ -235,7 +235,7 @@ For **enterprise v1**, Option A is faster; Option B if you’re doing landing in
 ## 11. Follow-on epics (order after this)
 
 1. **Shared workspace hardening** — stale banner, version integer, conflict UX with real users.
-2. **Yjs + PartyKit** — room id = `orgId` + workspace id; token from same Clerk session.
+2. **Canonical Postgres / Supabase** — per-market rows + Redis bundle cache; same Clerk JWT + `cap_*` ACL as `/api/shared-dsl`.
 3. **Workspace version control** — `created_by` = `userId`.
 4. **Enterprise readiness** — SAML, audit log export, RUM (see `epic-enterprise-readiness`).
 

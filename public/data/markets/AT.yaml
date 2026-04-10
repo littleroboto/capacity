@@ -454,7 +454,7 @@ trading:
   campaign_store_boost_prep: 0
   campaign_store_boost_live: 0.28
   campaign_effect_scale: 1.2
-  payday_month_peak_multiplier: 1.15
+  payday_month_peak_multiplier: 1.10
   monthly_pattern:
     Jan: 0.72
     Feb: 0.75

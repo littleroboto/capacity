@@ -1,0 +1,9 @@
+# Minimal Supabase CLI config for local dev / migrations.
+# https://supabase.com/docs/guides/cli/config
+
+[api]
+enabled = true
+
+[db]
+# Align with Supabase hosted major version when linking a project
+major_version = 15

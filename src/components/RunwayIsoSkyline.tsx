@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo } from 'react';
+import { useIsoRunwayGrowFactor } from '@/hooks/useIsoRunwayGrowFactor';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
@@ -44,6 +45,8 @@ type RunwayTipAnchor = { clientX: number; clientY: number };
 
 export type RunwayIsoSkylineProps = {
   moKey: string;
+  /** Bumps isometric column grow-in when market / lens / data changes. */
+  growResetKey: string;
   weeks: RunwayCalendarCellValue[][];
   /** When set, major week boundaries draw faint seams on the ground plane (3D runway). */
   sections?: VerticalYearSection[];
@@ -84,6 +87,7 @@ function groundSeamWeekdayCol(nDayCols: number): number {
 
 export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
   moKey,
+  growResetKey,
   weeks,
   sections,
   cellPx,
@@ -98,6 +102,8 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
   dimPastDays,
   openDayDetailsFromCell,
 }: RunwayIsoSkylineProps) {
+  const grow = useIsoRunwayGrowFactor(growResetKey);
+
   /** Earliest model dates sit nearest (front); latest recede — reverse chronological week order for layout. */
   const layoutWeeks = useMemo(() => [...weeks].reverse(), [weeks]);
   const nWeeks = layoutWeeks.length;
@@ -341,7 +347,9 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
           const isPad = !dateStr;
           const height01 = transformedHeatmapMetric(viewMode, metric, heatmapOpts);
-          const calH = calHeightFromMetric(height01, rowTowerPx, isPad);
+          const calHTarget = calHeightFromMetric(height01, rowTowerPx, isPad);
+          const calH0 = calHeightFromMetric(0, rowTowerPx, isPad);
+          const calH = calH0 + (calHTarget - calH0) * grow;
           const columnTy = deckAndColumnY(L, calH, runwayBandH);
           const topC = isPad ? ISO_PAD_TOP : contribPanelFill(fill, 'top');
           const leftC = isPad ? ISO_PAD_LEFT : contribPanelFill(fill, 'left');

@@ -22,11 +22,11 @@
 | `CAPACITY_ORG_ADMIN_ROLES` / `VITE_CAPACITY_ORG_ADMIN_ROLES` | Server / Vite | Org roles treated as workspace admin |
 | `CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE` | Server | When `1` and Clerk is on, PUT rejects legacy shared secret |
 | `CAPACITY_SHARED_DSL_SECRET` | Server | Legacy write secret (reads never use this when Clerk protects GET) |
-| `VITE_ALLOWED_USER_EMAILS` / `CAPACITY_ALLOWED_USER_EMAILS` | Build / server / PartyKit | Optional comma-separated allowlist of **primary** sign-in emails. When unset, any signed-in Clerk user is allowed (subject to other rules). |
+| `VITE_ALLOWED_USER_EMAILS` / `CAPACITY_ALLOWED_USER_EMAILS` | Build / server | Optional comma-separated allowlist of **primary** sign-in emails. When unset, any signed-in Clerk user is allowed (subject to other rules). |
 
 **Clerk production vs development:** Use **`pk_live_…`** and **`sk_live_…`** from your Clerk **production** application in Vercel (not `pk_test_…`). The hosted build shows an amber banner while `pk_test_…` is baked in.
 
-**Email allowlist:** Set the same comma-separated addresses in **`VITE_ALLOWED_USER_EMAILS`** (client gate), **`CAPACITY_ALLOWED_USER_EMAILS`** (Vercel `/api/shared-dsl`), and **`CAPACITY_ALLOWED_USER_EMAILS`** on **PartyKit** if you use collab. The session JWT must include the user’s email, for example in Clerk → **Sessions** → **Customize session token** add to the JSON claims:
+**Email allowlist:** Set the same comma-separated addresses in **`VITE_ALLOWED_USER_EMAILS`** (client gate) and **`CAPACITY_ALLOWED_USER_EMAILS`** (Vercel `/api/shared-dsl`). The session JWT must include the user’s email, for example in Clerk → **Sessions** → **Customize session token** add to the JSON claims:
 
 ```json
 "email": "{{user.primary_email_address}}"
@@ -61,8 +61,10 @@ Configure under Clerk → **Sessions** → **Customize session token**. When **n
 | Cloud sync | `src/lib/sharedDslSync.ts` |
 | API + Blob | `api/shared-dsl.js` + esbuild output `api/_shared-dsl.runtime.cjs` (from `api/_sharedDslImpl.ts`); ACL data `api/_capacityWorkspaceAcl.data.ts` |
 | Server JWT + legacy bearer | bundled handler (Clerk verify + bearer parsing) |
-| Server YAML filter / merge | same; email allowlist: `api/_allowedUserEmails.ts` (PartyKit + bundle) |
+| Server YAML filter / merge | same; email allowlist: `api/_allowedUserEmails.ts` (bundled handler) |
 
 ## Still open (backlog)
 
 Per-org Blob paths, SSO/SCIM runbooks for customers, automated role × market test matrix — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) (`epic-auth-org`, `epic-market-acl`).
+
+**Canonical workspace (Supabase + Redis):** SQL migrations under `supabase/migrations/` and architecture notes in [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md). Clerk remains the session issuer; Vercel APIs use the Supabase **service role** and enforce the same `cap_*` rules as `api/_sharedDslImpl.ts`.

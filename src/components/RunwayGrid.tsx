@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from 'react';
-import type { ReactNode, Ref, RefObject } from 'react';
+import type { Dispatch, ReactNode, Ref, RefObject, SetStateAction } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { runwayHeatmapTitleForViewMode, type ViewModeId } from '@/lib/constants';
+import { heatmapTuningLensForViewMode } from '@/lib/heatmapTuningPerLens';
 import {
   heatmapCellMetric,
   runwayHeatmapCellFillAndDim,
@@ -15,12 +16,11 @@ import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import {
   HEATMAP_RUNWAY_PAD_FILL,
+  transformedHeatmapMetric,
   type HeatmapColorOpts,
   type HeatmapSpectrumMode,
 } from '@/lib/riskHeatmapColors';
 import { HeatmapLegend } from '@/components/HeatmapLegend';
-import { RunwayFocusSelect } from '@/components/RunwayFocusSelect';
-import { RunwayRangeSelect } from '@/components/RunwayRangeSelect';
 import { enumerateIsoDatesInclusive, runwayPickerLayoutBounds } from '@/lib/runwayDateFilter';
 import { buildRunwayTooltipPayload, type RunwayTipState } from '@/lib/runwayTooltipBreakdown';
 import {
@@ -61,6 +61,12 @@ import {
   runwayDayStripWidth,
   RUNWAY_DAY_COLUMNS,
 } from '@/lib/weekRunway';
+import {
+  autoMarketRiskPressureOffsetMapForSurface,
+  autoRestaurantPressureOffsetMapForSurface,
+  lensHeatmapShapeOptsForAutoCalibrate,
+} from '@/lib/autoRestaurantHeatmapOffset';
+import { heatmapColorOptsWithMarketYaml } from '@/lib/heatmapColorOptsMarketYaml';
 import { cn } from '@/lib/utils';
 import { RunwayCellTooltip } from '@/components/RunwayCellTooltip';
 import { RunwayDaySummaryPanel } from '@/components/RunwayDaySummaryPanel';
@@ -117,9 +123,9 @@ const SWOOSH_EASE = [0.2, 0.88, 0.22, 1] as const;
 
 /** Title-bar icon buttons: same surface language as `Button` outline / ghost (`accent` hover, `ring` focus). */
 const RUNWAY_TOOLBAR_ICON_BTN = cn(
-  'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-sm',
-  'transition-[color,background-color,border-color,box-shadow] duration-150 ease-out',
-  'hover:border-border hover:bg-accent hover:text-foreground hover:shadow-sm',
+  'flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-transparent text-muted-foreground',
+  'transition-[color,background-color] duration-150 ease-out',
+  'hover:bg-muted hover:text-foreground',
   'disabled:pointer-events-none disabled:opacity-35',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
 );
@@ -212,7 +218,7 @@ function RunwaySkeleton({
       >
       <div
         className={cn(
-          'flex w-fit max-w-[min(100%,6rem)] shrink-0 flex-col gap-3 self-center lg:border-r lg:border-border/50 lg:pr-3 lg:pl-1 lg:self-start',
+          'flex w-fit max-w-[min(100%,6rem)] shrink-0 flex-col gap-3 self-center lg:pr-3 lg:pl-1 lg:self-start',
           compareAll ? 'pt-1' : 'pt-1 lg:pt-[var(--runway-year-strip)]'
         )}
         style={
@@ -336,6 +342,24 @@ function riskByDateForMarket(surface: RiskRow[], market: string): Map<string, Ri
   return m;
 }
 
+/** Default heatmap selection: today if modelled, else latest modelled day on/before today, else first modelled day in layout. */
+function pickLayoutDayForDefaultSelection(
+  layoutDatesSorted: string[],
+  riskByDate: Map<string, RiskRow>,
+  todayYmd: string
+): string | null {
+  const has = (d: string) => layoutDatesSorted.includes(d) && riskByDate.has(d);
+  if (has(todayYmd)) return todayYmd;
+  for (let i = layoutDatesSorted.length - 1; i >= 0; i--) {
+    const d = layoutDatesSorted[i]!;
+    if (d <= todayYmd && riskByDate.has(d)) return d;
+  }
+  for (const d of layoutDatesSorted) {
+    if (riskByDate.has(d)) return d;
+  }
+  return null;
+}
+
 /** Avoid stealing ←/→ when typing or using form controls elsewhere on the page. */
 function isHeatmapKeyNavSuppressed(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -382,6 +406,8 @@ type HeatCellProps = {
   fill: string;
   dateStr: string | null;
   isToday: boolean;
+  /** Side summary / programmatic selection (e.g. default to today on load). */
+  isSelected?: boolean;
   /** When true, cell is wrapped at 25% opacity (past calendar days). */
   pastDimmed: boolean;
   weekdayCol: number;
@@ -444,6 +470,7 @@ const HeatCell = memo(function HeatCell({
   fill,
   dateStr,
   isToday,
+  isSelected = false,
   pastDimmed,
   weekdayCol,
   shimmerBase,
@@ -463,7 +490,8 @@ const HeatCell = memo(function HeatCell({
 
   const boxClass = cn(
     'relative shrink-0 cursor-pointer rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
-    isToday && 'z-[1]'
+    isToday && 'z-[1]',
+    isSelected && 'z-[2] ring-2 ring-inset ring-primary'
   );
 
   if (!enableColorSweep && !shimmer && !discoMode) {
@@ -475,6 +503,7 @@ const HeatCell = memo(function HeatCell({
             tabIndex={0}
             title="Click for day details"
             aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+            aria-pressed={isSelected}
             className={boxClass}
             style={{ width: CELL_PX, height: CELL_PX, backgroundColor: fill }}
             {...handlers}
@@ -495,6 +524,7 @@ const HeatCell = memo(function HeatCell({
             tabIndex={0}
             title="Click for day details"
             aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+            aria-pressed={isSelected}
             className={cn(boxClass, 'will-change-[opacity,filter]')}
             style={{ width: CELL_PX, height: CELL_PX, backgroundColor: fill }}
             initial={false}
@@ -527,12 +557,14 @@ const HeatCell = memo(function HeatCell({
         className={cn(
           'absolute inset-0 cursor-pointer rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
           isToday && 'z-[1]',
+          isSelected && 'z-[2] ring-2 ring-inset ring-primary',
           'will-change-[opacity,filter]'
         )}
         role="button"
         tabIndex={0}
         title="Click for day details"
         aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+        aria-pressed={isSelected}
         style={{ backgroundColor: fill }}
         initial={{ opacity: 0, filter: 'brightness(0.92) saturate(0.85)' }}
         animate={
@@ -581,6 +613,7 @@ const HeatCellSized = memo(function HeatCellSized({
   fill,
   dateStr,
   isToday,
+  isSelected = false,
   pastDimmed,
   weekdayCol,
   shimmerBase,
@@ -600,7 +633,8 @@ const HeatCellSized = memo(function HeatCellSized({
 
   const boxClass = cn(
     'relative shrink-0 cursor-pointer rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
-    isToday && 'z-[1]'
+    isToday && 'z-[1]',
+    isSelected && 'z-[2] ring-2 ring-inset ring-primary'
   );
 
   if (!enableColorSweep && !shimmer && !discoMode) {
@@ -612,6 +646,7 @@ const HeatCellSized = memo(function HeatCellSized({
             tabIndex={0}
             title="Click for day details"
             aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+            aria-pressed={isSelected}
             className={boxClass}
             style={{ width: cellPx, height: cellPx, backgroundColor: fill }}
             {...handlers}
@@ -632,6 +667,7 @@ const HeatCellSized = memo(function HeatCellSized({
             tabIndex={0}
             title="Click for day details"
             aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+            aria-pressed={isSelected}
             className={cn(boxClass, 'will-change-[opacity,filter]')}
             style={{ width: cellPx, height: cellPx, backgroundColor: fill }}
             initial={false}
@@ -664,12 +700,14 @@ const HeatCellSized = memo(function HeatCellSized({
         className={cn(
           'absolute inset-0 cursor-pointer rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
           isToday && 'z-[1]',
+          isSelected && 'z-[2] ring-2 ring-inset ring-primary',
           'will-change-[opacity,filter]'
         )}
         role="button"
         tabIndex={0}
         title="Click for day details"
         aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+        aria-pressed={isSelected}
         style={{ backgroundColor: fill }}
         initial={{ opacity: 0, filter: 'brightness(0.92) saturate(0.85)' }}
         animate={
@@ -742,6 +780,10 @@ type RunwayVerticalHeatmapBodyProps = {
   heatmap3d?: boolean;
   /** Tower height (px) for 3D column extrusion. */
   rowTowerPx?: number;
+  /** Single-market: highlight cell for side-summary selection (e.g. default today). */
+  selectedDayYmd?: string | null;
+  /** Isometric 3D: restarts column grow-in from zero-height baseline when this key changes. */
+  isoGrowResetKey?: string;
 };
 
 function monthBlockMinHeight(
@@ -878,6 +920,7 @@ function RunwayMonthMiniGrid({
   sweepMarketOffsetSec,
   openDayDetailsFromCell,
   dimPastDays,
+  selectedDayYmd = null,
   showMonthLabel = true,
   showWeekdayRow = true,
   monthLabelPlacement = 'above',
@@ -903,6 +946,8 @@ function RunwayMonthMiniGrid({
   openDayDetailsFromCell: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
   /** When true, calendar days strictly before today render at 25% opacity. */
   dimPastDays: boolean;
+  /** Highlights the day matching side-summary selection (e.g. default “today”). */
+  selectedDayYmd?: string | null;
   showMonthLabel?: boolean;
   showWeekdayRow?: boolean;
   monthLabelPlacement?: 'above' | 'side';
@@ -955,6 +1000,7 @@ function RunwayMonthMiniGrid({
               ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
               : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts, row);
             const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
+            const isSelected = typeof dateStr === 'string' && dateStr === selectedDayYmd;
             const shimmerBase = ((secYear % 100) * 500 + mo.monthIndex * 40 + wi * 7 + di) % 900;
             const sweepDelaySec = sweepDelayForCell(sweepMarketOffsetSec, si, sweepMi, wi, di);
             return cellPx === CELL_PX ? (
@@ -963,6 +1009,7 @@ function RunwayMonthMiniGrid({
                 fill={fill}
                 dateStr={dateStr}
                 isToday={typeof dateStr === 'string' && dateStr === todayYmd}
+                isSelected={isSelected}
                 pastDimmed={pastDimmed}
                 weekdayCol={di}
                 shimmerBase={shimmerBase}
@@ -982,6 +1029,7 @@ function RunwayMonthMiniGrid({
                 fill={fill}
                 dateStr={dateStr}
                 isToday={typeof dateStr === 'string' && dateStr === todayYmd}
+                isSelected={isSelected}
                 pastDimmed={pastDimmed}
                 weekdayCol={di}
                 shimmerBase={shimmerBase}
@@ -1068,6 +1116,8 @@ function RunwayVerticalHeatmapBody({
   firstCalendarMonthKey = null,
   heatmap3d = false,
   rowTowerPx = 0,
+  selectedDayYmd = null,
+  isoGrowResetKey = 'iso',
 }: RunwayVerticalHeatmapBodyProps) {
   const compactStripLabels = compareStripLabels;
   const showWeekdayRowForMonth = (mo: CalendarMonthBlock) =>
@@ -1080,6 +1130,7 @@ function RunwayVerticalHeatmapBody({
       <div className="flex min-h-0 w-full max-w-full flex-1 flex-col overflow-visible">
         <RunwayIsoSkyline
           moKey="runway-all"
+          growResetKey={isoGrowResetKey}
           weeks={skylineWeeks}
           sections={sections}
           cellPx={cellPx}
@@ -1177,6 +1228,7 @@ function RunwayVerticalHeatmapBody({
                         sweepMarketOffsetSec={sweepMarketOffsetSec}
                         openDayDetailsFromCell={openDayDetailsFromCell}
                         dimPastDays={dimPastDays}
+                        selectedDayYmd={selectedDayYmd}
                       />
                     );
                   })}
@@ -1287,6 +1339,7 @@ function RunwayVerticalHeatmapBody({
                           sweepMarketOffsetSec={sweepMarketOffsetSec}
                           openDayDetailsFromCell={openDayDetailsFromCell}
                           dimPastDays={dimPastDays}
+                          selectedDayYmd={selectedDayYmd}
                           showWeekdayRow={showWeekdayRowForMonth(mo)}
                           monthLabelPlacement={compareStripLabels ? 'side' : 'above'}
                         />
@@ -1368,12 +1421,7 @@ export function RunwayGrid({
       : runwayHeatmapTitleForViewMode(viewMode)
   }: ${runwayFocusStripLabel(country)}`;
   const riskTuning = useAtcStore((s) => s.riskTuning);
-  const riskHeatmapGamma = useAtcStore((s) => s.riskHeatmapGamma);
-  const riskHeatmapGammaTech = useAtcStore((s) => s.riskHeatmapGammaTech);
-  const riskHeatmapGammaBusiness = useAtcStore((s) => s.riskHeatmapGammaBusiness);
-  const riskHeatmapTailPower = useAtcStore((s) => s.riskHeatmapTailPower);
-  const riskHeatmapBusinessPressureOffset = useAtcStore((s) => s.riskHeatmapBusinessPressureOffset);
-  const riskHeatmapCurve = useAtcStore((s) => s.riskHeatmapCurve);
+  const riskHeatmapTuningByLens = useAtcStore((s) => s.riskHeatmapTuningByLens);
   const heatmapRenderStyle = useAtcStore((s) => s.heatmapRenderStyle);
   const heatmapMonoColor = useAtcStore((s) => s.heatmapMonoColor);
   const heatmapSpectrumContinuous = useAtcStore((s) => s.heatmapSpectrumContinuous);
@@ -1405,6 +1453,8 @@ export function RunwayGrid({
   const [tip, setTip] = useState<RunwayTipState | null>(null);
   const tipRef = useRef<RunwayTipState | null>(null);
   tipRef.current = tip;
+  /** Prevents re-applying default “today” selection when layout deps are unchanged (e.g. after Strict Mode double mount). */
+  const heatmapAutoDayAppliedKeyRef = useRef<string>('');
   const heatmapInteractionRef = useRef<HTMLDivElement>(null);
   const tooltipRootRef = useRef<HTMLDivElement>(null);
   const summaryPanelRef = useRef<HTMLDivElement>(null);
@@ -1444,6 +1494,14 @@ export function RunwayGrid({
     return runwayCompareMarketIds(country, base).filter((id) => present.has(id));
   }, [configs, riskSurface, country, landingMinimalChrome, landingCompareMarketOrder]);
 
+  const isoGrowResetKey = useMemo(
+    () =>
+      `${country}\u0001${viewMode}\u0001${riskSurface.length}\u0001${
+        compareAllMarkets ? marketsOrdered.join(',') : 'single'
+      }`,
+    [country, viewMode, riskSurface.length, compareAllMarkets, marketsOrdered]
+  );
+
   const singleMarketId = compareAllMarkets ? '' : country;
   const marketConfig = useMemo(
     () => (singleMarketId ? configs.find((c) => c.market === singleMarketId) : undefined),
@@ -1462,6 +1520,11 @@ export function RunwayGrid({
     }
     return [...new Set(riskSurface.map((r) => r.date))].sort();
   }, [riskSurface, runwayFilterYear, runwayFilterQuarter, runwayIncludeFollowingQuarter]);
+
+  const focusMarketRiskByDate = useMemo(() => {
+    if (isRunwayMultiMarketStrip(country)) return null;
+    return riskByDateForMarket(riskSurface, country);
+  }, [riskSurface, country]);
 
   useLayoutEffect(() => {
     setTip(null);
@@ -1607,40 +1670,94 @@ export function RunwayGrid({
     [compareAllMarkets, calendarLayout]
   );
 
-  const heatmapOpts: HeatmapColorOpts = useMemo(() => {
+  const heatmapOptsBase: HeatmapColorOpts = useMemo(() => {
     const heatmapSpectrumMode: HeatmapSpectrumMode = heatmapSpectrumContinuous
       ? 'continuous'
       : 'discrete';
-    const gamma =
-      viewMode === 'combined'
-        ? riskHeatmapGammaTech
-        : viewMode === 'in_store'
-          ? riskHeatmapGammaBusiness
-          : viewMode === 'market_risk'
-            ? riskHeatmapGammaTech
-            : riskHeatmapGamma;
-    const tailPower = viewMode === 'in_store' ? 1 : riskHeatmapTailPower;
+    const t = riskHeatmapTuningByLens[heatmapTuningLensForViewMode(viewMode)];
     return {
-      riskHeatmapCurve,
-      riskHeatmapGamma: gamma,
-      riskHeatmapTailPower: tailPower,
-      businessHeatmapPressureOffset: riskHeatmapBusinessPressureOffset,
+      riskHeatmapCurve: t.curve,
+      riskHeatmapGamma: t.gamma,
+      riskHeatmapTailPower: t.tailPower,
+      businessHeatmapPressureOffset: t.pressureOffset,
       renderStyle: heatmapRenderStyle,
       monoColor: heatmapMonoColor,
       heatmapSpectrumMode,
     };
   }, [
     viewMode,
-    riskHeatmapBusinessPressureOffset,
-    riskHeatmapCurve,
-    riskHeatmapGamma,
-    riskHeatmapGammaTech,
-    riskHeatmapGammaBusiness,
-    riskHeatmapTailPower,
+    riskHeatmapTuningByLens,
     heatmapRenderStyle,
     heatmapMonoColor,
     heatmapSpectrumContinuous,
   ]);
+
+  const inStoreShapeOptsForAuto = useMemo(
+    () =>
+      lensHeatmapShapeOptsForAutoCalibrate({
+        lensTuning: riskHeatmapTuningByLens.in_store,
+        heatmapRenderStyle,
+        heatmapMonoColor,
+        heatmapSpectrumContinuous,
+      }),
+    [riskHeatmapTuningByLens.in_store, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous]
+  );
+
+  const marketRiskShapeOptsForAuto = useMemo(
+    () =>
+      lensHeatmapShapeOptsForAutoCalibrate({
+        lensTuning: riskHeatmapTuningByLens.market_risk,
+        heatmapRenderStyle,
+        heatmapMonoColor,
+        heatmapSpectrumContinuous,
+      }),
+    [riskHeatmapTuningByLens.market_risk, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous]
+  );
+
+  const autoRestaurantPressureByMarket = useMemo(
+    () =>
+      autoRestaurantPressureOffsetMapForSurface({
+        riskSurface,
+        configs,
+        inStoreShapeOpts: inStoreShapeOptsForAuto,
+        globalInStorePressureOffset: riskHeatmapTuningByLens.in_store.pressureOffset,
+      }),
+    [riskSurface, configs, inStoreShapeOptsForAuto, riskHeatmapTuningByLens.in_store.pressureOffset]
+  );
+
+  const autoMarketRiskPressureByMarket = useMemo(
+    () =>
+      autoMarketRiskPressureOffsetMapForSurface({
+        riskSurface,
+        configs,
+        marketRiskShapeOpts: marketRiskShapeOptsForAuto,
+        globalMarketRiskPressureOffset: riskHeatmapTuningByLens.market_risk.pressureOffset,
+      }),
+    [
+      riskSurface,
+      configs,
+      marketRiskShapeOptsForAuto,
+      riskHeatmapTuningByLens.market_risk.pressureOffset,
+    ]
+  );
+
+  const heatmapOptsForMarket = useCallback(
+    (marketId: string) =>
+      heatmapColorOptsWithMarketYaml(
+        viewMode,
+        heatmapOptsBase,
+        configs.find((c) => c.market === marketId),
+        viewMode === 'in_store' ? (autoRestaurantPressureByMarket.get(marketId) ?? 0) : 0,
+        viewMode === 'market_risk' ? (autoMarketRiskPressureByMarket.get(marketId) ?? 0) : 0
+      ),
+    [
+      viewMode,
+      heatmapOptsBase,
+      configs,
+      autoRestaurantPressureByMarket,
+      autoMarketRiskPressureByMarket,
+    ]
+  );
 
   const buildPayloadTipState = useCallback(
     (market: string, dateStr: string, anchor: RunwayTipAnchor): RunwayTipState | null => {
@@ -1650,11 +1767,16 @@ export function RunwayGrid({
       const config = configs.find((c) => c.market === market);
       const wd = weekdayShortFromYmd(dateStr);
       const fillMetricValue = heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope);
+      const optsM = heatmapOptsForMarket(market);
+      const fillMetricDisplayValue =
+        viewMode === 'in_store' || viewMode === 'market_risk'
+          ? transformedHeatmapMetric(viewMode, fillMetricValue, optsM)
+          : fillMetricValue;
       const { fill: cellFillHex } = runwayHeatmapCellFillAndDim(
         viewMode,
         techWorkloadScope,
         fillMetricValue,
-        heatmapOpts,
+        optsM,
         row
       );
       const payload = buildRunwayTooltipPayload({
@@ -1669,12 +1791,13 @@ export function RunwayGrid({
         fillMetricLabel: fillMetricLabelForView(viewMode, techWorkloadScope),
         fillMetricLeadCompact: fillMetricLeadCompactForView(viewMode, techWorkloadScope),
         fillMetricValue,
+        fillMetricDisplayValue,
         cellFillHex,
         techWorkloadScope,
       });
       return { x: anchor.clientX, y: anchor.clientY, payload };
     },
-    [riskSurface, configs, viewMode, riskTuning, heatmapOpts, techWorkloadScope]
+    [riskSurface, configs, viewMode, riskTuning, heatmapOptsForMarket, techWorkloadScope]
   );
 
   const makeShowTip = useCallback(
@@ -1760,6 +1883,50 @@ export function RunwayGrid({
   }, [tip, dismissTip, layoutDatesSorted, buildPayloadTipState]);
 
   const todayYmd = formatDateYmd(new Date());
+
+  useEffect(() => {
+    if (landingMinimalChrome) return;
+    if (!useSideSummary) return;
+    if (viewMode === 'code') return;
+    if (countrySwitchLoading) return;
+    if (!focusMarketRiskByDate || focusMarketRiskByDate.size === 0) return;
+    if (!layoutDatesSorted.length) return;
+
+    const key = [
+      country,
+      viewMode,
+      String(runwayFilterYear ?? ''),
+      String(runwayFilterQuarter ?? ''),
+      String(runwayIncludeFollowingQuarter),
+      layoutDatesSorted[0] ?? '',
+      layoutDatesSorted[layoutDatesSorted.length - 1] ?? '',
+      String(riskSurface.length),
+    ].join('|');
+
+    if (heatmapAutoDayAppliedKeyRef.current === key) return;
+
+    const todayStr = formatDateYmd(new Date());
+    const pick = pickLayoutDayForDefaultSelection(layoutDatesSorted, focusMarketRiskByDate, todayStr);
+    if (!pick) return;
+
+    heatmapAutoDayAppliedKeyRef.current = key;
+    const next = buildPayloadTipState(country, pick, { clientX: 0, clientY: 0 });
+    if (next) setTip(next);
+  }, [
+    landingMinimalChrome,
+    useSideSummary,
+    viewMode,
+    countrySwitchLoading,
+    focusMarketRiskByDate,
+    layoutDatesSorted,
+    runwayFilterYear,
+    runwayFilterQuarter,
+    runwayIncludeFollowingQuarter,
+    riskSurface.length,
+    country,
+    buildPayloadTipState,
+  ]);
+
   const gap = RUNWAY_CELL_GAP_PX;
   const monthStripW = runwayDayStripWidth(cellPx, gap, RUNWAY_DAY_COLUMNS);
 
@@ -1962,6 +2129,54 @@ export function RunwayGrid({
     }
   }, [calendarLayout, countrySwitchLoading, pngFilenameBase]);
 
+  const runwayViewToolbarEl = useMemo(() => {
+    if (landingMinimalChrome) return null;
+    return (
+      <RunwayViewActionsToolbar
+        countrySwitchLoading={countrySwitchLoading}
+        runwaySvgHeatmapPref={runwaySvgHeatmapPref}
+        setRunwaySvgHeatmap={setRunwaySvgHeatmap}
+        showIso3dSingleMarket={showIso3dSingleMarket}
+        compareAllMarkets={compareAllMarkets}
+        runway3dHeatmap={runway3dHeatmap}
+        setRunway3dHeatmap={setRunway3dHeatmap}
+        reduceMotion={reduceMotion}
+        theme={theme}
+        discoModePref={discoModePref}
+        setDiscoMode={setDiscoMode}
+        dimPastDays={dimPastDays}
+        setDimPastDays={setDimPastDays}
+        runwayCellPx={runwayCellPx}
+        setRunwayCellPx={setRunwayCellPx}
+        calendarLayoutPresent={!!calendarLayout}
+        pngExporting={pngExporting}
+        handleDownloadPng={handleDownloadPng}
+        layoutDatesSortedEmpty={layoutDatesSorted.length === 0}
+      />
+    );
+  }, [
+    landingMinimalChrome,
+    countrySwitchLoading,
+    runwaySvgHeatmapPref,
+    setRunwaySvgHeatmap,
+    showIso3dSingleMarket,
+    compareAllMarkets,
+    runway3dHeatmap,
+    setRunway3dHeatmap,
+    reduceMotion,
+    theme,
+    discoModePref,
+    setDiscoMode,
+    dimPastDays,
+    setDimPastDays,
+    runwayCellPx,
+    setRunwayCellPx,
+    calendarLayout,
+    pngExporting,
+    handleDownloadPng,
+    layoutDatesSorted.length,
+  ]);
+
   if (!countrySwitchLoading && !calendarLayout) {
     return (
       <div className="flex w-full flex-col items-center justify-center gap-2 bg-transparent px-8 py-12 text-center">
@@ -1992,141 +2207,11 @@ export function RunwayGrid({
       <div
         key={`${viewMode}-${country}`}
         className={cn(
-          'mx-auto w-full max-w-full rounded-xl border border-border/45 bg-card/35 px-4 pb-3 pt-3 shadow-sm dark:bg-card/20 sm:px-5 sm:pb-4 sm:pt-3.5',
+          'mx-auto w-full max-w-full bg-transparent px-4 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-3.5',
           compareStripViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col'
         )}
       >
         <div className="mb-3 flex flex-col gap-3 sm:mb-4">
-          {!landingMinimalChrome ? (
-            <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between min-[480px]:gap-4">
-              <div className="flex min-w-0 flex-1 flex-wrap items-end gap-3 gap-y-2">
-                <RunwayFocusSelect className="min-w-0" />
-                <RunwayRangeSelect className="min-w-0" />
-              </div>
-              <div
-                className="flex shrink-0 flex-wrap items-center justify-center gap-0.5 min-[480px]:justify-end"
-                role="toolbar"
-                aria-label="Runway view actions"
-              >
-            <button
-              type="button"
-              disabled={countrySwitchLoading}
-              aria-pressed={runwaySvgHeatmapPref}
-              title={
-                showIso3dSingleMarket
-                  ? '3D single-market view is on — turn 3D off to use flat SVG cells'
-                  : runwaySvgHeatmapPref
-                    ? 'SVG runway cells on (flat heatmap). Off for HTML cells, colour swoosh, disco twinkle.'
-                    : 'SVG runway cells off — HTML cells; enables swoosh / disco on flat view'
-              }
-              aria-label={
-                runwaySvgHeatmapPref ? 'Turn off SVG runway heatmap' : 'Turn on SVG runway heatmap'
-              }
-              onClick={() => setRunwaySvgHeatmap(!runwaySvgHeatmapPref)}
-              className={cn(
-                RUNWAY_TOOLBAR_ICON_BTN,
-                runwaySvgHeatmapPref && 'border-primary/40 bg-primary/10 text-foreground'
-              )}
-            >
-              <Grid2x2 className="h-3.5 w-3.5 opacity-90" aria-hidden />
-            </button>
-            {RUNWAY_ISO_3D_ENABLED ? (
-              <button
-                type="button"
-                disabled={countrySwitchLoading}
-                aria-pressed={runway3dHeatmap}
-                title={
-                  compareAllMarkets
-                    ? 'Isometric 3D city block: all markets on one surface'
-                    : 'Isometric 3D pressure blocks in one vertical column'
-                }
-                aria-label={runway3dHeatmap ? 'Turn off 3D runway' : 'Turn on 3D runway'}
-                onClick={() => setRunway3dHeatmap(!runway3dHeatmap)}
-                className={cn(
-                  RUNWAY_TOOLBAR_ICON_BTN,
-                  runway3dHeatmap && 'border-primary/40 bg-primary/10 text-foreground'
-                )}
-              >
-                <Box className="h-3.5 w-3.5 opacity-90" aria-hidden />
-              </button>
-            ) : null}
-            <button
-              type="button"
-              disabled={countrySwitchLoading}
-              aria-pressed={discoModePref}
-              title={
-                reduceMotion
-                  ? 'Disco twinkle: twinkle every runway cell. Off while reduced motion is preferred.'
-                  : theme !== 'dark'
-                    ? 'Disco twinkle (applies in dark theme)'
-                    : 'Twinkle every runway cell'
-              }
-              aria-label={discoModePref ? 'Turn off disco twinkle' : 'Turn on disco twinkle'}
-              onClick={() => setDiscoMode(!discoModePref)}
-              className={cn(
-                RUNWAY_TOOLBAR_ICON_BTN,
-                discoModePref && 'border-primary/40 bg-primary/10 text-foreground'
-              )}
-            >
-              <Sparkles className="h-3.5 w-3.5 opacity-90" aria-hidden />
-            </button>
-            <span
-              className="mx-0.5 hidden h-4 w-px shrink-0 self-center bg-border/60 sm:block"
-              aria-hidden
-            />
-            <button
-              type="button"
-              disabled={countrySwitchLoading}
-              aria-pressed={dimPastDays}
-              title={dimPastDays ? 'Past days: dimmed (click for full strength)' : 'Dim calendar days before today'}
-              aria-label={dimPastDays ? 'Show past days at full strength' : 'Dim past days'}
-              onClick={() => setDimPastDays((v) => !v)}
-              className={cn(
-                RUNWAY_TOOLBAR_ICON_BTN,
-                dimPastDays && 'border-primary/40 bg-primary/10 text-foreground'
-              )}
-            >
-              <CalendarDays className="h-3.5 w-3.5 opacity-90" aria-hidden />
-            </button>
-            <button
-              type="button"
-              disabled={runwayCellPx <= RUNWAY_CELL_PX_MIN || countrySwitchLoading}
-              onClick={() => setRunwayCellPx((p) => snapRunwayCellPx(p - RUNWAY_CELL_PX_STEP))}
-              title="Zoom out"
-              aria-label="Zoom out runway heatmap"
-              className={RUNWAY_TOOLBAR_ICON_BTN}
-            >
-              <ZoomOut className="h-3.5 w-3.5 opacity-90" aria-hidden />
-            </button>
-            <button
-              type="button"
-              disabled={runwayCellPx >= RUNWAY_CELL_PX_MAX || countrySwitchLoading}
-              onClick={() => setRunwayCellPx((p) => snapRunwayCellPx(p + RUNWAY_CELL_PX_STEP))}
-              title="Zoom in"
-              aria-label="Zoom in runway heatmap"
-              className={RUNWAY_TOOLBAR_ICON_BTN}
-            >
-              <ZoomIn className="h-3.5 w-3.5 opacity-90" aria-hidden />
-            </button>
-            <button
-              type="button"
-              disabled={
-                !calendarLayout || countrySwitchLoading || pngExporting || !layoutDatesSorted.length
-              }
-              onClick={() => void handleDownloadPng()}
-              title={pngExporting ? 'Exporting…' : 'Download PNG'}
-              aria-label={pngExporting ? 'Exporting runway image' : 'Download runway heatmap as PNG'}
-              className={RUNWAY_TOOLBAR_ICON_BTN}
-            >
-              {pngExporting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground/80" aria-hidden />
-              ) : (
-                <Download className="h-3.5 w-3.5 opacity-90" aria-hidden />
-              )}
-            </button>
-              </div>
-            </div>
-          ) : null}
           <div className="flex min-w-0 flex-row flex-wrap items-center justify-center gap-2.5 min-[480px]:justify-start">
             <h2 className="min-w-0 text-center text-lg font-bold leading-snug tracking-tight text-foreground min-[480px]:text-left sm:text-xl">
               {runwayTitleWithMarket}
@@ -2147,7 +2232,7 @@ export function RunwayGrid({
             {countrySwitchLoading ? (
               <motion.div
                 key={`sk-${country}`}
-                className="w-full"
+                className="flex w-full flex-col items-stretch gap-3"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -2158,6 +2243,11 @@ export function RunwayGrid({
                   reduceMotion={!!reduceMotion}
                   compareColumnCount={marketsOrdered.length}
                 />
+                {runwayViewToolbarEl ? (
+                  <div className="flex w-full justify-center">
+                    {runwayViewToolbarEl}
+                  </div>
+                ) : null}
               </motion.div>
             ) : calendarLayout ? (
               <motion.div
@@ -2188,7 +2278,8 @@ export function RunwayGrid({
                   cellPx={cellPx}
                   gap={gap}
                   monthStripW={monthStripW}
-                  heatmapOpts={heatmapOpts}
+                  heatmapOptsBase={heatmapOptsBase}
+                  heatmapOptsForMarket={heatmapOptsForMarket}
                   riskTuning={riskTuning}
                   viewMode={viewMode}
                   techWorkloadScope={techWorkloadScope}
@@ -2216,6 +2307,8 @@ export function RunwayGrid({
                   tip={tip}
                   summaryPanelRef={summaryPanelRef}
                   onClearDaySummary={dismissTip}
+                  runwayViewToolbar={runwayViewToolbarEl}
+                  isoGrowResetKey={isoGrowResetKey}
                 />
               </motion.div>
             ) : null}
@@ -2231,6 +2324,171 @@ export function RunwayGrid({
         onDismiss={dismissTip}
         rootRef={tooltipRootRef}
       />
+    </div>
+  );
+}
+
+type RunwayViewActionsToolbarProps = {
+  countrySwitchLoading: boolean;
+  runwaySvgHeatmapPref: boolean;
+  setRunwaySvgHeatmap: (next: boolean) => void;
+  showIso3dSingleMarket: boolean;
+  compareAllMarkets: boolean;
+  runway3dHeatmap: boolean;
+  setRunway3dHeatmap: (next: boolean) => void;
+  reduceMotion: boolean | null;
+  theme: string;
+  discoModePref: boolean;
+  setDiscoMode: (next: boolean) => void;
+  dimPastDays: boolean;
+  setDimPastDays: Dispatch<SetStateAction<boolean>>;
+  runwayCellPx: number;
+  setRunwayCellPx: Dispatch<SetStateAction<number>>;
+  calendarLayoutPresent: boolean;
+  pngExporting: boolean;
+  handleDownloadPng: () => void | Promise<void>;
+  layoutDatesSortedEmpty: boolean;
+};
+
+function RunwayViewActionsToolbar({
+  countrySwitchLoading,
+  runwaySvgHeatmapPref,
+  setRunwaySvgHeatmap,
+  showIso3dSingleMarket,
+  compareAllMarkets,
+  runway3dHeatmap,
+  setRunway3dHeatmap,
+  reduceMotion,
+  theme,
+  discoModePref,
+  setDiscoMode,
+  dimPastDays,
+  setDimPastDays,
+  runwayCellPx,
+  setRunwayCellPx,
+  calendarLayoutPresent,
+  pngExporting,
+  handleDownloadPng,
+  layoutDatesSortedEmpty,
+}: RunwayViewActionsToolbarProps) {
+  return (
+    <div
+      className="flex w-full min-w-0 shrink-0 flex-wrap items-center justify-center gap-0.5"
+      role="toolbar"
+      aria-label="Runway view actions"
+    >
+      <button
+        type="button"
+        disabled={countrySwitchLoading}
+        aria-pressed={runwaySvgHeatmapPref}
+        title={
+          showIso3dSingleMarket
+            ? '3D single-market view is on — turn 3D off to use flat SVG cells'
+            : runwaySvgHeatmapPref
+              ? 'SVG runway cells on (flat heatmap). Off for HTML cells, colour swoosh, disco twinkle.'
+              : 'SVG runway cells off — HTML cells; enables swoosh / disco on flat view'
+        }
+        aria-label={
+          runwaySvgHeatmapPref ? 'Turn off SVG runway heatmap' : 'Turn on SVG runway heatmap'
+        }
+        onClick={() => setRunwaySvgHeatmap(!runwaySvgHeatmapPref)}
+        className={cn(
+          RUNWAY_TOOLBAR_ICON_BTN,
+          runwaySvgHeatmapPref && 'bg-primary/15 text-foreground'
+        )}
+      >
+        <Grid2x2 className="h-3.5 w-3.5 opacity-90" aria-hidden />
+      </button>
+      {RUNWAY_ISO_3D_ENABLED ? (
+        <button
+          type="button"
+          disabled={countrySwitchLoading}
+          aria-pressed={runway3dHeatmap}
+          title={
+            compareAllMarkets
+              ? 'Isometric 3D city block: all markets on one surface'
+              : 'Isometric 3D pressure blocks in one vertical column'
+          }
+          aria-label={runway3dHeatmap ? 'Turn off 3D runway' : 'Turn on 3D runway'}
+          onClick={() => setRunway3dHeatmap(!runway3dHeatmap)}
+          className={cn(
+            RUNWAY_TOOLBAR_ICON_BTN,
+            runway3dHeatmap && 'bg-primary/15 text-foreground'
+          )}
+        >
+          <Box className="h-3.5 w-3.5 opacity-90" aria-hidden />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        disabled={countrySwitchLoading}
+        aria-pressed={discoModePref}
+        title={
+          reduceMotion
+            ? 'Disco twinkle: twinkle every runway cell. Off while reduced motion is preferred.'
+            : theme !== 'dark'
+              ? 'Disco twinkle (applies in dark theme)'
+              : 'Twinkle every runway cell'
+        }
+        aria-label={discoModePref ? 'Turn off disco twinkle' : 'Turn on disco twinkle'}
+        onClick={() => setDiscoMode(!discoModePref)}
+        className={cn(
+          RUNWAY_TOOLBAR_ICON_BTN,
+          discoModePref && 'bg-primary/15 text-foreground'
+        )}
+      >
+        <Sparkles className="h-3.5 w-3.5 opacity-90" aria-hidden />
+      </button>
+      <button
+        type="button"
+        disabled={countrySwitchLoading}
+        aria-pressed={dimPastDays}
+        title={dimPastDays ? 'Past days: dimmed (click for full strength)' : 'Dim calendar days before today'}
+        aria-label={dimPastDays ? 'Show past days at full strength' : 'Dim past days'}
+        onClick={() => setDimPastDays((v) => !v)}
+        className={cn(
+          RUNWAY_TOOLBAR_ICON_BTN,
+          dimPastDays && 'bg-primary/15 text-foreground'
+        )}
+      >
+        <CalendarDays className="h-3.5 w-3.5 opacity-90" aria-hidden />
+      </button>
+      <button
+        type="button"
+        disabled={runwayCellPx <= RUNWAY_CELL_PX_MIN || countrySwitchLoading}
+        onClick={() => setRunwayCellPx((p) => snapRunwayCellPx(p - RUNWAY_CELL_PX_STEP))}
+        title="Zoom out"
+        aria-label="Zoom out runway heatmap"
+        className={RUNWAY_TOOLBAR_ICON_BTN}
+      >
+        <ZoomOut className="h-3.5 w-3.5 opacity-90" aria-hidden />
+      </button>
+      <button
+        type="button"
+        disabled={runwayCellPx >= RUNWAY_CELL_PX_MAX || countrySwitchLoading}
+        onClick={() => setRunwayCellPx((p) => snapRunwayCellPx(p + RUNWAY_CELL_PX_STEP))}
+        title="Zoom in"
+        aria-label="Zoom in runway heatmap"
+        className={RUNWAY_TOOLBAR_ICON_BTN}
+      >
+        <ZoomIn className="h-3.5 w-3.5 opacity-90" aria-hidden />
+      </button>
+      <button
+        type="button"
+        disabled={
+          !calendarLayoutPresent || countrySwitchLoading || pngExporting || layoutDatesSortedEmpty
+        }
+        onClick={() => void handleDownloadPng()}
+        title={pngExporting ? 'Exporting…' : 'Download PNG'}
+        aria-label={pngExporting ? 'Exporting runway image' : 'Download runway heatmap as PNG'}
+        className={RUNWAY_TOOLBAR_ICON_BTN}
+      >
+        {pngExporting ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground/80" aria-hidden />
+        ) : (
+          <Download className="h-3.5 w-3.5 opacity-90" aria-hidden />
+        )}
+      </button>
     </div>
   );
 }
@@ -2254,7 +2512,8 @@ type RunwayGridBodyProps = {
   cellPx: number;
   gap: number;
   monthStripW: number;
-  heatmapOpts: HeatmapColorOpts;
+  heatmapOptsBase: HeatmapColorOpts;
+  heatmapOptsForMarket: (marketId: string) => HeatmapColorOpts;
   riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
   techWorkloadScope: TechWorkloadScope;
@@ -2288,6 +2547,10 @@ type RunwayGridBodyProps = {
   tip: RunwayTipState | null;
   summaryPanelRef: Ref<HTMLDivElement | null>;
   onClearDaySummary: () => void;
+  /** Flat/tooling row rendered under the heatmap column (SVG/HTML/3D/compare). */
+  runwayViewToolbar: ReactNode;
+  /** 3D iso views: restarts column grow-in when this key changes. */
+  isoGrowResetKey: string;
 };
 
 function RunwayGridBody({
@@ -2308,7 +2571,8 @@ function RunwayGridBody({
   cellPx,
   gap,
   monthStripW,
-  heatmapOpts,
+  heatmapOptsBase,
+  heatmapOptsForMarket,
   riskTuning,
   viewMode,
   techWorkloadScope,
@@ -2334,6 +2598,8 @@ function RunwayGridBody({
   tip,
   summaryPanelRef,
   onClearDaySummary,
+  runwayViewToolbar,
+  isoGrowResetKey,
 }: RunwayGridBodyProps) {
   const enableColorSweep = !reduceMotion;
   const [postSweep, setPostSweep] = useState(reduceMotion);
@@ -2358,6 +2624,15 @@ function RunwayGridBody({
     [compareAllMarkets, riskSurface, country]
   );
 
+  const singleMarketSelectedDayYmd =
+    !compareAllMarkets && tip && 'payload' in tip ? tip.payload.dateStr : null;
+
+  const runwayToolbarSlot = runwayViewToolbar ? (
+    <div className="mt-2 flex w-full min-w-0 shrink-0 justify-center pt-1">
+      {runwayViewToolbar}
+    </div>
+  ) : null;
+
   return (
     <div
       className={cn(
@@ -2377,7 +2652,7 @@ function RunwayGridBody({
           // Swatch-only legend: hug content; cap so large cell zoom still fits without eating the runway.
           'box-border flex w-fit max-w-[min(100%,6.5rem)] shrink-0 grow-0 flex-col',
           'mx-auto lg:mx-0 lg:self-start',
-          'lg:border-r lg:border-border/40 lg:pr-2.5 lg:pl-0.5',
+          'lg:pr-2.5 lg:pl-0.5',
           compareAllMarkets ? 'pt-0.5' : 'pt-0.5',
           !compareAllMarkets && !heatmap3d && 'lg:pt-[var(--runway-year-strip)]'
         )}
@@ -2390,7 +2665,7 @@ function RunwayGridBody({
         <HeatmapLegend
           className="w-fit max-w-full min-w-0 text-left"
           viewMode={viewMode}
-          heatmapOpts={heatmapOpts}
+          heatmapOpts={heatmapOptsBase}
           cellSizePx={cellPx}
           cellGapPx={gap}
         />
@@ -2411,19 +2686,24 @@ function RunwayGridBody({
       >
         {compareAllMarkets ? (
           runway3dHeatmap ? (
-            <RunwayIsoCityBlock
-              sections={sections}
-              markets={marketsOrdered}
-              riskSurface={riskSurface}
-              cellPx={Math.max(cellPx, 18)}
-              heatmapOpts={heatmapOpts}
-              riskTuning={riskTuning}
-              viewMode={viewMode}
-              techWorkloadScope={techWorkloadScope}
-              todayYmd={todayYmd}
-              dimPastDays={dimPastDays}
-            />
+            <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col">
+              <RunwayIsoCityBlock
+                growResetKey={isoGrowResetKey}
+                sections={sections}
+                markets={marketsOrdered}
+                riskSurface={riskSurface}
+                cellPx={Math.max(cellPx, 18)}
+                heatmapOptsForMarket={heatmapOptsForMarket}
+                riskTuning={riskTuning}
+                viewMode={viewMode}
+                techWorkloadScope={techWorkloadScope}
+                todayYmd={todayYmd}
+                dimPastDays={dimPastDays}
+              />
+              {runwayToolbarSlot}
+            </div>
           ) : (
+          <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
           <div
             ref={compareScrollRef as Ref<HTMLDivElement>}
             className={cn(
@@ -2476,7 +2756,7 @@ function RunwayGridBody({
                           gap={gap}
                           monthStripW={monthStripW}
                           riskByDate={map}
-                          heatmapOpts={heatmapOpts}
+                          heatmapOpts={heatmapOptsForMarket(m)}
                           riskTuning={riskTuning}
                           viewMode={viewMode}
                           techWorkloadScope={techWorkloadScope}
@@ -2505,7 +2785,7 @@ function RunwayGridBody({
                           gap={gap}
                           monthStripW={monthStripW}
                           riskByDate={map}
-                          heatmapOpts={heatmapOpts}
+                          heatmapOpts={heatmapOptsForMarket(m)}
                           riskTuning={riskTuning}
                           viewMode={viewMode}
                           techWorkloadScope={techWorkloadScope}
@@ -2533,9 +2813,17 @@ function RunwayGridBody({
               })}
             </div>
           </div>
+          {runwayToolbarSlot}
+          </div>
           )
         ) : (
           <>
+            <div
+              className={cn(
+                'flex min-w-0 flex-1 flex-col',
+                useSideSummary && 'lg:min-h-0 lg:basis-0'
+              )}
+            >
             <div
               ref={singleMarketFitRef as Ref<HTMLDivElement>}
               className={cn(
@@ -2543,7 +2831,7 @@ function RunwayGridBody({
                 heatmap3d
                   ? 'min-h-[min(88dvh,calc(100dvh-6rem))] flex-1 flex-col overflow-x-auto overflow-y-auto'
                   : useSideSummary
-                    ? 'min-w-0 flex-1 justify-center overflow-x-auto overflow-y-visible lg:basis-0 lg:flex-col lg:items-center lg:justify-start lg:overflow-x-auto lg:overflow-y-auto lg:px-3'
+                    ? 'min-w-0 flex-1 justify-center overflow-x-auto overflow-y-visible lg:flex-col lg:items-center lg:justify-start lg:overflow-x-auto lg:overflow-y-auto lg:px-3'
                     : 'justify-center overflow-x-auto overflow-y-visible'
               )}
             >
@@ -2578,12 +2866,13 @@ function RunwayGridBody({
                     gap={gap}
                     monthStripW={monthStripW}
                     riskByDate={singleRiskByDate!}
-                    heatmapOpts={heatmapOpts}
+                    heatmapOpts={heatmapOptsForMarket(country)}
                     riskTuning={riskTuning}
                     viewMode={viewMode}
                     techWorkloadScope={techWorkloadScope}
                     todayYmd={todayYmd}
                     dimPastDays={dimPastDays}
+                    selectedDayYmd={singleMarketSelectedDayYmd}
                     openDayDetailsFromCell={makeShowTip(country, singleRiskByDate!, marketConfig)}
                   />
                 ) : (
@@ -2593,7 +2882,7 @@ function RunwayGridBody({
                     gap={gap}
                     monthStripW={monthStripW}
                     riskByDate={singleRiskByDate!}
-                    heatmapOpts={heatmapOpts}
+                    heatmapOpts={heatmapOptsForMarket(country)}
                     riskTuning={riskTuning}
                     viewMode={viewMode}
                     techWorkloadScope={techWorkloadScope}
@@ -2608,15 +2897,20 @@ function RunwayGridBody({
                     layout={heatmap3d ? 'vertical_strip' : 'quarter_grid'}
                     heatmap3d={heatmap3d}
                     rowTowerPx={rowTowerPx}
+                    selectedDayYmd={singleMarketSelectedDayYmd}
+                    isoGrowResetKey={isoGrowResetKey}
                   />
                 )}
               </div>
+            </div>
+            {runwayToolbarSlot}
             </div>
             {useSideSummary ? (
               <RunwayDaySummaryPanel
                 tip={tip}
                 onClear={onClearDaySummary}
                 panelRef={summaryPanelRef}
+                viewMode={viewMode}
               />
             ) : null}
           </>

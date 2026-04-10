@@ -8,6 +8,7 @@ import { applyLoadCarryover } from '@/planning/carryover';
 import { campaignLoadBearingPrepLiveForDate } from './campaignPrepLive';
 import { buildCalendar, parseDate } from './calendar';
 import { computeCapacity } from './capacityModel';
+import { nationalLeaveLabTeamCapMult } from './nationalLeaveBands';
 import { createHolidayCheck } from './holidayLoader';
 import { getAutoHolidayDates } from './holidayCalc';
 import {
@@ -272,13 +273,17 @@ export function runPipeline(
     return baseHol;
   };
 
+  const nationalLeaveCapMultForDay = (market: string, date: string): number =>
+    nationalLeaveLabTeamCapMult(configByMarket[market]?.nationalLeaveBands, date);
+
   const withCapacity = computeCapacity(
     aggregated,
     configs,
     holidayCapacityStress,
     tuning.holidayCapacityScale,
     labTeamCapMultForDay,
-    holidayCapScaleAtFullStress
+    holidayCapScaleAtFullStress,
+    nationalLeaveCapMultForDay
   );
   const withStoreCampaign = withCapacity.map((r, i) => ({
     ...r,

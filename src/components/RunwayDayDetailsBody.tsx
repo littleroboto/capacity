@@ -8,6 +8,7 @@ import {
   glossaryPlanningBlendPopover,
   glossaryTileVsBandCollapse,
 } from '@/lib/runwayDayDetailsGlossary';
+import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 
 export type DayDetailsPresentation = 'popover' | 'markdown';
@@ -40,19 +41,26 @@ function relativeLuminanceFromSrgb(r: number, g: number, b: number): number {
   return 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!;
 }
 
-/** Readable text on arbitrary heatmap cell fills (relative luminance; blends rgba on white). */
-function foregroundOnHeatmapFill(cssColor: string): string {
+/** Backdrop behind semi-transparent heatmap fills: light ≈ card, dark ≈ `dark` card. */
+const HEATMAP_CHIP_BACKDROP: Record<'light' | 'dark', [number, number, number]> = {
+  light: [255, 255, 255],
+  dark: [17, 24, 39],
+};
+
+/** Readable text on heatmap chip: blends rgba on theme card tone, then picks light/dark fg. */
+function foregroundOnHeatmapFill(cssColor: string, mode: 'light' | 'dark'): string {
+  const [br0, bg0, bb0] = HEATMAP_CHIP_BACKDROP[mode];
   const rgba = parseRgbaCss(cssColor);
   if (rgba) {
     const [r, g, b, a] = rgba;
-    const br = Math.round(r * a + 255 * (1 - a));
-    const bg = Math.round(g * a + 255 * (1 - a));
-    const bb = Math.round(b * a + 255 * (1 - a));
+    const br = Math.round(r * a + br0 * (1 - a));
+    const bg = Math.round(g * a + bg0 * (1 - a));
+    const bb = Math.round(b * a + bb0 * (1 - a));
     const L = relativeLuminanceFromSrgb(br, bg, bb);
     return L > 0.52 ? 'rgb(15 23 42)' : 'rgb(255 252 250)';
   }
   const rgb = parseRgbHex6(cssColor);
-  if (!rgb) return 'rgb(15 23 42)';
+  if (!rgb) return mode === 'dark' ? 'rgb(248 250 252)' : 'rgb(15 23 42)';
   const L = relativeLuminanceFromSrgb(rgb[0], rgb[1], rgb[2]);
   return L > 0.52 ? 'rgb(15 23 42)' : 'rgb(255 252 250)';
 }
@@ -144,7 +152,7 @@ function ContributorsBlock({
 
   const wrap = (inner: ReactNode) =>
     presentation === 'markdown' ? (
-      <div className="mt-6 border-l-2 border-primary/35 bg-muted/20 py-3 pl-4 pr-2 dark:border-primary/25 dark:bg-muted/10">
+      <div className="mt-6 border-l-2 border-primary/40 bg-muted/30 py-3 pl-4 pr-2 dark:border-primary/25 dark:bg-muted/10">
         {inner}
       </div>
     ) : (
@@ -376,7 +384,7 @@ function LensScoreFootnote({
   if (viewMode === 'market_risk') {
     return (
       <p className={cls}>
-        Tile is the deployment risk score (deployment/calendar fragility).{' '}
+        Tile % matches heatmap colouring (pressure offset + transfer on deployment risk).{' '}
         <span className="font-medium text-foreground">Planning blend</span> is still the wider operational mix used for
         the band.
       </p>
@@ -384,14 +392,14 @@ function LensScoreFootnote({
   }
   return (
     <p className={cls}>
-      Fill score is modeled restaurant busyness from the store curve (0–1 before colour tweaks).{' '}
+      Tile % matches heatmap colouring (pressure offset + transfer on store-trading intensity).{' '}
       <span className="font-medium text-foreground">Planning blend</span> still includes tech delivery and campaign risk,
       so the two numbers can diverge.
     </p>
   );
 }
 
-/** Lens fill metric before transfer curve / γ (all runway lenses use 0–1 headline values today). */
+/** Format 0–1 for the fill-score row (display value: matches tile %; Restaurant / Deployment use post-transfer space). */
 function formatLensFillScore(v: number, _viewMode: RunwayTooltipPayload['viewMode']): string {
   const clamped = Math.min(1, Math.max(0, v));
   return (Math.round(clamped * 1000) / 1000).toFixed(3).replace(/\.?0+$/, '') || '0';
@@ -404,11 +412,13 @@ export function RunwayDayDetailsPayloadBody({
   p: RunwayTooltipPayload;
   presentation?: DayDetailsPresentation;
 }) {
-  const pct = Math.min(999, Math.round(Math.max(0, p.fillMetricValue) * 100));
-  const heatmapScoreStr = formatLensFillScore(p.fillMetricValue, p.viewMode);
+  const theme = useAtcStore((s) => s.theme);
+  const displayForTile = p.fillMetricDisplayValue;
+  const pct = Math.min(999, Math.round(Math.max(0, displayForTile) * 100));
+  const heatmapScoreStr = formatLensFillScore(displayForTile, p.viewMode);
   const planningBlend = p.row.planning_blend_01 ?? 0;
   const planningBlendStr = (Math.round(Math.min(1, Math.max(0, planningBlend)) * 100) / 100).toFixed(2);
-  const fg = foregroundOnHeatmapFill(p.cellFillHex);
+  const fg = foregroundOnHeatmapFill(p.cellFillHex, theme);
   const camps = clampList(p.activeCampaigns, 4);
   const techProgs = clampList(p.activeTechProgrammes, 4);
   const primaryTech = clampList(p.activeTechProgrammes, LENS_PRIMARY_LIST_MAX);
@@ -436,42 +446,53 @@ export function RunwayDayDetailsPayloadBody({
       )}
     >
       {presentation === 'markdown' ? (
-        <header className="border-b border-border/70 pb-4">
-          <p className="text-xs font-medium text-muted-foreground">{p.fillMetricHeadline}</p>
-          <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+        <header className="border-b border-border/80 pb-3 dark:border-border/55">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-4">
             <div className="min-w-0">
-              <h1 className="font-mono text-2xl font-bold tracking-tight text-foreground">{p.dateStr}</h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {p.fillMetricHeadline}
+              </p>
+              <h1 className="mt-1 font-mono text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                {p.dateStr}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {p.market} · {p.weekdayShort}
               </p>
             </div>
             <div
-              className="shrink-0 rounded-lg border border-border/80 px-3.5 py-2.5 shadow-sm"
+              className="shrink-0 rounded-lg border border-border/90 px-3 py-2 shadow-sm ring-2 ring-black/[0.06] dark:border-border/60 dark:ring-white/10"
               style={{ backgroundColor: p.cellFillHex, color: fg }}
               aria-label={`${pct} percent`}
             >
-              <span className="block text-center text-3xl font-extrabold tabular-nums leading-none tracking-tight">
+              <span className="block text-center text-[1.75rem] font-extrabold tabular-nums leading-none tracking-tight sm:text-3xl">
                 {pct}
-                <span className="align-top text-xl font-extrabold tracking-tight">%</span>
+                <span className="align-top text-lg font-extrabold tracking-tight sm:text-xl">%</span>
               </span>
             </div>
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">
-            <strong className="font-semibold text-foreground">{p.riskBand}</strong>
-            <span className="mx-2 text-muted-foreground/40">·</span>
-            {fillLeadForPresentation}
-          </p>
-          <p className="mt-2 font-mono text-sm tabular-nums text-foreground">
-            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
-              <TermWithDefinition label="Planning blend" definition={planningGlossary} dense />
-            </span>{' '}
-            <span className="font-semibold">{planningBlendStr}</span>
-            <span className="mx-2 text-muted-foreground/50">·</span>
-            <span className="inline-flex items-center gap-0.5 text-muted-foreground">
-              <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
-            </span>{' '}
-            <span className="font-semibold">{heatmapScoreStr}</span>
-          </p>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="rounded-md border border-border/70 bg-muted/35 px-2.5 py-2 dark:border-border/50 dark:bg-muted/15">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Band</p>
+              <p className="mt-0.5 text-sm font-semibold text-foreground">{p.riskBand}</p>
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{fillLeadForPresentation}</p>
+            </div>
+            <div className="rounded-md border border-border/70 bg-muted/35 px-2.5 py-2 dark:border-border/50 dark:bg-muted/15">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <span className="inline-flex items-center gap-0.5">
+                  <TermWithDefinition label="Planning blend" definition={planningGlossary} dense />
+                </span>
+              </p>
+              <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{planningBlendStr}</p>
+            </div>
+            <div className="rounded-md border border-border/70 bg-muted/35 px-2.5 py-2 dark:border-border/50 dark:bg-muted/15">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <span className="inline-flex items-center gap-0.5">
+                  <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
+                </span>
+              </p>
+              <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{heatmapScoreStr}</p>
+            </div>
+          </div>
           <LensScoreFootnote viewMode={p.viewMode} presentation={presentation} />
         </header>
       ) : (
@@ -489,7 +510,7 @@ export function RunwayDayDetailsPayloadBody({
               </p>
             </div>
             <div
-              className="shrink-0 rounded-lg border border-border/80 px-3.5 py-2.5 shadow-sm ring-1 ring-border/50"
+              className="shrink-0 rounded-lg border border-border/90 px-3.5 py-2.5 shadow-sm ring-2 ring-black/[0.06] dark:border-border/60 dark:ring-white/10"
               style={{ backgroundColor: p.cellFillHex, color: fg }}
               aria-label={`${pct} percent`}
             >
@@ -540,9 +561,14 @@ export function RunwayDayDetailsPayloadBody({
         {presentation === 'markdown' ? (
           <>
             <h3 className="mt-0 text-sm font-semibold tracking-tight text-foreground">What shaped this day</h3>
-            <div className="mt-3 space-y-5">
+            <div
+              className={cn(
+                'mt-3 grid gap-5',
+                p.driverSummaryBlocks.length > 1 && 'sm:grid-cols-2',
+              )}
+            >
               {p.driverSummaryBlocks.map((block) => (
-                <div key={block.heading}>
+                <div key={block.heading} className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {block.heading}
                   </p>

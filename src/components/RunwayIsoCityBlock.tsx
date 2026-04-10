@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react';
+import { useIsoRunwayGrowFactor } from '@/hooks/useIsoRunwayGrowFactor';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
@@ -47,11 +48,13 @@ import {
 } from '@/components/RunwayIsoHeatCell';
 
 export type RunwayIsoCityBlockProps = {
+  /** Bumps isometric column grow-in when market set / lens / data changes. */
+  growResetKey: string;
   sections: VerticalYearSection[];
   markets: string[];
   riskSurface: RiskRow[];
   cellPx: number;
-  heatmapOpts: HeatmapColorOpts;
+  heatmapOptsForMarket: (marketId: string) => HeatmapColorOpts;
   riskTuning: RiskModelTuning;
   viewMode: ViewModeId;
   techWorkloadScope: TechWorkloadScope;
@@ -69,17 +72,19 @@ function deckAndColumnY(L: IsoLayoutCore, calH: number, runwayBandH: number): nu
 }
 
 export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
+  growResetKey,
   sections,
   markets,
   riskSurface,
   cellPx,
-  heatmapOpts,
+  heatmapOptsForMarket,
   riskTuning,
   viewMode,
   techWorkloadScope,
   todayYmd,
   dimPastDays,
 }: RunwayIsoCityBlockProps) {
+  const grow = useIsoRunwayGrowFactor(growResetKey);
   const towerPx = Math.round(cellPx * 1.4);
 
   const flatWeeks = useMemo(
@@ -416,16 +421,20 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
           }
 
           const dateStr = cell;
-          const riskByDate = riskByMarket.get(markets[mi]!)!;
+          const mk = markets[mi]!;
+          const riskByDate = riskByMarket.get(mk)!;
           const row = dateStr ? riskByDate.get(dateStr) : undefined;
           const metric = row ? heatmapCellMetric(row, viewMode, riskTuning, techWorkloadScope) : undefined;
+          const optsM = heatmapOptsForMarket(mk);
           const { fill, dimOpacity } = !dateStr
             ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
-            : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, heatmapOpts, row);
+            : runwayHeatmapCellFillAndDim(viewMode, techWorkloadScope, metric, optsM, row);
           const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
           const isPad = !dateStr;
-          const height01 = transformedHeatmapMetric(viewMode, metric, heatmapOpts);
-          const calH = calHeightFromMetric(height01, towerPx, isPad);
+          const height01 = transformedHeatmapMetric(viewMode, metric, optsM);
+          const calHTarget = calHeightFromMetric(height01, towerPx, isPad);
+          const calH0 = calHeightFromMetric(0, towerPx, isPad);
+          const calH = calH0 + (calHTarget - calH0) * grow;
           const columnTy = deckAndColumnY(L, calH, runwayBandH);
           const topC = isPad ? ISO_PAD_TOP : contribPanelFill(fill, 'top');
           const leftC = isPad ? ISO_PAD_LEFT : contribPanelFill(fill, 'left');

@@ -18,6 +18,27 @@ export type StressCorrelations = {
   school_holidays?: SchoolHolidayStress;
 };
 
+/** One ISO week (Monday–Sunday) inside a {@link NationalLeaveBand}. */
+export type NationalLeaveWeekSlice = {
+  weekStart: string;
+  capacityMultiplier: number;
+};
+
+/**
+ * Calendar band where lab+team **effective capacity** is scaled (collective leave, national break density).
+ * Stacks with holiday taper and school operating-window capacity multipliers.
+ */
+export type NationalLeaveBand = {
+  id?: string;
+  label?: string;
+  from: string;
+  to: string;
+  /** When `weeks` is omitted or no week matches a day, this multiplier applies for days in `[from, to]`. */
+  capacityMultiplier?: number;
+  /** Per-week multipliers (`week_start` = Monday of that ISO week). */
+  weeks?: NationalLeaveWeekSlice[];
+};
+
 /** YAML `deployment_risk_events`: corporate or governance windows that add deployment fragility. */
 export type DeploymentRiskEvent = {
   id: string;
@@ -175,6 +196,11 @@ export type MarketConfig = {
   schoolHolidayExtraDates?: string[];
   /** Smooth lab/team holiday capacity toward stub dates across N adjacent days (`holidays.capacity_taper_days`). */
   holidayCapacityTaperDays?: number;
+  /**
+   * Optional national / collective leave bands (`national_leave_bands` in YAML). Each day in range scales
+   * lab+team effective caps; overlapping bands multiply.
+   */
+  nationalLeaveBands?: NationalLeaveBand[];
   stressCorrelations?: StressCorrelations;
   operatingWindows?: OperatingWindow[];
   techRhythm?: TechRhythmConfig;
@@ -184,6 +210,16 @@ export type MarketConfig = {
   riskHeatmapGammaTech?: number;
   /** Legacy optional YAML γ for business lens (ignored by the app UI). */
   riskHeatmapGammaBusiness?: number;
+  /**
+   * Optional YAML-only Δ added to the global Restaurant Activity pressure offset for this market (then clamped with
+   * the UI to ±0.5 total). Keys: `risk_heatmap_business_pressure_offset` or `riskHeatmapBusinessPressureOffset`.
+   */
+  riskHeatmapBusinessPressureOffset?: number;
+  /**
+   * Optional YAML-only Δ added to the global Deployment Risk pressure offset for this market (then clamped with the
+   * UI to ±0.5 total). Keys: `risk_heatmap_market_risk_pressure_offset` or `riskHeatmapMarketRiskPressureOffset`.
+   */
+  riskHeatmapMarketRiskPressureOffset?: number;
   /** Legacy optional YAML transfer curve id (ignored by the app UI). */
   riskHeatmapCurve?: RiskHeatmapCurveId;
   /** Optional deployment-risk calendar events (`deployment_risk_events` in YAML). */
@@ -237,7 +273,7 @@ export type CampaignConfig = {
   /**
    * Multiplier on this campaign’s **business / store** signal (`campaign_risk`, prep/live store boosts).
    * Use it to separate flagship store programmes (e.g. collectibles **1**–**1.3**) from smaller promos (e.g. drinks **0.5**–**0.8**).
-   * Default **1** when omitted. YAML aliases: `business_uplift`, `trading_emphasis`, `store_trading_weight`.
+   * Default **1** when omitted. Preferred YAML key: **`promo_weight`**; aliases: `business_uplift`, `trading_emphasis`, `store_trading_weight`.
    */
   businessUplift?: number;
   /**

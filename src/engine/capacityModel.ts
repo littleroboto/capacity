@@ -10,7 +10,7 @@ export type CapacityRow = AggregatedDay & {
   lab_load_ratio: number;
   team_load_ratio: number;
   backend_load_ratio: number;
-  /** Effective denominators for the day (after holiday / school cap multipliers). */
+  /** Effective denominators for the day (after holiday, school / window cap multipliers, and national leave bands). */
   labs_effective_cap: number;
   teams_effective_cap: number;
   backend_effective_cap: number;
@@ -32,7 +32,12 @@ export function computeCapacity(
    * Target lab+team cap scale when holiday stress = 1 (clamped 0.12–1). Tapered days still blend
    * toward this. Defaults to per-market `holidayLabCapacityScale` or `defaultHolidayCapacityScale`.
    */
-  holidayCapScaleAtFullStress?: (market: string, date: string) => number
+  holidayCapScaleAtFullStress?: (market: string, date: string) => number,
+  /**
+   * Applied **after** the school / operating-window cap multiplier (which is clamped 0.65–1.05) so
+   * collective leave can still pull caps below that floor (YAML `national_leave_bands`).
+   */
+  nationalLeaveLabTeamCapMult: (market: string, date: string) => number = () => 1
 ): CapacityRow[] {
   const capByMarket: Record<
     string,
@@ -86,6 +91,11 @@ export function computeCapacity(
     );
     const scale = 1 + (scaleOnHoliday - 1) * stress;
     const schoolM = Math.min(1.05, Math.max(0.65, schoolLabTeamCapMult(r.market, r.date)));
+    const leaveRaw = nationalLeaveLabTeamCapMult(r.market, r.date);
+    const leaveM =
+      leaveRaw != null && Number.isFinite(leaveRaw)
+        ? Math.min(1.5, Math.max(0.05, leaveRaw))
+        : 1;
     const monthK = tradingMonthKeyFromIsoDate(r.date);
     const labMonth = cap.monthlyLabs?.[monthK];
     const staffMonth = cap.monthlyStaff?.[monthK];
@@ -100,10 +110,10 @@ export function computeCapacity(
           : 1;
     const availShape = availMonth != null && Number.isFinite(availMonth) ? availMonth : 1;
     const labDenom = cap.testingCapacity ?? cap.labs ?? 5;
-    const labsCap = (labDenom || 5) * labShape * scale * schoolM * availShape;
+    const labsCap = (labDenom || 5) * labShape * scale * schoolM * leaveM * availShape;
     const teamsCap = cap.staffMonthlyAbsolute
-      ? staffShape * scale * schoolM * availShape
-      : teamsBase * staffShape * scale * schoolM * availShape;
+      ? staffShape * scale * schoolM * leaveM * availShape
+      : teamsBase * staffShape * scale * schoolM * leaveM * availShape;
     const backendCap = cap.backend || 1000;
 
     const lab_load_ratio = labsCap > 0 ? Math.max(0, (r.lab_load || 0) / labsCap) : 0;

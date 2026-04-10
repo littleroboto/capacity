@@ -2,6 +2,8 @@
 
 This repo scopes runway and `/api/shared-dsl` using **session JWT claims** (`cap_*`). Clerk’s org tree does **not** apply those rules by itself — you wire **organization `public_metadata`** (and optional **user `public_metadata`**) into the token in **Sessions → Customize session token**.
 
+**Single production org (e.g. McDonald’s):** Use **one Clerk Organization** for the whole workspace. Segment-wide vs single-market access comes from **metadata on orgs or teams** (e.g. an “IOM segment” team with `capacity_segment` only, vs a “UK” team with `capacity_segment` + `capacity_market`), not from spinning up separate Clerk applications per region.
+
 **Target policy**
 
 | Persona | What they get |

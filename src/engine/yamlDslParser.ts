@@ -20,6 +20,9 @@ import { expandTechWeeklyPattern } from './techWeeklyPattern';
 import { PAYDAY_MONTH_MULTIPLIER_MAX } from './paydayMonthShape';
 import type { EnvelopeKind } from './weighting';
 import type { TradingMonthKey } from '@/lib/tradingMonthlyDsl';
+import { parseNationalLeaveBands } from './nationalLeaveBands';
+import { coerceYamlDateString } from './yamlDateCoerce';
+import { clampHeatmapPressureOffset } from '@/lib/heatmapTuningPerLens';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -75,21 +78,6 @@ function pickPhaseLoad(raw: unknown): PhaseLoad {
   if (ops != null) out.ops = ops;
   if (commercial != null) out.commercial = commercial;
   return out;
-}
-
-/**
- * js-yaml deserializes unquoted `YYYY-MM-DD` as JavaScript `Date`. `String(date)` is not ISO and breaks
- * `parseDate()` / lexicographic window checks in the pipeline.
- */
-function coerceYamlDateString(v: unknown): string {
-  if (v == null || v === '') return '';
-  if (v instanceof Date && !Number.isNaN(v.getTime())) {
-    const y = v.getFullYear();
-    const m = String(v.getMonth() + 1).padStart(2, '0');
-    const d = String(v.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-  return String(v).trim();
 }
 
 function weekDayFromToken(tok: string): number | undefined {
@@ -240,6 +228,10 @@ export type ParsedYaml = {
   risk_heatmap_gamma?: number;
   risk_heatmap_gamma_tech?: number;
   risk_heatmap_gamma_business?: number;
+  /** Optional Δ added to global Restaurant Activity pressure offset for this market (see `yamlToPipelineConfig`). */
+  risk_heatmap_business_pressure_offset?: number;
+  /** Optional Δ added to global Deployment Risk pressure offset for this market. */
+  risk_heatmap_market_risk_pressure_offset?: number;
   /** Transfer curve id for combined heatmap (optional; default power). */
   risk_heatmap_curve?: string;
   deployment_risk_events?: unknown[];
@@ -248,6 +240,8 @@ export type ParsedYaml = {
   deployment_risk_context_month_curve?: Record<string, unknown>;
   deployment_risk_week_weight?: number;
   deployment_resourcing_strain_weight?: number;
+  /** Collective / national leave density — scales lab+team effective caps for calendar days in range. */
+  national_leave_bands?: unknown[];
 };
 
 const EMPTY: ParsedYaml = {
@@ -265,6 +259,8 @@ const EMPTY: ParsedYaml = {
   risk_heatmap_gamma: undefined,
   risk_heatmap_gamma_tech: undefined,
   risk_heatmap_gamma_business: undefined,
+  risk_heatmap_business_pressure_offset: undefined,
+  risk_heatmap_market_risk_pressure_offset: undefined,
   risk_heatmap_curve: undefined,
   deployment_risk_events: undefined,
   deployment_risk_blackouts: undefined,
@@ -272,6 +268,7 @@ const EMPTY: ParsedYaml = {
   deployment_risk_context_month_curve: undefined,
   deployment_risk_week_weight: undefined,
   deployment_resourcing_strain_weight: undefined,
+  national_leave_bands: undefined,
 };
 
 function normalizeYamlObject(raw: unknown): ParsedYaml {
@@ -327,6 +324,19 @@ function normalizeYamlObject(raw: unknown): ParsedYaml {
     risk_heatmap_gamma: Number.isFinite(g) ? g : undefined,
     risk_heatmap_gamma_tech: Number.isFinite(gTech) ? gTech : undefined,
     risk_heatmap_gamma_business: Number.isFinite(gBus) ? gBus : undefined,
+    risk_heatmap_business_pressure_offset: (() => {
+      const raw = o.risk_heatmap_business_pressure_offset ?? o.riskHeatmapBusinessPressureOffset;
+      if (raw == null || raw === '') return undefined;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : undefined;
+    })(),
+    risk_heatmap_market_risk_pressure_offset: (() => {
+      const raw =
+        o.risk_heatmap_market_risk_pressure_offset ?? o.riskHeatmapMarketRiskPressureOffset;
+      if (raw == null || raw === '') return undefined;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : undefined;
+    })(),
     risk_heatmap_curve:
       o.risk_heatmap_curve == null || o.risk_heatmap_curve === ''
         ? undefined
@@ -365,6 +375,11 @@ function normalizeYamlObject(raw: unknown): ParsedYaml {
       const n = Number(w);
       return w != null && w !== '' && Number.isFinite(n) ? n : undefined;
     })(),
+    national_leave_bands: Array.isArray(o.national_leave_bands)
+      ? o.national_leave_bands
+      : Array.isArray(o.nationalLeaveBands)
+        ? o.nationalLeaveBands
+        : undefined,
   };
 }
 
@@ -682,6 +697,8 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
       return Math.floor(n);
     };
     const buRaw =
+      row.promo_weight ??
+      row.promoWeight ??
       row.business_uplift ??
       row.businessUplift ??
       row.trading_emphasis ??
@@ -742,6 +759,16 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     riskHeatmapGammaBusiness = riskHeatmapGamma;
   }
   const riskHeatmapCurve = parseRiskHeatmapCurve(parsed.risk_heatmap_curve);
+  let riskHeatmapBusinessPressureOffset: number | undefined;
+  const bp = parsed.risk_heatmap_business_pressure_offset;
+  if (bp != null && Number.isFinite(bp)) {
+    riskHeatmapBusinessPressureOffset = clampHeatmapPressureOffset(bp);
+  }
+  let riskHeatmapMarketRiskPressureOffset: number | undefined;
+  const mrp = parsed.risk_heatmap_market_risk_pressure_offset;
+  if (mrp != null && Number.isFinite(mrp)) {
+    riskHeatmapMarketRiskPressureOffset = clampHeatmapPressureOffset(mrp);
+  }
   const deployment_risk_month_curve = mapDeploymentRiskMonthCurve(parsed.deployment_risk_month_curve);
   const deployment_risk_context_month_curve = mapDeploymentRiskMonthCurve(
     parsed.deployment_risk_context_month_curve
@@ -823,6 +850,7 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     publicHolidayExtraDates,
     schoolHolidayStaffingMultiplier,
     schoolHolidayExtraDates,
+    nationalLeaveBands: parseNationalLeaveBands(parsed.national_leave_bands),
     tradingPressure,
     bau,
     campaigns,
@@ -840,6 +868,8 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     riskHeatmapGamma,
     riskHeatmapGammaTech,
     riskHeatmapGammaBusiness,
+    riskHeatmapBusinessPressureOffset,
+    riskHeatmapMarketRiskPressureOffset,
     riskHeatmapCurve,
     deployment_risk_month_curve,
     deployment_risk_context_month_curve,

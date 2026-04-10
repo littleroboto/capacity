@@ -105,6 +105,11 @@ export function technologyHeadroomHeatmapMetric(row: RiskRow, scope: TechWorkloa
   return Math.min(1, Math.max(0, 1 - capped));
 }
 
+/** **Deployment Risk** heatmap: `deployment_risk_01` clamped to [0, 1]. */
+export function deploymentRiskHeatmapMetric(row: RiskRow): number {
+  return Math.min(1, Math.max(0, row.deployment_risk_01 ?? 0));
+}
+
 /**
  * Runway cell value per view: **Technology** = {@link technologyHeadroomHeatmapMetric}; **Business** = {@link inStoreHeatmapMetric}.
  */
@@ -120,7 +125,7 @@ export function heatmapCellMetric(
     case 'in_store':
       return inStoreHeatmapMetric(row, tuning);
     case 'market_risk':
-      return Math.min(1, Math.max(0, row.deployment_risk_01 ?? 0));
+      return deploymentRiskHeatmapMetric(row);
     default:
       return technologyHeadroomHeatmapMetric(row, techWorkloadScope);
   }

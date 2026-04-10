@@ -2,28 +2,22 @@ import { useMemo, useState } from 'react';
 import { RightPanelSection } from '@/components/RightPanelSection';
 import { RestaurantTradingPatternsPanel } from '@/components/RestaurantTradingPatternsPanel';
 import { TechLensPatternsPanel } from '@/components/TechLensPatternsPanel';
-import { gammaFocusMarket, isRunwayMultiMarketStrip, runwayFocusStripLabel } from '@/lib/markets';
+import { isRunwayMultiMarketStrip, runwayFocusStripLabel } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 
 const PATTERNS_INNER_SCROLL =
-  'min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden overscroll-y-contain rounded-lg border border-border/60 bg-card px-3 pb-3 pt-3 text-card-foreground shadow-sm ring-1 ring-border/50 dark:ring-border/40 [-webkit-overflow-scrolling:touch]';
+  'min-h-0 flex-1 basis-0 overflow-y-auto overflow-x-hidden overscroll-y-contain px-2.5 pb-1 pt-2.5 text-foreground [-webkit-overflow-scrolling:touch]';
 
 const PATTERNS_OUTER_WRAP =
-  'flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-x-hidden overflow-y-hidden border-t border-border/50 bg-background/25 px-3 pb-3 pt-3 dark:bg-background/20';
+  'flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-x-hidden overflow-y-hidden px-0 pb-0 pt-0';
 
 /** Lens-specific YAML pattern editors (no tabs). Same structure for single-market and compare strips; focus market from {@link gammaFocusMarket}. */
 export function RiskModelPanel() {
-  const [expanded, setExpanded] = useState(false);
+  /** Open by default so the resizable panel’s vertical space goes to pattern editors, not an empty shell. */
+  const [expanded, setExpanded] = useState(true);
   const country = useAtcStore((s) => s.country);
   const viewMode = useAtcStore((s) => s.viewMode);
-  const configs = useAtcStore((s) => s.configs);
-  const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
   const compareAllMarkets = isRunwayMultiMarketStrip(country);
-
-  const focusMarket = useMemo(
-    () => gammaFocusMarket(country, configs, runwayMarketOrder),
-    [country, configs, runwayMarketOrder]
-  );
 
   const patternKind = useMemo(() => {
     if (viewMode === 'in_store' || viewMode === 'market_risk') return 'trading' as const;
@@ -46,10 +40,11 @@ export function RiskModelPanel() {
         {stripPrefix}
         <span className="font-medium text-foreground/90">Trading</span>
         {' · '}
-        weekly / monthly / early-month
-        {viewMode === 'market_risk'
-          ? ' · deployment risk shape · heatmap · deploy. context'
-          : ' · global heatmap + offset'}
+        {compareAllMarkets
+          ? 'heatmap offset + transfer'
+          : viewMode === 'market_risk'
+            ? 'weekly / monthly / early-month · deploy. context · heatmap'
+            : 'weekly / monthly / early-month · heatmap'}
       </span>
     ) : (
       <span className="text-[11px] text-muted-foreground">
@@ -61,8 +56,9 @@ export function RiskModelPanel() {
     );
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <div className="mt-1.5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/55 bg-muted/15 dark:border-border/45 dark:bg-muted/10">
       <RightPanelSection
+        className="min-h-0 flex-1 border-b-0"
         expanded={expanded}
         onExpandedChange={setExpanded}
         title="Business Patterns"
@@ -70,15 +66,6 @@ export function RiskModelPanel() {
       >
         <div className={PATTERNS_OUTER_WRAP}>
           <div className={PATTERNS_INNER_SCROLL}>
-            {compareAllMarkets ? (
-              <p className="mb-3 text-[10px] leading-relaxed text-muted-foreground">
-                <span className="font-medium text-foreground/85">{runwayFocusStripLabel(country)}</span>
-                {' — '}
-                same Business Patterns as single-market (2D or 3D). YAML follows runway focus{' '}
-                <span className="font-mono text-foreground/80">{focusMarket}</span>; heatmap pressure offset, curve, γ,
-                tail power, and deployment-risk mix are global across columns and lenses.
-              </p>
-            ) : null}
             {patternKind === 'trading' ? (
               <RestaurantTradingPatternsPanel />
             ) : (

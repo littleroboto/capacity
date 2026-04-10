@@ -75,7 +75,7 @@
 ## 3. Explicitly out of scope here
 
 - **Runway auto-plan**, **corporate calendar risk** — Phase 2 [BACKLOG_EPICS.md](./BACKLOG_EPICS.md).
-- **Auth / PartyKit / versioning** — later phases.
+- **Auth / versioning** — later phases.
 - **New heatmap metrics or banding policy** — product epic, not “polish.”
 
 ---

@@ -6,9 +6,9 @@ export function glossaryFillScore(mode: ViewModeId): string {
     return 'Headroom on lab and Market IT lanes (0–1 before colour transfer and γ): more free capacity vs scheduled work on those lanes; backend is excluded from the headline. The tile % is this value × 100%.';
   }
   if (mode === 'market_risk') {
-    return 'Deployment risk (0–1 before transfer and γ): deployment and calendar fragility—holidays, Q4/month curve, trading intensity, campaigns × peaks, tech bench strain, YAML events. Hotter = more fragile, not a ban. The tile % is this value × 100%.';
+    return 'Deployment risk: model score (0–1) shaped by holidays, Q4/month curve, trading, campaigns, YAML events—then the same pressure offset and heatmap transfer as the runway cells. Tile % is that display value × 100%.';
   }
-  return 'Trading pressure: modeled restaurant / store trading intensity from the store-pressure lane (0–1 before display tweaks)—rhythm, early-month lift, holidays, store boosts. Does not add scheduled tech work. The tile % is this value × 100%.';
+  return 'Restaurant / store trading from the store-pressure lane (rhythm, early-month lift, holidays, store boosts), then the same pressure offset and heatmap transfer as the runway cells. Tile % is that display value × 100%.';
 }
 
 /** Align with `docs/LENS_GLOSSARY.md` — planning blend (full). */
@@ -19,7 +19,7 @@ export function glossaryPlanningBlend(mode: ViewModeId): string {
     return `${base} The Technology Teams tile shows tech capacity headroom only.`;
   }
   if (mode === 'market_risk') {
-    return `${base} The Deployment Risk heatmap shows deployment/calendar fragility only; the band still reflects the full operational mix.`;
+    return `${base} The Deployment Risk tile % matches heatmap display (offset + transfer on the risk score); the band still reflects the full operational mix.`;
   }
   return `${base} Restaurant Activity shows store trading only while the blend still includes tech and campaigns, so the two numbers can differ.`;
 }
@@ -30,9 +30,9 @@ export function glossaryFillScorePopover(mode: ViewModeId): string {
     return 'Lab + Market IT headroom (0–1) before γ and transfer. Tile % = this × 100. Cooler = more capacity free.';
   }
   if (mode === 'market_risk') {
-    return 'Deployment/calendar fragility (0–1) before γ and transfer. Tile % = this × 100.';
+    return 'Deployment risk after heatmap offset + transfer (same as cell colour). Tile % = this × 100.';
   }
-  return 'Store-pressure trading intensity (0–1) before display tweaks. Tile % = this × 100.';
+  return 'Store intensity after heatmap offset + transfer (same as cell colour). Tile % = this × 100.';
 }
 
 /** Popover — planning blend (compact). */
@@ -53,9 +53,9 @@ export function glossaryTileVsBandCollapse(mode: ViewModeId): string {
     return 'The band uses the full planning blend. The large percentage is Technology Teams headroom on lab + Market IT only—backend excluded from that headline.';
   }
   if (mode === 'market_risk') {
-    return 'The band uses the full planning blend. The tile is the deployment-risk score (deployment/calendar fragility) only.';
+    return 'The band uses the full planning blend. The tile % matches Deployment Risk heatmap display (offset + transfer).';
   }
-  return 'The band uses the full planning blend. The tile is restaurant/store trading intensity from the store curve only.';
+  return 'The band uses the full planning blend. The tile matches Restaurant Activity heatmap display (offset + transfer on store intensity).';
 }
 
 /** @deprecated Use {@link glossaryPlanningBlend}. */

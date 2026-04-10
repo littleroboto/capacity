@@ -36,12 +36,12 @@ export function RightPanelSection({
   return (
     <div
       className={cn(
-        'flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-muted/20 shadow-sm',
+        'flex min-h-0 flex-col overflow-hidden',
         expanded && fillHeight && 'flex-1',
         className
       )}
     >
-      <div className="shrink-0 border-b border-border/50 bg-card/40 px-3 py-2.5">
+      <div className="shrink-0 px-2.5 py-2">
         <div className="flex items-start justify-between gap-2">
           <button
             type="button"

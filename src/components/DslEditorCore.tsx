@@ -1,9 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type BeforeMount, type Monaco, type OnMount } from '@monaco-editor/react';
-import type YPartyKitProvider from 'y-partykit/provider';
-import * as Y from 'yjs';
-import { MonacoBinding } from 'y-monaco';
 import {
   ALargeSmall,
   AlertCircle,
@@ -105,12 +102,6 @@ type DslEditorCoreProps = {
    * Code view market tabs: bind Monaco to one document; omit to use store `dslText` only.
    */
   marketTabDocument?: DslEditorMarketTabBinding | null;
-  /**
-   * When set, Monaco is driven by Yjs (`y-monaco`) instead of controlled React `value` / `onChange`.
-   */
-  collab?: { ytext: Y.Text; provider: YPartyKitProvider } | null;
-  /** Bumps Monaco `key` when collab sessions reconnect (see {@link useCollabSession}). */
-  collabRemountVersion?: number;
   /** Tighter vertical chrome when the parent is a mobile full-viewport shell. */
   fillVerticalSpace?: boolean;
 };
@@ -125,8 +116,6 @@ export function DslEditorCore({
   showApplyButton = true,
   editorChrome = 'default',
   marketTabDocument = null,
-  collab = null,
-  collabRemountVersion = 0,
   fillVerticalSpace = false,
 }: DslEditorCoreProps) {
   const [fontSize, setFontSize] = useState(initialFontSize);
@@ -147,14 +136,8 @@ export function DslEditorCore({
   const tabOnChangeRef = useRef(marketTabDocument?.onTextChange);
   tabOnChangeRef.current = marketTabDocument?.onTextChange;
 
-  const collabActive = Boolean(collab?.ytext && collab?.provider);
-  const collabRef = useRef(collab);
-  collabRef.current = collab;
-  const monacoBindingRef = useRef<MonacoBinding | null>(null);
-
   const editorValue = marketTabDocument?.text ?? dslText;
   const handleEditorChange = useCallback((v: string | undefined) => {
-    if (collabRef.current?.ytext) return;
     const tabFn = tabOnChangeRef.current;
     if (tabFn) tabFn(v ?? '');
     else setDslText(v ?? '');
@@ -233,13 +216,6 @@ export function DslEditorCore({
     registerCapacityYamlThemes(monaco);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      monacoBindingRef.current?.destroy();
-      monacoBindingRef.current = null;
-    };
-  }, [collabActive, collab?.ytext, collab?.provider, collabRemountVersion]);
-
   const handleMount = useCallback<OnMount>((editor) => {
     const sync = () => {
       const p = editor.getPosition();
@@ -247,23 +223,9 @@ export function DslEditorCore({
     };
     sync();
     editor.onDidChangeCursorPosition(sync);
-
-    const c = collabRef.current;
-    if (c?.ytext && c.provider) {
-      const model = editor.getModel();
-      if (model) {
-        monacoBindingRef.current?.destroy();
-        monacoBindingRef.current = new MonacoBinding(
-          c.ytext,
-          model,
-          new Set([editor]),
-          c.provider.awareness
-        );
-      }
-    }
   }, []);
 
-  const displaySource = collabActive && collab ? collab.ytext.toString() : editorValue;
+  const displaySource = editorValue;
   const lineCount = displaySource.split('\n').length;
   const charCount = displaySource.length;
 
@@ -282,38 +244,23 @@ export function DslEditorCore({
         className={cn(
           'flex min-h-0 w-full flex-col overflow-hidden bg-background',
           editorFixedHeight ? 'shrink-0' : 'min-h-0 flex-1',
-          studio
-            ? isDark
-              ? 'rounded-2xl border border-violet-500/25 shadow-[0_0_0_1px_rgba(167,139,250,0.18),0_24px_60px_-12px_rgba(0,0,0,0.55)]'
-              : 'rounded-2xl border border-border/80 shadow-sm shadow-black/[0.06]'
-            : 'rounded-md border border-border',
+          studio ? 'rounded-none border-0 shadow-none' : 'rounded-md border border-border',
           editorWrapClassName
         )}
         style={editorFixedHeight ? ({ height: editorFixedHeight } as CSSProperties) : undefined}
       >
         <div
           className={cn(
-            'flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-2 py-1.5',
-            studio
-              ? isDark
-                ? 'border-violet-500/20 bg-gradient-to-r from-[#12101c] via-[#1a1428] to-[#12101c]'
-                : 'border-border/70 bg-gradient-to-r from-zinc-100/95 via-background to-zinc-100/95'
-              : 'border-border/80 bg-muted/25'
+            'flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 px-2 py-1.5',
+            studio ? 'bg-muted/15' : 'border-b border-border/80 bg-muted/25'
           )}
           role="toolbar"
           aria-label="Editor appearance"
         >
           <div className="flex flex-wrap items-center gap-1">
             {studio ? (
-              <span
-                className={cn(
-                  'mr-1 flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider',
-                  isDark
-                    ? 'border-violet-400/25 bg-violet-500/15 text-violet-200'
-                    : 'border-border/70 bg-muted/90 text-foreground'
-                )}
-              >
-                <Sparkles className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
+              <span className="mr-1 flex items-center gap-1 rounded-md bg-muted/50 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Sparkles className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
                 YAML
               </span>
             ) : null}
@@ -420,10 +367,7 @@ export function DslEditorCore({
         </div>
         {dslAssistantEditorLock && studio ? (
           <div
-            className={cn(
-              'flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-[11px] font-medium',
-              isDark ? 'border-violet-500/30 bg-violet-950/40 text-violet-200' : 'border-border/70 bg-primary/10 text-primary'
-            )}
+            className="flex shrink-0 items-center gap-2 bg-muted/25 px-3 py-1.5 text-[11px] font-medium text-foreground"
             role="status"
             aria-live="polite"
           >
@@ -433,16 +377,12 @@ export function DslEditorCore({
         ) : null}
         <div className="min-h-0 min-w-0 flex-1">
           <Editor
-            key={
-              marketTabDocument
-                ? `dsl-tab-${marketTabDocument.marketId}-c${collabRemountVersion}`
-                : `dsl-single-c${collabRemountVersion}`
-            }
+            key={marketTabDocument ? `dsl-tab-${marketTabDocument.marketId}` : 'dsl-single'}
             height="100%"
             defaultLanguage="yaml"
             theme={monacoTheme}
-            value={collabActive ? undefined : editorValue}
-            onChange={collabActive ? undefined : handleEditorChange}
+            value={editorValue}
+            onChange={handleEditorChange}
             options={editorOptions}
             beforeMount={handleBeforeMount as BeforeMount}
             onMount={handleMount}
@@ -459,14 +399,9 @@ export function DslEditorCore({
           />
         </div>
         {studio ? (
-          <div
-            className={cn(
-              'flex shrink-0 items-center justify-between gap-2 border-t px-3 py-1.5',
-              isDark ? 'border-violet-500/15 bg-black/20' : 'border-border/70 bg-muted/35'
-            )}
-          >
+          <div className="flex shrink-0 items-center justify-between gap-2 bg-muted/10 px-3 py-1.5">
             <p className="font-mono text-[10px] text-muted-foreground">
-              <span className={cn(isDark ? 'text-violet-300' : 'font-semibold text-foreground')}>Capacity</span> syntax
+              <span className="font-semibold text-foreground">Capacity</span> syntax
               theme · keys / dates / strings highlighted
             </p>
             <span className="font-mono text-[10px] tabular-nums text-muted-foreground sm:hidden">

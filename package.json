@@ -10,9 +10,7 @@
     "postinstall": "node scripts/write-build-meta.mjs",
     "prebuild": "node scripts/generate-market-manifest.mjs && node scripts/write-build-meta.mjs && node scripts/sync-api-workspace-acl.mjs && node scripts/bundle-shared-dsl.mjs",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "party:dev": "partykit dev",
-    "party:deploy": "partykit deploy"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@clerk/backend": "^3.2.4",
@@ -44,10 +42,6 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.14.0",
     "tailwind-merge": "^2.6.0",
-    "y-monaco": "^0.1.6",
-    "y-partykit": "^0.0.33",
-    "y-protocols": "^1.0.7",
-    "yjs": "^13.6.30",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
@@ -59,7 +53,6 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "esbuild": "^0.25.12",
-    "partykit": "^0.0.115",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.21.0",

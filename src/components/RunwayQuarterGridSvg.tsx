@@ -26,6 +26,8 @@ export type RunwayQuarterGridSvgProps = {
   techWorkloadScope: TechWorkloadScope;
   todayYmd: string;
   dimPastDays: boolean;
+  /** Matches side-summary selection (e.g. default “today” on load). */
+  selectedDayYmd?: string | null;
   openDayDetailsFromCell: (anchor: RunwayTipAnchor, dateStr: string | null, weekdayCol: number) => void;
 };
 
@@ -48,6 +50,7 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
   techWorkloadScope,
   todayYmd,
   dimPastDays,
+  selectedDayYmd = null,
   openDayDetailsFromCell,
 }: RunwayQuarterGridSvgProps) {
   const { width, height, cells, monthLabels, weekdayLabels, yearLabels, quarterLabels } = useMemo(
@@ -143,6 +146,7 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
         const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
         const opacity = pastDimmed ? 0.25 * dimOp : dimOp;
         const isToday = typeof dateStr === 'string' && dateStr === todayYmd;
+        const isSelected = typeof dateStr === 'string' && dateStr === selectedDayYmd;
 
         return (
           <g key={`${marketKey}-svg-${i}-${c.x}-${c.y}`}>
@@ -155,8 +159,9 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
               ry={3}
               fill={fill}
               opacity={opacity}
-              className="stroke-border/35"
-              strokeWidth={0.5}
+              className={isSelected ? 'stroke-primary' : 'stroke-border/35'}
+              strokeWidth={isSelected ? 1.75 : 0.5}
+              aria-pressed={isSelected}
               style={{ cursor: 'pointer' }}
               role="button"
               tabIndex={0}

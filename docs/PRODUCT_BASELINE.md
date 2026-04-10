@@ -44,8 +44,8 @@ Four **view modes** (see `VIEW_MODES` in `src/lib/constants.ts`):
 
 ## Not in this baseline (planned / backlog)
 
-- **Deeper tenancy** (per-org Blob paths, Postgres revision history, PartyKit) — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) (`epic-auth-org`, `epic-partykit-yjs`, `epic-versioning`). Clerk + scoped workspace ACL on `/api/shared-dsl` (segments, optional **`cap_mkts`**, GET filter / PUT merge) ships; per-org storage paths remain backlog. [AUTH_PROVIDER.md](./AUTH_PROVIDER.md) summarizes claims and env vars.
-- Real-time collab (Yjs / PartyKit); version history DB; comments/chat — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md).
+- **Deeper tenancy** (per-org Blob paths, Postgres / Supabase revision history) — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) (`epic-auth-org`, `epic-versioning`) and [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md). Clerk + scoped workspace ACL on `/api/shared-dsl` (segments, optional **`cap_mkts`**, GET filter / PUT merge) ships; per-org storage paths remain backlog. [AUTH_PROVIDER.md](./AUTH_PROVIDER.md) summarizes claims and env vars.
+- Version history DB; comments/chat — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md). (PartyKit + Yjs **removed** from the repo; no live multi-tab YAML sync.)
 - **Runway auto-plan** (slot finder, ghost overlays, 3D viz) — backlog **Phase 2**; intended to build on runway lenses once shipped.
 
 ## Code anchors

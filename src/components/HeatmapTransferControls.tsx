@@ -1,5 +1,7 @@
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import type { HeatmapTuningLensId } from '@/lib/heatmapTuningPerLens';
+import { labelForHeatmapTuningLens } from '@/lib/heatmapTuningPerLens';
 import {
   RISK_HEATMAP_CURVE_OPTIONS,
   applyRiskHeatmapTransfer,
@@ -91,32 +93,32 @@ export type HeatmapTransferControlsProps = {
   className?: string;
   /** Distinct prefix for form control ids (e.g. `settings` vs `patterns`). */
   idPrefix: string;
+  lens: HeatmapTuningLensId;
 };
 
 /**
- * Heatmap pressure → colour transfer: curve, γ, and high-end power (t^p).
- * One persisted triple for every lens (Technology Teams, Code, Restaurant Activity, Deployment Risk); not per-market YAML.
+ * Heatmap pressure → colour transfer: curve, γ, and high-end power (t^p) for one lens.
+ * Persisted per lens; same values for every market column; not YAML.
  */
-export function HeatmapTransferControls({ className, idPrefix }: HeatmapTransferControlsProps) {
-  const riskHeatmapGamma = useAtcStore((s) => s.riskHeatmapGamma);
-  const riskHeatmapCurve = useAtcStore((s) => s.riskHeatmapCurve);
-  const setRiskHeatmapGamma = useAtcStore((s) => s.setRiskHeatmapGamma);
-  const setRiskHeatmapCurve = useAtcStore((s) => s.setRiskHeatmapCurve);
-  const riskHeatmapTailPower = useAtcStore((s) => s.riskHeatmapTailPower);
-  const setRiskHeatmapTailPower = useAtcStore((s) => s.setRiskHeatmapTailPower);
+export function HeatmapTransferControls({ className, idPrefix, lens }: HeatmapTransferControlsProps) {
+  const t = useAtcStore((s) => s.riskHeatmapTuningByLens[lens]);
+  const patch = useAtcStore((s) => s.patchRiskHeatmapTuningForLens);
+  const riskHeatmapGamma = t.gamma;
+  const riskHeatmapCurve = t.curve;
+  const riskHeatmapTailPower = t.tailPower;
+  const lensLabel = labelForHeatmapTuningLens(lens);
 
-  const onCurveChange = setRiskHeatmapCurve;
-  const onGammaChange = setRiskHeatmapGamma;
-  const onTailPowerChange = setRiskHeatmapTailPower;
-
-  const curveId = `risk-heatmap-curve-${idPrefix}`;
-  const gammaId = `risk-heatmap-gamma-${idPrefix}`;
-  const tailPowerId = `risk-heatmap-tail-power-${idPrefix}`;
+  const curveId = `risk-heatmap-curve-${idPrefix}-${lens}`;
+  const gammaId = `risk-heatmap-gamma-${idPrefix}-${lens}`;
+  const tailPowerId = `risk-heatmap-tail-power-${idPrefix}-${lens}`;
 
   const curveLabel = RISK_HEATMAP_CURVE_OPTIONS.find((o) => o.id === riskHeatmapCurve)?.label ?? riskHeatmapCurve;
 
   const curveSelect = (
-    <Select value={riskHeatmapCurve} onValueChange={(v) => onCurveChange(v as RiskHeatmapCurveId)}>
+    <Select
+      value={riskHeatmapCurve}
+      onValueChange={(v) => patch(lens, { curve: v as RiskHeatmapCurveId })}
+    >
       <SelectTrigger
         id={curveId}
         aria-label="Transfer curve"
@@ -148,14 +150,13 @@ export function HeatmapTransferControls({ className, idPrefix }: HeatmapTransfer
   return (
     <div className={cn('space-y-4', className)}>
       <div className="space-y-1">
-        <p className="text-xs font-semibold text-foreground">Heatmap transfer</p>
+        <p className="text-xs font-semibold text-foreground">Heatmap transfer — {lensLabel}</p>
         <p className="text-[10px] leading-relaxed text-muted-foreground">
-          Maps heatmap input (0–1) through curve + γ + tail, then into palette bands. Runs{' '}
-          <strong className="font-medium text-foreground/90">after</strong> the global pressure offset Δ (above) on every
-          lens. <strong className="font-medium text-foreground/90">One global</strong> curve / γ / tail for every column —
-          browser only, not YAML. γ stays aligned from the shared slider. High-end{' '}
-          <span className="font-mono text-foreground/80">p</span> applies to Technology Teams, Deployment Risk, and Code;
-          Restaurant Activity keeps <span className="font-mono text-foreground/80">p = 1</span> on the runway.
+          Maps this lens’s heatmap input (0–1) through curve + γ + tail, then into palette bands. Runs{' '}
+          <strong className="font-medium text-foreground/90">after</strong> that lens’s pressure offset Δ.{' '}
+          <strong className="font-medium text-foreground/90">Independent per lens</strong> (Technology Teams, Restaurant
+          Activity, Deployment Risk); <strong className="font-medium text-foreground/90">same for all countries</strong> in
+          compare mode. Browser only, not YAML.
         </p>
       </div>
 
@@ -174,7 +175,7 @@ export function HeatmapTransferControls({ className, idPrefix }: HeatmapTransfer
                 max={GAMMA_UI_MAX}
                 step={GAMMA_UI_STEP}
                 value={snapGammaUi(riskHeatmapGamma)}
-                onChange={(e) => onGammaChange(Number(e.target.value))}
+                onChange={(e) => patch(lens, { gamma: Number(e.target.value) })}
                 className={TUNING_RANGE}
               />
             </div>
@@ -212,7 +213,7 @@ export function HeatmapTransferControls({ className, idPrefix }: HeatmapTransfer
               max={TAIL_POWER_UI_MAX}
               step={TAIL_POWER_UI_STEP}
               value={snapTailPowerUi(riskHeatmapTailPower)}
-              onChange={(e) => onTailPowerChange(Number(e.target.value))}
+              onChange={(e) => patch(lens, { tailPower: Number(e.target.value) })}
               className={TUNING_RANGE}
               aria-label="High-end power exponent"
             />

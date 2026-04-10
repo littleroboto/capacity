@@ -421,7 +421,13 @@ export type RunwayTooltipPayload = {
   fillMetricLabel: string;
   /** One scannable sentence for popover; panel may use {@link fillMetricLabel}. */
   fillMetricLeadCompact: string;
+  /** Raw lens metric from {@link heatmapCellMetric} (e.g. tech headroom, store 0–1, deployment risk 0–1). */
   fillMetricValue: number;
+  /**
+   * Large % tile and fill-score digits: matches runway cell colour path — Restaurant Activity and Deployment Risk use
+   * pressure offset + heatmap transfer on the raw lens metric; Technology Teams uses raw headroom (same as fillMetricValue).
+   */
+  fillMetricDisplayValue: number;
   /** Heatmap cell fill (hex) for KPI pill background. */
   cellFillHex: string;
   /** When `public_holiday_flag`, stub catalog name(s) for tooltips. */
@@ -455,6 +461,7 @@ export function buildRunwayTooltipPayload(input: {
   fillMetricLabel: string;
   fillMetricLeadCompact: string;
   fillMetricValue: number;
+  fillMetricDisplayValue: number;
   cellFillHex: string;
   /** Technology lens workload slice (combined load, BAU, or project surfaces). */
   techWorkloadScope?: TechWorkloadScope;
@@ -471,6 +478,7 @@ export function buildRunwayTooltipPayload(input: {
     fillMetricLabel,
     fillMetricLeadCompact,
     fillMetricValue,
+    fillMetricDisplayValue,
     cellFillHex,
     techWorkloadScope = 'all',
   } = input;
@@ -500,6 +508,7 @@ export function buildRunwayTooltipPayload(input: {
     fillMetricLabel,
     fillMetricLeadCompact,
     fillMetricValue,
+    fillMetricDisplayValue,
     cellFillHex,
     publicHolidayName: row.public_holiday_flag ? getStubPublicHolidayName(market, dateStr) : null,
     pressureSurfaceLines: pressureLines,

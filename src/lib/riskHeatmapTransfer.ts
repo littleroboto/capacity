@@ -28,12 +28,12 @@ export const RISK_HEATMAP_CURVE_OPTIONS: { id: RiskHeatmapCurveId; label: string
 ];
 
 export function parseRiskHeatmapCurve(raw: unknown): RiskHeatmapCurveId {
-  if (raw == null || raw === '') return 'power';
+  if (raw == null || raw === '') return 'sigmoid';
   const s = String(raw)
     .trim()
     .toLowerCase()
     .replace(/-/g, '_');
-  return (RISK_HEATMAP_CURVE_IDS as readonly string[]).includes(s) ? (s as RiskHeatmapCurveId) : 'power';
+  return (RISK_HEATMAP_CURVE_IDS as readonly string[]).includes(s) ? (s as RiskHeatmapCurveId) : 'sigmoid';
 }
 
 /** γ affects mapping for these curves (slider stays visible). */

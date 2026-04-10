@@ -74,7 +74,7 @@ export function ViewModeRadios({
                 'relative flex cursor-pointer items-center gap-2 rounded-md px-2 transition-colors',
                 compact ? 'py-0.5 text-[11px] md:px-2' : 'py-1.5 text-sm md:px-2.5',
                 'hover:bg-background/80',
-                reduceMotion && selected && 'bg-background shadow-sm ring-1 ring-border/90'
+                reduceMotion && selected && 'bg-muted text-foreground'
               )}
               whileTap={reduceMotion ? undefined : { scale: 0.985 }}
             >

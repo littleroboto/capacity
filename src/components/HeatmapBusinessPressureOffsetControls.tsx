@@ -1,4 +1,6 @@
 import { Label } from '@/components/ui/label';
+import type { HeatmapTuningLensId } from '@/lib/heatmapTuningPerLens';
+import { labelForHeatmapTuningLens } from '@/lib/heatmapTuningPerLens';
 import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 
@@ -22,27 +24,34 @@ const TUNING_RANGE = 'h-3 w-full min-w-0 cursor-pointer accent-primary';
 export type HeatmapBusinessPressureOffsetControlsProps = {
   className?: string;
   idPrefix: string;
+  /** Which runway lens these controls edit (same tuning for every market column). */
+  lens: HeatmapTuningLensId;
 };
 
 /**
- * Global linear shift on each lens’s 0–1 heatmap input before transfer (single- and multi-market; not YAML).
+ * Linear shift on the lens’s 0–1 heatmap input before transfer (single- and multi-market; not YAML).
  */
-export function HeatmapBusinessPressureOffsetControls({ className, idPrefix }: HeatmapBusinessPressureOffsetControlsProps) {
-  const v = useAtcStore((s) => s.riskHeatmapBusinessPressureOffset);
-  const set = useAtcStore((s) => s.setRiskHeatmapBusinessPressureOffset);
-  const id = `risk-heatmap-business-offset-${idPrefix}`;
+export function HeatmapBusinessPressureOffsetControls({
+  className,
+  idPrefix,
+  lens,
+}: HeatmapBusinessPressureOffsetControlsProps) {
+  const v = useAtcStore((s) => s.riskHeatmapTuningByLens[lens].pressureOffset);
+  const patch = useAtcStore((s) => s.patchRiskHeatmapTuningForLens);
+  const id = `risk-heatmap-business-offset-${idPrefix}-${lens}`;
   const snapped = snapOffset(v);
+  const lensLabel = labelForHeatmapTuningLens(lens);
 
   return (
     <div className={cn('space-y-2', className)}>
       <div className="space-y-1">
-        <p className="text-xs font-semibold text-foreground">Global pressure offset</p>
+        <p className="text-xs font-semibold text-foreground">Pressure offset — {lensLabel}</p>
         <p className="text-[10px] leading-relaxed text-muted-foreground">
-          <strong className="font-medium text-foreground/90">Same Δ for every lens and every runway column</strong> (one
+          <strong className="font-medium text-foreground/90">Same Δ for every market column</strong> in this lens (single
           market or compare strip). Add to the lens heatmap input (0–1) after any Technology headroom→stress flip, then
           clamp, then <strong className="font-medium text-foreground/90">Heatmap transfer</strong> (curve, γ, tail).{' '}
-          <span className="font-medium text-foreground/85">Technology / Code</span>: stress;{' '}
-          <span className="font-medium text-foreground/85">Restaurant</span>: store intensity;{' '}
+          <span className="font-medium text-foreground/85">Technology Teams / Code</span>: stress;{' '}
+          <span className="font-medium text-foreground/85">Restaurant Activity</span>: store intensity;{' '}
           <span className="font-medium text-foreground/85">Deployment Risk</span>:{' '}
           <span className="font-mono text-foreground/85">deployment_risk_01</span>. Not in YAML.
         </p>
@@ -67,9 +76,9 @@ export function HeatmapBusinessPressureOffsetControls({ className, idPrefix }: H
               max={OFFSET_MAX}
               step={OFFSET_STEP}
               value={snapped}
-              onChange={(e) => set(Number(e.target.value))}
+              onChange={(e) => patch(lens, { pressureOffset: Number(e.target.value) })}
               className={TUNING_RANGE}
-              aria-label="Global linear shift on heatmap input before transfer, all lenses and columns"
+              aria-label={`Pressure offset for ${lensLabel}, all columns`}
             />
           </div>
         </div>
@@ -86,7 +95,7 @@ export function HeatmapBusinessPressureOffsetControls({ className, idPrefix }: H
       <button
         type="button"
         className="text-[10px] font-medium text-primary underline-offset-2 hover:underline"
-        onClick={() => set(0)}
+        onClick={() => patch(lens, { pressureOffset: 0 })}
       >
         Reset to 0
       </button>

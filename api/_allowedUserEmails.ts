@@ -3,7 +3,7 @@
  * Set `CAPACITY_ALLOWED_USER_EMAILS` (comma-separated, case-insensitive).
  *
  * Leading `_`: not deployed as its own Vercel `/api/*` route (bundled into shared-dsl).
- * Shared by bundled handler and PartyKit (`party/collab.ts`).
+ * Shared by bundled `/api/shared-dsl` handler.
  */
 
 export function parseAllowedEmailSet(raw: string | undefined): Set<string> {

@@ -947,7 +947,7 @@ export function LandingYamlProjectTwinMock() {
           Campaigns, BAU, and programmes draw on the same resources
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-          The YAML encodes what you believe is true in each market: <span className="text-zinc-300">resources</span>,{' '}
+          Configuration data has encoded what we believe is true in each market: <span className="text-zinc-300">resources</span>,{' '}
           <span className="text-zinc-300">BAU rhythm</span>, <span className="text-zinc-300">campaign waves</span>,{' '}
           <span className="text-zinc-300">holidays</span>, <span className="text-zinc-300">trading shape</span>, and tech
           cadence. Toggle layers here to see how prep and live phases, national and school breaks, and baseline load{' '}

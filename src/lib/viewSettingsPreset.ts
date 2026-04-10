@@ -3,7 +3,12 @@ import { riskTuningFromPersisted } from '@/engine/riskModelTuning';
 import { normalizeViewModeId, type ViewModeId } from '@/lib/constants';
 import type { HeatmapRenderStyle } from '@/lib/riskHeatmapColors';
 import { normalizeHeatmapMonoHex } from '@/lib/riskHeatmapColors';
-import { parseRiskHeatmapCurve, type RiskHeatmapCurveId } from '@/lib/riskHeatmapTransfer';
+import type { HeatmapTuningLensId, PerLensHeatmapTuning } from '@/lib/heatmapTuningPerLens';
+import {
+  parseRiskHeatmapTuningByLens,
+  riskHeatmapTuningByLensFromLegacyGlobals,
+} from '@/lib/heatmapTuningPerLens';
+import { parseRiskHeatmapCurve } from '@/lib/riskHeatmapTransfer';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
 import type { TechWorkloadScope } from '@/lib/runwayViewMetrics';
 
@@ -28,12 +33,8 @@ export type ViewSettingsPayloadV1 = {
   runwayFilterYear?: number | null;
   runwayFilterQuarter?: RunwayQuarter | null;
   runwayIncludeFollowingQuarter?: boolean;
-  riskHeatmapGamma?: number;
-  riskHeatmapGammaTech?: number;
-  riskHeatmapGammaBusiness?: number;
-  riskHeatmapCurve?: RiskHeatmapCurveId;
-  riskHeatmapTailPower?: number;
-  riskHeatmapBusinessPressureOffset?: number;
+  /** Per runway lens (Technology Teams, Restaurant Activity, Deployment Risk); same tuning for every column. */
+  riskHeatmapTuningByLens?: Record<HeatmapTuningLensId, PerLensHeatmapTuning>;
 };
 
 export type ViewSettingsFileV1 = {
@@ -62,12 +63,7 @@ export const VIEW_SETTINGS_PAYLOAD_KEYS = [
   'runwayFilterYear',
   'runwayFilterQuarter',
   'runwayIncludeFollowingQuarter',
-  'riskHeatmapGamma',
-  'riskHeatmapGammaTech',
-  'riskHeatmapGammaBusiness',
-  'riskHeatmapCurve',
-  'riskHeatmapTailPower',
-  'riskHeatmapBusinessPressureOffset',
+  'riskHeatmapTuningByLens',
 ] as const satisfies readonly (keyof ViewSettingsPayloadV1)[];
 
 export type ViewSettingsPayloadKey = (typeof VIEW_SETTINGS_PAYLOAD_KEYS)[number];
@@ -117,6 +113,72 @@ function clampBusinessOffset(x: unknown, fallback: number): number {
   return typeof x === 'number' && Number.isFinite(x)
     ? Math.min(0.5, Math.max(-0.5, Math.round(x * 100) / 100))
     : fallback;
+}
+
+const LEGACY_HEATMAP_JSON_KEYS = [
+  'riskHeatmapGamma',
+  'riskHeatmapGammaTech',
+  'riskHeatmapGammaBusiness',
+  'riskHeatmapCurve',
+  'riskHeatmapTailPower',
+  'riskHeatmapBusinessPressureOffset',
+  'marketRiskHeatmapCurve',
+  'marketRiskHeatmapGamma',
+  'marketRiskHeatmapTailPower',
+] as const;
+
+function rawHasLegacyHeatmapKeys(raw: Record<string, unknown>): boolean {
+  return LEGACY_HEATMAP_JSON_KEYS.some((k) => Object.prototype.hasOwnProperty.call(raw, k));
+}
+
+/** Read flat pre-epic export keys for migration into `riskHeatmapTuningByLens`. */
+function legacyHeatmapGlobalsFromRaw(raw: Record<string, unknown>): Parameters<
+  typeof riskHeatmapTuningByLensFromLegacyGlobals
+>[0] {
+  const legacy: Parameters<typeof riskHeatmapTuningByLensFromLegacyGlobals>[0] = {};
+
+  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapGamma')) {
+    legacy.riskHeatmapGamma = clampGamma(raw.riskHeatmapGamma, 1);
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapGammaTech')) {
+    legacy.riskHeatmapGammaTech = clampGamma(raw.riskHeatmapGammaTech, 1);
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapGammaBusiness')) {
+    legacy.riskHeatmapGammaBusiness = clampGamma(raw.riskHeatmapGammaBusiness, 1);
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapTailPower')) {
+    legacy.riskHeatmapTailPower = clampTailPower(raw.riskHeatmapTailPower, 1);
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapBusinessPressureOffset')) {
+    legacy.riskHeatmapBusinessPressureOffset = clampBusinessOffset(raw.riskHeatmapBusinessPressureOffset, 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapCurve')) {
+    legacy.riskHeatmapCurve = parseRiskHeatmapCurve(
+      typeof raw.riskHeatmapCurve === 'string' ? raw.riskHeatmapCurve : undefined
+    );
+  }
+
+  if (legacy.riskHeatmapCurve == null && raw.marketRiskHeatmapCurve != null) {
+    legacy.riskHeatmapCurve = parseRiskHeatmapCurve(
+      typeof raw.marketRiskHeatmapCurve === 'string' ? raw.marketRiskHeatmapCurve : undefined
+    );
+  }
+  if (
+    legacy.riskHeatmapGamma == null &&
+    legacy.riskHeatmapGammaTech == null &&
+    legacy.riskHeatmapGammaBusiness == null &&
+    raw.marketRiskHeatmapGamma != null
+  ) {
+    const g = clampGamma(raw.marketRiskHeatmapGamma, 1);
+    legacy.riskHeatmapGamma = g;
+    legacy.riskHeatmapGammaTech = g;
+    legacy.riskHeatmapGammaBusiness = g;
+  }
+  if (legacy.riskHeatmapTailPower == null && raw.marketRiskHeatmapTailPower != null) {
+    legacy.riskHeatmapTailPower = clampTailPower(raw.marketRiskHeatmapTailPower, 1);
+  }
+
+  return legacy;
 }
 
 /** Parse and validate top-level file shape. */
@@ -247,42 +309,14 @@ export function sanitizeSettingsPayload(raw: Record<string, unknown>): Partial<V
     out.runwayIncludeFollowingQuarter = raw.runwayIncludeFollowingQuarter;
   }
 
-  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapGamma')) {
-    out.riskHeatmapGamma = clampGamma(raw.riskHeatmapGamma, 1);
+  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapTuningByLens')) {
+    const parsed = parseRiskHeatmapTuningByLens(raw.riskHeatmapTuningByLens);
+    if (parsed) {
+      out.riskHeatmapTuningByLens = parsed;
+    }
   }
-  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapGammaTech')) {
-    out.riskHeatmapGammaTech = clampGamma(raw.riskHeatmapGammaTech, 1);
-  }
-  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapGammaBusiness')) {
-    out.riskHeatmapGammaBusiness = clampGamma(raw.riskHeatmapGammaBusiness, 1);
-  }
-  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapTailPower')) {
-    out.riskHeatmapTailPower = clampTailPower(raw.riskHeatmapTailPower, 1);
-  }
-  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapBusinessPressureOffset')) {
-    out.riskHeatmapBusinessPressureOffset = clampBusinessOffset(raw.riskHeatmapBusinessPressureOffset, 0);
-  }
-
-  if (Object.prototype.hasOwnProperty.call(raw, 'riskHeatmapCurve')) {
-    out.riskHeatmapCurve = parseRiskHeatmapCurve(
-      typeof raw.riskHeatmapCurve === 'string' ? raw.riskHeatmapCurve : undefined
-    );
-  }
-
-  /** Older exports used separate market-risk transfer keys; fold into global if primary keys absent. */
-  if (!Object.prototype.hasOwnProperty.call(out, 'riskHeatmapCurve') && raw.marketRiskHeatmapCurve != null) {
-    out.riskHeatmapCurve = parseRiskHeatmapCurve(
-      typeof raw.marketRiskHeatmapCurve === 'string' ? raw.marketRiskHeatmapCurve : undefined
-    );
-  }
-  if (!Object.prototype.hasOwnProperty.call(out, 'riskHeatmapGamma') && raw.marketRiskHeatmapGamma != null) {
-    const g = clampGamma(raw.marketRiskHeatmapGamma, 1);
-    out.riskHeatmapGamma = g;
-    out.riskHeatmapGammaTech = g;
-    out.riskHeatmapGammaBusiness = g;
-  }
-  if (!Object.prototype.hasOwnProperty.call(out, 'riskHeatmapTailPower') && raw.marketRiskHeatmapTailPower != null) {
-    out.riskHeatmapTailPower = clampTailPower(raw.marketRiskHeatmapTailPower, 1);
+  if (!out.riskHeatmapTuningByLens && rawHasLegacyHeatmapKeys(raw)) {
+    out.riskHeatmapTuningByLens = riskHeatmapTuningByLensFromLegacyGlobals(legacyHeatmapGlobalsFromRaw(raw));
   }
 
   return out;

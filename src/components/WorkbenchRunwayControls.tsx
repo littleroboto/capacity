@@ -33,7 +33,7 @@ type WorkbenchRunwayControlsProps = {
   compareAllMarkets?: boolean;
 };
 
-/** Heatmap lens — right workbench panel. Market / compare-strip **Focus** is above the runway (main column). */
+/** Heatmap lens — right workbench panel. Focus and year/quarter live in the same scroll column above this block. */
 export function WorkbenchRunwayControls({ compareAllMarkets = false }: WorkbenchRunwayControlsProps) {
   const viewMode = useAtcStore((s) => s.viewMode);
   const setViewMode = useAtcStore((s) => s.setViewMode);
@@ -42,59 +42,52 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
   const reduceMotion = useReducedMotion();
 
   return (
-    <div
-      className={cn(
-        'flex shrink-0 flex-col gap-3 rounded-lg border border-border/60 bg-muted/15 p-3',
-        'shadow-[0_0_22px_-6px_rgba(37,99,235,0.28)] dark:shadow-[0_0_32px_-8px_rgba(96,165,250,0.22)]'
-      )}
-    >
-      <p className="text-[10px] leading-snug text-muted-foreground">
+    <div className="flex shrink-0 flex-col gap-3 px-0 py-0">
+      <p className="text-[11px] leading-snug text-muted-foreground">
         {compareAllMarkets ? (
           <>
             Lens applies to <span className="font-semibold text-foreground/90">every</span> column.{' '}
-            <span className="font-semibold text-foreground/90">Business Patterns</span> below matches single-market layout
-            (trading, tech rhythm, heatmap transfer for this lens); YAML edits use the focus market shown there.
+            <span className="font-semibold text-foreground/90">Business Patterns</span> uses the focus market; YAML
+            follows the strip focus.
           </>
         ) : (
           <>
-            Use the <span className="font-semibold text-foreground/90">market picker</span> above the runway for one
-            region or a compare strip (e.g. LIOM, IOM).
+            <span className="font-semibold text-foreground/90">Focus</span> and{' '}
+            <span className="font-semibold text-foreground/90">Year / Quarter</span> above set one region or a compare
+            strip (LIOM, IOM, …).
           </>
         )}
       </p>
 
-      <div className="border-t border-border/50 pt-3">
+      <div>
         <Label
           id="workbench-runway-lens-label"
-          className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+          className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
         >
           Runway lens
         </Label>
-        <div
-          className="mt-2 rounded-lg border border-border/80 bg-muted/25 p-2 shadow-sm"
-          role="group"
-          aria-labelledby="workbench-runway-lens-label"
-        >
+        <div className="mt-1.5 p-0" role="group" aria-labelledby="workbench-runway-lens-label">
           <ViewModeRadios
             viewMode={viewMode}
             setViewMode={setViewMode}
             reduceMotion={!!reduceMotion}
-            compact={false}
+            compact
             unstyled
             layoutGroupId="view-mode-panel"
             layoutBgId="view-mode-active-bg-panel"
             labelledBy="workbench-runway-lens-label"
             idSuffix="panel"
             allowedIds={compareAllMarkets ? RUNWAY_LENS_MODE_IDS : undefined}
+            className="gap-x-0.5 gap-y-0.5"
           />
 
           {viewMode === 'combined' ? (
             <>
-              <div className="my-2.5 h-px w-full bg-border/50" aria-hidden />
-              <div className="flex flex-col gap-1.5">
+              <div className="my-1.5 h-px w-full max-w-full bg-border/30" aria-hidden />
+              <div className="flex flex-col gap-1">
                 <span
                   id="workbench-tech-load-hint"
-                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                  className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
                 >
                   Technology load
                 </span>
@@ -102,7 +95,7 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
                   value={techWorkloadScope}
                   onValueChange={(v) => setTechWorkloadScope(v as TechWorkloadScope)}
                   aria-labelledby="workbench-tech-load-hint"
-                  className="grid grid-cols-2 gap-px overflow-hidden rounded-md bg-border/40 p-px ring-1 ring-border/35 sm:grid-cols-3"
+                  className="grid grid-cols-2 gap-1 overflow-hidden sm:grid-cols-3"
                 >
                   {TECH_WORKLOAD_OPTIONS.map((opt) => {
                     const on = techWorkloadScope === opt.value;
@@ -111,10 +104,10 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
                         key={opt.value}
                         title={opt.title}
                         className={cn(
-                          'relative flex min-h-[2.25rem] cursor-pointer select-none items-center justify-center px-1.5 text-center text-[11px] font-medium leading-snug transition-colors',
+                          'relative flex min-h-[2rem] cursor-pointer select-none items-center justify-center rounded-md px-1 text-center text-[10px] font-medium leading-tight transition-colors sm:min-h-[2.125rem] sm:text-[11px]',
                           on
-                            ? 'bg-background text-foreground shadow-sm'
-                            : 'bg-muted/40 text-muted-foreground hover:bg-muted/55 hover:text-foreground'
+                            ? 'bg-muted text-foreground'
+                            : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                         )}
                       >
                         <RadioGroupItem

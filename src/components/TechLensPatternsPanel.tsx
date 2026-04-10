@@ -4,7 +4,7 @@ import { TechCapacityPlanningPanel } from '@/components/TechCapacityPlanningPane
 import { TechDailyBusinessPanel } from '@/components/TechDailyBusinessPanel';
 
 /**
- * Technology Teams → Business Patterns: per-market YAML (support week, supply curves), then global heatmap transfer.
+ * Technology Teams → Business Patterns: per-market YAML (support week, supply curves), then Technology lens heatmap transfer.
  * Extra Market IT–only support patterns remain YAML-only (same weekly shape would double-count if edited twice).
  */
 export function TechLensPatternsPanel() {
@@ -14,8 +14,9 @@ export function TechLensPatternsPanel() {
         <span className="font-medium text-foreground/85">YAML</span> below follows the runway focus market — support week,
         lab/staff monthly shapes, and holiday staffing are <span className="font-medium text-foreground/80">per market</span>{' '}
         (that market&apos;s document only).{' '}
-        <span className="font-medium text-foreground/85">Global heatmap</span> at the bottom: pressure offset (Δ), then
-        curve, γ, and tail power — same persisted values for every lens and column (gear → Settings matches).
+        <span className="font-medium text-foreground/85">Technology Teams heatmap</span> at the bottom: pressure offset (Δ),
+        then curve, γ, and tail — <strong className="font-medium text-foreground/80">same for every column</strong>; other
+        lenses are tuned separately (gear → Settings).
       </p>
       <TechDailyBusinessPanel />
       <div className="border-t border-border/60 pt-2">
@@ -23,15 +24,15 @@ export function TechLensPatternsPanel() {
       </div>
       <div className="space-y-2 border-t border-border/50 pt-3">
         <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Global heatmap — pressure offset, then curve, γ, and tail power
+          Technology Teams heatmap — pressure offset, then curve, γ, and tail
         </span>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Pipeline matches the engine: global Δ on heatmap input first, then transfer —{' '}
-          <strong className="font-medium text-foreground/80">Technology stress</strong> (and every other lens) uses the same
-          persisted controls for single- or multi-market runways.
+          Pipeline matches the engine: Δ on Technology heatmap input first, then transfer —{' '}
+          <strong className="font-medium text-foreground/80">only this lens</strong>; Restaurant Activity and Deployment Risk
+          have their own controls.
         </p>
-        <HeatmapBusinessPressureOffsetControls idPrefix="patterns-tech" />
-        <HeatmapTransferControls idPrefix="patterns-tech" className="border-t border-border/40 pt-3" />
+        <HeatmapBusinessPressureOffsetControls idPrefix="patterns-tech" lens="combined" />
+        <HeatmapTransferControls idPrefix="patterns-tech" lens="combined" className="border-t border-border/40 pt-3" />
       </div>
     </div>
   );

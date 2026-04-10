@@ -2,10 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { DslAssistantPanel } from '@/components/DslAssistantPanel';
 import { DslEditorCore } from '@/components/DslEditorCore';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
-import { CollabLiveBadge } from '@/components/CollabLiveBadge';
-import { isCollabBuildEnabled, partykitHost } from '@/lib/collab/collabBuildFlags';
-import { useCollabSession } from '@/lib/collab/collabSessionContext';
-import { useCollabProviderStatus } from '@/lib/collab/useCollabProviderStatus';
 import { applyCodeTabDocumentEdit, getCodeTabDocumentText } from '@/lib/codeViewMarketTabs';
 import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { marketIdToCircleFlagCode } from '@/lib/marketCircleFlag';
@@ -62,7 +58,6 @@ export function MainDslWorkspace({
   const showLlmAssistant = llmFromQuery || llmFromToybox;
   const country = useAtcStore((s) => s.country);
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
-  const collabCtx = useCollabSession();
   const dslText = useAtcStore((s) => s.dslText);
   const dslByMarket = useAtcStore((s) => s.dslByMarket);
   const showMarketTabs = runwayMarketOrder.length > 1;
@@ -101,19 +96,6 @@ export function MainDslWorkspace({
       onTextChange: onMarketTabSliceChange,
     };
   }, [showMarketTabs, codeMarketTab, tabSliceText, onMarketTabSliceChange]);
-
-  const collabMarketId = showMarketTabs ? codeMarketTab : country;
-  const collabSession = collabCtx?.getSession(collabMarketId);
-  const collabBinding = collabSession
-    ? { ytext: collabSession.ytext, provider: collabSession.provider }
-    : null;
-  const collabRemountVersion = collabCtx?.version ?? 0;
-  const showCollabChrome = isCollabBuildEnabled() && Boolean(partykitHost());
-  const collabLinkPhase = useCollabProviderStatus(collabSession?.provider);
-  const collabLiveEditorWrap =
-    showCollabChrome && collabSession && collabLinkPhase === 'synced'
-      ? 'shadow-[inset_0_2px_0_0_rgba(34,197,94,0.5)] ring-1 ring-emerald-500/20 dark:shadow-[inset_0_2px_0_0_rgba(52,211,153,0.35)] dark:ring-emerald-400/15'
-      : undefined;
 
   const [dockHeight, setDockHeight] = useState(readDockHeight);
   const [maxDockPx, setMaxDockPx] = useState(560);
@@ -216,7 +198,7 @@ export function MainDslWorkspace({
       )}
     >
       {onRequestMobileFullscreen ? (
-        <div className="flex shrink-0 items-center justify-end border-b border-border/50 bg-muted/20 px-2 py-1.5 lg:hidden dark:bg-muted/10">
+        <div className="flex shrink-0 items-center justify-end px-2 py-1.5 lg:hidden">
           <Button
             type="button"
             variant="outline"
@@ -232,7 +214,7 @@ export function MainDslWorkspace({
       ) : null}
       {showMarketTabs ? (
         <div
-          className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 border-b border-border/50 bg-muted/15 px-2 pt-1.5 dark:bg-muted/10"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 px-2 pt-1.5"
           role="tablist"
           aria-label="Market YAML documents"
         >
@@ -273,42 +255,22 @@ export function MainDslWorkspace({
               );
             })}
             </div>
-            {showCollabChrome && collabSession ? (
-              <CollabLiveBadge
-                className="shrink-0"
-                provider={collabSession.provider}
-                marketId={collabMarketId}
-              />
-            ) : null}
           </div>
           <DslEditorCore
             className={cn('min-w-0', editorShellClass)}
-            editorWrapClassName={collabLiveEditorWrap}
             initialFontSize={16}
             editorChrome="studio"
             marketTabDocument={marketTabDocument}
-            collab={collabBinding}
-            collabRemountVersion={collabRemountVersion}
             fillVerticalSpace={fillViewport}
           />
         </div>
       ) : (
-        <>
-          {showCollabChrome && collabSession ? (
-            <div className="flex shrink-0 justify-end px-1 pb-1">
-              <CollabLiveBadge provider={collabSession.provider} marketId={collabMarketId} />
-            </div>
-          ) : null}
-          <DslEditorCore
-            className={cn('min-w-0', editorShellClass)}
-            editorWrapClassName={collabLiveEditorWrap}
-            initialFontSize={16}
-            editorChrome="studio"
-            collab={collabBinding}
-            collabRemountVersion={collabRemountVersion}
-            fillVerticalSpace={fillViewport}
-          />
-        </>
+        <DslEditorCore
+          className={cn('min-w-0', editorShellClass)}
+          initialFontSize={16}
+          editorChrome="studio"
+          fillVerticalSpace={fillViewport}
+        />
       )}
 
       {showLlmAssistant ? (
@@ -322,10 +284,10 @@ export function MainDslWorkspace({
             aria-valuenow={Math.round(dockHeight)}
             title="Drag to resize · double-click to reset assistant height"
             className={cn(
-              'group relative z-10 flex shrink-0 cursor-row-resize items-center justify-center border-y border-border/30 bg-muted/20',
-              'min-h-[12px] py-1 transition-[background-color,border-color] duration-150',
-              'hover:border-border/60 hover:bg-muted/45',
-              dragging && 'border-primary/40 bg-primary/10',
+              'group relative z-10 flex shrink-0 cursor-row-resize items-center justify-center bg-transparent',
+              'min-h-[12px] py-1 transition-[background-color] duration-150',
+              'hover:bg-muted/25',
+              dragging && 'bg-muted/40',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background'
             )}
             style={{ minHeight: SEPARATOR_HIT_PX }}
@@ -361,7 +323,7 @@ export function MainDslWorkspace({
           </div>
 
           <div
-            className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-b-2xl border border-t-0 border-border/60 bg-card/40 px-3 pb-3 pt-2.5 shadow-sm dark:border-border/50 dark:bg-zinc-950/40"
+            className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden px-3 pb-3 pt-2.5"
             style={{ height: dockHeight }}
           >
             <DslAssistantPanel layout="dock" />
