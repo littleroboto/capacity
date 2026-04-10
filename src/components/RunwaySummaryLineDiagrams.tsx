@@ -73,7 +73,7 @@ const MINI_STROKE_W = 1.5;
 const MINI_STROKE_VEC = { strokeWidth: MINI_STROKE_W, vectorEffect: 'non-scaling-stroke' as const };
 
 /** Mix segment rim — softer than full-ink so the bars read the same as Store trading / Deployment area outlines. */
-const TECH_MIX_SEG_OUTLINE_CLASS = 'stroke-zinc-600/75 dark:stroke-white/38';
+const TECH_MIX_SEG_OUTLINE_CLASS = 'stroke-zinc-600/75 dark:stroke-white/60';
 
 /**
  * Pattern tile fills for Technology mix (`fill="url(#…)"` like Store trading — direct `fill-zinc` on `<rect>`
