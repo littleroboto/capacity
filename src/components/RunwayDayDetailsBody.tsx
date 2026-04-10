@@ -471,26 +471,26 @@ export function RunwayDayDetailsPayloadBody({
             </div>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <div className="rounded-md border border-border/70 bg-muted/35 px-2.5 py-2 dark:border-border/50 dark:bg-muted/15">
+            <div className="rounded-md border border-border/70 bg-muted/35 px-3 py-3 dark:border-border/50 dark:bg-muted/15">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Band</p>
-              <p className="mt-0.5 text-sm font-semibold text-foreground">{p.riskBand}</p>
+              <p className="mt-1 text-2xl font-extrabold tracking-tight text-foreground">{p.riskBand}</p>
               <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{fillLeadForPresentation}</p>
             </div>
-            <div className="rounded-md border border-border/70 bg-muted/35 px-2.5 py-2 dark:border-border/50 dark:bg-muted/15">
+            <div className="rounded-md border border-border/70 bg-muted/35 px-3 py-3 dark:border-border/50 dark:bg-muted/15">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <span className="inline-flex items-center gap-0.5">
                   <TermWithDefinition label="Planning blend" definition={planningGlossary} dense />
                 </span>
               </p>
-              <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{planningBlendStr}</p>
+              <p className="mt-1 font-mono text-2xl font-extrabold tabular-nums tracking-tight text-foreground">{planningBlendStr}</p>
             </div>
-            <div className="rounded-md border border-border/70 bg-muted/35 px-2.5 py-2 dark:border-border/50 dark:bg-muted/15">
+            <div className="rounded-md border border-border/70 bg-muted/35 px-3 py-3 dark:border-border/50 dark:bg-muted/15">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <span className="inline-flex items-center gap-0.5">
                   <TermWithDefinition label="Fill score" definition={fillGlossary} dense />
                 </span>
               </p>
-              <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{heatmapScoreStr}</p>
+              <p className="mt-1 font-mono text-2xl font-extrabold tabular-nums tracking-tight text-foreground">{heatmapScoreStr}</p>
             </div>
           </div>
           <LensScoreFootnote viewMode={p.viewMode} presentation={presentation} />
