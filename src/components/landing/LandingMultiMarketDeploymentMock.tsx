@@ -144,7 +144,8 @@ export function LandingMultiMarketDeploymentMock() {
         </p>
 
         <div className="w-full min-w-0 justify-self-stretch lg:justify-self-end">
-          <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_24px_80px_-12px_rgba(0,0,0,0.85)]">
+          {/* Scoped `.dark` so RunwayGrid shadcn tokens match this chrome even if `html` is light. */}
+          <div className="dark overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0f] shadow-[0_24px_80px_-12px_rgba(0,0,0,0.85)]">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] bg-[#111114] px-2.5 py-2 sm:px-3">
               <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 <span className="rounded-md border border-white/[0.1] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] font-semibold text-zinc-300 sm:text-[10px]">

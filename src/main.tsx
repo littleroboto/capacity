@@ -30,15 +30,7 @@ function clerkWaitlistUrlPath(): string {
   return b === '/' ? path : `${b}${path}`;
 }
 
-function pathnameLooksLikeWorkbench(): boolean {
-  if (typeof window === 'undefined') return false;
-  const p = window.location.pathname.replace(/\/+$/, '') || '/';
-  return p.endsWith('/app');
-}
-
-if (pathnameLooksLikeWorkbench()) {
-  applyPersistedWorkbenchThemeClass();
-}
+applyPersistedWorkbenchThemeClass();
 
 function WorkbenchLoading() {
   return (
