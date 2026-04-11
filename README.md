@@ -38,6 +38,18 @@ Think in three layers. All three are **encoded** (today as **YAML per market**) 
 
 ---
 
+## Organisation view: actual capacity, market by market
+
+This is not an org chart. It is a way to **surface what capacity actually is**: **effective supply on each day** (named caps after local working and calendar reality) and **declared demand** on the **same** days from BAU, trading rhythm, campaigns, technology programmes, and named business or deployment windows.
+
+**Per market**, nuance lives in the **values and dates**—work patterns, collective leave and public holidays, trading shape, campaign prep and live intensity, programme windows—not in a pile of incompatible definitions of “busy.” Each country keeps its own envelope; the scenario file is where that honesty is encoded.
+
+**Across markets**, the contract is **shared field meanings** in inspectable YAML (`public/data/markets/`), so segment and centre read comparable runways **without** pretending every market shares the same calendar. Side-by-side and multi-market views stay fair when **lens semantics** stay consistent; they should not replace local reality with a bland segment average.
+
+For **quarterly-style planning**, this layer belongs **early**: it makes **absorption and crunch visible before** initiative lists and dependencies fully harden elsewhere—so “can the week carry this?” is argued from **one recomputable model** instead of reconciled slide decks after the fact.
+
+---
+
 ## What the scenario file actually says
 
 Below are **illustrative fragments**. They are simplified for reading; real markets live under `public/data/markets/` with the same **field meanings** everywhere. Full pipeline order and schema: [docs/MARKET_DSL_AND_PIPELINE.md](docs/MARKET_DSL_AND_PIPELINE.md).
