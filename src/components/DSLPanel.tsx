@@ -3,6 +3,7 @@ import { DslPanelClerkSignOut } from '@/components/DslPanelClerkSignOut';
 import { HeatmapSettingsPanel } from '@/components/HeatmapSettingsPanel';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
 import { RiskModelPanel } from '@/components/RiskModelPanel';
+import { TechLensHeatmapPatternsPanel } from '@/components/TechLensHeatmapPatternsPanel';
 import { RunwayFocusSelect } from '@/components/RunwayFocusSelect';
 import { RunwayRangeSelect } from '@/components/RunwayRangeSelect';
 import { WorkbenchRunwayControls } from '@/components/WorkbenchRunwayControls';
@@ -262,6 +263,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
             </p>
           ) : null}
           <RiskModelPanel />
+          <TechLensHeatmapPatternsPanel />
         </div>
       </aside>
       {localDataDialog}

@@ -2197,19 +2197,21 @@ export function RunwayGrid({
 
   /** Flat LIOM compare (not isometric city block): fill flex height so compare scrollport gets a real clientHeight and cell auto-fit can use the viewport. */
   const compareStripViewportFill = compareAllMarkets && !showCompareIsoCityBlock;
+  /** Single-market + day summary: same bounded-height chain so the summary panel’s `overflow-y-auto` wins wheel events instead of chaining to the heatmap column. */
+  const runwayStackViewportFill = compareStripViewportFill || useSideSummary;
 
   return (
     <div
       className={cn(
         'relative flex w-full flex-col overflow-visible bg-transparent',
-        compareStripViewportFill ? 'min-h-0 flex-1 flex-col' : 'shrink-0'
+        runwayStackViewportFill ? 'min-h-0 flex-1 flex-col' : 'shrink-0'
       )}
     >
       <div
         key={`${viewMode}-${country}`}
         className={cn(
           'mx-auto w-full max-w-full bg-transparent px-4 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-3.5',
-          compareStripViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col'
+          runwayStackViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col'
         )}
       >
         <div className="mb-3 flex flex-col gap-3 sm:mb-4">
@@ -2226,7 +2228,7 @@ export function RunwayGrid({
         <div
           className={cn(
             'relative w-full max-w-full',
-            compareStripViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col'
+            runwayStackViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col'
           )}
         >
             <AnimatePresence mode="wait">
@@ -2255,7 +2257,7 @@ export function RunwayGrid({
                 key={`grid-${country}-${compareAllMarkets ? 'compare' : 'single'}-${
                   showIso3dSingleMarket || showCompareIsoCityBlock ? '3d' : 'flat'
                 }-${useSvgHeatmap ? 'svg' : 'html'}`}
-                className={cn('w-full', compareStripViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col')}
+                className={cn('w-full', runwayStackViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col')}
                 initial={reduceMotion ? false : { y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
@@ -2635,14 +2637,14 @@ function RunwayGridBody({
     <div
       className={cn(
         'flex w-full min-w-0 max-w-full justify-start pl-0.5 sm:pl-1',
-        landingCompareStackFill && 'min-h-0 min-w-0 flex-1 flex-col'
+        (landingCompareStackFill || useSideSummary) && 'min-h-0 min-w-0 flex-1 flex-col'
       )}
     >
       <div
         ref={heatmapCaptureRef}
         className={cn(
           'flex w-full min-w-0 max-w-full flex-col-reverse items-stretch gap-4 lg:flex-row lg:gap-4',
-          heatmap3d || compareAllMarkets ? 'lg:min-h-0 lg:items-stretch' : 'lg:items-start'
+          heatmap3d || compareAllMarkets || useSideSummary ? 'lg:min-h-0 lg:items-stretch' : 'lg:items-start'
         )}
       >
       <div
@@ -2678,8 +2680,10 @@ function RunwayGridBody({
               ? landingCompareStackFill
                 ? 'min-h-0 min-w-0 flex-1 justify-stretch'
                 : 'min-h-0 justify-stretch'
-              : 'justify-center',
-          !compareAllMarkets && useSideSummary && 'lg:flex-row lg:items-start'
+              : useSideSummary
+                ? 'min-h-0 min-w-0 flex-1 justify-stretch'
+                : 'justify-center',
+          !compareAllMarkets && useSideSummary && 'lg:flex-row lg:items-stretch'
         )}
       >
         {compareAllMarkets ? (

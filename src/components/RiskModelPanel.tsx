@@ -13,7 +13,7 @@ const PATTERNS_OUTER_WRAP =
 
 /** Lens-specific YAML pattern editors (no tabs). Same structure for single-market and compare strips; focus market from {@link gammaFocusMarket}. */
 export function RiskModelPanel() {
-  /** Open by default so the resizable panel’s vertical space goes to pattern editors, not an empty shell. */
+  /** Business Patterns: open by default so YAML / support editors are visible. */
   const [expanded, setExpanded] = useState(true);
   const country = useAtcStore((s) => s.country);
   const viewMode = useAtcStore((s) => s.viewMode);
@@ -51,7 +51,7 @@ export function RiskModelPanel() {
         {stripPrefix}
         <span className="font-medium text-foreground/90">Tech</span>
         {' · '}
-        supply & week shape · global heatmap + offset
+        support week & supply (YAML)
       </span>
     );
 

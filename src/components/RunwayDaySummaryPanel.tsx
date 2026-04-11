@@ -19,7 +19,7 @@ export function RunwayDaySummaryPanel({ tip, onClear, panelRef, viewMode }: Runw
       role="complementary"
       ref={panelRef as LegacyRef<HTMLDivElement>}
       className={cn(
-        'mt-4 flex min-h-[min(12rem,40dvh)] w-full shrink-0 flex-col bg-transparent lg:mt-0 lg:min-h-[min(52vh,520px)] lg:basis-0 lg:flex-1 lg:min-w-0 lg:flex-col lg:items-stretch lg:px-4 lg:pt-0'
+        'mt-4 flex min-h-[min(12rem,40dvh)] w-full shrink-0 flex-col bg-transparent lg:mt-0 lg:min-h-0 lg:basis-0 lg:flex-1 lg:min-w-0 lg:flex-col lg:items-stretch lg:px-4 lg:pt-0'
       )}
       aria-label="Day summary"
     >
