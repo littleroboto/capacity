@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateScope } from '../_lib/authScope';
-import { supabaseServiceClient } from '../_lib/supabaseClient';
+import { authenticateScope } from '../lib/authScope';
+import { supabaseServiceClient } from '../lib/supabaseClient';
 
 function bearerFromHeader(h: string | string[] | undefined): string | undefined {
   if (!h) return undefined;

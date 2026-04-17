@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateScope } from '../_lib/authScope';
-import { scopeAllowsMarket, scopeAllowsMarketEdit } from '../_lib/scopeResolver';
-import { getFragment, listFragments, createFragment, updateFragment, archiveFragment } from '../_services/fragmentService';
-import type { FragmentType, OperatingModelId } from '../_lib/domainTypes';
-import { supabaseServiceClient } from '../_lib/supabaseClient';
+import { authenticateScope } from '../lib/authScope';
+import { scopeAllowsMarket, scopeAllowsMarketEdit } from '../lib/scopeResolver';
+import { getFragment, listFragments, createFragment, updateFragment, archiveFragment } from '../services/fragmentService';
+import type { FragmentType, OperatingModelId } from '../lib/domainTypes';
+import { supabaseServiceClient } from '../lib/supabaseClient';
 
 const ALLOWED_TABLES: Set<string> = new Set([
   'resource_configs', 'bau_configs', 'campaign_configs',

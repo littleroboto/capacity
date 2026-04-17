@@ -10,8 +10,8 @@
  * and revision pipeline — this service is the common entry point for
  * creating fragments from YAML-shaped input.
  */
-import { supabaseServiceClient } from '../_lib/supabaseClient';
-import type { OperatingModelId } from '../_lib/domainTypes';
+import { supabaseServiceClient } from '../lib/supabaseClient';
+import type { OperatingModelId } from '../lib/domainTypes';
 
 export interface YamlImportResult {
   marketId: string;

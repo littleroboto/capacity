@@ -2,6 +2,8 @@
  * Multi-entry API bundler. Replaces the single-entry bundle-shared-dsl.mjs.
  * Emits CommonJS runtimes under server-bundles/ (NOT under api/) so Vercel does
  * not treat each .cjs next to api/app.js as its own Serverless Function.
+ * Implementation TS lives under server/ (not api/) so Vercel does not create one
+ * Serverless Function per api/**/*.ts file.
  */
 import * as esbuild from 'esbuild';
 import path from 'node:path';
@@ -14,18 +16,18 @@ const bundleDir = path.join(root, 'server-bundles');
 fs.mkdirSync(bundleDir, { recursive: true });
 
 const entries = [
-  { impl: 'api/impl/_sharedDslImpl.ts', out: 'server-bundles/_shared-dsl.runtime.cjs' },
-  { impl: 'api/impl/_healthImpl.ts', out: 'server-bundles/_health.runtime.cjs' },
-  { impl: 'api/impl/_meImpl.ts', out: 'server-bundles/_me.runtime.cjs' },
-  { impl: 'api/impl/_fragmentsImpl.ts', out: 'server-bundles/_fragments.runtime.cjs' },
-  { impl: 'api/impl/_buildsImpl.ts', out: 'server-bundles/_builds.runtime.cjs' },
-  { impl: 'api/impl/_configImpl.ts', out: 'server-bundles/_config.runtime.cjs' },
-  { impl: 'api/impl/_validateImpl.ts', out: 'server-bundles/_validate.runtime.cjs' },
-  { impl: 'api/impl/_revisionsImpl.ts', out: 'server-bundles/_revisions.runtime.cjs' },
-  { impl: 'api/impl/_auditImpl.ts', out: 'server-bundles/_audit.runtime.cjs' },
-  { impl: 'api/impl/_marketsImpl.ts', out: 'server-bundles/_markets.runtime.cjs' },
-  { impl: 'api/impl/_importImpl.ts', out: 'server-bundles/_import.runtime.cjs' },
-  { impl: 'api/impl/_holidayEntriesImpl.ts', out: 'server-bundles/_holidayEntries.runtime.cjs' },
+  { impl: 'server/impl/_sharedDslImpl.ts', out: 'server-bundles/_shared-dsl.runtime.cjs' },
+  { impl: 'server/impl/_healthImpl.ts', out: 'server-bundles/_health.runtime.cjs' },
+  { impl: 'server/impl/_meImpl.ts', out: 'server-bundles/_me.runtime.cjs' },
+  { impl: 'server/impl/_fragmentsImpl.ts', out: 'server-bundles/_fragments.runtime.cjs' },
+  { impl: 'server/impl/_buildsImpl.ts', out: 'server-bundles/_builds.runtime.cjs' },
+  { impl: 'server/impl/_configImpl.ts', out: 'server-bundles/_config.runtime.cjs' },
+  { impl: 'server/impl/_validateImpl.ts', out: 'server-bundles/_validate.runtime.cjs' },
+  { impl: 'server/impl/_revisionsImpl.ts', out: 'server-bundles/_revisions.runtime.cjs' },
+  { impl: 'server/impl/_auditImpl.ts', out: 'server-bundles/_audit.runtime.cjs' },
+  { impl: 'server/impl/_marketsImpl.ts', out: 'server-bundles/_markets.runtime.cjs' },
+  { impl: 'server/impl/_importImpl.ts', out: 'server-bundles/_import.runtime.cjs' },
+  { impl: 'server/impl/_holidayEntriesImpl.ts', out: 'server-bundles/_holidayEntries.runtime.cjs' },
 ];
 
 // Legacy: .cjs files directly under api/ each counted as a separate Vercel function.

@@ -8,7 +8,7 @@
  * - TTL as safety net, not primary mechanism
  * - Server-side only — browser never hits Redis
  */
-import { serverEnv } from '../_lib/env';
+import { serverEnv } from '../lib/env';
 
 const DEFAULT_TTL_SECONDS = 3600; // 1 hour safety TTL
 
@@ -142,7 +142,7 @@ export async function getActiveArtifact(
   if (cached) return cached;
 
   // Cache miss — fall back to Postgres
-  const { supabaseServiceClient } = await import('../_lib/supabaseClient');
+  const { supabaseServiceClient } = await import('../lib/supabaseClient');
   const client = supabaseServiceClient();
 
   const { data: published } = await client
