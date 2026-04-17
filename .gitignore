@@ -12,7 +12,7 @@ coverage
 .vite
 pnpm-lock.yaml
 .vercel
-api/_shared-dsl.runtime.cjs
+server-bundles/
 src/lib/buildMeta.generated.ts
 # Vite-bundlable copies of public/data (see scripts/sync-bundled-market-seeds.mjs)
 src/data/markets/

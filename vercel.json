@@ -21,7 +21,7 @@
   ],
   "functions": {
     "api/app.js": {
-      "includeFiles": "api/_*.runtime.cjs"
+      "includeFiles": "server-bundles/**"
     }
   }
 }

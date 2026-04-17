@@ -1,15 +1,17 @@
 /**
- * Produces a single CommonJS file: `api/_shared-dsl.runtime.cjs` (leading `_` = not an API route).
+ * Produces a single CommonJS file under server-bundles/ (see scripts/bundle-api.mjs).
  * Avoids @vercel/node's multi-file ESM output (root package.json "type":"module"
  * was yielding ERR_MODULE_NOT_FOUND for split chunks in production).
  */
 import * as esbuild from 'esbuild';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const entry = path.join(root, 'api/_sharedDslImpl.ts');
-const outfile = path.join(root, 'api/_shared-dsl.runtime.cjs');
+const outfile = path.join(root, 'server-bundles/_shared-dsl.runtime.cjs');
+fs.mkdirSync(path.dirname(outfile), { recursive: true });
 
 await esbuild.build({
   absWorkingDir: root,
