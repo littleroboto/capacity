@@ -19,7 +19,7 @@ pnpm add @supabase/supabase-js
 ```
 
 **Done when:** `import { createClient } from '@supabase/supabase-js'` resolves
-in `api/lib/supabaseClient.ts` without errors.
+in `api/_lib/supabaseClient.ts` without errors.
 
 ---
 
@@ -44,7 +44,7 @@ all exist in the database with seed rows (17 markets, 2 segments,
 
 ## Step 3 — Wire the server env loader
 
-Update `api/_sharedDslImpl.ts` to use `[api/lib/env.ts]` for the Clerk
+Update `api/_sharedDslImpl.ts` to use `[api/_lib/env.ts]` for the Clerk
 secret key so the new Vercel-integrated key is preferred with a fallback
 to the old one.
 
@@ -59,7 +59,7 @@ from `.env.local`.
 
 ## Step 4 — Wire the Supabase client
 
-Make `[api/lib/supabaseClient.ts]` importable from the API bundle.
+Make `[api/_lib/supabaseClient.ts]` importable from the API bundle.
 
 1. Verify `supabaseClient.ts` compiles in the CJS bundle context
    (`api/package.json` is `"type": "commonjs"`).
@@ -78,7 +78,7 @@ Connect Clerk identity to the internal scope model.
 1. Add a route `api/me.ts` that:
    - verifies the Clerk JWT (reuse logic from `_sharedDslImpl.ts`)
    - calls `resolveUserScope(clerkUserId, email)` from
-     `[api/lib/scopeResolver.ts]`
+     `[api/_lib/scopeResolver.ts]`
    - returns the `ResolvedUserScope` as JSON
 2. Update the `user_access_scopes` seed row for your dev admin:
    after you sign in via Clerk on the local dev app, grab your
@@ -94,7 +94,7 @@ Connect Clerk identity to the internal scope model.
 
 Write a one-shot migration script that reads each of the 17 YAML files
 from `public/data/markets/`, parses them with `js-yaml`, and calls
-`importMarketYamlObject()` from `[api/services/yamlImportService.ts]`
+`importMarketYamlObject()` from `[api/_services/yamlImportService.ts]`
 for each one.
 
 Location: `scripts/seed-fragments.ts` (run with `tsx` or `ts-node`).
@@ -113,7 +113,7 @@ Spot-check: `campaign_configs` should have ≈ 8 rows for UK
 ## Step 7 — Verify the assembly round-trip
 
 For each market, run `buildMarket(marketId, 'system_verify')` from
-`[api/services/assemblyPipeline.ts]` and compare the generated YAML
+`[api/_services/assemblyPipeline.ts]` and compare the generated YAML
 against the original file content.
 
 Write this as `scripts/verify-assembly.ts`.
@@ -148,7 +148,7 @@ All routes:
 - verify Clerk JWT
 - resolve user scope
 - check `scopeAllowsMarketEdit` for writes
-- delegate to `[api/services/fragmentService.ts]`
+- delegate to `[api/_services/fragmentService.ts]`
 - return JSON
 
 Add `vercel.json` rewrite for `/api/fragments`.
@@ -181,7 +181,7 @@ supersedes any previous published artifact.
 
 ## Step 10 — Cache integration
 
-Wire `[api/services/cacheService.ts]` into the publish flow.
+Wire `[api/_services/cacheService.ts]` into the publish flow.
 
 1. After `publishBuild` succeeds, call `cachePublishedArtifact`.
 2. After a fragment update succeeds, call `invalidateMarketCache`.

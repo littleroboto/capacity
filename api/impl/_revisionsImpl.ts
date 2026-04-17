@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyClerkBearerToken } from '../lib/verifyClerkBearer';
-import { getRevisionHistory, getRevisionSnapshot } from '../services/fragmentService';
-import type { FragmentType } from '../lib/domainTypes';
+import { verifyClerkBearerToken } from '../_lib/verifyClerkBearer';
+import { getRevisionHistory, getRevisionSnapshot } from '../_services/fragmentService';
+import type { FragmentType } from '../_lib/domainTypes';
 
 function bearerFromHeader(h: string | string[] | undefined): string | undefined {
   if (!h) return undefined;

@@ -6,7 +6,7 @@
  *    or: pnpm admin:ensure-scope you@example.com
  *
  * Requires .env.local (repo root) with Clerk secret + Supabase service credentials
- * (same names as api/lib/env.ts — including VITE_PUBLIC_SUPABASE_URL fallback).
+ * (same names as api/_lib/env.ts — including VITE_PUBLIC_SUPABASE_URL fallback).
  */
 import fs from 'node:fs';
 import path from 'node:path';

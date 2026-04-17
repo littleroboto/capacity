@@ -231,8 +231,8 @@ It is still **judgment-led**. The model does not remove leadership; it **grounds
 | `src/`                      | React SPA — workbench UI, engine, heatmap, runway                |
 | `src/pages/admin/`          | Admin UI — market overview, fragment editors, build controls     |
 | `api/`                      | Vercel serverless functions — auth, CRUD, build, publish         |
-| `api/lib/`                  | Shared server utilities — env, Supabase client, scope resolver   |
-| `api/services/`             | Business logic — fragments, assembly, cache, validation, import  |
+| `api/_lib/`                  | Shared server utilities — env, Supabase client, scope resolver   |
+| `api/_services/`             | Business logic — fragments, assembly, cache, validation, import  |
 | `supabase/migrations/`      | Postgres schema and seed data (managed via Supabase CLI)         |
 | `public/data/markets/`      | Original per-market YAML (reference / seeding source)            |
 | `scripts/`                  | Tooling — API bundler, seeding, verification, RLS tests          |

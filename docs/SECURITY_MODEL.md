@@ -15,13 +15,13 @@ All API endpoints (except `/api/health`) require a valid Clerk JWT.
 - **Verification**: Server-side `verifyToken()` from `@clerk/backend` validates
   signature and expiry using `CLERK_SECRET_KEY`
 - **No secrets in client**: `CLERK_SECRET_KEY` and `SUPABASE_SERVICE_ROLE_KEY`
-  are only accessed in server-side code (`api/lib/env.ts`). Client code uses
+  are only accessed in server-side code (`api/_lib/env.ts`). Client code uses
   only the Clerk publishable key via Vite env vars.
 
 ## Authorization (Application Layer)
 
 After JWT verification, the user's Clerk ID is resolved to an internal scope
-via `api/lib/scopeResolver.ts`:
+via `api/_lib/scopeResolver.ts`:
 
 ```
 Clerk userId → user_access_scopes table → ResolvedUserScope

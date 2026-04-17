@@ -8,8 +8,8 @@
  * 4. Update the fragment row
  * 5. Log audit event
  */
-import { supabaseServiceClient } from '../lib/supabaseClient';
-import type { FragmentType, FragmentMeta, AuditEventType } from '../lib/domainTypes';
+import { supabaseServiceClient } from '../_lib/supabaseClient';
+import type { FragmentType, FragmentMeta, AuditEventType } from '../_lib/domainTypes';
 
 export interface FragmentWriteResult<T> {
   ok: boolean;

@@ -13,7 +13,7 @@
  * so the existing engine pipeline can consume it unchanged.
  */
 import { createHash } from 'crypto';
-import { supabaseServiceClient } from '../lib/supabaseClient';
+import { supabaseServiceClient } from '../_lib/supabaseClient';
 import type {
   AssembledMarketFragments,
   CampaignConfig,
@@ -27,7 +27,7 @@ import type {
   FragmentType,
   FragmentMeta,
   PhaseLoad,
-} from '../lib/domainTypes';
+} from '../_lib/domainTypes';
 
 // ============================================================================
 // Fragment Loading

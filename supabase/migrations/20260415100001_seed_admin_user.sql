@@ -2,7 +2,7 @@
 -- Prefer: from repo root, `pnpm admin:ensure-scope your@email.com` (uses Clerk API + Supabase service role from .env.local).
 --
 -- In production, user_access_scopes are managed through the admin UI.
--- Scopes are keyed by real Clerk `user_*` ids — see api/lib/scopeResolver.ts.
+-- Scopes are keyed by real Clerk `user_*` ids — see api/_lib/scopeResolver.ts.
 INSERT INTO public.user_access_scopes (
   clerk_user_id,
   email,

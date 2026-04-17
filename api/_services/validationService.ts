@@ -8,7 +8,7 @@
  *
  * All validation failures are persisted to validation_results.
  */
-import { supabaseServiceClient } from '../lib/supabaseClient';
+import { supabaseServiceClient } from '../_lib/supabaseClient';
 import type {
   CampaignConfig,
   TechProgrammeConfig,
@@ -17,7 +17,7 @@ import type {
   NationalLeaveBandConfig,
   AssembledMarketFragments,
   ValidationSeverity,
-} from '../lib/domainTypes';
+} from '../_lib/domainTypes';
 
 export interface ValidationIssue {
   severity: ValidationSeverity;

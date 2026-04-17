@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateScope } from '../lib/authScope';
-import { scopeAllowsMarket } from '../lib/scopeResolver';
-import { loadMarketFragments } from '../services/assemblyPipeline';
-import { validateMarketFragments, persistValidationResults } from '../services/validationService';
-import { supabaseServiceClient } from '../lib/supabaseClient';
-import type { OperatingModelId } from '../lib/domainTypes';
+import { authenticateScope } from '../_lib/authScope';
+import { scopeAllowsMarket } from '../_lib/scopeResolver';
+import { loadMarketFragments } from '../_services/assemblyPipeline';
+import { validateMarketFragments, persistValidationResults } from '../_services/validationService';
+import { supabaseServiceClient } from '../_lib/supabaseClient';
+import type { OperatingModelId } from '../_lib/domainTypes';
 
 function bearerFromHeader(h: string | string[] | undefined): string | undefined {
   if (!h) return undefined;

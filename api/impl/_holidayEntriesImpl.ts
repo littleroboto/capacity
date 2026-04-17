@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateScope } from '../lib/authScope';
-import { scopeAllowsMarketEdit } from '../lib/scopeResolver';
-import { supabaseServiceClient } from '../lib/supabaseClient';
-import type { OperatingModelId } from '../lib/domainTypes';
+import { authenticateScope } from '../_lib/authScope';
+import { scopeAllowsMarketEdit } from '../_lib/scopeResolver';
+import { supabaseServiceClient } from '../_lib/supabaseClient';
+import type { OperatingModelId } from '../_lib/domainTypes';
 
 function bearerFromHeader(h: string | string[] | undefined): string | undefined {
   if (!h) return undefined;

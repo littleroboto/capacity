@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateScope } from '../lib/authScope';
+import { authenticateScope } from '../_lib/authScope';
 
 function bearerFromHeader(authHeader: string | string[] | undefined): string | undefined {
   if (!authHeader) return undefined;

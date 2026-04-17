@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateScope } from '../lib/authScope';
-import { scopeAllowsMarket } from '../lib/scopeResolver';
-import { supabaseServiceClient } from '../lib/supabaseClient';
-import type { OperatingModelId } from '../lib/domainTypes';
-import { vercelRequestId } from '../lib/vercelRequestId';
+import { authenticateScope } from '../_lib/authScope';
+import { scopeAllowsMarket } from '../_lib/scopeResolver';
+import { supabaseServiceClient } from '../_lib/supabaseClient';
+import type { OperatingModelId } from '../_lib/domainTypes';
+import { vercelRequestId } from '../_lib/vercelRequestId';
 
 /** Strip PostgREST row to plain JSON (no spread of `*`, which can include non-JSON types). */
 function toMarketListDto(

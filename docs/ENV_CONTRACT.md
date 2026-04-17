@@ -42,7 +42,7 @@
 | Variable | Replacement | Migration Status | Used In |
 |----------|-------------|-----------------|---------|
 | `VITE_CLERK_PUBLISHABLE_KEY` | Prefer `NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY` | **Optional legacy alias** — same `pk_` value | `clerkConfig.ts`, `clientEnv.ts` |
-| `CLERK_SECRET_KEY` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` | **Optional server fallback** | `api/lib/env.ts` (all `verifyToken` callers) |
+| `CLERK_SECRET_KEY` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` | **Optional server fallback** | `api/_lib/env.ts` (all `verifyToken` callers) |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | N/A (wrong integration name) | **Do not use** | Not in code |
 
 ---
@@ -108,7 +108,7 @@ All other variables. Verified by:
 |----------|------|---------|-------|
 | `src/main.tsx` | ClerkProvider | `clerkPublishableKey()` | Reads canonical then legacy (see `clerkConfig.ts`) |
 | `src/lib/clerkConfig.ts` | Config helper | `NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_AUTH_DISABLED` | Determines if Clerk active |
-| `api/lib/env.ts` | `serverEnv().clerkSecretKey` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY`, `CLERK_SECRET_KEY` | Server JWT verification |
+| `api/_lib/env.ts` | `serverEnv().clerkSecretKey` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY`, `CLERK_SECRET_KEY` | Server JWT verification |
 | `api/_sharedDslImpl.ts` | verifyToken | same as `serverEnv()` | Shared DSL + partial-env fallback |
 
 ---
@@ -116,9 +116,9 @@ All other variables. Verified by:
 ## Migration Checklist
 
 1. [x] Audit all env var references in code
-2. [x] Server: `api/lib/env.ts` — `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` with fallback to `CLERK_SECRET_KEY`
+2. [x] Server: `api/_lib/env.ts` — `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` with fallback to `CLERK_SECRET_KEY`
 3. [x] Client: `clerkConfig.ts` / `clientEnv.ts` — `NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY` with fallback to `VITE_CLERK_PUBLISHABLE_KEY`; Vite `envPrefix` includes `NEXT_PUBLIC_`
-4. [ ] Add typed env validation (see `src/lib/env.ts` / `api/lib/env.ts`)
+4. [ ] Add typed env validation (see `src/lib/env.ts` / `api/_lib/env.ts`)
 5. [ ] Confirm no server secrets leak to client bundle
 6. [ ] Document which Vercel Integration auto-provisions which vars
 7. [ ] Remove legacy `VITE_CLERK_*` / `CLERK_SECRET_KEY` aliases after migration stabilises

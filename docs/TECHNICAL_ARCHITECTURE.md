@@ -53,19 +53,19 @@ Vercel Serverless Functions (api/)
 | `supabase/migrations/20260415100000_config_fragments_schema.sql` | Full fragment schema, RLS, audit, builds |
 | `supabase/migrations/20260415100001_seed_admin_user.sql` | Dev admin user seed |
 | **Domain Types** | |
-| `api/lib/domainTypes.ts` | Canonical domain types for fragments, builds, artifacts |
+| `api/_lib/domainTypes.ts` | Canonical domain types for fragments, builds, artifacts |
 | `src/engine/types.ts` | Existing engine types (unchanged — assembly targets these) |
 | **Auth & Env** | |
-| `api/lib/env.ts` | Server-side typed env validation |
+| `api/_lib/env.ts` | Server-side typed env validation |
 | `src/lib/clientEnv.ts` | Client-side typed env validation |
-| `api/lib/scopeResolver.ts` | Clerk identity → internal scope resolution |
-| `api/lib/supabaseClient.ts` | Server-side Supabase client + RLS scope injection |
+| `api/_lib/scopeResolver.ts` | Clerk identity → internal scope resolution |
+| `api/_lib/supabaseClient.ts` | Server-side Supabase client + RLS scope injection |
 | **Services** | |
-| `api/services/fragmentService.ts` | Fragment CRUD with optimistic concurrency + revisions |
-| `api/services/assemblyPipeline.ts` | Deterministic YAML assembly from fragments |
-| `api/services/cacheService.ts` | Upstash Redis cache with scope-aware keys |
-| `api/services/validationService.ts` | Fragment, cross-fragment, and artifact validation |
-| `api/services/yamlImportService.ts` | YAML decomposition into fragments (migration + expert mode) |
+| `api/_services/fragmentService.ts` | Fragment CRUD with optimistic concurrency + revisions |
+| `api/_services/assemblyPipeline.ts` | Deterministic YAML assembly from fragments |
+| `api/_services/cacheService.ts` | Upstash Redis cache with scope-aware keys |
+| `api/_services/validationService.ts` | Fragment, cross-fragment, and artifact validation |
+| `api/_services/yamlImportService.ts` | YAML decomposition into fragments (migration + expert mode) |
 | **Documentation** | |
 | `docs/REFACTOR_ARCHITECTURE.md` | High-level refactor plan and domain model |
 | `docs/ENV_CONTRACT.md` | Canonical environment variable contract |
@@ -153,7 +153,7 @@ Build (assembly event combining specific revisions)
 
 | Old | New | Status |
 |-----|-----|--------|
-| `CLERK_SECRET_KEY` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` | Fallback chain in `api/lib/env.ts` |
+| `CLERK_SECRET_KEY` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` | Fallback chain in `api/_lib/env.ts` |
 | `VITE_CLERK_PUBLISHABLE_KEY` | Keep (Vite needs `VITE_*` prefix) | Active |
 | `NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY` | Ignored by Vite | Vercel-provisioned |
 
