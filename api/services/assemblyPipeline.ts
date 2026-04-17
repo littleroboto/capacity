@@ -25,6 +25,8 @@ import type {
   ConfigBuild,
   ConfigArtifact,
   FragmentType,
+  FragmentMeta,
+  PhaseLoad,
 } from '../lib/domainTypes';
 
 // ============================================================================
@@ -353,15 +355,14 @@ export function sha256(content: string): string {
 }
 
 /** PostgREST returns snake_case; domain types use camelCase — normalize before inserts. */
-function marketRowHierarchy(market: Record<string, unknown>): {
+function marketRowHierarchy(market: unknown): {
   operatingModelId: OperatingModelId;
   segmentId: string;
 } {
+  const m = market as Record<string, unknown>;
   const om =
-    (market.operating_model_id as string | undefined) ??
-    (market.operatingModelId as string | undefined);
-  const seg =
-    (market.segment_id as string | undefined) ?? (market.segmentId as string | undefined);
+    (m.operating_model_id as string | undefined) ?? (m.operatingModelId as string | undefined);
+  const seg = (m.segment_id as string | undefined) ?? (m.segmentId as string | undefined);
   if (!om || !seg) {
     throw new Error('Market row missing operating_model_id or segment_id');
   }
@@ -386,7 +387,7 @@ export async function buildMarket(
     return { build: { status: 'failed' } as ConfigBuild, error: `Market ${marketId} not found` };
   }
 
-  const hier = marketRowHierarchy(fragments.market as Record<string, unknown>);
+  const hier = marketRowHierarchy(fragments.market);
 
   const { data: buildRow, error: buildErr } = await client
     .from('config_builds')
@@ -577,14 +578,10 @@ export async function previewAssembledYamlForMarket(marketId: string): Promise<s
 // Internal helpers
 // ============================================================================
 
-function normalizePhaseLoad(load: Record<string, unknown>): Record<string, unknown> {
+function normalizePhaseLoad(load: PhaseLoad): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  if (load.labsRequired != null || load.labs_required != null) {
-    out.labs_required = load.labsRequired ?? load.labs_required;
-  }
-  if (load.techStaff != null || load.tech_staff != null) {
-    out.tech_staff = load.techStaff ?? load.tech_staff;
-  }
+  if (load.labsRequired != null) out.labs_required = load.labsRequired;
+  if (load.techStaff != null) out.tech_staff = load.techStaff;
   if (load.labs != null) out.labs = load.labs;
   if (load.teams != null) out.teams = load.teams;
   if (load.backend != null) out.backend = load.backend;
@@ -606,7 +603,7 @@ async function recordBuildComponents(
     version_number: number;
   }> = [];
 
-  const fragmentSources: Array<{ type: FragmentType; fragment: Record<string, unknown> | undefined | null }> = [
+  const fragmentSources: Array<{ type: FragmentType; fragment: FragmentMeta | undefined | null }> = [
     { type: 'market_configs', fragment: fragments.marketConfig },
     { type: 'resource_configs', fragment: fragments.resourceConfig },
     { type: 'bau_configs', fragment: fragments.bauConfig },

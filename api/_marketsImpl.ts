@@ -95,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const requestId = vercelRequestId(req);
-  const rid = requestId ? { requestId } : {};
+  const rid: Record<string, string> | undefined = requestId ? { requestId } : undefined;
 
   const auth = await authenticateScope(bearer, res, rid);
   if (!auth.ok) return;

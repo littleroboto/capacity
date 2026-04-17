@@ -9,12 +9,7 @@
  * 5. Log audit event
  */
 import { supabaseServiceClient } from '../lib/supabaseClient';
-import type {
-  FragmentType,
-  FragmentMeta,
-  AuditEventType,
-  ResolvedUserScope,
-} from '../lib/domainTypes';
+import type { FragmentType, FragmentMeta, AuditEventType } from '../lib/domainTypes';
 
 export interface FragmentWriteResult<T> {
   ok: boolean;
@@ -39,7 +34,7 @@ export async function getFragment<T extends FragmentMeta>(
     throw new Error(`Failed to fetch ${table}/${id}: ${error.message}`);
   }
 
-  return data as T;
+  return data as unknown as T;
 }
 
 /**
@@ -122,8 +117,8 @@ export async function createFragment<T extends FragmentMeta>(
 
   const fragment = inserted as T;
 
-  await createRevision(table, fragment.id, 1, fragment, actorId);
-  await logAudit('fragment_created', actorId, actorEmail, fragment, table);
+  await createRevision(table, fragment.id, 1, fragment as unknown as Record<string, unknown>, actorId);
+  await logAudit('fragment_created', actorId, actorEmail, fragment as unknown as Record<string, unknown>, table);
 
   return { ok: true, data: fragment };
 }
@@ -192,8 +187,8 @@ export async function updateFragment<T extends FragmentMeta>(
 
   const fragment = updated as T;
 
-  await createRevision(table, id, newVersion, fragment, actorId);
-  await logAudit('fragment_updated', actorId, actorEmail, fragment, table);
+  await createRevision(table, id, newVersion, fragment as unknown as Record<string, unknown>, actorId);
+  await logAudit('fragment_updated', actorId, actorEmail, fragment as unknown as Record<string, unknown>, table);
 
   return { ok: true, data: fragment };
 }

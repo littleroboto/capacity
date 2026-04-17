@@ -10,7 +10,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyToken } from '@clerk/backend';
-import { clerkAuthEnvFromProcess, serverEnv } from './lib/env';
+import { clerkAuthEnvFromProcess } from './lib/env';
 import { isClerkJwtEmailAllowed, parseAllowedEmailSet } from './_allowedUserEmails';
 import { SEGMENT_TO_MARKETS, WORKSPACE_MANIFEST_MARKET_ORDER } from './_capacityWorkspaceAcl.data';
 

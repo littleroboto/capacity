@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticateScope } from './lib/authScope';
 import { scopeAllowsMarket, scopeAllowsMarketEdit } from './lib/scopeResolver';
 import { getFragment, listFragments, createFragment, updateFragment, archiveFragment } from './services/fragmentService';
-import type { FragmentType, FragmentMeta, OperatingModelId } from './lib/domainTypes';
+import type { FragmentType, OperatingModelId } from './lib/domainTypes';
 import { supabaseServiceClient } from './lib/supabaseClient';
 
 const ALLOWED_TABLES: Set<string> = new Set([
@@ -52,8 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (id) {
       const frag = await getFragment(table as FragmentType, id);
       if (!frag) { res.status(404).json({ error: 'not found' }); return; }
-      const mkt = await lookupMarketMeta((frag as Record<string, string>).market_id);
-      if (mkt && !scopeAllowsMarket(auth.scope, (frag as Record<string, string>).market_id, mkt.segment_id, mkt.operating_model_id as OperatingModelId)) {
+      const fragRow = frag as unknown as Record<string, string>;
+      const mkt = await lookupMarketMeta(fragRow.market_id);
+      if (mkt && !scopeAllowsMarket(auth.scope, fragRow.market_id, mkt.segment_id, mkt.operating_model_id as OperatingModelId)) {
         res.status(403).json({ error: 'forbidden' });
         return;
       }
@@ -106,8 +107,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const existing = await getFragment(table as FragmentType, id);
     if (!existing) { res.status(404).json({ error: 'not found' }); return; }
-    const mkt = await lookupMarketMeta((existing as Record<string, string>).market_id);
-    if (mkt && !scopeAllowsMarketEdit(auth.scope, (existing as Record<string, string>).market_id, mkt.segment_id, mkt.operating_model_id as OperatingModelId)) {
+    const existingRow = existing as unknown as Record<string, string>;
+    const mkt = await lookupMarketMeta(existingRow.market_id);
+    if (mkt && !scopeAllowsMarketEdit(auth.scope, existingRow.market_id, mkt.segment_id, mkt.operating_model_id as OperatingModelId)) {
       res.status(403).json({ error: 'forbidden' });
       return;
     }
@@ -130,8 +132,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const existing = await getFragment(table as FragmentType, id);
     if (!existing) { res.status(404).json({ error: 'not found' }); return; }
-    const mkt = await lookupMarketMeta((existing as Record<string, string>).market_id);
-    if (mkt && !scopeAllowsMarketEdit(auth.scope, (existing as Record<string, string>).market_id, mkt.segment_id, mkt.operating_model_id as OperatingModelId)) {
+    const existingRow = existing as unknown as Record<string, string>;
+    const mkt = await lookupMarketMeta(existingRow.market_id);
+    if (mkt && !scopeAllowsMarketEdit(auth.scope, existingRow.market_id, mkt.segment_id, mkt.operating_model_id as OperatingModelId)) {
       res.status(403).json({ error: 'forbidden' });
       return;
     }

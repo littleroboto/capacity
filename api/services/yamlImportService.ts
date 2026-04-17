@@ -11,13 +11,7 @@
  * creating fragments from YAML-shaped input.
  */
 import { supabaseServiceClient } from '../lib/supabaseClient';
-import type {
-  OperatingModelId,
-  CampaignConfig,
-  TechProgrammeConfig,
-  NationalLeaveBandConfig,
-  FragmentMeta,
-} from '../lib/domainTypes';
+import type { OperatingModelId } from '../lib/domainTypes';
 
 export interface YamlImportResult {
   marketId: string;

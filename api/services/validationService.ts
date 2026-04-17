@@ -13,11 +13,8 @@ import type {
   CampaignConfig,
   TechProgrammeConfig,
   ResourceConfig,
-  BauConfig,
   TradingConfig,
-  DeploymentRiskConfig,
   NationalLeaveBandConfig,
-  HolidayCalendar,
   AssembledMarketFragments,
   ValidationSeverity,
 } from '../lib/domainTypes';

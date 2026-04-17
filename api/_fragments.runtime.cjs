@@ -21117,7 +21117,7 @@ function optionalList(name) {
   if (!v) return [];
   return v.split(",").map((s) => s.trim()).filter(Boolean);
 }
-function supabaseUrlMissingHint(hasPg) {
+function supabaseUrlMissingHint(_hasPostgresUrl) {
   const vercelEnv = process.env.VERCEL_ENV?.trim();
   if (vercelEnv === "preview") {
     return " Enable the same variables for the Preview environment in the Vercel project (or they only exist on Production). The browser can still read `VITE_*` from the build, but server routes use the Preview server env.";
@@ -22825,8 +22825,9 @@ async function handler(req, res) {
         res.status(404).json({ error: "not found" });
         return;
       }
-      const mkt = await lookupMarketMeta(frag.market_id);
-      if (mkt && !scopeAllowsMarket(auth.scope, frag.market_id, mkt.segment_id, mkt.operating_model_id)) {
+      const fragRow = frag;
+      const mkt = await lookupMarketMeta(fragRow.market_id);
+      if (mkt && !scopeAllowsMarket(auth.scope, fragRow.market_id, mkt.segment_id, mkt.operating_model_id)) {
         res.status(403).json({ error: "forbidden" });
         return;
       }
@@ -22889,8 +22890,9 @@ async function handler(req, res) {
       res.status(404).json({ error: "not found" });
       return;
     }
-    const mkt = await lookupMarketMeta(existing.market_id);
-    if (mkt && !scopeAllowsMarketEdit(auth.scope, existing.market_id, mkt.segment_id, mkt.operating_model_id)) {
+    const existingRow = existing;
+    const mkt = await lookupMarketMeta(existingRow.market_id);
+    if (mkt && !scopeAllowsMarketEdit(auth.scope, existingRow.market_id, mkt.segment_id, mkt.operating_model_id)) {
       res.status(403).json({ error: "forbidden" });
       return;
     }
@@ -22919,8 +22921,9 @@ async function handler(req, res) {
       res.status(404).json({ error: "not found" });
       return;
     }
-    const mkt = await lookupMarketMeta(existing.market_id);
-    if (mkt && !scopeAllowsMarketEdit(auth.scope, existing.market_id, mkt.segment_id, mkt.operating_model_id)) {
+    const existingRow = existing;
+    const mkt = await lookupMarketMeta(existingRow.market_id);
+    if (mkt && !scopeAllowsMarketEdit(auth.scope, existingRow.market_id, mkt.segment_id, mkt.operating_model_id)) {
       res.status(403).json({ error: "forbidden" });
       return;
     }

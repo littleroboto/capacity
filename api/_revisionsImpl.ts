@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyClerkBearerToken } from './lib/verifyClerkBearer';
-import { resolveUserScope } from './lib/scopeResolver';
 import { getRevisionHistory, getRevisionSnapshot } from './services/fragmentService';
 import type { FragmentType } from './lib/domainTypes';
 

@@ -21125,7 +21125,7 @@ function optionalList(name) {
   if (!v) return [];
   return v.split(",").map((s) => s.trim()).filter(Boolean);
 }
-function supabaseUrlMissingHint(hasPg) {
+function supabaseUrlMissingHint(_hasPostgresUrl) {
   const vercelEnv = process.env.VERCEL_ENV?.trim();
   if (vercelEnv === "preview") {
     return " Enable the same variables for the Preview environment in the Vercel project (or they only exist on Production). The browser can still read `VITE_*` from the build, but server routes use the Preview server env.";
@@ -23025,12 +23025,8 @@ async function previewAssembledYamlForMarket(marketId) {
 }
 function normalizePhaseLoad(load) {
   const out = {};
-  if (load.labsRequired != null || load.labs_required != null) {
-    out.labs_required = load.labsRequired ?? load.labs_required;
-  }
-  if (load.techStaff != null || load.tech_staff != null) {
-    out.tech_staff = load.techStaff ?? load.tech_staff;
-  }
+  if (load.labsRequired != null) out.labs_required = load.labsRequired;
+  if (load.techStaff != null) out.tech_staff = load.techStaff;
   if (load.labs != null) out.labs = load.labs;
   if (load.teams != null) out.teams = load.teams;
   if (load.backend != null) out.backend = load.backend;

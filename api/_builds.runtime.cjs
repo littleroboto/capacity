@@ -21125,7 +21125,7 @@ function optionalList(name) {
   if (!v) return [];
   return v.split(",").map((s) => s.trim()).filter(Boolean);
 }
-function supabaseUrlMissingHint(hasPg) {
+function supabaseUrlMissingHint(_hasPostgresUrl) {
   const vercelEnv = process.env.VERCEL_ENV?.trim();
   if (vercelEnv === "preview") {
     return " Enable the same variables for the Preview environment in the Vercel project (or they only exist on Production). The browser can still read `VITE_*` from the build, but server routes use the Preview server env.";
@@ -22923,8 +22923,9 @@ function sha256(content) {
   return (0, import_crypto2.createHash)("sha256").update(content, "utf-8").digest("hex");
 }
 function marketRowHierarchy(market) {
-  const om = market.operating_model_id ?? market.operatingModelId;
-  const seg = market.segment_id ?? market.segmentId;
+  const m = market;
+  const om = m.operating_model_id ?? m.operatingModelId;
+  const seg = m.segment_id ?? m.segmentId;
   if (!om || !seg) {
     throw new Error("Market row missing operating_model_id or segment_id");
   }
@@ -23036,12 +23037,8 @@ async function publishBuild(buildId, actorId) {
 }
 function normalizePhaseLoad(load) {
   const out = {};
-  if (load.labsRequired != null || load.labs_required != null) {
-    out.labs_required = load.labsRequired ?? load.labs_required;
-  }
-  if (load.techStaff != null || load.tech_staff != null) {
-    out.tech_staff = load.techStaff ?? load.tech_staff;
-  }
+  if (load.labsRequired != null) out.labs_required = load.labsRequired;
+  if (load.techStaff != null) out.tech_staff = load.techStaff;
   if (load.labs != null) out.labs = load.labs;
   if (load.teams != null) out.teams = load.teams;
   if (load.backend != null) out.backend = load.backend;
@@ -23246,7 +23243,7 @@ async function redisCommand(command, ...args) {
 async function cacheSet(key, value, ttlSeconds = DEFAULT_TTL_SECONDS) {
   await redisCommand("SET", key, value, "EX", ttlSeconds);
 }
-async function cachePublishedArtifact(marketId, operatingModelId, segmentId, buildId, yamlContent, meta) {
+async function cachePublishedArtifact(marketId, _operatingModelId, _segmentId, buildId, yamlContent, meta) {
   await Promise.all([
     cacheSet(CacheKeys.activeArtifact(marketId), yamlContent),
     cacheSet(CacheKeys.buildArtifact(buildId), yamlContent),

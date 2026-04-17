@@ -21117,7 +21117,7 @@ function optionalList(name) {
   if (!v) return [];
   return v.split(",").map((s) => s.trim()).filter(Boolean);
 }
-function supabaseUrlMissingHint(hasPg) {
+function supabaseUrlMissingHint(_hasPostgresUrl) {
   const vercelEnv = process.env.VERCEL_ENV?.trim();
   if (vercelEnv === "preview") {
     return " Enable the same variables for the Preview environment in the Vercel project (or they only exist on Production). The browser can still read `VITE_*` from the build, but server routes use the Preview server env.";

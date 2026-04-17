@@ -51,12 +51,6 @@ function loadRepoDotEnvOnce(): void {
   }
 }
 
-function required(name: string): string {
-  const v = process.env[name]?.trim();
-  if (!v) throw new Error(`Missing required env var: ${name}`);
-  return v;
-}
-
 function optional(name: string): string | undefined {
   return process.env[name]?.trim() || undefined;
 }
@@ -129,7 +123,7 @@ function optionalList(name: string): string[] {
 }
 
 /** Actionable hint when Supabase URL is missing (Vercel env scoping / local dev). */
-function supabaseUrlMissingHint(hasPg: boolean): string {
+function supabaseUrlMissingHint(_hasPostgresUrl: boolean): string {
   const vercelEnv = process.env.VERCEL_ENV?.trim();
   if (vercelEnv === 'preview') {
     return (

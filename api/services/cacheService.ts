@@ -10,8 +10,6 @@
  */
 import { serverEnv } from '../lib/env';
 
-type CacheEntry = { value: string; meta?: Record<string, unknown> };
-
 const DEFAULT_TTL_SECONDS = 3600; // 1 hour safety TTL
 
 // ============================================================================
@@ -120,8 +118,8 @@ export async function cacheDelMulti(...keys: string[]): Promise<void> {
  */
 export async function cachePublishedArtifact(
   marketId: string,
-  operatingModelId: string,
-  segmentId: string,
+  _operatingModelId: string,
+  _segmentId: string,
   buildId: string,
   yamlContent: string,
   meta: Record<string, unknown>
