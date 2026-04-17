@@ -3,7 +3,7 @@
  * Emits CommonJS runtimes under server-bundles/ (NOT under api/) so Vercel does
  * not treat each .cjs next to api/app.js as its own Serverless Function.
  * Implementation TS lives under server/ (not api/) so Vercel does not create one
- * Serverless Function per api/**/*.ts file.
+ * Serverless Function for every TypeScript file under the api/ directory tree.
  */
 import * as esbuild from 'esbuild';
 import path from 'node:path';
