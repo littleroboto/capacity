@@ -2,10 +2,18 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "rewrites": [
-    {
-      "source": "^/api/(health|me|fragments|builds|config|validate|revisions|audit|markets|import|holiday-entries|shared-dsl)/?$",
-      "destination": "/api/app.js?__cap=$1"
-    },
+    { "source": "/api/health", "destination": "/api/app.js?__cap=health" },
+    { "source": "/api/me", "destination": "/api/app.js?__cap=me" },
+    { "source": "/api/fragments", "destination": "/api/app.js?__cap=fragments" },
+    { "source": "/api/builds", "destination": "/api/app.js?__cap=builds" },
+    { "source": "/api/config", "destination": "/api/app.js?__cap=config" },
+    { "source": "/api/validate", "destination": "/api/app.js?__cap=validate" },
+    { "source": "/api/revisions", "destination": "/api/app.js?__cap=revisions" },
+    { "source": "/api/audit", "destination": "/api/app.js?__cap=audit" },
+    { "source": "/api/markets", "destination": "/api/app.js?__cap=markets" },
+    { "source": "/api/import", "destination": "/api/app.js?__cap=import" },
+    { "source": "/api/holiday-entries", "destination": "/api/app.js?__cap=holiday-entries" },
+    { "source": "/api/shared-dsl", "destination": "/api/app.js?__cap=shared-dsl" },
     {
       "source": "^/((?!api/|src/|node_modules/|@|data/|assets/|favicon\\.svg).*)$",
       "destination": "/index.html"

@@ -1,0 +1,3 @@
+# Local-only lockfile (ignored in git). When uploaded, Vercel treats the repo as
+# pnpm-first and runs a second frozen pnpm install that can fail vs package.json.
+pnpm-lock.yaml
