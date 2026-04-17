@@ -14,10 +14,7 @@
     { "source": "/api/import", "destination": "/api/app.js?__cap=import" },
     { "source": "/api/holiday-entries", "destination": "/api/app.js?__cap=holiday-entries" },
     { "source": "/api/shared-dsl", "destination": "/api/app.js?__cap=shared-dsl" },
-    {
-      "source": "^/((?!api/|src/|node_modules/|@|data/|assets/|favicon\\.svg).*)$",
-      "destination": "/index.html"
-    }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/app.js": {
