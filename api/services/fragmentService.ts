@@ -59,7 +59,7 @@ export async function listFragments<T extends FragmentMeta>(
     if (error) {
       throw new Error(`Failed to list ${table} for ${marketId}: ${error.message}`);
     }
-    return (data ?? []) as T[];
+    return (data ?? []) as unknown as T[];
   }
 
   let query = client.from(table).select('*').eq('market_id', marketId);
@@ -74,7 +74,7 @@ export async function listFragments<T extends FragmentMeta>(
     throw new Error(`Failed to list ${table} for ${marketId}: ${error.message}`);
   }
 
-  return (data ?? []) as T[];
+  return (data ?? []) as unknown as T[];
 }
 
 /**
@@ -115,7 +115,7 @@ export async function createFragment<T extends FragmentMeta>(
     return { ok: false, error: error.message, errorCode: 'internal' };
   }
 
-  const fragment = inserted as T;
+  const fragment = inserted as unknown as T;
 
   await createRevision(table, fragment.id, 1, fragment as unknown as Record<string, unknown>, actorId);
   await logAudit('fragment_created', actorId, actorEmail, fragment as unknown as Record<string, unknown>, table);
@@ -185,7 +185,7 @@ export async function updateFragment<T extends FragmentMeta>(
     return { ok: false, error: error.message, errorCode: 'internal' };
   }
 
-  const fragment = updated as T;
+  const fragment = updated as unknown as T;
 
   await createRevision(table, id, newVersion, fragment as unknown as Record<string, unknown>, actorId);
   await logAudit('fragment_updated', actorId, actorEmail, fragment as unknown as Record<string, unknown>, table);

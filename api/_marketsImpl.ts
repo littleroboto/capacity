@@ -96,6 +96,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const requestId = vercelRequestId(req);
   const rid: Record<string, string> | undefined = requestId ? { requestId } : undefined;
+  /** Avoid `...rid` when `rid` may be exactly `undefined` (TS2698 under some compiler modes). */
+  const ridFields: Record<string, string> = rid ?? {};
 
   const auth = await authenticateScope(bearer, res, rid);
   if (!auth.ok) return;
@@ -118,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         JSON.stringify({
           tag: 'markets',
           step: 'markets_query',
-          ...rid,
+          ...ridFields,
           message: marketsError.message,
           code: marketsError.code,
         })
@@ -127,7 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         error: 'database_error',
         step: 'markets_query',
         detail: marketsError.message,
-        ...rid,
+        ...ridFields,
       });
       return;
     }
@@ -163,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         jwt_email: jwtEmail ?? null,
         detail:
           'Signed in, but this Clerk user has no Postgres scope that allows any market. Ensure `user_access_scopes.clerk_user_id` matches `clerk_sub`, or the row email matches `jwt_email` (add email to the Clerk session JWT template if `jwt_email` is null). Confirm `SUPABASE_URL` in this environment is the same project where scopes were inserted.',
-        ...rid,
+        ...ridFields,
       });
       return;
     }
@@ -191,7 +193,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         error: 'server_error',
         step: 'respond',
         detail: `json_stringify: ${sm}`,
-        ...rid,
+        ...ridFields,
       });
       return;
     }
@@ -200,12 +202,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.end(payload);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(JSON.stringify({ tag: 'markets', step, ...rid, message: msg }), e);
+    console.error(JSON.stringify({ tag: 'markets', step, ...ridFields, message: msg }), e);
     sendJsonIfOpen(res, 500, {
       error: 'server_error',
       step,
       detail: msg,
-      ...rid,
+      ...ridFields,
     });
   }
 }

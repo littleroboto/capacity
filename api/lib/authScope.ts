@@ -36,11 +36,12 @@ export async function authenticateScope(
   res: VercelResponse,
   extraJson?: Record<string, string>
 ): Promise<AuthenticateScopeResult> {
+  const extra = extraJson ?? {};
   try {
     const payload = (await verifyClerkBearerToken(bearer)) as Record<string, unknown>;
     const sub = payload.sub as string;
     if (!sub) {
-      res.status(401).json({ error: 'invalid token', ...extraJson });
+      res.status(401).json({ error: 'invalid token', ...extra });
       return { ok: false };
     }
     const email = jwtEmailFromPayload(payload);
@@ -54,12 +55,12 @@ export async function authenticateScope(
         message,
         hint:
           'This is the exact env error from serverEnv() in this process. For `vercel dev`, run from the repo root with `.env.local` present, or run `vercel env pull`. Vercel UI: set vars for Preview/Development too, not only Production.',
-        ...extraJson,
+        ...extra,
       });
       return { ok: false };
     }
     const msg = e instanceof Error ? e.message : String(e);
-    res.status(401).json({ error: 'unauthorized', message: msg, ...extraJson });
+    res.status(401).json({ error: 'unauthorized', message: msg, ...extra });
     return { ok: false };
   }
 }
