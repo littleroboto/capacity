@@ -2,59 +2,18 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "rewrites": [
-    { "source": "/api/health", "destination": "/api/health.js" },
-    { "source": "/api/me", "destination": "/api/me.js" },
-    { "source": "/api/fragments", "destination": "/api/fragments.js" },
-    { "source": "/api/builds", "destination": "/api/builds.js" },
-    { "source": "/api/config", "destination": "/api/config.js" },
-    { "source": "/api/validate", "destination": "/api/validate.js" },
-    { "source": "/api/revisions", "destination": "/api/revisions.js" },
-    { "source": "/api/audit", "destination": "/api/audit.js" },
-    { "source": "/api/markets", "destination": "/api/markets.js" },
-    { "source": "/api/import", "destination": "/api/import.js" },
-    { "source": "/api/holiday-entries", "destination": "/api/holidayEntries.js" },
-    { "source": "/api/shared-dsl", "destination": "/api/shared-dsl.js" },
+    {
+      "source": "^/api/(health|me|fragments|builds|config|validate|revisions|audit|markets|import|holiday-entries|shared-dsl)/?$",
+      "destination": "/api/app.js?__cap=$1"
+    },
     {
       "source": "^/((?!api/|src/|node_modules/|@|data/|assets/|favicon\\.svg).*)$",
       "destination": "/index.html"
     }
   ],
   "functions": {
-    "api/shared-dsl.js": {
-      "includeFiles": "api/_shared-dsl.runtime.cjs"
-    },
-    "api/health.js": {
-      "includeFiles": "api/_health.runtime.cjs"
-    },
-    "api/me.js": {
-      "includeFiles": "api/_me.runtime.cjs"
-    },
-    "api/fragments.js": {
-      "includeFiles": "api/_fragments.runtime.cjs"
-    },
-    "api/builds.js": {
-      "includeFiles": "api/_builds.runtime.cjs"
-    },
-    "api/config.js": {
-      "includeFiles": "api/_config.runtime.cjs"
-    },
-    "api/validate.js": {
-      "includeFiles": "api/_validate.runtime.cjs"
-    },
-    "api/revisions.js": {
-      "includeFiles": "api/_revisions.runtime.cjs"
-    },
-    "api/audit.js": {
-      "includeFiles": "api/_audit.runtime.cjs"
-    },
-    "api/markets.js": {
-      "includeFiles": "api/_markets.runtime.cjs"
-    },
-    "api/import.js": {
-      "includeFiles": "api/_import.runtime.cjs"
-    },
-    "api/holidayEntries.js": {
-      "includeFiles": "api/_holidayEntries.runtime.cjs"
+    "api/app.js": {
+      "includeFiles": "api/_*.runtime.cjs"
     }
   }
 }

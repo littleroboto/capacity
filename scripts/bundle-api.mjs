@@ -68,7 +68,7 @@ if (failed.length > 0) {
 }
 
 // Empty api/<route>/ directories (e.g. from older layouts) can confuse Vercel's api scanner so
-// `functions["api/shared-dsl.js"]` no longer matches; remove only if the directory is empty.
+// `functions["api/app.js"]` includeFiles globs no longer match; remove only if the directory is empty.
 const orphanRouteDirs = [
   'shared-dsl',
   'me',
