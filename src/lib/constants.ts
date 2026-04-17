@@ -53,6 +53,12 @@ export function runwayHeatmapTitleForViewMode(id: ViewModeId): string {
   return m?.runwayHeatmapTitle ?? VIEW_MODES[0].runwayHeatmapTitle;
 }
 
+/** Product name for tooltips / chrome (e.g. Technology Teams, Restaurant Activity). */
+export function runwayLensProductLabel(id: ViewModeId): string {
+  const m = VIEW_MODES.find((v) => v.id === id);
+  return m?.label ?? id;
+}
+
 /** Map legacy layer ids to runway view modes (`combined` = Technology lens in the UI). */
 export function normalizeViewModeId(raw: string | null): ViewModeId {
   if (!raw) return 'combined';

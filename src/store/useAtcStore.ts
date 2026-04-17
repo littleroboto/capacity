@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ViewModeId } from '@/lib/constants';
-import { parseYamlToConfigs, runPipelineFromDsl } from '@/engine/pipeline';
+import { runPipelineFromDsl } from '@/engine/pipeline';
 import type { RiskRow } from '@/engine/riskModel';
 import {
   applyRiskTuningPatch,
@@ -10,6 +10,7 @@ import {
   type RiskModelTuning,
 } from '@/engine/riskModelTuning';
 import type { MarketConfig } from '@/engine/types';
+import { flushDslEditorIntoStore } from '@/lib/dslEditorSyncBridge';
 import { looksLikeYamlDsl } from '@/lib/dslGuards';
 import { defaultDslForMarket } from '@/lib/marketDslSeeds';
 import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
@@ -79,7 +80,11 @@ import {
   type HeatmapRenderStyle,
 } from '@/lib/riskHeatmapColors';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
+import type { MarketActivityLedger } from '@/lib/marketActivityLedger';
+import { ledgerEntryIdsContributingToDay } from '@/lib/runwayLedgerAttribution';
 import { CAPACITY_ATC_PERSIST_KEY, CAPACITY_ATC_PERSIST_VERSION } from '@/lib/capacityAtcPersist';
+import { runPipelineInWorker } from '@/lib/pipelineWorkerClient';
+import { computeWorkbenchHydrateBundle } from '@/lib/workbenchHydrate';
 import {
   buildViewSettingsFile,
   parseViewSettingsFile,
@@ -93,14 +98,6 @@ import {
 
 /** Last bundle/server multi-doc passed to hydrateFromStorage (session only; not localStorage). */
 let lastBootstrapMultiDoc: string | undefined;
-
-function countParsedMarkets(dsl: string): number {
-  try {
-    return parseYamlToConfigs(dsl).length;
-  } catch {
-    return 0;
-  }
-}
 
 type AtcState = {
   country: string;
@@ -128,8 +125,8 @@ type AtcState = {
    */
   runway3dHeatmap: boolean;
   /**
-   * Flat heatmaps (quarter grid + compare-all columns): SVG by default. Ignored when single-market 3D runway is on.
-   * Turn off for HTML cells + colour swoosh / disco twinkle.
+   * Flat heatmaps: SVG by default for quarter grid, LIOM compare columns, and triple Tech/Trading/Risk strip.
+   * Ignored when single-market 3D runway is on. Turn off for HTML cells + swoosh / disco.
    */
   runwaySvgHeatmap: boolean;
   /**
@@ -150,6 +147,17 @@ type AtcState = {
    * cleared when switching market or entering LIOM compare.
    */
   runwaySelectedDayYmd: string | null;
+  /**
+   * Single-market activity ledger: excluded row ids (`entryId`). All other rows contribute to
+   * cumulative heatmap overlap and sparkline bands. Session-only; cleared when changing market or LIOM.
+   */
+  runwayLedgerExcludedEntryIds: string[];
+  /**
+   * Ledger heatmap footprint: when true (default), days with no active ledger row still count one implicit
+   * baseline stratum (orthogonal to exclusions — not a fake table row). Session-only; reset with exclusions
+   * when changing runway focus market or LIOM.
+   */
+  runwayLedgerImplicitBaselineFootprint: boolean;
   /** Runway cell fill: multi-band temperature ramp vs one hue with alpha by intensity. */
   heatmapRenderStyle: HeatmapRenderStyle;
   /** `#rrggbb` when {@link heatmapRenderStyle} is `mono`. */
@@ -164,6 +172,11 @@ type AtcState = {
    * LIOM column header). Not persisted.
    */
   runwayReturnPicker: string | null;
+  /**
+   * Last runway lens before opening Code view; used when returning so Technology / Restaurant / Risk
+   * lens choice is preserved. Not persisted.
+   */
+  runwayLensBeforeCode: ViewModeId;
   /** When true, Monaco YAML editor is read-only (DSL assistant is streaming or applying). Not persisted. */
   dslAssistantEditorLock: boolean;
   setDslAssistantEditorLock: (v: boolean) => void;
@@ -181,6 +194,25 @@ type AtcState = {
   setRunwayFilterQuarter: (q: RunwayQuarter | null) => void;
   setRunwayIncludeFollowingQuarter: (v: boolean) => void;
   setRunwaySelectedDayYmd: (ymd: string | null) => void;
+  toggleRunwayLedgerExcludedEntryId: (entryId: string) => void;
+  /** Toggle exclusion for every id in the chunk (e.g. merged holiday span rows). */
+  toggleRunwayLedgerExcludedEntryGroup: (entryIds: readonly string[]) => void;
+  /** If every visible id is included, exclude all visible; otherwise clear exclusions for visible ids. */
+  toggleRunwayLedgerExcludeBulkVisible: (visibleEntryIds: readonly string[]) => void;
+  /** Clear exclusions so every ledger row contributes again. */
+  clearRunwayLedgerExclusions: () => void;
+  setRunwayLedgerImplicitBaselineFootprint: (v: boolean) => void;
+  /** Drop excluded ids that are not in the current visible (date-filtered) ledger. */
+  pruneRunwayLedgerExclusionsToAllowedEntryIds: (allowedIds: ReadonlySet<string>) => void;
+  /**
+   * Exclude every ledger row that does not contribute to `dayYmd` for this lens (so checkboxes match “what
+   * touched this day”). Rows irrelevant to the lens are excluded as well.
+   */
+  restrictRunwayLedgerToDayContributors: (
+    ledger: MarketActivityLedger,
+    dayYmd: string,
+    lensView: Exclude<ViewModeId, 'code'>,
+  ) => void;
   setHeatmapRenderStyle: (v: HeatmapRenderStyle) => void;
   setHeatmapMonoColor: (hex: string) => void;
   setHeatmapSpectrumContinuous: (v: boolean) => void;
@@ -214,7 +246,7 @@ type AtcState = {
   applyDsl: (text?: string) => void;
   resetDsl: () => void;
   /** `multiDocFallback`: bundled or cloud multi-doc YAML from bootstrap (session memory only). */
-  hydrateFromStorage: (multiDocFallback?: string) => void;
+  hydrateFromStorage: (multiDocFallback?: string) => Promise<void>;
   /** Last valid `multiDocFallback` from bootstrap (for “reset DSL” without reload). */
   getLastBootstrapMultiDoc: () => string | undefined;
   /** JSON snapshot of persisted UI state (heatmap, filters, tuning — not YAML). */
@@ -277,6 +309,8 @@ export const useAtcStore = create<AtcState>()(
       runwayFilterQuarter: null,
       runwayIncludeFollowingQuarter: false,
       runwaySelectedDayYmd: null,
+      runwayLedgerExcludedEntryIds: [],
+      runwayLedgerImplicitBaselineFootprint: true,
       heatmapRenderStyle: 'spectrum',
       heatmapMonoColor: DEFAULT_HEATMAP_MONO_COLOR,
       heatmapSpectrumContinuous: true,
@@ -285,6 +319,7 @@ export const useAtcStore = create<AtcState>()(
       parseError: null,
       discoMode: false,
       runwayReturnPicker: null,
+      runwayLensBeforeCode: 'combined',
       dslAssistantEditorLock: false,
       dslMutationLocked: false,
 
@@ -304,10 +339,13 @@ export const useAtcStore = create<AtcState>()(
           dslByMarket[prev] = get().dslText.trim();
         }
         let runwaySelectedDayYmdPatch: string | null | undefined;
+        let clearLedger = false;
         if (isRunwayMultiMarketStrip(c)) {
           runwaySelectedDayYmdPatch = null;
+          clearLedger = true;
         } else if (!isRunwayMultiMarketStrip(prev) && prev !== c) {
           runwaySelectedDayYmdPatch = null;
+          clearLedger = true;
         }
         set({
           country: c,
@@ -315,6 +353,9 @@ export const useAtcStore = create<AtcState>()(
           runwayReturnPicker: nextRunwayReturnPicker,
           ...(runwaySelectedDayYmdPatch !== undefined
             ? { runwaySelectedDayYmd: runwaySelectedDayYmdPatch }
+            : {}),
+          ...(clearLedger
+            ? { runwayLedgerExcludedEntryIds: [], runwayLedgerImplicitBaselineFootprint: true }
             : {}),
         });
 
@@ -372,7 +413,12 @@ export const useAtcStore = create<AtcState>()(
         if (prev === 'code' && v !== 'code') {
           get().applyDsl();
         }
-        set({ viewMode: v });
+        const prevWasRunwayLens =
+          prev === 'combined' || prev === 'in_store' || prev === 'market_risk';
+        set({
+          viewMode: v,
+          ...(v === 'code' && prev !== 'code' && prevWasRunwayLens ? { runwayLensBeforeCode: prev } : {}),
+        });
       },
 
       setTheme: (t) => {
@@ -404,6 +450,55 @@ export const useAtcStore = create<AtcState>()(
           return;
         }
         set({ runwaySelectedDayYmd: null });
+      },
+
+      toggleRunwayLedgerExcludedEntryId: (entryId) => {
+        const id = String(entryId).trim();
+        if (!id) return;
+        const cur = new Set(get().runwayLedgerExcludedEntryIds);
+        if (cur.has(id)) cur.delete(id);
+        else cur.add(id);
+        set({ runwayLedgerExcludedEntryIds: [...cur] });
+      },
+      toggleRunwayLedgerExcludedEntryGroup: (entryIds) => {
+        const ids = [...new Set(entryIds.map((x) => String(x).trim()).filter(Boolean))];
+        if (!ids.length) return;
+        const cur = new Set(get().runwayLedgerExcludedEntryIds);
+        const allExcluded = ids.every((id) => cur.has(id));
+        if (allExcluded) {
+          for (const id of ids) cur.delete(id);
+        } else {
+          for (const id of ids) cur.add(id);
+        }
+        set({ runwayLedgerExcludedEntryIds: [...cur] });
+      },
+      toggleRunwayLedgerExcludeBulkVisible: (visibleEntryIds) => {
+        const vis = [...new Set(visibleEntryIds.map((x) => String(x).trim()).filter(Boolean))];
+        if (!vis.length) return;
+        const cur = new Set(get().runwayLedgerExcludedEntryIds);
+        const allIncluded = vis.every((id) => !cur.has(id));
+        if (allIncluded) {
+          for (const id of vis) cur.add(id);
+        } else {
+          for (const id of vis) cur.delete(id);
+        }
+        set({ runwayLedgerExcludedEntryIds: [...cur] });
+      },
+      clearRunwayLedgerExclusions: () => set({ runwayLedgerExcludedEntryIds: [] }),
+      setRunwayLedgerImplicitBaselineFootprint: (v) =>
+        set({ runwayLedgerImplicitBaselineFootprint: Boolean(v) }),
+      pruneRunwayLedgerExclusionsToAllowedEntryIds: (allowedIds) => {
+        const cur = get().runwayLedgerExcludedEntryIds;
+        if (!cur.length) return;
+        const next = cur.filter((id) => allowedIds.has(id));
+        if (next.length !== cur.length) set({ runwayLedgerExcludedEntryIds: next });
+      },
+      restrictRunwayLedgerToDayContributors: (ledger, dayYmd, lensView) => {
+        const ymd = String(dayYmd).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return;
+        const keep = new Set(ledgerEntryIdsContributingToDay(ledger, ymd, lensView));
+        const excluded = ledger.entries.map((e) => e.entryId).filter((id) => !keep.has(id));
+        set({ runwayLedgerExcludedEntryIds: excluded });
       },
 
       setHeatmapRenderStyle: (v) => set({ heatmapRenderStyle: v }),
@@ -690,44 +785,29 @@ export const useAtcStore = create<AtcState>()(
 
       applyDsl: (text) => {
         if (shouldBlockDslMutation(get)) return;
-        const dsl = (text ?? get().dslText).trim();
-        if (!looksLikeYamlDsl(dsl)) {
+        if (!text?.trim()) flushDslEditorIntoStore();
+        const stateAfterFlush = get();
+        const merged = (text?.trim() ? text.trim() : mergeStateToFullMultiDoc(stateAfterFlush).trim());
+        if (!looksLikeYamlDsl(merged)) {
           set({
             parseError:
               'Editor content is not valid workspace YAML (e.g. HTML, a JS/TS source file like api/_sharedDslImpl.ts, or a bad cloud pull). Reset the workspace or paste real market DSL. If the team Blob has the wrong file, re-save valid YAML from the editor.',
           });
           return;
         }
-        const co = get().country;
-        const order = get().runwayMarketOrder;
-        let dslByMarket = { ...get().dslByMarket };
-        if (!isRunwayMultiMarketStrip(co)) {
-          dslByMarket[co] = dsl;
-        }
-        let full: string;
-        if (isRunwayMultiMarketStrip(co)) {
-          const splitSeg = splitToDslByMarket(dsl);
-          dslByMarket = { ...dslByMarket, ...splitSeg };
-          full = mergeMarketsToMultiDocYaml(dslByMarket, order);
-        } else {
-          full = mergeMarketsToMultiDocYaml(dslByMarket, order);
-        }
-        const fullFinal = full.trim() && looksLikeYamlDsl(full) ? full : dsl;
-        const split = splitToDslByMarket(fullFinal);
-        if (Object.keys(split).length) {
-          dslByMarket = { ...dslByMarket, ...split };
-        }
+        const co = stateAfterFlush.country;
+        const order = stateAfterFlush.runwayMarketOrder;
+        const split = splitToDslByMarket(merged);
+        const dslByMarket = { ...stateAfterFlush.dslByMarket, ...split };
+        const full = mergeMarketsToMultiDocYaml(dslByMarket, order);
         const nextEditorText = isRunwayMultiMarketStrip(co)
           ? mergeMarketsToMultiDocYaml(dslByMarket, runwayCompareMarketIds(co, order))
-          : dsl;
+          : (extractMarketDocument(full, co) ?? dslByMarket[co] ?? merged);
         set({
           dslText: nextEditorText,
           dslByMarket,
         });
-        const r = runPipelineFromDsl(
-          fullFinal,
-          riskTuningForPipelineView(get().riskTuning, co)
-        );
+        const r = runPipelineFromDsl(full, riskTuningForPipelineView(get().riskTuning, co));
         set({
           riskSurface: r.riskSurface,
           configs: r.configs,
@@ -767,61 +847,19 @@ export const useAtcStore = create<AtcState>()(
 
       getLastBootstrapMultiDoc: () => lastBootstrapMultiDoc,
 
-      hydrateFromStorage: (multiDocFallback) => {
+      hydrateFromStorage: async (multiDocFallback) => {
         if (multiDocFallback?.trim() && looksLikeYamlDsl(multiDocFallback)) {
           lastBootstrapMultiDoc = multiDocFallback.trim();
         }
         const { country, dslByMarket, riskTuning, runwayMarketOrder } = get();
-        const mergedFromDisk = mergeMarketsToMultiDocYaml(dslByMarket, runwayMarketOrder);
-        const firstId = runwayMarketOrder[0] ?? FALLBACK_RUNWAY_MARKET_IDS[0]!;
-        let singleFallback: string;
-        if (isRunwayMultiMarketStrip(country)) {
-          const segOrder = runwayCompareMarketIds(country, runwayMarketOrder);
-          const segYaml = mergeMarketsToMultiDocYaml(dslByMarket, segOrder);
-          const fb = segOrder[0] ?? firstId;
-          singleFallback =
-            segYaml.trim() && looksLikeYamlDsl(segYaml)
-              ? segYaml
-              : (dslByMarket[fb] ?? defaultDslForMarket(fb));
-        } else {
-          singleFallback = dslByMarket[country] ?? defaultDslForMarket(country);
-        }
-        if (!looksLikeYamlDsl(singleFallback)) {
-          if (isRunwayMultiMarketStrip(country)) {
-            const fb = runwayCompareMarketIds(country, runwayMarketOrder)[0] ?? firstId;
-            singleFallback = defaultDslForMarket(fb);
-          } else {
-            singleFallback = defaultDslForMarket(country);
-          }
-        }
-        const merged =
-          multiDocFallback?.trim() && looksLikeYamlDsl(multiDocFallback)
-            ? multiDocFallback.trim()
-            : mergedFromDisk;
-        const mergedOk = merged.length > 0 && looksLikeYamlDsl(merged);
-        const diskOk = mergedFromDisk.length > 0 && looksLikeYamlDsl(mergedFromDisk);
-        const bundledCount = mergedOk ? countParsedMarkets(merged) : 0;
-        const diskCount = diskOk ? countParsedMarkets(mergedFromDisk) : 0;
-        /** Prefer bootstrap/cloud multi-doc when it has more markets than in-memory merge (e.g. new shipped markets). */
-        const preferBundled = mergedOk && bundledCount > 0 && (!diskOk || bundledCount > diskCount);
-        const dsl = preferBundled ? merged : diskOk ? mergedFromDisk : mergedOk ? merged : singleFallback;
-        const split = splitToDslByMarket(dsl);
-        const nextByMarket =
-          Object.keys(split).length > 0 ? { ...get().dslByMarket, ...split } : { ...get().dslByMarket };
-        let dslText = dsl;
-        if (isRunwayMultiMarketStrip(country)) {
-          dslText = mergeMarketsToMultiDocYaml(
-            nextByMarket,
-            runwayCompareMarketIds(country, runwayMarketOrder)
-          );
-          if (!looksLikeYamlDsl(dslText)) dslText = singleFallback;
-        } else {
-          dslText =
-            extractMarketDocument(dsl, country) ?? nextByMarket[country] ?? singleFallback;
-          if (!looksLikeYamlDsl(dslText)) dslText = singleFallback;
-        }
-        set({ dslText, dslByMarket: nextByMarket, runwayReturnPicker: null });
-        const r = runPipelineFromDsl(dsl, riskTuningForPipelineView(riskTuning, country));
+        const bundle = computeWorkbenchHydrateBundle({
+          country,
+          dslByMarket,
+          runwayMarketOrder,
+          multiDocFallback,
+        });
+        set({ dslText: bundle.dslText, dslByMarket: bundle.dslByMarket, runwayReturnPicker: null });
+        const r = await runPipelineInWorker(bundle.dslMultiDoc, riskTuningForPipelineView(riskTuning, country));
         set({
           riskSurface: r.riskSurface,
           configs: r.configs,

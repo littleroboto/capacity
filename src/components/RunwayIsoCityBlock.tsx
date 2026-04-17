@@ -1,7 +1,10 @@
-import { memo, useMemo } from 'react';
+import { memo, useId, useMemo } from 'react';
 import { useReducedMotion } from 'motion/react';
-import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
-import { RUNWAY_EMERGE_PAUSE_MS } from '@/hooks/useRunwayHeatmapEmergence';
+import {
+  RUNWAY_EMERGE_PAUSE_MS,
+  runwayHeatmapEmergenceClipRect,
+  useRunwayHeatmapEmergence,
+} from '@/hooks/useRunwayHeatmapEmergence';
 import { useIsoRunwayGrowFactor } from '@/hooks/useIsoRunwayGrowFactor';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
@@ -378,15 +381,16 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
   const qFs = Math.max(10, stepX * 1.9);
   const yrFs = Math.max(9, stepX * 1.7);
 
+  const insetTopPct = useRunwayHeatmapEmergence(growResetKey);
+  const cellClipId = useId().replace(/:/g, '');
+  const clipR = runwayHeatmapEmergenceClipRect(vbW, vbH, insetTopPct);
+
   return (
     <div
       className="relative flex h-[min(86dvh,calc(100dvh-6.5rem))] min-h-0 w-full max-w-full flex-1 flex-col overflow-visible bg-background"
       data-runway-iso-city-block
     >
-      <RunwayHeatmapEmergenceClip
-        resetKey={growResetKey}
-        className="flex h-full min-h-0 w-full flex-1 flex-col"
-      >
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col">
       <svg
         viewBox={`0 0 ${vbW} ${vbH}`}
         width="100%"
@@ -395,6 +399,11 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
         preserveAspectRatio="xMidYMin meet"
         aria-label="Multi-market isometric city block"
       >
+        <defs>
+          <clipPath id={cellClipId} clipPathUnits="userSpaceOnUse">
+            <rect x={clipR.x} y={clipR.y} width={clipR.w} height={clipR.h} />
+          </clipPath>
+        </defs>
         {marketStripSeams.length > 0 ? (
           <g
             className="pointer-events-none text-muted-foreground opacity-[0.2] dark:opacity-[0.34]"
@@ -415,6 +424,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
             ))}
           </g>
         ) : null}
+        <g clipPath={`url(#${cellClipId})`}>
         {cells.map(({ li, mi, di, dayCol, cell, isoW, stagger01 }) => {
           const { ax, ay } = isoCellTopLeft(isoW, di, stepX, stepY);
           const gx = ax - minX;
@@ -484,6 +494,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
             </g>
           );
         })}
+        </g>
 
         {/* Market labels — iso ground plane, back edge */}
         <g className="pointer-events-none" aria-hidden>
@@ -553,7 +564,7 @@ export const RunwayIsoCityBlock = memo(function RunwayIsoCityBlock({
           ))}
         </g>
       </svg>
-      </RunwayHeatmapEmergenceClip>
+      </div>
     </div>
   );
 });

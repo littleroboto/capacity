@@ -44,7 +44,7 @@ export type MarketRiskScalesControlsProps = {
 
 /**
  * Per-component multipliers for the Deployment Risk deployment sum (0–4×).
- * Shown in Business Patterns when the Deployment Risk lens is active.
+ * Shown when the Deployment Risk lens is active (inline runway controls / settings).
  */
 export function MarketRiskScalesControls({ className, compact }: MarketRiskScalesControlsProps) {
   const riskTuning = useAtcStore((s) => s.riskTuning);

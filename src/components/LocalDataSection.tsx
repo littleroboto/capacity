@@ -131,7 +131,7 @@ export function LocalDataPanelContent() {
 
   const clearAppliedDsl = () => {
     const fb = useAtcStore.getState().getLastBootstrapMultiDoc();
-    hydrateFromStorage(fb);
+    void hydrateFromStorage(fb);
   };
 
   const resetPersistedPrefs = () => {

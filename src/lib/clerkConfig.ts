@@ -1,12 +1,16 @@
 /**
  * Optional Clerk sign-in gate. When active, the workbench renders only for signed-in users.
  *
- * - Set `VITE_CLERK_PUBLISHABLE_KEY` (pk_live_… / pk_test_…) from the Clerk dashboard.
- * - Set `VITE_AUTH_DISABLED=1` to force the gate off even if the key is present (e.g. internal preview).
+ * **Canonical (Vercel Clerk integration):** `NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY`
+ * **Legacy:** `VITE_CLERK_PUBLISHABLE_KEY` (same value; kept for older `.env` files)
+ *
+ * Set `VITE_AUTH_DISABLED=1` to force the gate off even if the key is present (e.g. internal preview).
  */
 export function clerkPublishableKey(): string | null {
-  const k = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim();
-  return k || null;
+  const fromIntegration =
+    import.meta.env.NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY?.trim();
+  const legacy = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim();
+  return fromIntegration || legacy || null;
 }
 
 export function isClerkAuthDisabled(): boolean {

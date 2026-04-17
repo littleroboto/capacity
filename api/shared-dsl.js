@@ -1,10 +1,10 @@
-'use strict';
-
 /**
  * Vercel serverless entry for GET|HEAD|PUT `/api/shared-dsl`.
- * Runtime is pre-bundled in `_shared-dsl.runtime.cjs` (see scripts/bundle-shared-dsl.mjs).
+ * Runtime is pre-bundled in `_shared-dsl.runtime.cjs` (see scripts/bundle-api.mjs).
  */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const mod = require('./_shared-dsl.runtime.cjs');
+import { createRequire } from 'node:module';
+
+const nodeRequire = createRequire(import.meta.url);
+const mod = nodeRequire('./_shared-dsl.runtime.cjs');
 const fn = mod.default ?? mod;
-module.exports = fn;
+export default fn;

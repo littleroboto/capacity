@@ -1,8 +1,8 @@
 /**
- * Canonical segment → ordered market ids from `public/data/segments.json`.
- * Compare-strip order and ACL segment expansion both use this module (no duplicated arrays).
+ * Segment → ordered market ids (same content as `public/data/segments.json`).
+ * Vite cannot import from `public/`; `scripts/sync-bundled-market-seeds.mjs` copies the file to `src/data/`.
  */
-import rawSegments from '../../public/data/segments.json';
+import rawSegments from '../data/segments.json';
 
 export type SegmentRegistry = Readonly<Record<string, readonly string[]>>;
 

@@ -7,7 +7,7 @@ import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { marketIdToCircleFlagCode } from '@/lib/marketCircleFlag';
 import { cn } from '@/lib/utils';
 import { useAtcStore } from '@/store/useAtcStore';
-import { GripHorizontal, Maximize2 } from 'lucide-react';
+import { GripHorizontal, LayoutGrid, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const DOCK_H_KEY = 'capacity:dsl-dock-px';
@@ -57,6 +57,8 @@ export function MainDslWorkspace({
   const llmFromToybox = useAtcStore((s) => s.dslLlmAssistantEnabled);
   const showLlmAssistant = llmFromQuery || llmFromToybox;
   const country = useAtcStore((s) => s.country);
+  const setViewMode = useAtcStore((s) => s.setViewMode);
+  const runwayLensBeforeCode = useAtcStore((s) => s.runwayLensBeforeCode);
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
   const dslText = useAtcStore((s) => s.dslText);
   const dslByMarket = useAtcStore((s) => s.dslByMarket);
@@ -197,21 +199,32 @@ export function MainDslWorkspace({
         fillViewport && 'h-full min-h-0'
       )}
     >
-      {onRequestMobileFullscreen ? (
-        <div className="flex shrink-0 items-center justify-end px-2 py-1.5 lg:hidden">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/45 bg-muted/15 px-2 py-1.5 dark:bg-muted/10">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 text-xs"
+          onClick={() => setViewMode(runwayLensBeforeCode)}
+          title="Leave the editor and show the runway heatmap (applies YAML first)"
+        >
+          <LayoutGrid className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+          Heatmap
+        </Button>
+        {onRequestMobileFullscreen ? (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 gap-1.5 text-xs"
+            className="h-8 gap-1.5 text-xs lg:hidden"
             onClick={onRequestMobileFullscreen}
             aria-label="Open YAML editor full screen"
           >
             <Maximize2 className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
             Full screen
           </Button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       {showMarketTabs ? (
         <div
           className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 px-2 pt-1.5"

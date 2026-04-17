@@ -9,6 +9,9 @@ import { FullCapacityAccessProvider } from '@/lib/capacityAccessContext';
 import { clerkPublishableKey, isClerkConfigured } from '@/lib/clerkConfig';
 import { ClerkUkWaitlistPage } from '@/pages/ClerkUkWaitlistPage';
 import { LandingPage } from '@/pages/LandingPage';
+import { AdminClerkBridge } from '@/components/AdminClerkBridge';
+import { AdminMarketOverview } from '@/pages/admin/AdminMarketOverview';
+import { AdminMarketDetail } from '@/pages/admin/AdminMarketDetail';
 import { applyPersistedWorkbenchThemeClass } from '@/lib/syncPersistedWorkbenchTheme';
 import './index.css';
 
@@ -73,6 +76,8 @@ function AppRoutes() {
       {/* Some Clerk setups use this path for the OAuth return URL */}
       <Route path="/sign-in/sso-callback" element={<ClerkOAuthCallbackPage />} />
       <Route path="/app" element={<WorkbenchRoutes />} />
+      <Route path="/admin" element={<SignInGate enabled={gate}><AdminClerkBridge><AdminMarketOverview /></AdminClerkBridge></SignInGate>} />
+      <Route path="/admin/market/:id" element={<SignInGate enabled={gate}><AdminClerkBridge><AdminMarketDetail /></AdminClerkBridge></SignInGate>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

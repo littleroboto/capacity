@@ -11,6 +11,20 @@ export const RUNWAY_EMERGE_DURATION_SEC = 1.08;
 export const RUNWAY_EMERGE_EASE: [number, number, number, number] = [0.18, 0.88, 0.22, 1];
 
 /**
+ * Visible rectangle in SVG user space matching CSS `clip-path: inset(insetTopPct% 0 0 0)`
+ * on a box `{ width, height }` (reveals upward from the bottom).
+ */
+export function runwayHeatmapEmergenceClipRect(
+  width: number,
+  height: number,
+  insetTopPct: number
+): { x: number; y: number; w: number; h: number } {
+  const y = (insetTopPct / 100) * height;
+  const h = Math.max(0, height - y);
+  return { x: 0, y, w: width, h };
+}
+
+/**
  * Percentage clipped from the top (100 = hidden, 0 = fully visible).
  * Re-runs when `resetKey` changes (e.g. market / lens / runway layout identity).
  */

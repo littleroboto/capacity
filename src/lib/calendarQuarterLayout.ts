@@ -537,3 +537,82 @@ export function bestCellPxForSingleMarketFit(
   }
   return best;
 }
+
+/** Number of side-by-side lens columns (Technology, Restaurant, Deployment Risk) in single-market mode. */
+export const SINGLE_MARKET_TRIPLE_LENS_COLUMN_COUNT = 3;
+
+/**
+ * Label row above each lens column: matches compare strip `mb-1.5` + `h-[28px]` (tighter than market stickers).
+ */
+export const SINGLE_MARKET_TRIPLE_LENS_HEADER_STACK_PX = 6 + 28;
+
+/**
+ * Largest stepped cell size so three single-market lens columns (compare-style width) plus shared gutter
+ * fit `availableWidth`, and one vertical month stack fits `availableHeight` with the lens header row.
+ */
+export const SINGLE_MARKET_STACKED_STRIP_GAP_PX = 24;
+
+/**
+ * Largest cell size so **one** lens column + gutter fits the width, and **three** stacked strips
+ * (headers + vertical month layout + gaps) fit the available height.
+ */
+export function bestCellPxForSingleMarketStackedLensFit(
+  availableWidth: number,
+  availableHeight: number,
+  sortedDatesYmd: string[],
+): number {
+  if (!sortedDatesYmd.length || !Number.isFinite(availableWidth) || availableWidth <= 0) {
+    return RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+  }
+  const useHeight =
+    Number.isFinite(availableHeight) && availableHeight >= RUNWAY_COMPARE_FIT_MIN_VIEWPORT_H;
+  const stripCount = SINGLE_MARKET_TRIPLE_LENS_COLUMN_COUNT;
+  const perHeader = SINGLE_MARKET_TRIPLE_LENS_HEADER_STACK_PX + 6;
+  let best = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+  for (
+    let px = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+    px <= RUNWAY_COMPARE_FIT_CELL_PX_MAX;
+    px += RUNWAY_COMPARE_FIT_CELL_PX_STEP
+  ) {
+    if (compareAllRunwayTotalContentWidthPx(px, 1) > availableWidth) continue;
+    if (useHeight) {
+      const layout = buildVerticalMonthsRunwayLayout(sortedDatesYmd, px);
+      if (!layout) continue;
+      const stackH =
+        stripCount * (perHeader + layout.contentHeight) + (stripCount - 1) * SINGLE_MARKET_STACKED_STRIP_GAP_PX;
+      if (stackH > availableHeight) continue;
+    }
+    best = px;
+  }
+  return best;
+}
+
+export function bestCellPxForSingleMarketTripleColumnFit(
+  availableWidth: number,
+  availableHeight: number,
+  sortedDatesYmd: string[]
+): number {
+  if (!sortedDatesYmd.length || !Number.isFinite(availableWidth) || availableWidth <= 0) {
+    return RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+  }
+  const useHeight =
+    Number.isFinite(availableHeight) && availableHeight >= RUNWAY_COMPARE_FIT_MIN_VIEWPORT_H;
+  let best = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+  for (
+    let px = RUNWAY_COMPARE_FIT_CELL_PX_MIN;
+    px <= RUNWAY_COMPARE_FIT_CELL_PX_MAX;
+    px += RUNWAY_COMPARE_FIT_CELL_PX_STEP
+  ) {
+    if (compareAllRunwayTotalContentWidthPx(px, SINGLE_MARKET_TRIPLE_LENS_COLUMN_COUNT) > availableWidth) {
+      continue;
+    }
+    if (useHeight) {
+      const layout = buildVerticalMonthsRunwayLayout(sortedDatesYmd, px);
+      if (!layout) continue;
+      const totalH = SINGLE_MARKET_TRIPLE_LENS_HEADER_STACK_PX + layout.contentHeight;
+      if (totalH > availableHeight) continue;
+    }
+    best = px;
+  }
+  return best;
+}

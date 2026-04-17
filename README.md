@@ -226,10 +226,53 @@ It is still **judgment-led**. The model does not remove leadership; it **grounds
 
 ## Repository map
 
-| Path                   | Role                                                    |
-| ---------------------- | ------------------------------------------------------- |
-| `public/data/markets/` | Per-market scenario YAML                                |
-| `src/`                 | UI, engine, heatmap and runway                          |
-| `api/`                 | Optional shared workspace and server routes             |
-| `docs/`                | Product and technical documentation                     |
-| `docs/images/`         | PNGs referenced inline from the README (and other docs) |
+| Path                        | Role                                                             |
+| --------------------------- | ---------------------------------------------------------------- |
+| `src/`                      | React SPA — workbench UI, engine, heatmap, runway                |
+| `src/pages/admin/`          | Admin UI — market overview, fragment editors, build controls     |
+| `api/`                      | Vercel serverless functions — auth, CRUD, build, publish         |
+| `api/lib/`                  | Shared server utilities — env, Supabase client, scope resolver   |
+| `api/services/`             | Business logic — fragments, assembly, cache, validation, import  |
+| `supabase/migrations/`      | Postgres schema and seed data (managed via Supabase CLI)         |
+| `public/data/markets/`      | Original per-market YAML (reference / seeding source)            |
+| `scripts/`                  | Tooling — API bundler, seeding, verification, RLS tests          |
+| `docs/`                     | Architecture, security, backlog, and product documentation       |
+
+---
+
+## Architecture
+
+The application is built on a **Postgres-driven config assembly** architecture:
+
+```
+Browser (React SPA)
+  ├── Workbench (capacity engine, heatmaps, runway)
+  ├── Admin UI (market config, fragment editors)
+  └── Expert YAML editor (paste/preview/apply)
+      │
+      ▼
+Vercel Serverless Functions (api/)
+  ├── Auth: Clerk JWT → internal scope resolution
+  ├── Fragment CRUD + revision tracking
+  ├── Validation pipeline
+  ├── Assembly pipeline (fragments → YAML)
+  ├── Build/publish lifecycle
+  └── Cache layer (Upstash Redis)
+      │
+      ▼
+Supabase Postgres (source of truth)
+  ├── Organizational hierarchy (operating models → segments → markets)
+  ├── Config fragment tables (campaigns, resources, BAU, trading, etc.)
+  ├── Revision history + audit log
+  ├── Build + artifact records
+  └── Row-level security policies
+```
+
+**Key principles:**
+- **Postgres is the canonical source of truth** for all editable configuration
+- **YAML is a generated artifact** — assembled deterministically from fragments, versioned, immutable once published
+- **Upstash Redis** is a cache layer only — never the source of truth
+- **Clerk** provides authentication; internal scope resolution enforces authorization
+- **Dual-mode authoring** — structured UI forms and expert YAML paste both flow through the same validation and revision pipeline
+
+See [`docs/TECHNICAL_ARCHITECTURE.md`](docs/TECHNICAL_ARCHITECTURE.md) for the full design and [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md) for the security model.

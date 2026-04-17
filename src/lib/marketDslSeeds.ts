@@ -1,15 +1,17 @@
 /**
- * Bundled YAML for offline / failed-fetch fallback. Markets that only exist as files under
- * `public/data/markets/` use `defaultDslForMarket` → `minimalDsl` until you add a `?raw` import here (optional).
+ * Bundled YAML for offline / failed-fetch fallback.
+ * Source of truth for disk + HTTP is still `public/data/markets/*.yaml`; Vite cannot import
+ * from `public/`, so `scripts/sync-bundled-market-seeds.mjs` copies the seed set into `src/data/`
+ * (run from dev / prebuild / postinstall).
  */
-import auDsl from '../../public/data/markets/AU.yaml?raw';
-import caDsl from '../../public/data/markets/CA.yaml?raw';
-import deDsl from '../../public/data/markets/DE.yaml?raw';
-import esDsl from '../../public/data/markets/ES.yaml?raw';
-import frDsl from '../../public/data/markets/FR.yaml?raw';
-import itDsl from '../../public/data/markets/IT.yaml?raw';
-import plDsl from '../../public/data/markets/PL.yaml?raw';
-import ukDsl from '../../public/data/markets/UK.yaml?raw';
+import auDsl from '../data/markets/AU.yaml?raw';
+import caDsl from '../data/markets/CA.yaml?raw';
+import deDsl from '../data/markets/DE.yaml?raw';
+import esDsl from '../data/markets/ES.yaml?raw';
+import frDsl from '../data/markets/FR.yaml?raw';
+import itDsl from '../data/markets/IT.yaml?raw';
+import plDsl from '../data/markets/PL.yaml?raw';
+import ukDsl from '../data/markets/UK.yaml?raw';
 
 const BUNDLED_BY_MARKET: Record<string, string> = {
   AU: auDsl,

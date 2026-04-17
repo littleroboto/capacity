@@ -20,6 +20,7 @@ import {
   capacityYamlThemeId,
   registerCapacityYamlThemes,
 } from '@/lib/monacoCapacityThemes';
+import { registerDslEditorFlush } from '@/lib/dslEditorSyncBridge';
 import { cn } from '@/lib/utils';
 
 /** Long-form YAML reference (also used in the syntax dialog). */
@@ -136,6 +137,8 @@ export function DslEditorCore({
   const tabOnChangeRef = useRef(marketTabDocument?.onTextChange);
   tabOnChangeRef.current = marketTabDocument?.onTextChange;
 
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+
   const editorValue = marketTabDocument?.text ?? dslText;
   const handleEditorChange = useCallback((v: string | undefined) => {
     const tabFn = tabOnChangeRef.current;
@@ -217,6 +220,7 @@ export function DslEditorCore({
   }, []);
 
   const handleMount = useCallback<OnMount>((editor) => {
+    editorRef.current = editor;
     const sync = () => {
       const p = editor.getPosition();
       if (p) setCursorPos({ line: p.lineNumber, column: p.column });
@@ -224,6 +228,21 @@ export function DslEditorCore({
     sync();
     editor.onDidChangeCursorPosition(sync);
   }, []);
+
+  useEffect(() => {
+    registerDslEditorFlush(() => {
+      const ed = editorRef.current;
+      if (!ed || dslAssistantEditorLock || dslMutationLocked) return;
+      const v = ed.getValue();
+      const tabFn = tabOnChangeRef.current;
+      if (tabFn) tabFn(v);
+      else useAtcStore.getState().setDslText(v);
+    });
+    return () => {
+      registerDslEditorFlush(null);
+      editorRef.current = null;
+    };
+  }, [dslAssistantEditorLock, dslMutationLocked]);
 
   const displaySource = editorValue;
   const lineCount = displaySource.split('\n').length;

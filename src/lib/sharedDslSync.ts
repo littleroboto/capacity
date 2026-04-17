@@ -274,8 +274,9 @@ function parseSharedDslErrorDetail(text: string): string | undefined {
   const t = text.trim();
   if (!t.startsWith('{')) return undefined;
   try {
-    const j = JSON.parse(t) as { message?: unknown; hint?: unknown; error?: unknown };
+    const j = JSON.parse(t) as { message?: unknown; hint?: unknown; error?: unknown; code?: unknown };
     const parts: string[] = [];
+    if (typeof j.code === 'string' && j.code.trim()) parts.push(`code:${j.code.trim()}`);
     if (typeof j.error === 'string' && j.error.trim()) parts.push(j.error.trim());
     if (typeof j.message === 'string' && j.message.trim()) parts.push(j.message.trim());
     if (typeof j.hint === 'string' && j.hint.trim()) parts.push(j.hint.trim());
@@ -312,6 +313,7 @@ export function describeSharedDslProbe(d: FetchSharedDslDetailed): string[] {
       lines.unshift(
         `GET returned 401. Server expects a valid Clerk JWT when CLERK_SECRET_KEY is set. Check sign-in, Vercel env CLERK_SECRET_KEY (same instance as publishable key), and CAPACITY_CLERK_AUTHORIZED_PARTIES (must include this origin exactly).`
       );
+      if (d.serverDetail) lines.push(d.serverDetail);
       if (d.authSent === 'legacy') {
         lines.push(
           'You only sent the legacy team secret. Reads (GET) do not accept that when CLERK_SECRET_KEY is set — sign in so the app sends a Clerk session token, or you are hitting an API that still requires JWT.'
@@ -365,7 +367,16 @@ export async function fetchSharedDslDetailed(): Promise<FetchSharedDslDetailed> 
     const built = await buildSharedDslAuth();
     authSent = built.authSent;
     const res = await fetch(apiUrl(), { method: 'GET', cache: 'no-store', headers: built.headers });
-    if (res.status === 401) return { ok: false, authSent, reason: 'unauthorized', httpStatus: 401 };
+    if (res.status === 401) {
+      const raw = await res.text();
+      return {
+        ok: false,
+        authSent,
+        reason: 'unauthorized',
+        httpStatus: 401,
+        serverDetail: parseSharedDslErrorDetail(raw),
+      };
+    }
     if (res.status === 403) {
       const raw = await res.text();
       return {
@@ -516,7 +527,7 @@ export async function pullSharedDslToStore(): Promise<boolean> {
   suppressSharedDslOutboundSync = true;
   try {
     setSharedDslEtag(r.etag || null);
-    useAtcStore.getState().hydrateFromStorage(r.yaml);
+    await useAtcStore.getState().hydrateFromStorage(r.yaml);
     const full = mergeStateToFullMultiDoc(useAtcStore.getState()).trim();
     markSharedDslBaseline(full);
     notifySharedDslConflictCleared();

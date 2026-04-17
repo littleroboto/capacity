@@ -1,5 +1,5 @@
-import { memo, useCallback, useMemo, type KeyboardEvent, type MouseEvent } from 'react';
-import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
+import { memo, useCallback, useId, useMemo, type KeyboardEvent, type MouseEvent } from 'react';
+import { useRunwayHeatmapEmergence, runwayHeatmapEmergenceClipRect } from '@/hooks/useRunwayHeatmapEmergence';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
@@ -67,9 +67,11 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
   );
 
   const emergeKey = emergeResetKey ?? marketKey;
+  const insetTopPct = useRunwayHeatmapEmergence(emergeKey);
+  const cellClipId = useId().replace(/:/g, '');
+  const clipR = runwayHeatmapEmergenceClipRect(width, height, insetTopPct);
 
   return (
-    <RunwayHeatmapEmergenceClip resetKey={emergeKey} className="block shrink-0">
     <svg
       className="block shrink-0 text-foreground"
       width={width}
@@ -78,6 +80,11 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
       role="img"
       aria-label={`Runway heatmap ${marketKey}`}
     >
+      <defs>
+        <clipPath id={cellClipId} clipPathUnits="userSpaceOnUse">
+          <rect x={clipR.x} y={clipR.y} width={clipR.w} height={clipR.h} />
+        </clipPath>
+      </defs>
       <rect width={width} height={height} className="fill-transparent" aria-hidden />
       <g className="pointer-events-none select-none fill-foreground" aria-hidden>
         {yearLabels.map((yl, i) => (
@@ -136,6 +143,7 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
           </text>
         ))}
       </g>
+      <g clipPath={`url(#${cellClipId})`}>
       {cells.map((c, i) => {
         if (c.cell === false) return null;
         const dateStr = c.cell;
@@ -183,7 +191,7 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
           </g>
         );
       })}
+      </g>
     </svg>
-    </RunwayHeatmapEmergenceClip>
   );
 });

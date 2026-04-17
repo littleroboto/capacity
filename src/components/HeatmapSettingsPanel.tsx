@@ -30,7 +30,7 @@ type HeatmapSettingsPanelProps = {
   /** When false, Campaign Boost row is omitted (Technology Teams lens). */
   showCampaignBoost: boolean;
   /**
-   * When false, heatmap transfer is omitted here — Restaurant Activity uses Business Patterns for transfer (same global
+   * When false, heatmap transfer is omitted here — Restaurant Activity tuning may live in admin trading fragments (same global
    * store as Settings for other lenses).
    */
   showHeatmapTransferTuning: boolean;

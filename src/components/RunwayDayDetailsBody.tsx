@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { TermWithDefinition } from '@/components/DefinitionInfo';
 import type { RunwayTooltipPayload } from '@/lib/runwayTooltipBreakdown';
 import {
@@ -12,6 +13,30 @@ import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
 
 export type DayDetailsPresentation = 'popover' | 'markdown';
+
+/** Side panel: stagger short sections so drivers / programmes read as layered “events”. */
+function MarkdownReveal({
+  children,
+  cascadeIndex,
+}: {
+  children: ReactNode;
+  cascadeIndex: number;
+}) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.34,
+        delay: reduce ? 0 : 0.07 * cascadeIndex,
+        ease: [0.22, 0.61, 0.36, 1],
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 function parseRgbHex6(hex: string): [number, number, number] | null {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
@@ -559,7 +584,7 @@ export function RunwayDayDetailsPayloadBody({
         ) : null}
 
         {presentation === 'markdown' ? (
-          <>
+          <MarkdownReveal cascadeIndex={0}>
             <h3 className="mt-0 text-sm font-semibold tracking-tight text-foreground">What shaped this day</h3>
             <div
               className={cn(
@@ -580,11 +605,11 @@ export function RunwayDayDetailsPayloadBody({
                 </div>
               ))}
             </div>
-          </>
+          </MarkdownReveal>
         ) : null}
 
         {presentation === 'markdown' && p.viewMode === 'combined' ? (
-          <>
+          <MarkdownReveal cascadeIndex={1}>
             <h3 className="mt-6 text-sm font-semibold tracking-tight text-foreground">Tech programmes</h3>
             {primaryTech.shown.length > 0 ? (
               <BulletList items={primaryTech.shown} presentation={presentation} />
@@ -594,11 +619,11 @@ export function RunwayDayDetailsPayloadBody({
             {primaryTech.more > 0 ? (
               <p className="mt-1 text-xs italic text-muted-foreground">+{primaryTech.more} more</p>
             ) : null}
-          </>
+          </MarkdownReveal>
         ) : null}
 
         {presentation === 'markdown' && (p.viewMode === 'in_store' || p.viewMode === 'market_risk') ? (
-          <>
+          <MarkdownReveal cascadeIndex={1}>
             <h3 className="mt-6 text-sm font-semibold tracking-tight text-foreground">Marketing campaigns</h3>
             {primaryCamps.shown.length > 0 ? (
               <BulletList items={primaryCamps.shown} presentation={presentation} />
@@ -616,7 +641,7 @@ export function RunwayDayDetailsPayloadBody({
                 <span className="text-muted-foreground/90"> — no store marketing uplift.</span>
               </p>
             ) : null}
-          </>
+          </MarkdownReveal>
         ) : null}
 
         {camps.shown.length > 0 && presentation !== 'markdown' ? (
@@ -691,18 +716,22 @@ export function RunwayDayDetailsPayloadBody({
         ) : null}
 
         {presentation === 'markdown' && p.row.public_holiday_flag ? (
-          <div className="mt-6 rounded-md border border-sky-500/35 bg-sky-500/10 px-3 py-3 dark:border-sky-400/30 dark:bg-sky-400/10">
-            <p className="text-xs font-semibold text-sky-950 dark:text-sky-200">Public holiday</p>
-            <p className="mt-1.5 text-sm font-medium leading-snug text-foreground">
-              {p.publicHolidayName ?? 'Stub calendar'}
-            </p>
-          </div>
+          <MarkdownReveal cascadeIndex={2}>
+            <div className="mt-6 rounded-md border border-sky-500/35 bg-sky-500/10 px-3 py-3 dark:border-sky-400/30 dark:bg-sky-400/10">
+              <p className="text-xs font-semibold text-sky-950 dark:text-sky-200">Public holiday</p>
+              <p className="mt-1.5 text-sm font-medium leading-snug text-foreground">
+                {p.publicHolidayName ?? 'Stub calendar'}
+              </p>
+            </div>
+          </MarkdownReveal>
         ) : null}
 
         {presentation === 'markdown' && p.row.school_holiday_flag ? (
-          <p className="mt-5 text-sm font-medium leading-relaxed text-muted-foreground">
-            School break — the model may treat this as a busier or tighter week.
-          </p>
+          <MarkdownReveal cascadeIndex={3}>
+            <p className="mt-5 text-sm font-medium leading-relaxed text-muted-foreground">
+              School break — the model may treat this as a busier or tighter week.
+            </p>
+          </MarkdownReveal>
         ) : null}
       </div>
     </article>

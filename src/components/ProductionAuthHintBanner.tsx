@@ -36,11 +36,15 @@ export function ProductionAuthHintBanner() {
         role="status"
       >
         <p className="min-w-0 flex-1 leading-snug">
-          Sign-in is off: this build has no{' '}
+          Sign-in is off: this build has no Clerk publishable key (
+          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">
+            NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY
+          </code>{' '}
+          or legacy{' '}
           <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">
             VITE_CLERK_PUBLISHABLE_KEY
           </code>
-          . Add it under Vercel → Project → Environment Variables (Production), then redeploy so the key is baked into the bundle.
+          ). Add it under Vercel → Project → Environment Variables (Production), then redeploy so the key is baked into the bundle.
         </p>
         <Button
           type="button"
@@ -92,9 +96,15 @@ export function ProductionAuthHintBanner() {
         <p className="min-w-0 flex-1 leading-snug">
           Clerk is in development mode (<code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">pk_test_…</code>
           ). For production, use your Clerk production instance: set{' '}
-          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">VITE_CLERK_PUBLISHABLE_KEY</code> to{' '}
+          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">
+            NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY
+          </code>{' '}
+          to{' '}
           <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">pk_live_…</code> and{' '}
-          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">CLERK_SECRET_KEY</code> to{' '}
+          <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">
+            CLERK_AUTHENTICATION_CLERK_SECRET_KEY
+          </code>{' '}
+          to{' '}
           <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.7rem] dark:bg-white/10">sk_live_…</code> on Vercel, then redeploy. In the Clerk dashboard, turn off dev-only conveniences under your production app settings as needed.
         </p>
         <Button

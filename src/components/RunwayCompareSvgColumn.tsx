@@ -1,5 +1,5 @@
-import { memo, useCallback, useMemo } from 'react';
-import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
+import { memo, useCallback, useId, useMemo } from 'react';
+import { useRunwayHeatmapEmergence, runwayHeatmapEmergenceClipRect } from '@/hooks/useRunwayHeatmapEmergence';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
@@ -7,6 +7,11 @@ import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatma
 import { layoutCompareMarketColumnSvg } from '@/lib/runwayCompareSvgLayout';
 import type { VerticalYearSection } from '@/lib/calendarQuarterLayout';
 import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
+import {
+  effectiveLedgerFootprintOverlap,
+  LEDGER_EMPTY_DAY_OPACITY_FACTOR,
+  ledgerAttributionNeutralFillHex,
+} from '@/lib/runwayLedgerAttribution';
 
 type RunwayTipAnchor = { clientX: number; clientY: number };
 
@@ -35,6 +40,10 @@ export type RunwayCompareSvgColumnProps = {
   emergeResetKey?: string;
   /** Extra delay before this column’s reveal (compare-all wave). */
   emergeStaggerMs?: number;
+  /** Activity ledger selection → per-day footprint (single-market attribution). */
+  ledgerAttribution?: { overlapByDay: Map<string, number>; lens: Exclude<ViewModeId, 'code'> } | null;
+  /** Matches store: N=0 raw overlap → one baseline stratum when true. */
+  ledgerImplicitBaselineFootprint?: boolean;
 };
 
 function svgClientPoint(e: React.MouseEvent | React.KeyboardEvent, fallbackW: number, fallbackH: number) {
@@ -62,6 +71,8 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
   preferReducedMotion = false,
   emergeResetKey,
   emergeStaggerMs = 0,
+  ledgerAttribution = null,
+  ledgerImplicitBaselineFootprint = true,
 }: RunwayCompareSvgColumnProps) {
   const { width, height, cells, monthLabels, weekdayLabels } = useMemo(
     () => layoutCompareMarketColumnSvg(sections, cellPx, gap, monthStripW, firstCalendarMonthKey),
@@ -79,13 +90,11 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
   );
 
   const emergeKey = emergeResetKey ?? marketKey;
+  const insetTopPct = useRunwayHeatmapEmergence(emergeKey, { staggerMs: emergeStaggerMs });
+  const cellClipId = useId().replace(/:/g, '');
+  const clipR = runwayHeatmapEmergenceClipRect(width, height, insetTopPct);
 
   return (
-    <RunwayHeatmapEmergenceClip
-      resetKey={emergeKey}
-      staggerMs={emergeStaggerMs}
-      className="block shrink-0"
-    >
     <svg
       className="block shrink-0 text-foreground"
       width={width}
@@ -94,6 +103,11 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
       role="img"
       aria-label={`Runway heatmap column ${marketKey}`}
     >
+      <defs>
+        <clipPath id={cellClipId} clipPathUnits="userSpaceOnUse">
+          <rect x={clipR.x} y={clipR.y} width={clipR.w} height={clipR.h} />
+        </clipPath>
+      </defs>
       <rect width={width} height={height} className="fill-transparent" aria-hidden />
       <g className="pointer-events-none select-none fill-muted-foreground" aria-hidden>
         {weekdayLabels.map((wd, wi) => (
@@ -123,16 +137,28 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
           </text>
         ))}
       </g>
+      <g clipPath={`url(#${cellClipId})`}>
       {cells.map((c, i) => {
         if (c.cell === false) return null;
         const dateStr = c.cell;
         const row = dateStr ? riskByDate.get(dateStr) : undefined;
         const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
-        const { fill, dimOpacity: dimOp } = !dateStr
+        const { fill: baseFill, dimOpacity: dimOp } = !dateStr
           ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
           : runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
+        let fill = baseFill;
+        let overlap = 0;
+        if (ledgerAttribution && dateStr) {
+          overlap = effectiveLedgerFootprintOverlap(
+            ledgerAttribution.overlapByDay.get(dateStr) ?? 0,
+            ledgerImplicitBaselineFootprint,
+          );
+          fill = overlap === 0 ? ledgerAttributionNeutralFillHex() : baseFill;
+        }
         const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
-        const opacity = pastDimmed ? 0.25 * dimOp : dimOp;
+        const ledgerEmptyNonOverlap = Boolean(ledgerAttribution && dateStr && overlap === 0);
+        const opacity =
+          (pastDimmed ? 0.25 * dimOp : dimOp) * (ledgerEmptyNonOverlap ? LEDGER_EMPTY_DAY_OPACITY_FACTOR : 1);
         const isToday = typeof dateStr === 'string' && dateStr === todayYmd;
         const inPulseRange =
           pulseDateRange != null &&
@@ -153,7 +179,7 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
               fill={fill}
               opacity={opacity}
               className="stroke-border/35"
-              strokeWidth={0.5}
+              strokeWidth={ledgerAttribution && overlap > 1 ? 1.25 : 0.5}
               style={interactionDisabled ? undefined : { cursor: 'pointer' }}
               role={interactionDisabled ? 'presentation' : 'button'}
               tabIndex={interactionDisabled ? undefined : 0}
@@ -194,10 +220,27 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
                 pointerEvents="none"
               />
             ) : null}
+            {ledgerAttribution && overlap > 1 ? (
+              <text
+                x={c.x + c.w - 1}
+                y={c.y + c.h - 1}
+                textAnchor="end"
+                dominantBaseline="ideographic"
+                fill="#fff"
+                className="font-bold"
+                stroke="rgba(0,0,0,0.32)"
+                strokeWidth={0.45}
+                paintOrder="stroke fill"
+                style={{ fontSize: Math.max(6, c.w * 0.28) }}
+                pointerEvents="none"
+              >
+                {overlap}
+              </text>
+            ) : null}
           </g>
         );
       })}
+      </g>
     </svg>
-    </RunwayHeatmapEmergenceClip>
   );
 });

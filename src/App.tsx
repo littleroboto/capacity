@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
@@ -10,10 +11,12 @@ import { WORKBENCH_SPLIT_HANDLE_PX, WorkbenchSplitHandle } from '@/components/Wo
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
 import { MainDslWorkspace } from '@/components/MainDslWorkspace';
 import { RunwayGrid, type SlotSelection } from '@/components/RunwayGrid';
+import { RunwayHeatmapSkeleton } from '@/components/RunwayHeatmapSkeleton';
 import { looksLikeYamlDsl } from '@/lib/dslGuards';
 import { defaultDslForMarket } from '@/lib/marketDslSeeds';
 import { publicAsset } from '@/lib/publicUrl';
 import { mergeMarketsToMultiDocYaml } from '@/lib/mergeMarketYaml';
+import { deferTwoAnimationFrames } from '@/lib/deferPaint';
 import { fetchRunwayMarketOrder } from '@/lib/runwayManifest';
 import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
@@ -30,9 +33,13 @@ import {
 } from '@/lib/sharedDslSync';
 
 const MIN_DSL_PANEL_PX = 280;
-const DEFAULT_DSL_PANEL_PX = 520;
+/** Initial width for the controls column (Focus, year, shortcuts). Drag the split handle to resize. */
+const DEFAULT_DSL_PANEL_PX = 392;
+
+type RunwayBootstrapUi = { message: string; progressLabel?: string };
 
 export default function App() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const access = useCapacityAccess();
   const accessBootstrapKey = useMemo(() => {
     if (access.legacyFullAccess || access.admin) return 'full';
@@ -56,6 +63,10 @@ export default function App() {
   const [mobileCodeFullscreen, setMobileCodeFullscreen] = useState(false);
 
   const [dslRightWidthPx, setDslRightWidthPx] = useState(DEFAULT_DSL_PANEL_PX);
+  /** Non-null while initial market YAML + first pipeline run are in flight (heatmap area only). */
+  const [runwayBootstrap, setRunwayBootstrap] = useState<RunwayBootstrapUi | null>({
+    message: 'Preparing workbench…',
+  });
 
   useEffect(() => {
     if (!lgUp || dslPanelLayoutCollapsed || !mainGridRef.current) return;
@@ -96,6 +107,17 @@ export default function App() {
     document.title = 'Segment Workbench';
   }, []);
 
+  /** Deep-link from admin (or bookmarks): `/app?market=DE` focuses that market once, then strip the query. */
+  useEffect(() => {
+    const m = searchParams.get('market') ?? searchParams.get('country');
+    if (!m?.trim()) return;
+    useAtcStore.getState().setCountry(m.trim(), {});
+    const next = new URLSearchParams(searchParams);
+    next.delete('market');
+    next.delete('country');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   useEffect(() => {
     if (isRunwayMultiMarketStrip(country) && viewMode === 'code') {
       setViewMode('combined');
@@ -126,36 +148,124 @@ export default function App() {
     let cancelled = false;
     let stopOutboundSync: (() => void) | undefined;
     const { setDslByMarket, setRunwayMarketOrder, hydrateFromStorage } = useAtcStore.getState();
+    setRunwayBootstrap({ message: 'Loading workspace…' });
 
-    (async () => {
-      const order = await fetchRunwayMarketOrder();
-      const orderEffective =
-        access.legacyFullAccess || access.admin
-          ? order
-          : filterManifestOrderForAccess(order, access);
-      const dslByMarket: Record<string, string> = {};
-      for (const id of orderEffective) {
+    const loadOneMarketYaml = async (id: string): Promise<readonly [string, string] | null> => {
+      try {
         try {
           const r = await fetch(publicAsset(`data/markets/${id}.yaml`));
           if (r.ok) {
             const text = await r.text();
-            if (looksLikeYamlDsl(text)) dslByMarket[id] = text;
+            if (looksLikeYamlDsl(text)) return [id, text] as const;
           }
         } catch {
           /* ignore */
         }
-        if (!dslByMarket[id]) {
-          const seed = defaultDslForMarket(id);
-          if (looksLikeYamlDsl(seed)) dslByMarket[id] = seed;
+        const seed = defaultDslForMarket(id);
+        if (looksLikeYamlDsl(seed)) return [id, seed] as const;
+        return null;
+      } catch {
+        return null;
+      }
+    };
+
+    const loadYamlMap = async (
+      ids: readonly string[],
+      bump?: () => void
+    ): Promise<Record<string, string>> => {
+      const out: Record<string, string> = {};
+      const loaded = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const row = await loadOneMarketYaml(id);
+            return row;
+          } finally {
+            bump?.();
+          }
+        })
+      );
+      for (const row of loaded) {
+        if (row) {
+          const [id, text] = row;
+          out[id] = text;
         }
       }
+      return out;
+    };
+
+    (async () => {
+      setRunwayBootstrap({ message: 'Fetching market directory…' });
+      const order = await fetchRunwayMarketOrder();
       if (cancelled) return;
+      const orderEffective =
+        access.legacyFullAccess || access.admin
+          ? order
+          : filterManifestOrderForAccess(order, access);
+      const focusCountry = useAtcStore.getState().country;
+      const canStageYamlFirst =
+        !isSharedDslEnabled() &&
+        !isRunwayMultiMarketStrip(focusCountry) &&
+        orderEffective.includes(focusCountry);
+
+      let dslByMarket: Record<string, string> | undefined;
+      let didStagedTwoPhaseHydrate = false;
+
+      if (canStageYamlFirst) {
+        setRunwayBootstrap({ message: `Loading ${focusCountry}…` });
+        const partial = await loadYamlMap([focusCountry]);
+        if (cancelled) return;
+        if (partial[focusCountry]) {
+          setRunwayMarketOrder(orderEffective);
+          setDslByMarket(partial);
+          setRunwayBootstrap({
+            message: 'Computing runway and heatmaps…',
+            progressLabel: undefined,
+          });
+          await deferTwoAnimationFrames();
+          if (cancelled) return;
+          await hydrateFromStorage(mergeMarketsToMultiDocYaml(partial, orderEffective));
+          if (cancelled) return;
+          setRunwayBootstrap(null);
+
+          const restIds = orderEffective.filter((id) => id !== focusCountry);
+          const more = await loadYamlMap(restIds);
+          if (cancelled) return;
+          dslByMarket = { ...partial, ...more };
+          setRunwayMarketOrder(orderEffective);
+          setDslByMarket(dslByMarket);
+          await deferTwoAnimationFrames();
+          if (cancelled) return;
+          await hydrateFromStorage(mergeMarketsToMultiDocYaml(dslByMarket, orderEffective));
+          didStagedTwoPhaseHydrate = true;
+        }
+      }
+
+      if (dslByMarket == null) {
+        const totalYaml = orderEffective.length;
+        let yamlDone = 0;
+        const bumpYamlProgress = () => {
+          if (cancelled) return;
+          yamlDone += 1;
+          setRunwayBootstrap({
+            message: 'Loading market YAML in parallel…',
+            progressLabel: `${yamlDone} / ${totalYaml}`,
+          });
+        };
+        setRunwayBootstrap({
+          message: 'Loading market YAML in parallel…',
+          progressLabel: `0 / ${totalYaml}`,
+        });
+        dslByMarket = await loadYamlMap(orderEffective, bumpYamlProgress);
+        if (cancelled) return;
+      }
 
       let multiDocFallback = mergeMarketsToMultiDocYaml(dslByMarket, orderEffective);
 
       if (isSharedDslEnabled()) {
+        setRunwayBootstrap({ message: 'Preparing cloud workspace session…' });
         await waitForSharedDslFetchAuth();
         if (cancelled) return;
+        setRunwayBootstrap({ message: 'Fetching shared YAML from team workspace…' });
         const detail = await fetchSharedDslDetailed();
         if (cancelled) return;
         if (detail.ok) {
@@ -166,8 +276,11 @@ export default function App() {
             dslByMarket[k] = v;
           }
         } else if (detail.reason === 'unauthorized' && !cancelled) {
+          const fromApi = detail.serverDetail?.trim();
           setCloudLoadWarning(
-            'The team cloud workspace did not authorize this session (HTTP 401). You are viewing bundled market YAML only. Check sign-in, Vercel CLERK_SECRET_KEY, and CAPACITY_CLERK_AUTHORIZED_PARTIES, then reload — or open Workspace below for a connection check.'
+            `The team cloud workspace did not authorize this session (HTTP 401). You are viewing bundled market YAML only.${
+              fromApi ? ` Server: ${fromApi}` : ''
+            } Open Workspace below for a connection check, or reload after fixing Clerk keys / sign-in.`
           );
         } else if (detail.reason === 'forbidden' && !cancelled) {
           setCloudLoadWarning(
@@ -176,13 +289,26 @@ export default function App() {
         }
       }
 
-      setRunwayMarketOrder(orderEffective);
-      setDslByMarket(dslByMarket);
-      hydrateFromStorage(multiDocFallback);
+      const needsBundledHydrate = !didStagedTwoPhaseHydrate || isSharedDslEnabled();
+      if (needsBundledHydrate) {
+        setRunwayBootstrap({
+          message: 'Computing runway and heatmaps…',
+          progressLabel: undefined,
+        });
+        setRunwayMarketOrder(orderEffective);
+        setDslByMarket(dslByMarket);
+        await deferTwoAnimationFrames();
+        if (cancelled) return;
+        await hydrateFromStorage(multiDocFallback);
+      }
+
       markSharedDslBaseline(mergeStateToFullMultiDoc(useAtcStore.getState()));
 
       if (!cancelled && isSharedDslEnabled()) {
         stopOutboundSync = initSharedDslOutboundSync();
+      }
+      if (!cancelled) {
+        setRunwayBootstrap(null);
       }
     })();
 
@@ -280,7 +406,14 @@ export default function App() {
                     ) : null}
                     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
                       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
-                        <RunwayGrid riskSurface={riskSurface} viewMode={viewMode} onSlotSelection={onSlotSelection} />
+                        {runwayBootstrap ? (
+                          <RunwayHeatmapSkeleton
+                            message={runwayBootstrap.message}
+                            progressLabel={runwayBootstrap.progressLabel}
+                          />
+                        ) : (
+                          <RunwayGrid riskSurface={riskSurface} viewMode={viewMode} onSlotSelection={onSlotSelection} />
+                        )}
                       </div>
                     </div>
                   </>

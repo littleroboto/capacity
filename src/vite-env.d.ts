@@ -13,7 +13,9 @@ declare global {
 interface ImportMetaEnv {
   /** When `1` or `true`, load/save workspace YAML via `/api/shared-dsl` (Vercel Blob). */
   readonly VITE_SHARED_DSL?: string;
-  /** Clerk publishable key — when set (and not disabled), the workbench requires sign-in. */
+  /** Vercel Clerk integration publishable key (canonical). */
+  readonly NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY?: string;
+  /** Legacy Clerk publishable key — same value as `NEXT_PUBLIC_CLERK_AUTHENTICATION_*` if you used Vite-only env before. */
   readonly VITE_CLERK_PUBLISHABLE_KEY?: string;
   /** Comma-separated emails allowed to use the workbench (must match server `CAPACITY_ALLOWED_USER_EMAILS`). */
   readonly VITE_ALLOWED_USER_EMAILS?: string;

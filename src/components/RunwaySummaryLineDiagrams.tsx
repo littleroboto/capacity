@@ -1,10 +1,7 @@
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import type { ViewModeId } from '@/lib/constants';
 import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
-import {
-  smoothLineThroughMild,
-  type GapRibbonLayout,
-} from '@/lib/runwayGapRibbonPaths';
+import { polylineThrough, smoothLineThroughMild, type GapRibbonLayout } from '@/lib/runwayGapRibbonPaths';
 import { runwayPickerLayoutBounds } from '@/lib/runwayDateFilter';
 import {
   buildRunwayMiniTimeAxisMarks,
@@ -23,6 +20,12 @@ import {
   miniChartDataIndexForDayYmd,
   techMixMonthlyRowsToShares,
 } from '@/lib/runwaySummaryMiniSeries';
+import type { MarketActivityLedger } from '@/lib/marketActivityLedger';
+import {
+  activeLedgerEntryIds,
+  ledgerBandsForMiniChart,
+  type LedgerMiniChartBand,
+} from '@/lib/runwayLedgerAttribution';
 import { deploymentRiskHeatmapMetric, inStoreHeatmapMetric } from '@/lib/runwayViewMetrics';
 import { formatDateYmd } from '@/lib/weekRunway';
 import { useAtcStore } from '@/store/useAtcStore';
@@ -51,12 +54,24 @@ const DR_CHART_MARGIN = { top: 12, right: 6, bottom: 22, left: 28 };
 
 type MiniMargin = { top: number; right: number; bottom: number; left: number };
 
-/* ── theme ── */
-const ZINC_FG = 'var(--color-zinc-950)';
-const ZINC_FG_DIM = 'hsl(var(--muted-foreground))';
+/* ── SVG paint: CSS vars from index.css (Tailwind JIT often skips classes that only appear in TS string constants) ── */
+const RS = {
+  grid: 'var(--runway-spark-grid)',
+  axisTick: 'var(--runway-spark-axis-tick)',
+  line: 'var(--runway-spark-line)',
+  lineMuted: 'var(--runway-spark-line-muted)',
+  capacityLine: 'var(--runway-spark-capacity-line)',
+  scalarArea: 'var(--runway-spark-scalar-area)',
+  gapUnder: 'var(--runway-spark-gap-under)',
+  legendUnder: 'var(--runway-spark-legend-under)',
+  attrib: 'var(--runway-spark-attrib)',
+  mixBau: 'var(--runway-spark-mix-bau)',
+  mixCamp: 'var(--runway-spark-mix-campaign)',
+  mixProj: 'var(--runway-spark-mix-programme)',
+} as const;
 
 const TICK_LABEL_PROPS = {
-  fill: ZINC_FG_DIM,
+  fill: RS.axisTick,
   fontSize: 7.5,
   fontFamily: 'inherit',
   letterSpacing: '0.01em',
@@ -64,30 +79,21 @@ const TICK_LABEL_PROPS = {
 
 const AXIS_TICK_LENGTH = 3;
 
-/* ── style constants ── */
-const SCALAR_AREA_FILL_CLASS = 'fill-zinc-400/40 dark:fill-zinc-600/32';
-const MINI_INK_STROKE = 'stroke-zinc-950 dark:stroke-white';
-const MINI_INK_STROKE_SOFT = 'stroke-zinc-500/75 dark:stroke-white/30';
 const MINI_STROKE_W = 1.5;
 const MINI_STROKE_VEC = { strokeWidth: MINI_STROKE_W, vectorEffect: 'non-scaling-stroke' as const };
 
 const LEGEND_LINE_LEN = 18;
 
 /** Inline stroke sample matching mini-chart line weight (legends only). */
-function LegendStrokeLine({ strokeDasharray }: { strokeDasharray?: string }) {
+function LegendStrokeLine({ strokeDasharray, stroke = RS.line }: { strokeDasharray?: string; stroke?: string }) {
   return (
-    <svg
-      width={LEGEND_LINE_LEN + 4}
-      height={10}
-      className="shrink-0 text-foreground"
-      aria-hidden
-    >
+    <svg width={LEGEND_LINE_LEN + 4} height={10} className="shrink-0" aria-hidden>
       <line
         x1={2}
         y1={5}
         x2={LEGEND_LINE_LEN + 2}
         y2={5}
-        stroke="currentColor"
+        stroke={stroke}
         strokeWidth={1.35}
         strokeLinecap="round"
         {...(strokeDasharray ? { strokeDasharray } : {})}
@@ -96,14 +102,12 @@ function LegendStrokeLine({ strokeDasharray }: { strokeDasharray?: string }) {
   );
 }
 
-/** Fill chip matching capacity gap fills. */
-function LegendFillChip({ className }: { className: string }) {
+/** Fill chip for legend swatches (span — not SVG — so use backgroundColor). */
+function LegendFillChip({ fill }: { fill: string }) {
   return (
     <span
-      className={cn(
-        'inline-block h-2.5 w-3.5 shrink-0 rounded-sm ring-1 ring-inset ring-black/10 dark:ring-white/15',
-        className,
-      )}
+      className="inline-block h-2.5 w-3.5 shrink-0 rounded-sm ring-1 ring-inset ring-black/10 dark:ring-white/15"
+      style={{ backgroundColor: fill }}
       aria-hidden
     />
   );
@@ -112,15 +116,16 @@ function LegendFillChip({ className }: { className: string }) {
 /** Tiny area + line silhouette like scalar runway minis. */
 function LegendScalarSpark() {
   return (
-    <svg width={24} height={11} className="shrink-0 text-foreground" aria-hidden>
+    <svg width={24} height={11} className="shrink-0" aria-hidden>
       <path
         d="M 1 8.5 L 5.5 5 L 10 7 L 14.5 3.5 L 19 6 L 23 4 L 23 10 L 1 10 Z"
-        className={SCALAR_AREA_FILL_CLASS}
+        fill={RS.scalarArea}
+        stroke="none"
       />
       <path
         d="M 1 8.5 L 5.5 5 L 10 7 L 14.5 3.5 L 19 6 L 23 4"
         fill="none"
-        stroke="currentColor"
+        stroke={RS.line}
         strokeWidth={1.2}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -167,8 +172,8 @@ function scalePoints(vals: number[], xScale: ScaleFn, yScale: ScaleFn): Pt[] {
   }));
 }
 
-function smoothAreaToBaselineScaled(pts: Pt[], baselineY: number): string {
-  const line = smoothLineThroughMild(pts);
+function polylineAreaToBaselineScaled(pts: Pt[], baselineY: number): string {
+  const line = polylineThrough(pts);
   if (!line) return '';
   const f = (n: number) => n.toFixed(2);
   return `${line} L ${f(pts[pts.length - 1]!.x)} ${f(baselineY)} L ${f(pts[0]!.x)} ${f(baselineY)} Z`;
@@ -222,8 +227,6 @@ function gapPathsScaled(
 const Y_TICK_VALUES = [0, 0.5, 1];
 const pctFormat = (v: number) => `${Math.round(v * 100)}%`;
 
-const CROSSHAIR_STROKE = ZINC_FG_DIM;
-
 function nearestIndexFromLocalX(localX: number, n: number, innerW: number): number {
   if (n <= 1) return 0;
   const t = Math.min(1, Math.max(0, localX / innerW));
@@ -234,17 +237,19 @@ function CapacityDemandOverlay({ demand, capacity, s }: { demand: number[]; capa
   const dPts = scalePoints(demand, s.xScale, s.yScale);
   const cPts = scalePoints(capacity, s.xScale, s.yScale);
   const gap = gapPathsScaled(demand, capacity, dPts, cPts);
-  const demandLine = smoothLineThroughMild(dPts);
-  const capacityLine = smoothLineThroughMild(cPts);
+  const demandLine = polylineThrough(dPts);
+  const capacityLine = polylineThrough(cPts);
   return (
     <>
-      {gap.under && <path d={gap.under} className={SCALAR_AREA_FILL_CLASS} stroke="none" pointerEvents="none" />}
+      {gap.under && (
+        <path d={gap.under} fill={RS.gapUnder} stroke="none" pointerEvents="none" />
+      )}
       {gap.over && <path d={gap.over} className="fill-red-500/50 dark:fill-red-400/48" stroke="none" pointerEvents="none" />}
       <path
         d={capacityLine}
         fill="none"
-        className={MINI_INK_STROKE}
-        strokeOpacity={0.9}
+        stroke={RS.capacityLine}
+        strokeOpacity={0.95}
         {...MINI_STROKE_VEC}
         strokeDasharray="5 3"
         strokeLinecap="round"
@@ -253,7 +258,7 @@ function CapacityDemandOverlay({ demand, capacity, s }: { demand: number[]; capa
       <path
         d={demandLine}
         fill="none"
-        className={MINI_INK_STROKE}
+        stroke={RS.line}
         {...MINI_STROKE_VEC}
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -278,7 +283,8 @@ function SelectedDayLine({
   return (
     <line
       x1={x} x2={x} y1={0} y2={s.innerH}
-      className={cn('pointer-events-none', isToday ? 'stroke-muted-foreground' : MINI_INK_STROKE)}
+      className="pointer-events-none"
+      stroke={isToday ? RS.lineMuted : RS.line}
       {...MINI_STROKE_VEC}
       strokeOpacity={isToday ? 0.88 : 0.78}
       {...(isToday ? { strokeDasharray: SELECTED_TODAY_LINE_DASH } : {})}
@@ -286,46 +292,55 @@ function SelectedDayLine({
   );
 }
 
-function ScalarAreaFill({ vals, fillClassName, s }: { vals: number[]; fillClassName: string; s: MiniScales }) {
+function ScalarAreaFill({ vals, s }: { vals: number[]; s: MiniScales }) {
   const pts = scalePoints(vals, s.xScale, s.yScale);
   const baselineY = s.yScale(0);
-  const area = smoothAreaToBaselineScaled(pts, baselineY);
+  const area = polylineAreaToBaselineScaled(pts, baselineY);
   if (!area) return null;
-  return (
-    <path d={area} className={cn(fillClassName, MINI_INK_STROKE_SOFT)} {...MINI_STROKE_VEC} paintOrder="fill stroke" pointerEvents="none" />
-  );
+  return <path d={area} fill={RS.scalarArea} stroke="none" pointerEvents="none" />;
 }
 
 function ScalarLinePath({ vals, s }: { vals: number[]; s: MiniScales }) {
   const pts = scalePoints(vals, s.xScale, s.yScale);
-  const line = smoothLineThroughMild(pts);
-  if (!line) return null;
-  return (
-    <path d={line} fill="none" className={MINI_INK_STROKE} {...MINI_STROKE_VEC} strokeLinejoin="round" strokeLinecap="round" pointerEvents="none" />
-  );
-}
-
-/** Mildly smoothed mix-share line (0–1 per point). Optional `strokeDasharray`: omit for solid, short gap for dotted, long gap for dashed. */
-function MixShareLinePath({
-  vals,
-  s,
-  strokeClassName = MINI_INK_STROKE,
-  strokeDasharray,
-}: {
-  vals: number[];
-  s: MiniScales;
-  strokeClassName?: string;
-  strokeDasharray?: string;
-}) {
-  const safe = vals.map((v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0));
-  const pts = scalePoints(safe, s.xScale, s.yScale);
-  const line = smoothLineThroughMild(pts);
+  const line = polylineThrough(pts);
   if (!line) return null;
   return (
     <path
       d={line}
       fill="none"
-      className={strokeClassName}
+      stroke={RS.line}
+      {...MINI_STROKE_VEC}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      pointerEvents="none"
+    />
+  );
+}
+
+/**
+ * Mix-share line (0–1 per point) drawn with mild cubic smoothing so monthly/daily shares read less jagged.
+ * Optional `strokeDasharray`: omit for solid, short gap for dotted, long gap for dashed.
+ */
+function MixShareLinePath({
+  vals,
+  s,
+  strokeColor = RS.mixBau,
+  strokeDasharray,
+}: {
+  vals: number[];
+  s: MiniScales;
+  strokeColor?: string;
+  strokeDasharray?: string;
+}) {
+  const safe = vals.map((v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0));
+  const pts = scalePoints(safe, s.xScale, s.yScale);
+  const line = pts.length >= 2 ? smoothLineThroughMild(pts) : polylineThrough(pts);
+  if (!line) return null;
+  return (
+    <path
+      d={line}
+      fill="none"
+      stroke={strokeColor}
       {...MINI_STROKE_VEC}
       {...(strokeDasharray ? { strokeDasharray } : {})}
       strokeLinejoin="round"
@@ -398,6 +413,10 @@ type MiniRunwaySvgProps = {
   selectedDataIdx: number | null;
   /** When the selected runway day is calendar today, the vertical marker is dotted grey. */
   selectionLineIsToday?: boolean;
+  /** Ledger span shading in chart index space (union of selected rows). */
+  attributionBands?: LedgerMiniChartBand[];
+  /** Multiplies opacity of series strokes/fills when ledger rows are selected. */
+  seriesMutedOpacity?: number;
   /** Plot layer in inner coordinates (0,0)-(innerW,innerH). */
   children: (s: MiniScales) => ReactNode;
   tooltipSeries: TooltipSeries[];
@@ -413,6 +432,8 @@ function MiniRunwaySvg({
   bottomTickFormat,
   selectedDataIdx,
   selectionLineIsToday = false,
+  attributionBands,
+  seriesMutedOpacity = 1,
   children,
   tooltipSeries,
   crosshair,
@@ -489,31 +510,53 @@ function MiniRunwaySvg({
 
   return (
     <>
-      <svg width={width} height={height} className="block max-w-full touch-pan-y cursor-default" aria-label="Runway mini chart">
+      <svg
+        width={width}
+        height={height}
+        className="block max-w-full touch-pan-y cursor-default text-foreground"
+        aria-label="Runway mini chart"
+      >
         <Group left={margin.left} top={margin.top}>
           <GridRows
             scale={yScale}
             width={innerW}
-            stroke={ZINC_FG_DIM}
-            strokeWidth={0.4}
-            strokeOpacity={0.5}
+            stroke={RS.grid}
+            strokeWidth={0.45}
+            strokeOpacity={0.85}
             strokeDasharray="3 4"
             numTicks={2}
             pointerEvents="none"
           />
-          {children(s)}
+          {attributionBands?.map((b, i) => {
+            const x1 = s.xScale(b.i0);
+            const x2 = s.xScale(b.i1);
+            const left = Math.min(x1, x2);
+            const w = Math.max(Math.abs(x2 - x1), 2);
+            return (
+              <rect
+                key={`ab-${i}`}
+                x={left}
+                y={0}
+                width={w}
+                height={innerH}
+                fill={RS.attrib}
+                pointerEvents="none"
+              />
+            );
+          })}
+          <g style={{ opacity: seriesMutedOpacity }}>{children(s)}</g>
           {tooltipOpen && tooltipData ? (
             <g pointerEvents="none">
               <line
                 x1={snapX} x2={snapX} y1={0} y2={innerH}
-                stroke={CROSSHAIR_STROKE}
+                stroke={RS.lineMuted}
                 strokeWidth={0.75}
                 strokeDasharray="4 3"
               />
               {crosshair === 'both' && horizY != null ? (
                 <line
                   x1={0} x2={innerW} y1={horizY} y2={horizY}
-                  stroke={CROSSHAIR_STROKE}
+                  stroke={RS.lineMuted}
                   strokeWidth={0.75}
                   strokeDasharray="4 3"
                 />
@@ -523,7 +566,17 @@ function MiniRunwaySvg({
                 if (v == null || !Number.isFinite(v)) return null;
                 const cx = snapX;
                 const cy = s.yScale(Math.min(1, Math.max(0, v)));
-                return <circle key={ser.key} cx={cx} cy={cy} r={3} fill={ZINC_FG} strokeWidth={0} />;
+                return (
+                  <circle
+                    key={ser.key}
+                    cx={cx}
+                    cy={cy}
+                    r={3}
+                    fill={RS.line}
+                    stroke="hsl(var(--background))"
+                    strokeWidth={1}
+                  />
+                );
               })}
             </g>
           ) : null}
@@ -559,8 +612,8 @@ function MiniRunwaySvg({
           tickFormat={(v) => bottomTickFormat(Number(v))}
           hideAxisLine
           tickLength={AXIS_TICK_LENGTH}
-          stroke={ZINC_FG_DIM}
-          tickStroke={ZINC_FG_DIM}
+          stroke={RS.axisTick}
+          tickStroke={RS.axisTick}
           tickLabelProps={() => ({ ...TICK_LABEL_PROPS, textAnchor: 'middle' })}
         />
       </svg>
@@ -602,6 +655,8 @@ function MiniRunwaySvgScalar({
   bottomTickFormat,
   selectedDataIdx,
   selectionLineIsToday = false,
+  attributionBands,
+  seriesMutedOpacity = 1,
   children,
   values,
   label,
@@ -614,6 +669,8 @@ function MiniRunwaySvgScalar({
   bottomTickFormat: (v: number) => string;
   selectedDataIdx: number | null;
   selectionLineIsToday?: boolean;
+  attributionBands?: LedgerMiniChartBand[];
+  seriesMutedOpacity?: number;
   children: (s: MiniScales) => ReactNode;
   values: number[];
   label: string;
@@ -674,34 +731,63 @@ function MiniRunwaySvgScalar({
 
   return (
     <>
-      <svg width={width} height={height} className="block max-w-full touch-pan-y cursor-default" aria-label="Runway mini chart">
+      <svg
+        width={width}
+        height={height}
+        className="block max-w-full touch-pan-y cursor-default text-foreground"
+        aria-label="Runway mini chart"
+      >
         <Group left={margin.left} top={margin.top}>
           <GridRows
             scale={yScale}
             width={innerW}
-            stroke={ZINC_FG_DIM}
-            strokeWidth={0.4}
-            strokeOpacity={0.5}
+            stroke={RS.grid}
+            strokeWidth={0.45}
+            strokeOpacity={0.85}
             strokeDasharray="3 4"
             numTicks={2}
             pointerEvents="none"
           />
-          {children(s)}
+          {attributionBands?.map((b, i) => {
+            const x1 = s.xScale(b.i0);
+            const x2 = s.xScale(b.i1);
+            const left = Math.min(x1, x2);
+            const w = Math.max(Math.abs(x2 - x1), 2);
+            return (
+              <rect
+                key={`abs-${i}`}
+                x={left}
+                y={0}
+                width={w}
+                height={innerH}
+                fill={RS.attrib}
+                pointerEvents="none"
+              />
+            );
+          })}
+          <g style={{ opacity: seriesMutedOpacity }}>{children(s)}</g>
           {tooltipOpen && tooltipData && horizY != null ? (
             <g pointerEvents="none">
               <line
                 x1={snapX} x2={snapX} y1={0} y2={innerH}
-                stroke={CROSSHAIR_STROKE}
+                stroke={RS.lineMuted}
                 strokeWidth={0.75}
                 strokeDasharray="4 3"
               />
               <line
                 x1={0} x2={innerW} y1={horizY} y2={horizY}
-                stroke={CROSSHAIR_STROKE}
+                stroke={RS.lineMuted}
                 strokeWidth={0.75}
                 strokeDasharray="4 3"
               />
-              <circle cx={snapX} cy={horizY} r={3} fill={ZINC_FG} strokeWidth={0} />
+              <circle
+                cx={snapX}
+                cy={horizY}
+                r={3}
+                fill={RS.line}
+                stroke="hsl(var(--background))"
+                strokeWidth={1}
+              />
             </g>
           ) : null}
           {selectedDataIdx != null ? (
@@ -736,8 +822,8 @@ function MiniRunwaySvgScalar({
           tickFormat={(v) => bottomTickFormat(Number(v))}
           hideAxisLine
           tickLength={AXIS_TICK_LENGTH}
-          stroke={ZINC_FG_DIM}
-          tickStroke={ZINC_FG_DIM}
+          stroke={RS.axisTick}
+          tickStroke={RS.axisTick}
           tickLabelProps={() => ({ ...TICK_LABEL_PROPS, textAnchor: 'middle' })}
         />
       </svg>
@@ -760,16 +846,28 @@ function MiniRunwaySvgScalar({
   );
 }
 
+export type RunwaySparklineLayout = 'stack' | 'ledgerStrip';
+
 export function RunwaySummaryLineDiagrams({
   className,
   viewMode,
   selectedDayYmd = null,
+  activityLedger = null,
+  tripleLensReceipt = false,
+  sparklineLayout = 'stack',
 }: {
   className?: string;
   viewMode: ViewModeId;
   selectedDayYmd?: string | null;
+  /** Parsed-market ledger for attribution bands on sparklines. */
+  activityLedger?: MarketActivityLedger | null;
+  /** Triple-lens runway: tabbed mini charts (Technology / Restaurant / Deployment). */
+  tripleLensReceipt?: boolean;
+  /** `ledgerStrip`: two-column grid on large screens for the strip above the activity ledger. */
+  sparklineLayout?: RunwaySparklineLayout;
 }) {
   const riskSurface = useAtcStore((s) => s.riskSurface);
+  const runwayLedgerExcludedEntryIds = useAtcStore((s) => s.runwayLedgerExcludedEntryIds);
   const riskTuning = useAtcStore((s) => s.riskTuning);
   const country = useAtcStore((s) => s.country);
   const configs = useAtcStore((s) => s.configs);
@@ -781,6 +879,8 @@ export function RunwaySummaryLineDiagrams({
   const heatmapRenderStyle = useAtcStore((s) => s.heatmapRenderStyle);
   const heatmapMonoColor = useAtcStore((s) => s.heatmapMonoColor);
   const heatmapSpectrumContinuous = useAtcStore((s) => s.heatmapSpectrumContinuous);
+
+  const [tripleLensTab, setTripleLensTab] = useState<'technology' | 'restaurant' | 'deployment'>('technology');
 
   const market = useMemo(() => {
     if (isRunwayMultiMarketStrip(country)) return gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -870,6 +970,30 @@ export function RunwaySummaryLineDiagrams({
     [selectedDayYmd],
   );
 
+  const ledgerActiveEntryIds = useMemo(() => {
+    if (!activityLedger) return [] as string[];
+    return activeLedgerEntryIds(activityLedger, runwayLedgerExcludedEntryIds);
+  }, [activityLedger, runwayLedgerExcludedEntryIds]);
+
+  const ledgerBandsByLens = useMemo(() => {
+    const empty: LedgerMiniChartBand[] = [];
+    if (!activityLedger || ledgerActiveEntryIds.length === 0 || viewMode === 'code') {
+      return { combined: empty, in_store: empty, market_risk: empty };
+    }
+    const idx = (ymd: string) => miniChartDataIndexForDayYmd(ymd, riskSurface, market, seriesOpts ?? undefined);
+    return {
+      combined: ledgerBandsForMiniChart(activityLedger, ledgerActiveEntryIds, 'combined', idx),
+      in_store: ledgerBandsForMiniChart(activityLedger, ledgerActiveEntryIds, 'in_store', idx),
+      market_risk: ledgerBandsForMiniChart(activityLedger, ledgerActiveEntryIds, 'market_risk', idx),
+    };
+  }, [activityLedger, ledgerActiveEntryIds, viewMode, riskSurface, market, seriesOpts]);
+
+  const bC = ledgerBandsByLens.combined;
+  const bI = ledgerBandsByLens.in_store;
+  const bR = ledgerBandsByLens.market_risk;
+
+  const seriesMutedOpacity = runwayLedgerExcludedEntryIds.length > 0 ? 0.4 : 1;
+
   const timeAxisMarks = useMemo(() => {
     if (!heatmapVisibleRange) return null;
     return buildRunwayMiniTimeAxisMarks(heatmapVisibleRange.start, heatmapVisibleRange.end, CAP_LAY);
@@ -895,9 +1019,21 @@ export function RunwaySummaryLineDiagrams({
     };
   }, [series, techMixMonths, techMixRows]);
 
+  /** Polyline smoothing needs ≥2 points; monthly mode can yield one bucket. */
+  const mixChartSeries = useMemo(() => {
+    const pad = (a: number[]) => (a.length >= 2 ? a : a.length === 1 ? [a[0]!, a[0]!] : a);
+    return {
+      bau: pad(mixLineArrays.bau),
+      camp: pad(mixLineArrays.camp),
+      proj: pad(mixLineArrays.proj),
+    };
+  }, [mixLineArrays]);
+
+  const mixChartN = mixChartSeries.bau.length;
+
   const mixLineTickConfig = useMemo(
-    () => buildTickConfig(timeAxisMarks, Math.max(2, mixLineArrays.bau.length), CAP_LAY),
-    [timeAxisMarks, mixLineArrays.bau.length],
+    () => buildTickConfig(timeAxisMarks, Math.max(2, mixChartN), CAP_LAY),
+    [timeAxisMarks, mixChartN],
   );
 
   const mixSelectedDataIdx = useMemo(() => {
@@ -928,6 +1064,15 @@ export function RunwaySummaryLineDiagrams({
   }
 
   const cardClass = cn('flex w-full flex-col gap-4 px-0 py-2 sm:px-0', className);
+  const stripGrid = sparklineLayout === 'ledgerStrip';
+  /** Wide 2×1 grid only when a day is pinned — otherwise stack capacity above load mix in one column. */
+  const stripLedgerWideSplit =
+    stripGrid && Boolean(selectedDayYmd && String(selectedDayYmd).trim());
+  const stripLedgerChartsClass = stripLedgerWideSplit
+    ? 'grid w-full grid-cols-1 gap-6 gap-y-8 lg:grid-cols-2 lg:gap-8 lg:items-start'
+    : stripGrid
+      ? 'flex w-full flex-col gap-6 lg:gap-8'
+      : 'flex flex-col gap-6';
 
   const capacityBlock = (
     <MiniChartSection
@@ -938,13 +1083,13 @@ export function RunwaySummaryLineDiagrams({
             <LegendStrokeLine />
           </MiniLegendItem>
           <MiniLegendItem label="Capacity">
-            <LegendStrokeLine strokeDasharray="5 3" />
+            <LegendStrokeLine strokeDasharray="5 3" stroke={RS.capacityLine} />
           </MiniLegendItem>
           <MiniLegendItem label="Demand under capacity">
-            <LegendFillChip className={SCALAR_AREA_FILL_CLASS} />
+            <LegendFillChip fill={RS.legendUnder} />
           </MiniLegendItem>
           <MiniLegendItem label="Demand over capacity">
-            <LegendFillChip className="fill-red-500/55 dark:fill-red-400/50" />
+            <LegendFillChip fill="hsl(0 72% 52% / 0.42)" />
           </MiniLegendItem>
         </MiniLegendRow>
       }
@@ -955,6 +1100,7 @@ export function RunwaySummaryLineDiagrams({
           if (width < 20) return null;
           const height = Math.max(64, Math.round(width * CAP_ASPECT));
           return (
+            <div className="rounded-lg border border-border/35 bg-muted/10 px-2 py-2 shadow-sm dark:border-border/45 dark:bg-muted/20">
             <MiniRunwaySvg
               width={width}
               height={height}
@@ -964,6 +1110,8 @@ export function RunwaySummaryLineDiagrams({
               bottomTickFormat={capTickConfig.tickFormat}
               selectedDataIdx={selectedDataIdx}
               selectionLineIsToday={selectionLineIsToday}
+              attributionBands={bC}
+              seriesMutedOpacity={seriesMutedOpacity}
               tooltipSeries={[
                 { key: 'Capacity', values: series.capacity },
                 { key: 'Demand', values: series.demand },
@@ -972,6 +1120,7 @@ export function RunwaySummaryLineDiagrams({
             >
               {(s) => <CapacityDemandOverlay demand={series.demand} capacity={series.capacity} s={s} />}
             </MiniRunwaySvg>
+            </div>
           );
         }}
       </ParentSize>
@@ -1001,30 +1150,44 @@ export function RunwaySummaryLineDiagrams({
           if (width < 20) return null;
           const height = Math.max(64, Math.round(width * MIX_ASPECT));
           return (
+            <div className="rounded-lg border border-border/35 bg-muted/10 px-2 py-2 shadow-sm dark:border-border/45 dark:bg-muted/20">
             <MiniRunwaySvg
               width={width}
               height={height}
               margin={CHART_MARGIN}
-              n={mixLineArrays.bau.length}
+              n={Math.max(2, mixChartN)}
               bottomTickValues={mixLineTickConfig.tickValues}
               bottomTickFormat={mixLineTickConfig.tickFormat}
               selectedDataIdx={mixSelectedDataIdx}
               selectionLineIsToday={selectionLineIsToday}
+              attributionBands={bC}
+              seriesMutedOpacity={seriesMutedOpacity}
               tooltipSeries={[
-                { key: 'BAU', values: mixLineArrays.bau },
-                { key: 'Campaign', values: mixLineArrays.camp },
-                { key: 'Programmes', values: mixLineArrays.proj },
+                { key: 'BAU', values: mixChartSeries.bau },
+                { key: 'Campaign', values: mixChartSeries.camp },
+                { key: 'Programmes', values: mixChartSeries.proj },
               ]}
               crosshair="both"
             >
               {(s) => (
                 <>
-                  <MixShareLinePath vals={mixLineArrays.proj} s={s} strokeDasharray={MIX_LINE_STROKE_DASHED} />
-                  <MixShareLinePath vals={mixLineArrays.camp} s={s} strokeDasharray={MIX_LINE_STROKE_DOTTED} />
-                  <MixShareLinePath vals={mixLineArrays.bau} s={s} />
+                  <MixShareLinePath
+                    vals={mixChartSeries.proj}
+                    s={s}
+                    strokeColor={RS.mixProj}
+                    strokeDasharray={MIX_LINE_STROKE_DASHED}
+                  />
+                  <MixShareLinePath
+                    vals={mixChartSeries.camp}
+                    s={s}
+                    strokeColor={RS.mixCamp}
+                    strokeDasharray={MIX_LINE_STROKE_DOTTED}
+                  />
+                  <MixShareLinePath vals={mixChartSeries.bau} s={s} strokeColor={RS.mixBau} />
                 </>
               )}
             </MiniRunwaySvg>
+            </div>
           );
         }}
       </ParentSize>
@@ -1048,6 +1211,7 @@ export function RunwaySummaryLineDiagrams({
           if (width < 20) return null;
           const height = Math.max(52, Math.round(width * DR_ASPECT));
           return (
+            <div className="rounded-lg border border-border/35 bg-muted/10 px-2 py-2 shadow-sm dark:border-border/45 dark:bg-muted/20">
             <MiniRunwaySvgScalar
               width={width}
               height={height}
@@ -1057,16 +1221,19 @@ export function RunwaySummaryLineDiagrams({
               bottomTickFormat={capTickConfig.tickFormat}
               selectedDataIdx={selectedDataIdx}
               selectionLineIsToday={selectionLineIsToday}
+              attributionBands={bR}
+              seriesMutedOpacity={seriesMutedOpacity}
               values={series.deploymentRisk}
               label="Risk"
             >
               {(s) => (
                 <>
-                  <ScalarAreaFill vals={series.deploymentRisk} fillClassName={SCALAR_AREA_FILL_CLASS} s={s} />
+                  <ScalarAreaFill vals={series.deploymentRisk} s={s} />
                   <ScalarLinePath vals={series.deploymentRisk} s={s} />
                 </>
               )}
             </MiniRunwaySvgScalar>
+            </div>
           );
         }}
       </ParentSize>
@@ -1090,6 +1257,7 @@ export function RunwaySummaryLineDiagrams({
           if (width < 20) return null;
           const height = Math.max(52, Math.round(width * DR_ASPECT));
           return (
+            <div className="rounded-lg border border-border/35 bg-muted/10 px-2 py-2 shadow-sm dark:border-border/45 dark:bg-muted/20">
             <MiniRunwaySvgScalar
               width={width}
               height={height}
@@ -1099,23 +1267,101 @@ export function RunwaySummaryLineDiagrams({
               bottomTickFormat={capTickConfig.tickFormat}
               selectedDataIdx={selectedDataIdx}
               selectionLineIsToday={selectionLineIsToday}
+              attributionBands={bI}
+              seriesMutedOpacity={seriesMutedOpacity}
               values={series.storeTrading01}
               label="Trading"
             >
               {(s) => (
                 <>
-                  <ScalarAreaFill vals={series.storeTrading01} fillClassName={SCALAR_AREA_FILL_CLASS} s={s} />
+                  <ScalarAreaFill vals={series.storeTrading01} s={s} />
                   <ScalarLinePath vals={series.storeTrading01} s={s} />
                 </>
               )}
             </MiniRunwaySvgScalar>
+            </div>
           );
         }}
       </ParentSize>
     </MiniChartSection>
   );
 
+  if (tripleLensReceipt) {
+    const tabBtn = (id: typeof tripleLensTab, label: string) => {
+      const active = tripleLensTab === id;
+      return (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={active}
+          id={`runway-spark-tab-${id}`}
+          tabIndex={active ? 0 : -1}
+          className={cn(
+            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+            active
+              ? 'bg-muted/80 text-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+          )}
+          onClick={() => setTripleLensTab(id)}
+        >
+          {label}
+        </button>
+      );
+    };
+
+    return (
+      <div className={cardClass}>
+        <div
+          role="tablist"
+          aria-label="Runway lens trends"
+          className="mb-4 flex flex-wrap gap-1 border-b border-border/25 pb-3 dark:border-border/30"
+        >
+          {tabBtn('technology', 'Technology')}
+          {tabBtn('restaurant', 'Restaurant')}
+          {tabBtn('deployment', 'Deployment risk')}
+        </div>
+        <div
+          role="tabpanel"
+          aria-labelledby={`runway-spark-tab-${tripleLensTab}`}
+          className={cn(stripGrid ? stripLedgerChartsClass : 'flex flex-col gap-6')}
+        >
+          {tripleLensTab === 'technology' ? (
+            <>
+              {capacityBlock}
+              {techMixLineBlock}
+            </>
+          ) : null}
+          {tripleLensTab === 'restaurant' ? (
+            stripGrid ? (
+              <div className={cn('min-w-0', stripLedgerWideSplit && 'lg:col-span-2')}>{storeBlock}</div>
+            ) : (
+              storeBlock
+            )
+          ) : null}
+          {tripleLensTab === 'deployment' ? (
+            stripGrid ? (
+              <div className={cn('min-w-0', stripLedgerWideSplit && 'lg:col-span-2')}>{deploymentBlock}</div>
+            ) : (
+              deploymentBlock
+            )
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   if (viewMode === 'combined') {
+    if (stripGrid) {
+      return (
+        <div className={cn('w-full px-0 py-2 sm:px-0', className)}>
+          <div className={stripLedgerChartsClass}>
+            {capacityBlock}
+            {techMixLineBlock}
+          </div>
+        </div>
+      );
+    }
     return (
       <div className={cardClass}>
         {capacityBlock}
@@ -1124,9 +1370,15 @@ export function RunwaySummaryLineDiagrams({
     );
   }
   if (viewMode === 'market_risk') {
+    if (stripGrid) {
+      return <div className={cn('w-full px-0 py-2 sm:px-0', className)}>{deploymentBlock}</div>;
+    }
     return <div className={cardClass}>{deploymentBlock}</div>;
   }
   if (viewMode === 'in_store') {
+    if (stripGrid) {
+      return <div className={cn('w-full px-0 py-2 sm:px-0', className)}>{storeBlock}</div>;
+    }
     return <div className={cardClass}>{storeBlock}</div>;
   }
 

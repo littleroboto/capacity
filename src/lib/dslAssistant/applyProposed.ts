@@ -48,6 +48,6 @@ export function validateProposedEditorBuffer(
 
 export function commitProposedEditorBuffer(proposedEditorText: string): void {
   const normalized = normalizeAssistantYaml(proposedEditorText);
-  useAtcStore.getState().setDslText(normalized);
-  useAtcStore.getState().applyDsl();
+  const full = buildFullDslFromEditorBuffer(normalized);
+  useAtcStore.getState().applyDsl(full);
 }

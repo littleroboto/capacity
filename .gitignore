@@ -14,3 +14,7 @@ pnpm-lock.yaml
 .vercel
 api/_shared-dsl.runtime.cjs
 src/lib/buildMeta.generated.ts
+# Vite-bundlable copies of public/data (see scripts/sync-bundled-market-seeds.mjs)
+src/data/markets/
+src/data/segments.json
+.env*.local

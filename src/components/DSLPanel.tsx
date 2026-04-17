@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { DslPanelClerkSignOut } from '@/components/DslPanelClerkSignOut';
 import { HeatmapSettingsPanel } from '@/components/HeatmapSettingsPanel';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
-import { RiskModelPanel } from '@/components/RiskModelPanel';
+import { WorkbenchMarketAdminPanel } from '@/components/WorkbenchMarketAdminPanel';
 import { TechLensHeatmapPatternsPanel } from '@/components/TechLensHeatmapPatternsPanel';
 import { RunwayFocusSelect } from '@/components/RunwayFocusSelect';
 import { RunwayRangeSelect } from '@/components/RunwayRangeSelect';
@@ -21,7 +21,7 @@ import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { OPEN_WORKSPACE_EVENT } from '@/lib/sharedDslSync';
 import { useAtcStore } from '@/store/useAtcStore';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Database, FileCode2, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, FileCode2, LayoutGrid, SlidersHorizontal } from 'lucide-react';
 
 type DSLPanelProps = {
   collapsed: boolean;
@@ -43,6 +43,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
   const country = useAtcStore((s) => s.country);
   const setViewMode = useAtcStore((s) => s.setViewMode);
   const viewMode = useAtcStore((s) => s.viewMode);
+  const runwayLensBeforeCode = useAtcStore((s) => s.runwayLensBeforeCode);
   const resetRiskTuning = useAtcStore((s) => s.resetRiskTuning);
   const compareAllMarkets = isRunwayMultiMarketStrip(country);
 
@@ -55,7 +56,8 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
             Runway palette and campaign overlay.             Heatmap pressure offset, curve, γ, and tail are{' '}
             <strong className="font-medium text-foreground">per lens</strong> (Technology Teams, Restaurant Activity,
             Deployment Risk) and <strong className="font-medium text-foreground">the same for every country column</strong>.
-            Business Patterns panels edit the same persisted values for the active lens where shown.
+            Trading and deploy-risk fragments are edited in <strong className="font-medium text-foreground">admin</strong>{' '}
+            (Market configuration in the controls column when you have access).
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">
@@ -130,17 +132,38 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           </Button>
           <div className="min-h-0 flex-1" aria-hidden />
           {!compareAllMarkets ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
-              onClick={() => setViewMode('code')}
-              title="Code — YAML editor in the main area"
-              aria-label="Open Code view — YAML editor"
-            >
-              <FileCode2 className="h-4 w-4" aria-hidden />
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'h-9 w-9 shrink-0 p-0',
+                  viewMode === 'code' ? 'text-foreground hover:text-foreground' : 'opacity-40'
+                )}
+                disabled={viewMode !== 'code'}
+                onClick={() => setViewMode(runwayLensBeforeCode)}
+                title="Show runway heatmap"
+                aria-label="Show runway heatmap"
+              >
+                <LayoutGrid className="h-4 w-4" aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'h-9 w-9 shrink-0 p-0',
+                  viewMode === 'code' ? 'opacity-40' : 'text-muted-foreground hover:text-foreground'
+                )}
+                disabled={viewMode === 'code'}
+                onClick={() => setViewMode('code')}
+                title="Config (YAML) in the main column"
+                aria-label="Open config — YAML editor"
+              >
+                <FileCode2 className="h-4 w-4" aria-hidden />
+              </Button>
+            </>
           ) : null}
           <Button
             type="button"
@@ -235,12 +258,12 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 py-2.5 pr-2 [scrollbar-gutter:stable]">
-          <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 py-2 pr-2 [scrollbar-gutter:stable]">
+          <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-border/50 bg-muted/[0.07] px-2.5 py-2 dark:border-border/40 dark:bg-muted/10">
             <RunwayFocusSelect className="min-w-0 w-full" />
             <RunwayRangeSelect className="min-w-0 w-full" />
+            <WorkbenchRunwayControls compareAllMarkets={compareAllMarkets} />
           </div>
-          <WorkbenchRunwayControls compareAllMarkets={compareAllMarkets} />
           {!compareAllMarkets && parseError ? (
             <div
               className="flex w-full shrink-0 items-center gap-2 rounded-md border border-destructive/35 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
@@ -255,14 +278,7 @@ export function DSLPanel({ collapsed, onCollapsedChange }: DSLPanelProps) {
               </span>
             </div>
           ) : null}
-          {compareAllMarkets ? (
-            <p className="text-pretty text-[11px] leading-relaxed text-muted-foreground">
-              <span className="font-medium text-foreground/85">Focus</span> a single market for YAML, the DSL assistant,{' '}
-              <span className="font-medium text-foreground/85">Code</span>, business patterns, and toolbar{' '}
-              <span className="font-medium text-foreground/85">Settings</span>.
-            </p>
-          ) : null}
-          <RiskModelPanel />
+          <WorkbenchMarketAdminPanel />
           <TechLensHeatmapPatternsPanel />
         </div>
       </aside>

@@ -1,7 +1,10 @@
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useId, useMemo } from 'react';
 import { useReducedMotion } from 'motion/react';
-import { RunwayHeatmapEmergenceClip } from '@/components/RunwayHeatmapEmergenceClip';
-import { RUNWAY_EMERGE_PAUSE_MS } from '@/hooks/useRunwayHeatmapEmergence';
+import {
+  RUNWAY_EMERGE_PAUSE_MS,
+  runwayHeatmapEmergenceClipRect,
+  useRunwayHeatmapEmergence,
+} from '@/hooks/useRunwayHeatmapEmergence';
 import { useIsoRunwayGrowFactor } from '@/hooks/useIsoRunwayGrowFactor';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
@@ -263,6 +266,10 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
   const adjVbW = vbW + labelPadRight;
   const adjVbH = vbH + labelPadBottom;
 
+  const insetTopPct = useRunwayHeatmapEmergence(growResetKey);
+  const cellClipId = useId().replace(/:/g, '');
+  const clipR = runwayHeatmapEmergenceClipRect(adjVbW, adjVbH, insetTopPct);
+
   const cells = useMemo(() => {
     const out: { li: number; di: number; cell: RunwayCalendarCellValue; depth: number }[] = [];
     for (let li = 0; li < layoutWeeks.length; li++) {
@@ -293,10 +300,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
       className="relative flex h-[min(86dvh,calc(100dvh-6.5rem))] min-h-0 w-full max-w-full flex-1 flex-col overflow-visible bg-background"
       data-runway-iso-skyline
     >
-      <RunwayHeatmapEmergenceClip
-        resetKey={growResetKey}
-        className="flex h-full min-h-0 w-full flex-1 flex-col"
-      >
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col">
       <svg
         viewBox={`0 0 ${adjVbW} ${adjVbH}`}
         width="100%"
@@ -305,6 +309,11 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
         preserveAspectRatio="xMidYMin meet"
         aria-label="Isometric pressure skyline"
       >
+        <defs>
+          <clipPath id={cellClipId} clipPathUnits="userSpaceOnUse">
+            <rect x={clipR.x} y={clipR.y} width={clipR.w} height={clipR.h} />
+          </clipPath>
+        </defs>
         {chronologyMajor.length > 0 && (
           <g className="pointer-events-none text-muted-foreground" aria-hidden>
             {chronologyMajor.map((g) => {
@@ -331,6 +340,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
             })}
           </g>
         )}
+        <g clipPath={`url(#${cellClipId})`}>
         {cells.map(({ li, di, cell, stagger01 }) => {
           const { ax, ay } = isoCellTopLeft(layoutToIsoWi(li), di, stepX, stepY);
           const gx = ax - minX;
@@ -412,6 +422,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
             </g>
           );
         })}
+        </g>
         {/* Date labels — iso ground plane, right edge: months → quarters → years */}
         <g className="pointer-events-none" aria-hidden>
           {monthRow.map(({ key, tx, ty, text }) => (
@@ -461,7 +472,7 @@ export const RunwayIsoSkyline = memo(function RunwayIsoSkyline({
           ))}
         </g>
       </svg>
-      </RunwayHeatmapEmergenceClip>
+      </div>
     </div>
   );
 });

@@ -27,6 +27,19 @@
     /* Ground labels: halo stroke width (px) for readability on light bg */
     /* Slightly stronger halo so iso ground labels stay crisp on light backgrounds */
     --iso-label-stroke-width: 3.35px;
+    /* Runway summary sparklines (Visx): use vars on SVG fill/stroke — Tailwind may not emit opacity utilities from TS string constants */
+    --runway-spark-grid: hsl(var(--muted-foreground) / 0.3);
+    --runway-spark-axis-tick: hsl(var(--muted-foreground) / 0.88);
+    --runway-spark-line: hsl(var(--foreground) / 0.88);
+    --runway-spark-line-muted: hsl(var(--muted-foreground) / 0.62);
+    --runway-spark-capacity-line: hsl(var(--foreground) / 0.52);
+    --runway-spark-scalar-area: hsl(var(--foreground) / 0.07);
+    --runway-spark-gap-under: hsl(var(--foreground) / 0.09);
+    --runway-spark-attrib: hsl(var(--primary) / 0.09);
+    --runway-spark-legend-under: hsl(var(--foreground) / 0.1);
+    --runway-spark-mix-bau: hsl(var(--foreground) / 0.9);
+    --runway-spark-mix-campaign: hsl(265 52% 40%);
+    --runway-spark-mix-programme: hsl(199 70% 36%);
   }
 
   .dark {
@@ -48,6 +61,18 @@
     --iso-pad-left: 217 19% 28%;
     --iso-pad-right: 217 21% 23%;
     --iso-label-stroke-width: 2.65px;
+    --runway-spark-grid: hsl(var(--muted-foreground) / 0.22);
+    --runway-spark-axis-tick: hsl(var(--muted-foreground) / 0.78);
+    --runway-spark-line: hsl(var(--foreground) / 0.92);
+    --runway-spark-line-muted: hsl(var(--muted-foreground) / 0.48);
+    --runway-spark-capacity-line: hsl(var(--foreground) / 0.48);
+    --runway-spark-scalar-area: hsl(var(--primary) / 0.16);
+    --runway-spark-gap-under: hsl(var(--primary) / 0.12);
+    --runway-spark-attrib: hsl(var(--primary) / 0.24);
+    --runway-spark-legend-under: hsl(var(--primary) / 0.16);
+    --runway-spark-mix-bau: hsl(var(--foreground) / 0.94);
+    --runway-spark-mix-campaign: hsl(278 56% 72%);
+    --runway-spark-mix-programme: hsl(199 62% 60%);
   }
 
   * {
