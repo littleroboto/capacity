@@ -791,7 +791,7 @@ export const useAtcStore = create<AtcState>()(
         if (!looksLikeYamlDsl(merged)) {
           set({
             parseError:
-              'Editor content is not valid workspace YAML (e.g. HTML, a JS/TS source file like api/_sharedDslImpl.ts, or a bad cloud pull). Reset the workspace or paste real market DSL. If the team Blob has the wrong file, re-save valid YAML from the editor.',
+              'Editor content is not valid workspace YAML (e.g. HTML, a JS/TS source file like api/impl/_sharedDslImpl.ts, or a bad cloud pull). Reset the workspace or paste real market DSL. If the team Blob has the wrong file, re-save valid YAML from the editor.',
           });
           return;
         }

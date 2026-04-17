@@ -10,7 +10,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { verifyToken } from '@clerk/backend';
-import { clerkAuthEnvFromProcess } from './lib/env';
+import { clerkAuthEnvFromProcess } from '../lib/env';
 import { isClerkJwtEmailAllowed, parseAllowedEmailSet } from './_allowedUserEmails';
 import { SEGMENT_TO_MARKETS, WORKSPACE_MANIFEST_MARKET_ORDER } from './_capacityWorkspaceAcl.data';
 
@@ -233,8 +233,8 @@ async function handlePostgresGet(
   res: VercelResponse,
   ws: CapacityWorkspaceAccess | null
 ): Promise<void> {
-  const { getMultiMarketBundle } = await import('./services/cacheService');
-  const { supabaseServiceClient } = await import('./lib/supabaseClient');
+  const { getMultiMarketBundle } = await import('../services/cacheService');
+  const { supabaseServiceClient } = await import('../lib/supabaseClient');
 
   const client = supabaseServiceClient();
   const { data: allMarkets } = await client

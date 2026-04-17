@@ -14,18 +14,18 @@ const bundleDir = path.join(root, 'server-bundles');
 fs.mkdirSync(bundleDir, { recursive: true });
 
 const entries = [
-  { impl: 'api/_sharedDslImpl.ts', out: 'server-bundles/_shared-dsl.runtime.cjs' },
-  { impl: 'api/_healthImpl.ts', out: 'server-bundles/_health.runtime.cjs' },
-  { impl: 'api/_meImpl.ts', out: 'server-bundles/_me.runtime.cjs' },
-  { impl: 'api/_fragmentsImpl.ts', out: 'server-bundles/_fragments.runtime.cjs' },
-  { impl: 'api/_buildsImpl.ts', out: 'server-bundles/_builds.runtime.cjs' },
-  { impl: 'api/_configImpl.ts', out: 'server-bundles/_config.runtime.cjs' },
-  { impl: 'api/_validateImpl.ts', out: 'server-bundles/_validate.runtime.cjs' },
-  { impl: 'api/_revisionsImpl.ts', out: 'server-bundles/_revisions.runtime.cjs' },
-  { impl: 'api/_auditImpl.ts', out: 'server-bundles/_audit.runtime.cjs' },
-  { impl: 'api/_marketsImpl.ts', out: 'server-bundles/_markets.runtime.cjs' },
-  { impl: 'api/_importImpl.ts', out: 'server-bundles/_import.runtime.cjs' },
-  { impl: 'api/_holidayEntriesImpl.ts', out: 'server-bundles/_holidayEntries.runtime.cjs' },
+  { impl: 'api/impl/_sharedDslImpl.ts', out: 'server-bundles/_shared-dsl.runtime.cjs' },
+  { impl: 'api/impl/_healthImpl.ts', out: 'server-bundles/_health.runtime.cjs' },
+  { impl: 'api/impl/_meImpl.ts', out: 'server-bundles/_me.runtime.cjs' },
+  { impl: 'api/impl/_fragmentsImpl.ts', out: 'server-bundles/_fragments.runtime.cjs' },
+  { impl: 'api/impl/_buildsImpl.ts', out: 'server-bundles/_builds.runtime.cjs' },
+  { impl: 'api/impl/_configImpl.ts', out: 'server-bundles/_config.runtime.cjs' },
+  { impl: 'api/impl/_validateImpl.ts', out: 'server-bundles/_validate.runtime.cjs' },
+  { impl: 'api/impl/_revisionsImpl.ts', out: 'server-bundles/_revisions.runtime.cjs' },
+  { impl: 'api/impl/_auditImpl.ts', out: 'server-bundles/_audit.runtime.cjs' },
+  { impl: 'api/impl/_marketsImpl.ts', out: 'server-bundles/_markets.runtime.cjs' },
+  { impl: 'api/impl/_importImpl.ts', out: 'server-bundles/_import.runtime.cjs' },
+  { impl: 'api/impl/_holidayEntriesImpl.ts', out: 'server-bundles/_holidayEntries.runtime.cjs' },
 ];
 
 // Legacy: .cjs files directly under api/ each counted as a separate Vercel function.

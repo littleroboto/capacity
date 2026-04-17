@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const entry = path.join(root, 'api/_sharedDslImpl.ts');
+const entry = path.join(root, 'api/impl/_sharedDslImpl.ts');
 const outfile = path.join(root, 'server-bundles/_shared-dsl.runtime.cjs');
 fs.mkdirSync(path.dirname(outfile), { recursive: true });
 
