@@ -1,15 +1,16 @@
-import { runPipelineFromDsl } from '@/engine/pipeline';
+import { runPipelineFromDsl, type PipelineCalendarIsoRange } from '@/engine/pipeline';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 
 export type PipelineWorkerInbound = {
   dsl: string;
   tuning: RiskModelTuning;
+  calendarRange?: PipelineCalendarIsoRange | null;
 };
 
 self.onmessage = (e: MessageEvent<PipelineWorkerInbound>) => {
-  const { dsl, tuning } = e.data;
+  const { dsl, tuning, calendarRange } = e.data;
   try {
-    const r = runPipelineFromDsl(dsl, tuning);
+    const r = runPipelineFromDsl(dsl, tuning, calendarRange);
     postMessage({
       ok: true as const,
       riskSurface: r.riskSurface,

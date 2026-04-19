@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import type { ViewModeId } from '@/lib/constants';
 import { gammaFocusMarket, isRunwayMultiMarketStrip } from '@/lib/markets';
-import { polylineThrough, smoothLineThroughMild, type GapRibbonLayout } from '@/lib/runwayGapRibbonPaths';
-import { runwayPickerLayoutBounds } from '@/lib/runwayDateFilter';
+import { polylineThrough, type GapRibbonLayout } from '@/lib/runwayGapRibbonPaths';
+import { endYmdAfterFollowingQuarter, runwayPickerLayoutBounds } from '@/lib/runwayDateFilter';
+import { isRunwayCustomRangeActive } from '@/lib/runwayPipelineCalendarRange';
 import {
   buildRunwayMiniTimeAxisMarks,
   type MiniTimeAxisMark,
@@ -15,10 +16,11 @@ import {
 import { heatmapColorOptsWithMarketYaml } from '@/lib/heatmapColorOptsMarketYaml';
 import type { HeatmapColorOpts, HeatmapSpectrumMode } from '@/lib/riskHeatmapColors';
 import {
+  DEMAND_OVER_CAP_LIST_MAX_EXCLUSIVE_GAP_DAYS,
+  demandExceedsCapacityIsoRanges,
   extractRunwayMiniSeries,
-  extractTechMixMonthlyRows,
+  formatDemandOverCapRangeDisplay,
   miniChartDataIndexForDayYmd,
-  techMixMonthlyRowsToShares,
 } from '@/lib/runwaySummaryMiniSeries';
 import type { MarketActivityLedger } from '@/lib/marketActivityLedger';
 import {
@@ -39,13 +41,11 @@ import { scaleLinear } from '@visx/scale';
 import { useTooltip } from '@visx/tooltip';
 
 /* ── chart layout ── */
+/** Long overload lists start collapsed so the chart stays above the fold. */
+const DEMAND_OVER_CAP_COLLAPSE_AT = 6;
+
 const CAP_ASPECT = 140 / 420;
 const DR_ASPECT = 120 / 420;
-const MIX_ASPECT = 140 / 420;
-/** Campaign mix line — short gaps read as dotted at mini scale. */
-const MIX_LINE_STROKE_DOTTED = '1 3.5';
-/** Programmes mix line. */
-const MIX_LINE_STROKE_DASHED = '6 4';
 /** Vertical marker when the selected runway day is calendar “today”. */
 const SELECTED_TODAY_LINE_DASH = '2 4';
 
@@ -65,9 +65,6 @@ const RS = {
   gapUnder: 'var(--runway-spark-gap-under)',
   legendUnder: 'var(--runway-spark-legend-under)',
   attrib: 'var(--runway-spark-attrib)',
-  mixBau: 'var(--runway-spark-mix-bau)',
-  mixCamp: 'var(--runway-spark-mix-campaign)',
-  mixProj: 'var(--runway-spark-mix-programme)',
 } as const;
 
 const TICK_LABEL_PROPS = {
@@ -268,30 +265,6 @@ function CapacityDemandOverlay({ demand, capacity, s }: { demand: number[]; capa
   );
 }
 
-function SelectedDayLine({
-  dataIndex,
-  s,
-  isToday = false,
-}: {
-  dataIndex: number | null;
-  s: MiniScales;
-  /** Calendar today — dotted grey marker instead of solid ink. */
-  isToday?: boolean;
-}) {
-  if (dataIndex == null) return null;
-  const x = s.xScale(dataIndex);
-  return (
-    <line
-      x1={x} x2={x} y1={0} y2={s.innerH}
-      className="pointer-events-none"
-      stroke={isToday ? RS.lineMuted : RS.line}
-      {...MINI_STROKE_VEC}
-      strokeOpacity={isToday ? 0.88 : 0.78}
-      {...(isToday ? { strokeDasharray: SELECTED_TODAY_LINE_DASH } : {})}
-    />
-  );
-}
-
 function ScalarAreaFill({ vals, s }: { vals: number[]; s: MiniScales }) {
   const pts = scalePoints(vals, s.xScale, s.yScale);
   const baselineY = s.yScale(0);
@@ -310,39 +283,6 @@ function ScalarLinePath({ vals, s }: { vals: number[]; s: MiniScales }) {
       fill="none"
       stroke={RS.line}
       {...MINI_STROKE_VEC}
-      strokeLinejoin="round"
-      strokeLinecap="round"
-      pointerEvents="none"
-    />
-  );
-}
-
-/**
- * Mix-share line (0–1 per point) drawn with mild cubic smoothing so monthly/daily shares read less jagged.
- * Optional `strokeDasharray`: omit for solid, short gap for dotted, long gap for dashed.
- */
-function MixShareLinePath({
-  vals,
-  s,
-  strokeColor = RS.mixBau,
-  strokeDasharray,
-}: {
-  vals: number[];
-  s: MiniScales;
-  strokeColor?: string;
-  strokeDasharray?: string;
-}) {
-  const safe = vals.map((v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0));
-  const pts = scalePoints(safe, s.xScale, s.yScale);
-  const line = pts.length >= 2 ? smoothLineThroughMild(pts) : polylineThrough(pts);
-  if (!line) return null;
-  return (
-    <path
-      d={line}
-      fill="none"
-      stroke={strokeColor}
-      {...MINI_STROKE_VEC}
-      {...(strokeDasharray ? { strokeDasharray } : {})}
       strokeLinejoin="round"
       strokeLinecap="round"
       pointerEvents="none"
@@ -580,9 +520,6 @@ function MiniRunwaySvg({
               })}
             </g>
           ) : null}
-          {selectedDataIdx != null ? (
-            <SelectedDayLine dataIndex={selectedDataIdx} s={s} isToday={selectionLineIsToday} />
-          ) : null}
           <rect
             x={0}
             y={0}
@@ -616,6 +553,19 @@ function MiniRunwaySvg({
           tickStroke={RS.axisTick}
           tickLabelProps={() => ({ ...TICK_LABEL_PROPS, textAnchor: 'middle' })}
         />
+        {selectedDataIdx != null ? (
+          <line
+            x1={margin.left + (xScale(selectedDataIdx) ?? 0)}
+            x2={margin.left + (xScale(selectedDataIdx) ?? 0)}
+            y1={margin.top}
+            y2={height}
+            className="pointer-events-none"
+            stroke={selectionLineIsToday ? RS.lineMuted : RS.line}
+            {...MINI_STROKE_VEC}
+            strokeOpacity={selectionLineIsToday ? 0.88 : 0.78}
+            {...(selectionLineIsToday ? { strokeDasharray: SELECTED_TODAY_LINE_DASH } : {})}
+          />
+        ) : null}
       </svg>
       {tooltipOpen && tooltipData && tooltipSeries.length > 0 ? (
         <div
@@ -790,9 +740,6 @@ function MiniRunwaySvgScalar({
               />
             </g>
           ) : null}
-          {selectedDataIdx != null ? (
-            <SelectedDayLine dataIndex={selectedDataIdx} s={s} isToday={selectionLineIsToday} />
-          ) : null}
           <rect
             x={0}
             y={0}
@@ -826,6 +773,19 @@ function MiniRunwaySvgScalar({
           tickStroke={RS.axisTick}
           tickLabelProps={() => ({ ...TICK_LABEL_PROPS, textAnchor: 'middle' })}
         />
+        {selectedDataIdx != null ? (
+          <line
+            x1={margin.left + (xScale(selectedDataIdx) ?? 0)}
+            x2={margin.left + (xScale(selectedDataIdx) ?? 0)}
+            y1={margin.top}
+            y2={height}
+            className="pointer-events-none"
+            stroke={selectionLineIsToday ? RS.lineMuted : RS.line}
+            {...MINI_STROKE_VEC}
+            strokeOpacity={selectionLineIsToday ? 0.88 : 0.78}
+            {...(selectionLineIsToday ? { strokeDasharray: SELECTED_TODAY_LINE_DASH } : {})}
+          />
+        ) : null}
       </svg>
       {tooltipOpen && tooltipData && vy != null && Number.isFinite(vy) ? (
         <div
@@ -853,7 +813,6 @@ export function RunwaySummaryLineDiagrams({
   viewMode,
   selectedDayYmd = null,
   activityLedger = null,
-  tripleLensReceipt = false,
   sparklineLayout = 'stack',
 }: {
   className?: string;
@@ -861,12 +820,12 @@ export function RunwaySummaryLineDiagrams({
   selectedDayYmd?: string | null;
   /** Parsed-market ledger for attribution bands on sparklines. */
   activityLedger?: MarketActivityLedger | null;
-  /** Triple-lens runway: tabbed mini charts (Technology / Restaurant / Deployment). */
-  tripleLensReceipt?: boolean;
   /** `ledgerStrip`: two-column grid on large screens for the strip above the activity ledger. */
   sparklineLayout?: RunwaySparklineLayout;
 }) {
-  const riskSurface = useAtcStore((s) => s.riskSurface);
+  const riskSurfaceLedgerView = useAtcStore((s) => s.riskSurfaceLedgerView);
+  const riskSurfaceFull = useAtcStore((s) => s.riskSurface);
+  const riskSurface = riskSurfaceLedgerView !== null ? riskSurfaceLedgerView : riskSurfaceFull;
   const runwayLedgerExcludedEntryIds = useAtcStore((s) => s.runwayLedgerExcludedEntryIds);
   const riskTuning = useAtcStore((s) => s.riskTuning);
   const country = useAtcStore((s) => s.country);
@@ -875,12 +834,12 @@ export function RunwaySummaryLineDiagrams({
   const runwayFilterYear = useAtcStore((s) => s.runwayFilterYear);
   const runwayFilterQuarter = useAtcStore((s) => s.runwayFilterQuarter);
   const runwayIncludeFollowingQuarter = useAtcStore((s) => s.runwayIncludeFollowingQuarter);
+  const runwayCustomRangeStartYmd = useAtcStore((s) => s.runwayCustomRangeStartYmd);
+  const runwayCustomRangeEndYmd = useAtcStore((s) => s.runwayCustomRangeEndYmd);
   const riskHeatmapTuningByLens = useAtcStore((s) => s.riskHeatmapTuningByLens);
   const heatmapRenderStyle = useAtcStore((s) => s.heatmapRenderStyle);
   const heatmapMonoColor = useAtcStore((s) => s.heatmapMonoColor);
   const heatmapSpectrumContinuous = useAtcStore((s) => s.heatmapSpectrumContinuous);
-
-  const [tripleLensTab, setTripleLensTab] = useState<'technology' | 'restaurant' | 'deployment'>('technology');
 
   const market = useMemo(() => {
     if (isRunwayMultiMarketStrip(country)) return gammaFocusMarket(country, configs, runwayMarketOrder);
@@ -888,14 +847,39 @@ export function RunwaySummaryLineDiagrams({
   }, [country, configs, runwayMarketOrder]);
 
   const heatmapVisibleRange = useMemo(() => {
+    const slice = {
+      runwayCustomRangeStartYmd,
+      runwayCustomRangeEndYmd,
+      runwayFilterYear,
+      runwayFilterQuarter,
+      runwayIncludeFollowingQuarter,
+    };
+    if (isRunwayCustomRangeActive(slice)) {
+      let end = runwayCustomRangeEndYmd!;
+      if (runwayIncludeFollowingQuarter) {
+        end = endYmdAfterFollowingQuarter(end);
+      }
+      return { start: runwayCustomRangeStartYmd!, end };
+    }
     if (runwayFilterYear != null) {
-      const { start, end } = runwayPickerLayoutBounds(runwayFilterYear, runwayFilterQuarter, runwayIncludeFollowingQuarter);
+      const { start, end } = runwayPickerLayoutBounds(
+        runwayFilterYear,
+        runwayFilterQuarter,
+        runwayIncludeFollowingQuarter
+      );
       return { start, end };
     }
     const dates = [...new Set(riskSurface.map((r) => r.date))].sort();
     if (dates.length === 0) return null;
     return { start: dates[0]!, end: dates[dates.length - 1]! };
-  }, [riskSurface, runwayFilterYear, runwayFilterQuarter, runwayIncludeFollowingQuarter]);
+  }, [
+    riskSurface,
+    runwayFilterYear,
+    runwayFilterQuarter,
+    runwayIncludeFollowingQuarter,
+    runwayCustomRangeStartYmd,
+    runwayCustomRangeEndYmd,
+  ]);
 
   const inStoreShapeOptsForAuto = useMemo(
     () => lensHeatmapShapeOptsForAutoCalibrate({ lensTuning: riskHeatmapTuningByLens.in_store, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous }),
@@ -940,25 +924,26 @@ export function RunwaySummaryLineDiagrams({
     return heatmapColorOptsWithMarketYaml('market_risk', base, cfg, 0, marketRiskAutoPressureOffset);
   }, [riskHeatmapTuningByLens, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous, configs, market, marketRiskAutoPressureOffset]);
 
+  const stripGrid = sparklineLayout === 'ledgerStrip';
+
   const seriesOpts = useMemo(
-    () => heatmapVisibleRange ? { tuning: riskTuning, visibleDateRange: heatmapVisibleRange, inStoreHeatmapColorOpts, marketRiskHeatmapColorOpts } : null,
-    [riskTuning, heatmapVisibleRange, inStoreHeatmapColorOpts, marketRiskHeatmapColorOpts],
+    () =>
+      heatmapVisibleRange
+        ? {
+            tuning: riskTuning,
+            visibleDateRange: heatmapVisibleRange,
+            inStoreHeatmapColorOpts,
+            marketRiskHeatmapColorOpts,
+            ...(stripGrid ? { miniSeriesAggregation: 'day' as const } : {}),
+          }
+        : null,
+    [riskTuning, heatmapVisibleRange, inStoreHeatmapColorOpts, marketRiskHeatmapColorOpts, stripGrid],
   );
 
   const series = useMemo(() => {
     if (!seriesOpts) return null;
     return extractRunwayMiniSeries(riskSurface, market, seriesOpts);
   }, [riskSurface, market, seriesOpts]);
-
-  const techMixRows = useMemo(() => {
-    if (!heatmapVisibleRange) return null;
-    return extractTechMixMonthlyRows(riskSurface, market, heatmapVisibleRange);
-  }, [riskSurface, market, heatmapVisibleRange]);
-
-  const techMixMonths = useMemo(
-    () => (techMixRows ? techMixMonthlyRowsToShares(techMixRows) : null),
-    [techMixRows],
-  );
 
   const selectedDataIdx = useMemo(() => {
     if (!selectedDayYmd || !seriesOpts) return null;
@@ -1001,50 +986,12 @@ export function RunwaySummaryLineDiagrams({
 
   const n = series?.demand.length ?? 0;
 
+  const demandOverCapRanges = useMemo(() => {
+    if (!heatmapVisibleRange) return [];
+    return demandExceedsCapacityIsoRanges(riskSurface, market, heatmapVisibleRange);
+  }, [riskSurface, market, heatmapVisibleRange]);
+
   const capTickConfig = useMemo(() => buildTickConfig(timeAxisMarks, n, CAP_LAY), [timeAxisMarks, n]);
-
-  const mixLineArrays = useMemo(() => {
-    if (!series) return { bau: [] as number[], camp: [] as number[], proj: [] as number[] };
-    if (techMixMonths && techMixRows?.length && techMixMonths.some((m) => m.hasData)) {
-      return {
-        bau: techMixMonths.map((m) => (!m.hasData ? 0 : Math.min(1, Math.max(0, m.bauShare)))),
-        camp: techMixMonths.map((m) => (!m.hasData ? 0 : Math.min(1, Math.max(0, m.campaignShare)))),
-        proj: techMixMonths.map((m) => (!m.hasData ? 0 : Math.min(1, Math.max(0, m.projectShare)))),
-      };
-    }
-    return {
-      bau: series.techWorkloadMix.bauShare,
-      camp: series.techWorkloadMix.campaignShare,
-      proj: series.techWorkloadMix.projectShare,
-    };
-  }, [series, techMixMonths, techMixRows]);
-
-  /** Polyline smoothing needs ≥2 points; monthly mode can yield one bucket. */
-  const mixChartSeries = useMemo(() => {
-    const pad = (a: number[]) => (a.length >= 2 ? a : a.length === 1 ? [a[0]!, a[0]!] : a);
-    return {
-      bau: pad(mixLineArrays.bau),
-      camp: pad(mixLineArrays.camp),
-      proj: pad(mixLineArrays.proj),
-    };
-  }, [mixLineArrays]);
-
-  const mixChartN = mixChartSeries.bau.length;
-
-  const mixLineTickConfig = useMemo(
-    () => buildTickConfig(timeAxisMarks, Math.max(2, mixChartN), CAP_LAY),
-    [timeAxisMarks, mixChartN],
-  );
-
-  const mixSelectedDataIdx = useMemo(() => {
-    if (!selectedDayYmd || !series) return null;
-    if (techMixMonths && techMixRows?.length && techMixMonths.some((m) => m.hasData)) {
-      const mk = selectedDayYmd.slice(0, 7);
-      const i = techMixMonths.findIndex((m) => m.monthKey === mk);
-      return i >= 0 ? i : null;
-    }
-    return selectedDataIdx;
-  }, [selectedDayYmd, series, techMixMonths, techMixRows, selectedDataIdx]);
 
   if (viewMode === 'code') {
     return (
@@ -1064,8 +1011,7 @@ export function RunwaySummaryLineDiagrams({
   }
 
   const cardClass = cn('flex w-full flex-col gap-4 px-0 py-2 sm:px-0', className);
-  const stripGrid = sparklineLayout === 'ledgerStrip';
-  /** Wide 2×1 grid only when a day is pinned — otherwise stack capacity above load mix in one column. */
+  /** Wide 2×1 grid only when a day is pinned — otherwise a single column. */
   const stripLedgerWideSplit =
     stripGrid && Boolean(selectedDayYmd && String(selectedDayYmd).trim());
   const stripLedgerChartsClass = stripLedgerWideSplit
@@ -1073,6 +1019,32 @@ export function RunwaySummaryLineDiagrams({
     : stripGrid
       ? 'flex w-full flex-col gap-6 lg:gap-8'
       : 'flex flex-col gap-6';
+
+  const overCapCount = demandOverCapRanges.length;
+  const overCapListCollapsed = overCapCount >= DEMAND_OVER_CAP_COLLAPSE_AT;
+  const demandOverCapShellClass =
+    'mt-2 rounded-md border border-destructive/25 bg-destructive/[0.06] px-2 py-1.5 dark:border-destructive/30 dark:bg-destructive/[0.09]';
+  const demandOverCapListEl = (
+    <>
+      <ul className="space-y-1 text-[11px] leading-snug text-foreground/90" aria-label="Date ranges where demand exceeds capacity">
+        {demandOverCapRanges.map((r) => (
+          <li
+            key={`${r.dateStart}_${r.dateEnd}`}
+            className="border-b border-destructive/10 pb-1 last:border-b-0 last:pb-0 dark:border-destructive/15"
+            title={r.dateStart === r.dateEnd ? `ISO ${r.dateStart}` : `ISO ${r.dateStart} – ${r.dateEnd}`}
+          >
+            <span className="font-medium tabular-nums">{formatDemandOverCapRangeDisplay(r)}</span>
+          </li>
+        ))}
+      </ul>
+      <p
+        className="mt-2 border-t border-destructive/15 pt-1.5 text-[9px] leading-snug text-muted-foreground dark:border-destructive/20"
+        title={`Adjacent overloads up to ${DEMAND_OVER_CAP_LIST_MAX_EXCLUSIVE_GAP_DAYS} calendar days apart are merged into one row; days in between may still be within capacity.`}
+      >
+        Grouped within {DEMAND_OVER_CAP_LIST_MAX_EXCLUSIVE_GAP_DAYS}-day gaps; in-between days can be within capacity.
+      </p>
+    </>
+  );
 
   const capacityBlock = (
     <MiniChartSection
@@ -1093,104 +1065,69 @@ export function RunwaySummaryLineDiagrams({
           </MiniLegendItem>
         </MiniLegendRow>
       }
-      caption="Vertical line: selected runway day. Axis is 0–100% of modelled capacity."
-    >
-      <ParentSize className="block w-full" debounceTime={32}>
-        {({ width }) => {
-          if (width < 20) return null;
-          const height = Math.max(64, Math.round(width * CAP_ASPECT));
-          return (
-            <div className="rounded-lg border border-border/35 bg-muted/10 px-2 py-2 shadow-sm dark:border-border/45 dark:bg-muted/20">
-            <MiniRunwaySvg
-              width={width}
-              height={height}
-              margin={CHART_MARGIN}
-              n={n}
-              bottomTickValues={capTickConfig.tickValues}
-              bottomTickFormat={capTickConfig.tickFormat}
-              selectedDataIdx={selectedDataIdx}
-              selectionLineIsToday={selectionLineIsToday}
-              attributionBands={bC}
-              seriesMutedOpacity={seriesMutedOpacity}
-              tooltipSeries={[
-                { key: 'Capacity', values: series.capacity },
-                { key: 'Demand', values: series.demand },
-              ]}
-              crosshair="both"
-            >
-              {(s) => <CapacityDemandOverlay demand={series.demand} capacity={series.capacity} s={s} />}
-            </MiniRunwaySvg>
-            </div>
-          );
-        }}
-      </ParentSize>
-    </MiniChartSection>
-  );
-
-  const techMixLineBlock = (
-    <MiniChartSection
-      title="Technology load mix"
-      legend={
-        <MiniLegendRow>
-          <MiniLegendItem label="BAU">
-            <LegendStrokeLine />
-          </MiniLegendItem>
-          <MiniLegendItem label="Campaign">
-            <LegendStrokeLine strokeDasharray={MIX_LINE_STROKE_DOTTED} />
-          </MiniLegendItem>
-          <MiniLegendItem label="Programmes">
-            <LegendStrokeLine strokeDasharray={MIX_LINE_STROKE_DASHED} />
-          </MiniLegendItem>
-        </MiniLegendRow>
+      caption={
+        stripGrid
+          ? 'Vertical line: selected runway day. Axis is 0–100% of modelled capacity; trace uses each calendar day (resampled for display).'
+          : 'Vertical line: selected runway day. Axis is 0–100% of modelled capacity.'
       }
-      caption="Each line is that slice’s share of technology load; the three shares sum to 100% in each period with data."
     >
-      <ParentSize className="block w-full" debounceTime={32}>
-        {({ width }) => {
-          if (width < 20) return null;
-          const height = Math.max(64, Math.round(width * MIX_ASPECT));
-          return (
-            <div className="rounded-lg border border-border/35 bg-muted/10 px-2 py-2 shadow-sm dark:border-border/45 dark:bg-muted/20">
-            <MiniRunwaySvg
-              width={width}
-              height={height}
-              margin={CHART_MARGIN}
-              n={Math.max(2, mixChartN)}
-              bottomTickValues={mixLineTickConfig.tickValues}
-              bottomTickFormat={mixLineTickConfig.tickFormat}
-              selectedDataIdx={mixSelectedDataIdx}
-              selectionLineIsToday={selectionLineIsToday}
-              attributionBands={bC}
-              seriesMutedOpacity={seriesMutedOpacity}
-              tooltipSeries={[
-                { key: 'BAU', values: mixChartSeries.bau },
-                { key: 'Campaign', values: mixChartSeries.camp },
-                { key: 'Programmes', values: mixChartSeries.proj },
-              ]}
-              crosshair="both"
-            >
-              {(s) => (
-                <>
-                  <MixShareLinePath
-                    vals={mixChartSeries.proj}
-                    s={s}
-                    strokeColor={RS.mixProj}
-                    strokeDasharray={MIX_LINE_STROKE_DASHED}
-                  />
-                  <MixShareLinePath
-                    vals={mixChartSeries.camp}
-                    s={s}
-                    strokeColor={RS.mixCamp}
-                    strokeDasharray={MIX_LINE_STROKE_DOTTED}
-                  />
-                  <MixShareLinePath vals={mixChartSeries.bau} s={s} strokeColor={RS.mixBau} />
-                </>
-              )}
-            </MiniRunwaySvg>
+      <>
+        <ParentSize className="block w-full" debounceTime={32}>
+          {({ width }) => {
+            if (width < 20) return null;
+            const height = Math.max(64, Math.round(width * CAP_ASPECT));
+            return (
+              <div className="rounded-lg border border-border/35 bg-muted/10 px-2 py-2 shadow-sm dark:border-border/45 dark:bg-muted/20">
+                <MiniRunwaySvg
+                  width={width}
+                  height={height}
+                  margin={CHART_MARGIN}
+                  n={n}
+                  bottomTickValues={capTickConfig.tickValues}
+                  bottomTickFormat={capTickConfig.tickFormat}
+                  selectedDataIdx={selectedDataIdx}
+                  selectionLineIsToday={selectionLineIsToday}
+                  attributionBands={bC}
+                  seriesMutedOpacity={seriesMutedOpacity}
+                  tooltipSeries={[
+                    { key: 'Capacity', values: series.capacity },
+                    { key: 'Demand', values: series.demand },
+                  ]}
+                  crosshair="both"
+                >
+                  {(s) => <CapacityDemandOverlay demand={series.demand} capacity={series.capacity} s={s} />}
+                </MiniRunwaySvg>
+              </div>
+            );
+          }}
+        </ParentSize>
+        {overCapCount > 0 ? (
+          overCapListCollapsed ? (
+            <details className={cn(demandOverCapShellClass, 'group py-1')}>
+              <summary className="cursor-pointer list-none px-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive/90 marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="mr-1 inline-block translate-y-px text-muted-foreground transition-transform group-open:rotate-90">
+                  ▸
+                </span>
+                Demand over capacity
+                <span className="ml-1.5 font-normal normal-case text-muted-foreground">
+                  ({overCapCount} periods — expand)
+                </span>
+              </summary>
+              <div className="mt-2 border-t border-destructive/15 pt-2 dark:border-destructive/20">{demandOverCapListEl}</div>
+            </details>
+          ) : (
+            <div className={demandOverCapShellClass}>
+              <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-destructive/90">Demand over capacity</p>
+                <span className="text-[9px] tabular-nums text-muted-foreground">
+                  {overCapCount} period{overCapCount === 1 ? '' : 's'}
+                </span>
+              </div>
+              {demandOverCapListEl}
             </div>
-          );
-        }}
-      </ParentSize>
+          )
+        ) : null}
+      </>
     </MiniChartSection>
   );
 
@@ -1199,12 +1136,16 @@ export function RunwaySummaryLineDiagrams({
       title="Deployment risk"
       legend={
         <MiniLegendRow>
-          <MiniLegendItem label="Weekly risk">
+          <MiniLegendItem label={stripGrid ? 'Daily risk' : 'Weekly risk'}>
             <LegendScalarSpark />
           </MiniLegendItem>
         </MiniLegendRow>
       }
-      caption="Higher values mean more fragile release windows (weekly score)."
+      caption={
+        stripGrid
+          ? 'Higher values mean more fragile release windows (daily runway values, resampled).'
+          : 'Higher values mean more fragile release windows (weekly score).'
+      }
     >
       <ParentSize className="block w-full" debounceTime={32}>
         {({ width }) => {
@@ -1245,12 +1186,16 @@ export function RunwaySummaryLineDiagrams({
       title="Store trading"
       legend={
         <MiniLegendRow>
-          <MiniLegendItem label="Weekly trading">
+          <MiniLegendItem label={stripGrid ? 'Daily trading' : 'Weekly trading'}>
             <LegendScalarSpark />
           </MiniLegendItem>
         </MiniLegendRow>
       }
-      caption="Higher values mean busier restaurant trading (weekly score)."
+      caption={
+        stripGrid
+          ? 'Higher values mean busier restaurant trading (daily runway values, resampled).'
+          : 'Higher values mean busier restaurant trading (weekly score).'
+      }
     >
       <ParentSize className="block w-full" debounceTime={32}>
         {({ width }) => {
@@ -1286,78 +1231,12 @@ export function RunwaySummaryLineDiagrams({
     </MiniChartSection>
   );
 
-  if (tripleLensReceipt) {
-    const tabBtn = (id: typeof tripleLensTab, label: string) => {
-      const active = tripleLensTab === id;
-      return (
-        <button
-          key={id}
-          type="button"
-          role="tab"
-          aria-selected={active}
-          id={`runway-spark-tab-${id}`}
-          tabIndex={active ? 0 : -1}
-          className={cn(
-            'rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-            active
-              ? 'bg-muted/80 text-foreground shadow-sm'
-              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-          )}
-          onClick={() => setTripleLensTab(id)}
-        >
-          {label}
-        </button>
-      );
-    };
-
-    return (
-      <div className={cardClass}>
-        <div
-          role="tablist"
-          aria-label="Runway lens trends"
-          className="mb-4 flex flex-wrap gap-1 border-b border-border/25 pb-3 dark:border-border/30"
-        >
-          {tabBtn('technology', 'Technology')}
-          {tabBtn('restaurant', 'Restaurant')}
-          {tabBtn('deployment', 'Deployment risk')}
-        </div>
-        <div
-          role="tabpanel"
-          aria-labelledby={`runway-spark-tab-${tripleLensTab}`}
-          className={cn(stripGrid ? stripLedgerChartsClass : 'flex flex-col gap-6')}
-        >
-          {tripleLensTab === 'technology' ? (
-            <>
-              {capacityBlock}
-              {techMixLineBlock}
-            </>
-          ) : null}
-          {tripleLensTab === 'restaurant' ? (
-            stripGrid ? (
-              <div className={cn('min-w-0', stripLedgerWideSplit && 'lg:col-span-2')}>{storeBlock}</div>
-            ) : (
-              storeBlock
-            )
-          ) : null}
-          {tripleLensTab === 'deployment' ? (
-            stripGrid ? (
-              <div className={cn('min-w-0', stripLedgerWideSplit && 'lg:col-span-2')}>{deploymentBlock}</div>
-            ) : (
-              deploymentBlock
-            )
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
   if (viewMode === 'combined') {
     if (stripGrid) {
       return (
         <div className={cn('w-full px-0 py-2 sm:px-0', className)}>
           <div className={stripLedgerChartsClass}>
             {capacityBlock}
-            {techMixLineBlock}
           </div>
         </div>
       );
@@ -1365,7 +1244,6 @@ export function RunwaySummaryLineDiagrams({
     return (
       <div className={cardClass}>
         {capacityBlock}
-        {techMixLineBlock}
       </div>
     );
   }

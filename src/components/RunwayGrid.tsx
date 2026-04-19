@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from 'react';
-import type { Dispatch, ReactNode, Ref, RefObject, SetStateAction } from 'react';
+import type { CSSProperties, Dispatch, LegacyRef, ReactNode, Ref, RefObject, SetStateAction } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   runwayHeatmapTitleForViewMode,
@@ -24,8 +24,18 @@ import {
   type HeatmapSpectrumMode,
 } from '@/lib/riskHeatmapColors';
 import { HeatmapLegend } from '@/components/HeatmapLegend';
-import { enumerateIsoDatesInclusive, runwayPickerLayoutBounds } from '@/lib/runwayDateFilter';
-import { buildRunwayTooltipPayload, type RunwayTipState } from '@/lib/runwayTooltipBreakdown';
+import {
+  defaultRunwayCalendarYearFromRiskSurface,
+  endYmdAfterFollowingQuarter,
+  enumerateIsoDatesInclusive,
+  runwayPickerLayoutBounds,
+} from '@/lib/runwayDateFilter';
+import { isRunwayCustomRangeActive } from '@/lib/runwayPipelineCalendarRange';
+import {
+  buildRunwayTooltipPayload,
+  type RunwayTipState,
+  type RunwayTooltipPayload,
+} from '@/lib/runwayTooltipBreakdown';
 import {
   CALENDAR_MONTH_HEADER_H,
   CALENDAR_MONTH_SIDE_LABEL_GAP_PX,
@@ -44,13 +54,21 @@ import {
   bestCellPxForCompareAllRunwayFit,
   bestCellPxForSingleMarketFit,
   bestCellPxForSingleMarketTripleColumnFit,
-  buildQuarterGridRunwayLayout,
+  buildContributionStripRunwayLayout,
   buildVerticalMonthsRunwayLayout,
-  compareAllRunwayTotalContentWidthPx,
+  contributionStripGridOnlyContentHeightPx,
+  RUNWAY_CONTRIBUTION_STRIP_FLEX_ROW_PAD_LEFT_PX,
+  RUNWAY_TRIPLE_LENS_CONTRIBUTION_SVG_LEADING_OFFSET_PX,
+  SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX,
+  SINGLE_MARKET_TRIPLE_LENS_VERTICAL_GAP_PX,
+  tripleLensStackRailHeightPx,
+  tripleLensStackedContributionTotalContentHeightPx,
+  tripleLensStackedContributionTotalContentWidthPx,
   flattenRunwayWeeksFromSections,
   calendarQuarterTitle,
   quarterCodeLabel,
   type CalendarMonthBlock,
+  type ContributionStripLayoutMeta,
   type PlacedRunwayCell,
   type QuarterLetters,
   type VerticalYearSection,
@@ -68,6 +86,17 @@ import {
   RUNWAY_DAY_COLUMNS,
 } from '@/lib/weekRunway';
 import {
+  RUNWAY_HEATMAP_CELL_PX_MAX,
+  RUNWAY_HEATMAP_CELL_PX_MIN,
+  RUNWAY_HEATMAP_CELL_PX_STEP,
+  RUNWAY_HEATMAP_CELL_GAP_MAX,
+  RUNWAY_HEATMAP_CELL_GAP_MIN,
+  RUNWAY_HEATMAP_CELL_RADIUS_MAX,
+  RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX,
+  RUNWAY_HEATMAP_LAYOUT_DEFAULTS,
+  snapRunwayHeatmapCellPx,
+} from '@/lib/runwayHeatmapLayoutPrefs';
+import {
   autoMarketRiskPressureOffsetMapForSurface,
   autoRestaurantPressureOffsetMapForSurface,
   lensHeatmapShapeOptsForAutoCalibrate,
@@ -75,12 +104,14 @@ import {
 import { heatmapColorOptsWithMarketYaml } from '@/lib/heatmapColorOptsMarketYaml';
 import { cn } from '@/lib/utils';
 import { RunwayCellTooltip } from '@/components/RunwayCellTooltip';
-import { RunwayActivityLedgerTable, type RunwayLedgerDayRowFilter } from '@/components/RunwayActivityLedgerTable';
+import { RunwayActivityLedgerTable, type RunwayLedgerDayContributionPin } from '@/components/RunwayActivityLedgerTable';
 import { RunwayDaySummaryPanel } from '@/components/RunwayDaySummaryPanel';
 import { RunwaySummaryLineDiagrams } from '@/components/RunwaySummaryLineDiagrams';
+import { RunwayTechCapacityDemandSparkline } from '@/components/RunwayTechCapacityDemandSparkline';
 import { useAtcStore } from '@/store/useAtcStore';
 import { SlotOverlay } from '@/components/SlotOverlay';
-import type { MarketConfig } from '@/engine/types';
+import type { DeploymentRiskBlackout, MarketConfig } from '@/engine/types';
+import { ymdInAnyDeploymentRiskBlackout } from '@/lib/deploymentRiskBlackoutCalendar';
 import {
   buildMarketActivityLedgerFromConfig,
   filterLedgerToVisibleDateRange,
@@ -91,10 +122,13 @@ import {
   buildLedgerLensOverlapMap,
   effectiveLedgerFootprintOverlap,
   LEDGER_EMPTY_DAY_OPACITY_FACTOR,
+  ledgerAttributionHeatmapMetric,
   ledgerAttributionNeutralFillHex,
+  maxRawLedgerOverlapInMap,
 } from '@/lib/runwayLedgerAttribution';
 import {
   clearRunwayPngScrollportStamps,
+  collectOverflowScrollAncestors,
   downloadRunwayHeatmapPng,
   stampRunwayScrollportsForPngExport,
 } from '@/lib/runwayPngExport';
@@ -106,27 +140,20 @@ import {
   compareStripColumnWidthPx,
   compareStripMarketColumnLeftPx,
 } from '@/lib/runwayCompareSvgLayout';
+import { RunwayContributionStripSvg } from '@/components/RunwayContributionStripSvg';
+import { RunwayHeatmapCellStylePopover } from '@/components/RunwayHeatmapCellStylePopover';
 import { RunwayQuarterGridSvg } from '@/components/RunwayQuarterGridSvg';
-import {
-  Box,
-  CalendarDays,
-  Cpu,
-  Download,
-  Grid2x2,
-  Loader2,
-  ShieldAlert,
-  UtensilsCrossed,
-  ZoomIn,
-  ZoomOut,
-} from 'lucide-react';
+import { Box, CalendarDays, Download, Grid2x2, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 
-/** Default cell size (px) for runway heatmaps (single-market and LIOM compare). */
-export const CELL_PX = 20;
+/** @deprecated Use {@link RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX} / layout prefs; kept for external imports. */
+export const CELL_PX = RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX;
 
-const RUNWAY_CELL_PX_MIN = 12;
-const RUNWAY_CELL_PX_MAX = 28;
-const RUNWAY_CELL_PX_STEP = 2;
+const RUNWAY_CELL_PX_MIN = RUNWAY_HEATMAP_CELL_PX_MIN;
+const RUNWAY_CELL_PX_MAX = RUNWAY_HEATMAP_CELL_PX_MAX;
+const RUNWAY_CELL_PX_STEP = RUNWAY_HEATMAP_CELL_PX_STEP;
+const RUNWAY_CELL_GAP_ADJ_MIN = RUNWAY_HEATMAP_CELL_GAP_MIN;
+const RUNWAY_CELL_GAP_ADJ_MAX = RUNWAY_HEATMAP_CELL_GAP_MAX;
 
 /**
  * Isometric 3D runway (single-market skyline + LIOM city block). Hidden: toolbar + branches are gated off
@@ -134,10 +161,7 @@ const RUNWAY_CELL_PX_STEP = 2;
  */
 const RUNWAY_ISO_3D_ENABLED = false;
 
-function snapRunwayCellPx(n: number): number {
-  const s = Math.round(n / RUNWAY_CELL_PX_STEP) * RUNWAY_CELL_PX_STEP;
-  return Math.min(RUNWAY_CELL_PX_MAX, Math.max(RUNWAY_CELL_PX_MIN, s));
-}
+const snapRunwayCellPx = snapRunwayHeatmapCellPx;
 
 /** Pointer anchor for the day-details popover (click or keyboard). */
 type RunwayTipAnchor = { clientX: number; clientY: number };
@@ -159,31 +183,59 @@ const SINGLE_MARKET_MULTI_LENS_HEADLINE = 'Tech Capacity, Trading Pressure, Depl
 const SINGLE_MARKET_STACK_SHARED_LEGEND_LENS: ViewModeId =
   SINGLE_MARKET_STACK_LENS_IDS[0] ?? 'combined';
 
-/** Short column heading above each stacked lens (matches heatmap titles: tech / trading / risk). */
-function lensStackRailLabel(mode: ViewModeId) {
+/** Two-line heading in the slim triple-lens rail (no icons); JSX applies −90° (90° CCW) so it reads along the strip. */
+function lensStackRailLines(mode: ViewModeId): readonly [string, string] {
   switch (mode) {
     case 'combined':
-      return 'Tech';
+      return ['TECH', 'CAPACITY'];
     case 'in_store':
-      return 'Trading';
+      return ['RESTAURANT', 'TRADING'];
     case 'market_risk':
-      return 'Risk';
+      return ['DEPLOYMENT', 'RISK'];
     default:
-      return mode;
+      return [String(mode), ''];
   }
 }
 
-const LENS_STACK_HEADING_ICON = {
-  combined: Cpu,
-  in_store: UtensilsCrossed,
-  market_risk: ShieldAlert,
-} as const;
+/** Neutral rail surface (no lens tint — strip carries colour). */
+const LENS_STACK_RAIL_SURFACE = cn(
+  'border border-border/60 bg-muted/35 shadow-sm dark:border-border/55 dark:bg-muted/20',
+);
 
-function lensStackHeadingIcon(mode: ViewModeId) {
-  if (mode === 'combined' || mode === 'in_store' || mode === 'market_risk') {
-    return LENS_STACK_HEADING_ICON[mode];
-  }
-  return Cpu;
+/**
+ * Slim triple-lens rail: two uppercase lines in a fixed “sheet” (`sheetW` × `sheetH`), centred in the
+ * rail, then rotated −90° about the sheet centre. `sheetW` matches the rail’s long edge (minus pad) so
+ * the run of text lines up with the strip axis; `sheetH` is the rail width so the pre-rotate stack fits
+ * the narrow column — same layout contract as the original stacked-strip rail (see comment on
+ * {@link lensStackRailLines}).
+ */
+function TripleLensStackRailCaption({ lensMode, railH }: { lensMode: ViewModeId; railH: number }) {
+  const lines = lensStackRailLines(lensMode);
+  const railW = SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX;
+  const sheetW = Math.max(32, railH - 8);
+  const sheetH = railW;
+
+  return (
+    <div
+      className={cn('relative flex shrink-0 overflow-visible rounded-sm', LENS_STACK_RAIL_SURFACE)}
+      style={{ width: railW, height: railH, minHeight: railH, maxHeight: railH }}
+      title={runwayLensProductLabel(lensMode)}
+      aria-label={lines.filter(Boolean).join(' ')}
+    >
+      <div className="flex h-full min-h-0 w-full items-center justify-center">
+        <div
+          className="flex origin-center -rotate-90 flex-col items-center justify-center gap-0.5 whitespace-nowrap text-center text-[8px] font-semibold uppercase leading-none tracking-tight text-foreground/90 antialiased sm:text-[9px]"
+          style={{ width: sheetW, height: sheetH }}
+        >
+          {lines.map((line, li) =>
+            line ? (
+              <span key={`${lensMode}-${li}`}>{line}</span>
+            ) : null,
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export { RUNWAY_CELL_GAP_PX };
@@ -413,24 +465,6 @@ function riskByDateForMarket(surface: RiskRow[], market: string): Map<string, Ri
   return m;
 }
 
-/** Default heatmap selection: today if modelled, else latest modelled day on/before today, else first modelled day in layout. */
-function pickLayoutDayForDefaultSelection(
-  layoutDatesSorted: string[],
-  riskByDate: Map<string, RiskRow>,
-  todayYmd: string
-): string | null {
-  const has = (d: string) => layoutDatesSorted.includes(d) && riskByDate.has(d);
-  if (has(todayYmd)) return todayYmd;
-  for (let i = layoutDatesSorted.length - 1; i >= 0; i--) {
-    const d = layoutDatesSorted[i]!;
-    if (d <= todayYmd && riskByDate.has(d)) return d;
-  }
-  for (const d of layoutDatesSorted) {
-    if (riskByDate.has(d)) return d;
-  }
-  return null;
-}
-
 /** Avoid stealing ←/→ when typing or using form controls elsewhere on the page. */
 function isHeatmapKeyNavSuppressed(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -498,20 +532,11 @@ type HeatCellProps = {
   openDayDetailsFromCell: OpenDayDetailsFromCellFn;
   /** When set, day-details / summary use this lens (stacked single-market heatmap). */
   cellDetailViewMode?: ViewModeId;
-  /** When set, ledger footprint: `0` → neutral tile; `>0` → real heatmap fill (overlap count badge still applies). */
+  /** When set, ledger footprint: `0` → neutral tile; `>0` → heat from {@link ledgerAttributionHeatmapMetric}. */
   ledgerOverlap?: number;
+  /** Deployment Risk only: day falls in a YAML change-freeze / blackout window. */
+  deployFreezeDiagonal?: boolean;
 };
-
-function LedgerOverlapCountBadge({ count }: { count: number }) {
-  return (
-    <span
-      className="pointer-events-none absolute bottom-[1px] right-[1px] z-[3] flex min-h-[11px] min-w-[11px] items-center justify-center rounded-sm bg-black/55 px-[2px] text-[7px] font-bold tabular-nums leading-none text-white ring-1 ring-white/25"
-      aria-label={`${count} overlapping activities on this day`}
-    >
-      {count}
-    </span>
-  );
-}
 
 function heatCellTipHandlers(
   openDayDetailsFromCell: OpenDayDetailsFromCellFn,
@@ -555,6 +580,28 @@ function HeatCutoffOpacityWrap({ dimOpacity, children }: { dimOpacity: number; c
   );
 }
 
+/** Deployment Risk lens: diagonal across cell for YAML `deployment_risk_blackouts` (change-freeze windows). */
+function HeatCellDeployFreezeOverlay() {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full text-foreground/55"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <line
+        x1="0"
+        y1="100"
+        x2="100"
+        y2="0"
+        stroke="currentColor"
+        strokeWidth={8}
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 const HeatCell = memo(function HeatCell({
   fill,
   dateStr,
@@ -573,24 +620,26 @@ const HeatCell = memo(function HeatCell({
   openDayDetailsFromCell,
   cellDetailViewMode,
   ledgerOverlap,
+  deployFreezeDiagonal = false,
 }: HeatCellProps) {
   const tw = heatmapTwinkleParams(discoMode, shimmerBase, weekdayCol);
   const pulseOn = (shimmer || discoMode) && (!enableColorSweep || postSweep);
 
   const handlers = heatCellTipHandlers(openDayDetailsFromCell, dateStr, weekdayCol, cellDetailViewMode);
 
-  const effFill =
-    typeof ledgerOverlap === 'number'
-      ? ledgerOverlap === 0
-        ? ledgerAttributionNeutralFillHex()
-        : fill
-      : fill;
-  const overlapBadge = typeof ledgerOverlap === 'number' && ledgerOverlap > 1 ? ledgerOverlap : undefined;
+  const effFill = fill;
   const ledgerEmptyNonOverlap = typeof ledgerOverlap === 'number' && ledgerOverlap === 0;
   const heatDimOpacity = dimOpacity * (ledgerEmptyNonOverlap ? LEDGER_EMPTY_DAY_OPACITY_FACTOR : 1);
 
+  const dayAria =
+    dateStr != null
+      ? `Day details for ${dateStr}${deployFreezeDiagonal ? '; change-freeze window' : ''}`
+      : 'Day cell';
+  const dayTitle = deployFreezeDiagonal ? 'Click for day details (change-freeze window)' : 'Click for day details';
+
   const boxClass = cn(
     'relative shrink-0 cursor-pointer rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+    deployFreezeDiagonal && 'overflow-hidden',
     isToday && 'z-[1]',
     isSelected && 'z-[2] ring-2 ring-inset ring-primary'
   );
@@ -602,14 +651,18 @@ const HeatCell = memo(function HeatCell({
           <div
             role="button"
             tabIndex={0}
-            title="Click for day details"
-            aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+            title={dayTitle}
+            aria-label={dayAria}
             aria-pressed={isSelected}
             className={boxClass}
-            style={{ width: CELL_PX, height: CELL_PX, backgroundColor: effFill }}
+            style={{
+              width: RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX,
+              height: RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX,
+              backgroundColor: effFill,
+            }}
             {...handlers}
           >
-            {overlapBadge ? <LedgerOverlapCountBadge count={overlapBadge} /> : null}
+            {deployFreezeDiagonal ? <HeatCellDeployFreezeOverlay /> : null}
             {isToday ? <TodayDot /> : null}
           </div>
         </HeatCutoffOpacityWrap>
@@ -624,11 +677,15 @@ const HeatCell = memo(function HeatCell({
           <motion.div
             role="button"
             tabIndex={0}
-            title="Click for day details"
-            aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+            title={dayTitle}
+            aria-label={dayAria}
             aria-pressed={isSelected}
             className={cn(boxClass, 'will-change-[opacity,filter]')}
-            style={{ width: CELL_PX, height: CELL_PX, backgroundColor: effFill }}
+            style={{
+              width: RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX,
+              height: RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX,
+              backgroundColor: effFill,
+            }}
             initial={false}
             animate={{
               opacity: [...tw.opacity],
@@ -642,7 +699,7 @@ const HeatCell = memo(function HeatCell({
             }}
             {...handlers}
           >
-            {overlapBadge ? <LedgerOverlapCountBadge count={overlapBadge} /> : null}
+            {deployFreezeDiagonal ? <HeatCellDeployFreezeOverlay /> : null}
             {isToday ? <TodayDot /> : null}
           </motion.div>
         </HeatCutoffOpacityWrap>
@@ -653,20 +710,24 @@ const HeatCell = memo(function HeatCell({
   return (
     <HeatCellDimWrap pastDimmed={pastDimmed}>
     <HeatCutoffOpacityWrap dimOpacity={heatDimOpacity}>
-    <div className="relative shrink-0" style={{ width: CELL_PX, height: CELL_PX }}>
+    <div
+      className="relative shrink-0"
+      style={{ width: RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX, height: RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX }}
+    >
       <div className="pointer-events-none absolute inset-0 rounded-[3px] bg-muted" aria-hidden />
       <motion.div
         key={colorLayerKey}
         className={cn(
           'absolute inset-0 cursor-pointer rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+          deployFreezeDiagonal && 'overflow-hidden',
           isToday && 'z-[1]',
           isSelected && 'z-[2] ring-2 ring-inset ring-primary',
           'will-change-[opacity,filter]'
         )}
         role="button"
         tabIndex={0}
-        title="Click for day details"
-        aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+        title={dayTitle}
+        aria-label={dayAria}
         aria-pressed={isSelected}
         style={{ backgroundColor: effFill }}
         initial={{ opacity: 0, filter: 'brightness(0.92) saturate(0.85)' }}
@@ -701,7 +762,7 @@ const HeatCell = memo(function HeatCell({
         }
         {...handlers}
       >
-        {overlapBadge ? <LedgerOverlapCountBadge count={overlapBadge} /> : null}
+        {deployFreezeDiagonal ? <HeatCellDeployFreezeOverlay /> : null}
         {isToday ? <TodayDot /> : null}
       </motion.div>
     </div>
@@ -731,24 +792,26 @@ const HeatCellSized = memo(function HeatCellSized({
   openDayDetailsFromCell,
   cellDetailViewMode,
   ledgerOverlap,
+  deployFreezeDiagonal = false,
 }: HeatCellSizedProps) {
   const tw = heatmapTwinkleParams(discoMode, shimmerBase, weekdayCol);
   const pulseOn = (shimmer || discoMode) && (!enableColorSweep || postSweep);
 
   const handlers = heatCellTipHandlers(openDayDetailsFromCell, dateStr, weekdayCol, cellDetailViewMode);
 
-  const effFill =
-    typeof ledgerOverlap === 'number'
-      ? ledgerOverlap === 0
-        ? ledgerAttributionNeutralFillHex()
-        : fill
-      : fill;
-  const overlapBadge = typeof ledgerOverlap === 'number' && ledgerOverlap > 1 ? ledgerOverlap : undefined;
+  const effFill = fill;
   const ledgerEmptyNonOverlap = typeof ledgerOverlap === 'number' && ledgerOverlap === 0;
   const heatDimOpacity = dimOpacity * (ledgerEmptyNonOverlap ? LEDGER_EMPTY_DAY_OPACITY_FACTOR : 1);
 
+  const dayAria =
+    dateStr != null
+      ? `Day details for ${dateStr}${deployFreezeDiagonal ? '; change-freeze window' : ''}`
+      : 'Day cell';
+  const dayTitle = deployFreezeDiagonal ? 'Click for day details (change-freeze window)' : 'Click for day details';
+
   const boxClass = cn(
     'relative shrink-0 cursor-pointer rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+    deployFreezeDiagonal && 'overflow-hidden',
     isToday && 'z-[1]',
     isSelected && 'z-[2] ring-2 ring-inset ring-primary'
   );
@@ -760,14 +823,14 @@ const HeatCellSized = memo(function HeatCellSized({
           <div
             role="button"
             tabIndex={0}
-            title="Click for day details"
-            aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+            title={dayTitle}
+            aria-label={dayAria}
             aria-pressed={isSelected}
             className={boxClass}
             style={{ width: cellPx, height: cellPx, backgroundColor: effFill }}
             {...handlers}
           >
-            {overlapBadge ? <LedgerOverlapCountBadge count={overlapBadge} /> : null}
+            {deployFreezeDiagonal ? <HeatCellDeployFreezeOverlay /> : null}
             {isToday ? <TodayDot /> : null}
           </div>
         </HeatCutoffOpacityWrap>
@@ -782,8 +845,8 @@ const HeatCellSized = memo(function HeatCellSized({
           <motion.div
             role="button"
             tabIndex={0}
-            title="Click for day details"
-            aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+            title={dayTitle}
+            aria-label={dayAria}
             aria-pressed={isSelected}
             className={cn(boxClass, 'will-change-[opacity,filter]')}
             style={{ width: cellPx, height: cellPx, backgroundColor: effFill }}
@@ -800,7 +863,7 @@ const HeatCellSized = memo(function HeatCellSized({
             }}
             {...handlers}
           >
-            {overlapBadge ? <LedgerOverlapCountBadge count={overlapBadge} /> : null}
+            {deployFreezeDiagonal ? <HeatCellDeployFreezeOverlay /> : null}
             {isToday ? <TodayDot /> : null}
           </motion.div>
         </HeatCutoffOpacityWrap>
@@ -817,14 +880,15 @@ const HeatCellSized = memo(function HeatCellSized({
         key={colorLayerKey}
         className={cn(
           'absolute inset-0 cursor-pointer rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+          deployFreezeDiagonal && 'overflow-hidden',
           isToday && 'z-[1]',
           isSelected && 'z-[2] ring-2 ring-inset ring-primary',
           'will-change-[opacity,filter]'
         )}
         role="button"
         tabIndex={0}
-        title="Click for day details"
-        aria-label={dateStr ? `Day details for ${dateStr}` : 'Day cell'}
+        title={dayTitle}
+        aria-label={dayAria}
         aria-pressed={isSelected}
         style={{ backgroundColor: effFill }}
         initial={{ opacity: 0, filter: 'brightness(0.92) saturate(0.85)' }}
@@ -859,7 +923,7 @@ const HeatCellSized = memo(function HeatCellSized({
         }
         {...handlers}
       >
-        {overlapBadge ? <LedgerOverlapCountBadge count={overlapBadge} /> : null}
+        {deployFreezeDiagonal ? <HeatCellDeployFreezeOverlay /> : null}
         {isToday ? <TodayDot /> : null}
       </motion.div>
     </div>
@@ -909,6 +973,8 @@ type RunwayVerticalHeatmapBodyProps = {
    * {@link effectiveLedgerFootprintOverlap}).
    */
   ledgerImplicitBaselineFootprint?: boolean;
+  /** Deployment Risk lens: YAML change-freeze windows → diagonal mark on HTML cells. */
+  deploymentRiskBlackouts?: readonly DeploymentRiskBlackout[] | null;
 };
 
 function monthBlockMinHeight(
@@ -1051,6 +1117,7 @@ function RunwayMonthMiniGrid({
   cellDetailViewMode,
   ledgerAttribution = null,
   ledgerImplicitBaselineFootprint = true,
+  deploymentRiskBlackouts = null,
 }: {
   mo: CalendarMonthBlock;
   secYear: number;
@@ -1082,6 +1149,7 @@ function RunwayMonthMiniGrid({
   /** Ledger row selection → per-day overlap counts for this lens (attribution mode). */
   ledgerAttribution?: { overlapByDay: Map<string, number>; lens: Exclude<ViewModeId, 'code'> } | null;
   ledgerImplicitBaselineFootprint?: boolean;
+  deploymentRiskBlackouts?: readonly DeploymentRiskBlackout[] | null;
 }) {
   const colorLayerKey = viewMode === 'combined' ? 'c-combined-tech' : viewMode;
   const weekdayRow = showWeekdayRow ? (
@@ -1107,6 +1175,11 @@ function RunwayMonthMiniGrid({
 
   const weekRowMinH = cellPx;
 
+  const ledgerRawOverlapMax = useMemo(() => {
+    if (!ledgerAttribution) return 1;
+    return maxRawLedgerOverlapInMap(ledgerAttribution.overlapByDay);
+  }, [ledgerAttribution]);
+
   const weeksGrid = (
     <div data-runway-weeks-grid data-no-drag className="flex flex-col" style={{ gap }}>
       {mo.weeks.map((week, wi) => (
@@ -1127,21 +1200,53 @@ function RunwayMonthMiniGrid({
             const metric = row
               ? heatmapCellMetric(row, viewMode, riskTuning)
               : undefined;
-            const { fill, dimOpacity } = !dateStr
-              ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
-              : runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
+            const rawLedger =
+              ledgerAttribution && dateStr ? (ledgerAttribution.overlapByDay.get(dateStr) ?? 0) : undefined;
+            const ledgerOverlap =
+              ledgerAttribution && dateStr
+                ? effectiveLedgerFootprintOverlap(
+                    rawLedger ?? 0,
+                    ledgerImplicitBaselineFootprint,
+                  )
+                : undefined;
+            let fill: string;
+            let dimOpacity: number;
+            if (!dateStr) {
+              fill = HEATMAP_RUNWAY_PAD_FILL;
+              dimOpacity = 1;
+            } else if (
+              ledgerAttribution &&
+              typeof rawLedger === 'number' &&
+              typeof ledgerOverlap === 'number'
+            ) {
+              const lm = ledgerAttributionHeatmapMetric(
+                metric,
+                rawLedger,
+                ledgerOverlap,
+                ledgerRawOverlapMax,
+              );
+              if (lm === null) {
+                fill = ledgerAttributionNeutralFillHex();
+                dimOpacity = 1;
+              } else {
+                const heat = runwayHeatmapCellFillAndDim(viewMode, lm, heatmapOpts, row);
+                fill = heat.fill;
+                dimOpacity = heat.dimOpacity;
+              }
+            } else {
+              const heat = runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
+              fill = heat.fill;
+              dimOpacity = heat.dimOpacity;
+            }
             const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
             const isSelected = typeof dateStr === 'string' && dateStr === selectedDayYmd;
             const shimmerBase = ((secYear % 100) * 500 + mo.monthIndex * 40 + wi * 7 + di) % 900;
             const sweepDelaySec = sweepDelayForCell(sweepMarketOffsetSec, si, sweepMi, wi, di);
-            const ledgerOverlap =
-              ledgerAttribution && dateStr
-                ? effectiveLedgerFootprintOverlap(
-                    ledgerAttribution.overlapByDay.get(dateStr) ?? 0,
-                    ledgerImplicitBaselineFootprint,
-                  )
-                : undefined;
-            return cellPx === CELL_PX ? (
+            const deployFreezeDiagonal =
+              viewMode === 'market_risk' &&
+              typeof dateStr === 'string' &&
+              ymdInAnyDeploymentRiskBlackout(dateStr, deploymentRiskBlackouts);
+            return cellPx === RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX ? (
               <HeatCell
                 key={`${mo.key}-${wi}-${di}`}
                 fill={fill}
@@ -1161,6 +1266,7 @@ function RunwayMonthMiniGrid({
                 openDayDetailsFromCell={openDayDetailsFromCell}
                 cellDetailViewMode={cellDetailViewMode}
                 ledgerOverlap={ledgerAttribution ? ledgerOverlap : undefined}
+                deployFreezeDiagonal={deployFreezeDiagonal}
               />
             ) : (
               <HeatCellSized
@@ -1183,6 +1289,7 @@ function RunwayMonthMiniGrid({
                 openDayDetailsFromCell={openDayDetailsFromCell}
                 cellDetailViewMode={cellDetailViewMode}
                 ledgerOverlap={ledgerAttribution ? ledgerOverlap : undefined}
+                deployFreezeDiagonal={deployFreezeDiagonal}
               />
             );
           })}
@@ -1261,6 +1368,7 @@ function RunwayVerticalHeatmapBody({
   isoGrowResetKey = 'iso',
   ledgerAttribution = null,
   ledgerImplicitBaselineFootprint = true,
+  deploymentRiskBlackouts = null,
 }: RunwayVerticalHeatmapBodyProps) {
   const compactStripLabels = compareStripLabels;
   const showWeekdayRowForMonth = (mo: CalendarMonthBlock) =>
@@ -1372,6 +1480,7 @@ function RunwayVerticalHeatmapBody({
                         selectedDayYmd={selectedDayYmd}
                         ledgerAttribution={ledgerAttribution}
                         ledgerImplicitBaselineFootprint={ledgerImplicitBaselineFootprint}
+                        deploymentRiskBlackouts={deploymentRiskBlackouts}
                       />
                     );
                   })}
@@ -1486,6 +1595,7 @@ function RunwayVerticalHeatmapBody({
                           monthLabelPlacement={compareStripLabels ? 'side' : 'above'}
                           ledgerAttribution={ledgerAttribution}
                           ledgerImplicitBaselineFootprint={ledgerImplicitBaselineFootprint}
+                          deploymentRiskBlackouts={deploymentRiskBlackouts}
                         />
                       </div>
                     ))}
@@ -1593,8 +1703,11 @@ export function RunwayGrid({
   const runwayFilterYear = useAtcStore((s) => s.runwayFilterYear);
   const runwayFilterQuarter = useAtcStore((s) => s.runwayFilterQuarter);
   const runwayIncludeFollowingQuarter = useAtcStore((s) => s.runwayIncludeFollowingQuarter);
+  const runwayCustomRangeStartYmd = useAtcStore((s) => s.runwayCustomRangeStartYmd);
+  const runwayCustomRangeEndYmd = useAtcStore((s) => s.runwayCustomRangeEndYmd);
   const runwaySelectedDayYmd = useAtcStore((s) => s.runwaySelectedDayYmd);
   const setRunwaySelectedDayYmd = useAtcStore((s) => s.setRunwaySelectedDayYmd);
+  const setRunwayFilterYear = useAtcStore((s) => s.setRunwayFilterYear);
 
   const [displayedCountry, setDisplayedCountry] = useState(country);
   const [countrySwitchLoading, setCountrySwitchLoading] = useState(false);
@@ -1603,13 +1716,21 @@ export function RunwayGrid({
   const [tip, setTip] = useState<RunwayTipState | null>(null);
   const tipRef = useRef<RunwayTipState | null>(null);
   tipRef.current = tip;
-  /** Prevents re-applying default “today” selection when layout deps are unchanged (e.g. after Strict Mode double mount). */
+  /** Prevents re-applying persisted-day tip when layout deps are unchanged (e.g. after Strict Mode double mount). */
   const heatmapAutoDayAppliedKeyRef = useRef<string>('');
+  /**
+   * When `runwayFilterYear` is null on a single-market focus, we pick a default full calendar year once
+   * per market session; clearing to “all years” sets year null and sets this ref equal to `country` so we
+   * do not fight the user.
+   */
+  const singleMarketDefaultYearAppliedRef = useRef<string | null>(null);
   const heatmapInteractionRef = useRef<HTMLDivElement>(null);
   const tooltipRootRef = useRef<HTMLDivElement>(null);
+  /** Single-market side column: day summary + sparklines + activity ledger (exclude from document dismiss). */
   const summaryPanelRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
-  const heatmapCaptureRef = useRef<HTMLDivElement>(null);
+  /** Title row + runway body: full workbench “main” column for PNG export (not only the heatmap subtree). */
+  const runwayMainContentCaptureRef = useRef<HTMLDivElement>(null);
   /** LIOM compare: horizontal scrollport — measured to pick a cell size that fits the main heatmap column. */
   const compareScrollRef = useRef<HTMLDivElement>(null);
   const landingComparePanPlayedRef = useRef(false);
@@ -1618,9 +1739,21 @@ export function RunwayGrid({
   const [pngExporting, setPngExporting] = useState(false);
   const [dimPastDays, setDimPastDays] = useState(false);
 
-  const [runwayCellPx, setRunwayCellPx] = useState(CELL_PX);
+  const runwayHeatmapUserCellPx = useAtcStore((s) => s.runwayHeatmapCellPx);
+  const setRunwayHeatmapCellPx = useAtcStore((s) => s.setRunwayHeatmapCellPx);
+  const runwayCellGapPx = useAtcStore((s) => s.runwayHeatmapCellGapPx);
+  const setRunwayCellGapPx = useAtcStore((s) => s.setRunwayHeatmapCellGapPx);
+  const runwayHeatmapCellRadiusPx = useAtcStore((s) => s.runwayHeatmapCellRadiusPx);
+  const setRunwayHeatmapCellRadiusPx = useAtcStore((s) => s.setRunwayHeatmapCellRadiusPx);
 
-  const cellPx = runwayCellPx;
+  /** Largest cell size (px) that fits the current scrollport; {@link runwayHeatmapUserCellPx} may be larger. */
+  const [runwayHeatmapFitCapPx, setRunwayHeatmapFitCapPx] = useState(RUNWAY_HEATMAP_CELL_PX_MAX);
+
+  const cellPx = useMemo(
+    () => snapRunwayHeatmapCellPx(Math.min(runwayHeatmapUserCellPx, runwayHeatmapFitCapPx)),
+    [runwayHeatmapUserCellPx, runwayHeatmapFitCapPx],
+  );
+  const gap = runwayCellGapPx;
 
   const runway3dRowTowerPx = useMemo(
     () => (showIso3dSingleMarket ? Math.round(cellPx * 1.38) : 0),
@@ -1658,8 +1791,32 @@ export function RunwayGrid({
     [configs, singleMarketId]
   );
 
-  /** Dates shown in the calendar: full picker span when year is set (every calendar day), else model dates only. */
+  const runwayCalendarSlice = useMemo(
+    () => ({
+      runwayCustomRangeStartYmd,
+      runwayCustomRangeEndYmd,
+      runwayFilterYear,
+      runwayFilterQuarter,
+      runwayIncludeFollowingQuarter,
+    }),
+    [
+      runwayCustomRangeStartYmd,
+      runwayCustomRangeEndYmd,
+      runwayFilterYear,
+      runwayFilterQuarter,
+      runwayIncludeFollowingQuarter,
+    ]
+  );
+
+  /** Dates shown in the calendar: custom ISO window, else year/quarter picker span, else all model dates. */
   const layoutDatesSorted = useMemo(() => {
+    if (isRunwayCustomRangeActive(runwayCalendarSlice)) {
+      let end = runwayCustomRangeEndYmd!;
+      if (runwayIncludeFollowingQuarter) {
+        end = endYmdAfterFollowingQuarter(end);
+      }
+      return enumerateIsoDatesInclusive(runwayCustomRangeStartYmd!, end);
+    }
     if (runwayFilterYear != null) {
       const { start, end } = runwayPickerLayoutBounds(
         runwayFilterYear,
@@ -1669,7 +1826,14 @@ export function RunwayGrid({
       return enumerateIsoDatesInclusive(start, end);
     }
     return [...new Set(riskSurface.map((r) => r.date))].sort();
-  }, [riskSurface, runwayFilterYear, runwayFilterQuarter, runwayIncludeFollowingQuarter]);
+  }, [
+    riskSurface,
+    runwayCustomRangeStartYmd,
+    runwayCustomRangeEndYmd,
+    runwayFilterYear,
+    runwayFilterQuarter,
+    runwayIncludeFollowingQuarter,
+  ]);
 
   const layoutDateRangeBounds = useMemo(() => {
     if (!layoutDatesSorted.length) return null;
@@ -1683,29 +1847,86 @@ export function RunwayGrid({
     return filterLedgerToVisibleDateRange(full, layoutDateRangeBounds.start, layoutDateRangeBounds.end);
   }, [marketConfig, layoutDateRangeBounds]);
 
+  /** LIOM compare: same exclusion + BAU semantics as single-market, one ledger per column market. */
+  const activityLedgersByMarket = useMemo(() => {
+    if (!compareAllMarkets || !layoutDateRangeBounds) return null;
+    const out = new Map<string, MarketActivityLedger>();
+    for (const cfg of configs) {
+      const full = buildMarketActivityLedgerFromConfig(cfg);
+      out.set(
+        cfg.market,
+        filterLedgerToVisibleDateRange(full, layoutDateRangeBounds.start, layoutDateRangeBounds.end),
+      );
+    }
+    return out;
+  }, [compareAllMarkets, layoutDateRangeBounds, configs]);
+
   const pruneRunwayLedgerExclusionsToAllowedEntryIds = useAtcStore(
     (s) => s.pruneRunwayLedgerExclusionsToAllowedEntryIds,
   );
   useEffect(() => {
+    if (compareAllMarkets && activityLedgersByMarket) {
+      const allowed = new Set<string>();
+      for (const ledger of activityLedgersByMarket.values()) {
+        for (const e of ledger.entries) allowed.add(e.entryId);
+      }
+      pruneRunwayLedgerExclusionsToAllowedEntryIds(allowed);
+      return;
+    }
     if (!activityLedger) return;
     pruneRunwayLedgerExclusionsToAllowedEntryIds(new Set(activityLedger.entries.map((e) => e.entryId)));
-  }, [activityLedger, pruneRunwayLedgerExclusionsToAllowedEntryIds]);
-
-  const restrictRunwayLedgerToDayContributors = useAtcStore((s) => s.restrictRunwayLedgerToDayContributors);
-  useEffect(() => {
-    if (compareAllMarkets) return;
-    if (!activityLedger) return;
-    if (!tip || !('payload' in tip)) return;
-    if (tip.payload.market !== country) return;
-    const vm = tip.payload.viewMode;
-    if (vm === 'code') return;
-    restrictRunwayLedgerToDayContributors(activityLedger, tip.payload.dateStr, vm);
-  }, [tip, activityLedger, country, compareAllMarkets, restrictRunwayLedgerToDayContributors]);
+  }, [
+    compareAllMarkets,
+    activityLedgersByMarket,
+    activityLedger,
+    pruneRunwayLedgerExclusionsToAllowedEntryIds,
+  ]);
 
   const focusMarketRiskByDate = useMemo(() => {
     if (isRunwayMultiMarketStrip(country)) return null;
     return riskByDateForMarket(riskSurface, country);
   }, [riskSurface, country]);
+
+  /** Clear persisted / URL-backed day when it falls outside the visible layout or has no risk row (invalid share links). */
+  useEffect(() => {
+    if (compareAllMarkets) return;
+    const y = runwaySelectedDayYmd;
+    if (!y) return;
+    if (!layoutDatesSorted.length) return;
+    if (!focusMarketRiskByDate || focusMarketRiskByDate.size === 0) return;
+    if (layoutDatesSorted.includes(y) && focusMarketRiskByDate.has(y)) return;
+    setRunwaySelectedDayYmd(null);
+  }, [
+    compareAllMarkets,
+    runwaySelectedDayYmd,
+    layoutDatesSorted,
+    focusMarketRiskByDate,
+    setRunwaySelectedDayYmd,
+  ]);
+
+  useEffect(() => {
+    singleMarketDefaultYearAppliedRef.current = null;
+  }, [country]);
+
+  /** Single-market: use full calendar year when no year is chosen, once per focus market (honours explicit “all years”). */
+  useEffect(() => {
+    if (compareAllMarkets) return;
+    if (!riskSurface.length) return;
+    if (runwayFilterYear != null) return;
+    if (isRunwayCustomRangeActive(runwayCalendarSlice)) return;
+    if (singleMarketDefaultYearAppliedRef.current === country) return;
+    const y = defaultRunwayCalendarYearFromRiskSurface(riskSurface);
+    if (y == null) return;
+    singleMarketDefaultYearAppliedRef.current = country;
+    setRunwayFilterYear(y);
+  }, [
+    compareAllMarkets,
+    riskSurface,
+    runwayFilterYear,
+    country,
+    setRunwayFilterYear,
+    runwayCalendarSlice,
+  ]);
 
   useLayoutEffect(() => {
     setTip(null);
@@ -1772,12 +1993,13 @@ export function RunwayGrid({
         w,
         h,
         marketsOrdered.length,
-        layoutDatesSorted
+        layoutDatesSorted,
+        gap
       );
       if (landingCompareMaxCellPx != null) {
         next = snapRunwayCellPx(Math.min(next, landingCompareMaxCellPx));
       }
-      setRunwayCellPx((prev) => (prev === next ? prev : next));
+      setRunwayHeatmapFitCapPx((prev) => (prev === next ? prev : next));
     };
 
     applyFit();
@@ -1796,6 +2018,7 @@ export function RunwayGrid({
     countrySwitchLoading,
     showCompareIsoCityBlock,
     landingCompareMaxCellPx,
+    gap,
   ]);
 
   useLayoutEffect(() => {
@@ -1816,9 +2039,9 @@ export function RunwayGrid({
       const h =
         measuredH > 48 ? Math.min(measuredH, viewportBelow) : viewportBelow;
       const next = singleMarketMultiLens
-        ? bestCellPxForSingleMarketTripleColumnFit(w, h, layoutDatesSorted)
-        : bestCellPxForSingleMarketFit(w, h, layoutDatesSorted);
-      setRunwayCellPx((prev) => (prev === next ? prev : next));
+        ? bestCellPxForSingleMarketTripleColumnFit(w, h, layoutDatesSorted, gap)
+        : bestCellPxForSingleMarketFit(w, h, layoutDatesSorted, gap);
+      setRunwayHeatmapFitCapPx((prev) => (prev === next ? prev : next));
     };
 
     applyFit();
@@ -1829,7 +2052,14 @@ export function RunwayGrid({
       ro.disconnect();
       window.removeEventListener('resize', applyFit);
     };
-  }, [compareAllMarkets, compareDatesFitKey, countrySwitchLoading, showIso3dSingleMarket, singleMarketMultiLens]);
+  }, [
+    compareAllMarkets,
+    compareDatesFitKey,
+    countrySwitchLoading,
+    showIso3dSingleMarket,
+    singleMarketMultiLens,
+    gap,
+  ]);
 
   const dismissTip = useCallback(() => {
     setTip(null);
@@ -1837,24 +2067,35 @@ export function RunwayGrid({
   }, [compareAllMarkets, setRunwaySelectedDayYmd]);
 
   const calendarLayout = useMemo(() => {
-    if (compareAllMarkets) return buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx);
+    if (compareAllMarkets) {
+      return buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx, { cellGapPx: gap });
+    }
     if (showIso3dSingleMarket) {
       return buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx, {
         rowTowerPx: runway3dRowTowerPx,
+        cellGapPx: gap,
       });
     }
     if (singleMarketMultiLens) {
-      const base = buildVerticalMonthsRunwayLayout(layoutDatesSorted, cellPx);
-      if (!base) return null;
+      const strip = buildContributionStripRunwayLayout(layoutDatesSorted, cellPx, gap);
+      if (!strip) return null;
+      const colW = strip.contentWidth;
+      const compactH = contributionStripGridOnlyContentHeightPx(cellPx, gap);
+      const layerH = strip.contentHeight;
       return {
-        ...base,
-        contentWidth: compareAllRunwayTotalContentWidthPx(cellPx, SINGLE_MARKET_STACK_LENS_IDS.length),
+        ...strip,
+        contributionColumnContentWidth: colW,
+        contributionStripCompactHeight: compactH,
+        contributionStripLayerHeight: layerH,
+        contentWidth: tripleLensStackedContributionTotalContentWidthPx(colW),
+        contentHeight: tripleLensStackedContributionTotalContentHeightPx(layerH, cellPx, gap),
       };
     }
-    return buildQuarterGridRunwayLayout(layoutDatesSorted, cellPx);
+    return buildContributionStripRunwayLayout(layoutDatesSorted, cellPx, gap);
   }, [
     layoutDatesSorted,
     cellPx,
+    gap,
     compareAllMarkets,
     showIso3dSingleMarket,
     runway3dRowTowerPx,
@@ -2007,33 +2248,34 @@ export function RunwayGrid({
       if (!row) return null;
       const config = configs.find((c) => c.market === market);
       const wd = weekdayShortFromYmd(dateStr);
-      const fillMetricValue = heatmapCellMetric(row, payloadViewMode, riskTuning);
-      const optsM = heatmapOptsForMarketLens(market, payloadViewMode);
-      const fillMetricDisplayValue =
-        payloadViewMode === 'in_store' || payloadViewMode === 'market_risk'
-          ? transformedHeatmapMetric(payloadViewMode, fillMetricValue, optsM)
-          : fillMetricValue;
-      const { fill: cellFillHex } = runwayHeatmapCellFillAndDim(
-        payloadViewMode,
-        fillMetricValue,
-        optsM,
-        row
-      );
-      const payload = buildRunwayTooltipPayload({
-        dateStr,
-        weekdayShort: wd,
-        market,
-        viewMode: payloadViewMode,
-        row,
-        config,
-        tuning: riskTuning,
-        fillMetricHeadline: fillMetricHeadlineForView(payloadViewMode),
-        fillMetricLabel: fillMetricLabelForView(payloadViewMode),
-        fillMetricLeadCompact: fillMetricLeadCompactForView(payloadViewMode),
-        fillMetricValue,
-        fillMetricDisplayValue,
-        cellFillHex,
-      });
+
+      const buildForMode = (mode: ViewModeId): RunwayTooltipPayload => {
+        const fillMetricValue = heatmapCellMetric(row, mode, riskTuning);
+        const optsM = heatmapOptsForMarketLens(market, mode);
+        const fillMetricDisplayValue =
+          mode === 'in_store' || mode === 'market_risk'
+            ? transformedHeatmapMetric(mode, fillMetricValue, optsM)
+            : fillMetricValue;
+        const { fill: cellFillHex } = runwayHeatmapCellFillAndDim(mode, fillMetricValue, optsM, row);
+        return buildRunwayTooltipPayload({
+          dateStr,
+          weekdayShort: wd,
+          market,
+          viewMode: mode,
+          row,
+          config,
+          tuning: riskTuning,
+          fillMetricHeadline: fillMetricHeadlineForView(mode),
+          fillMetricLabel: fillMetricLabelForView(mode),
+          fillMetricLeadCompact: fillMetricLeadCompactForView(mode),
+          fillMetricValue,
+          fillMetricDisplayValue,
+          cellFillHex,
+        });
+      };
+
+      const payload = buildForMode(payloadViewMode);
+
       return { x: anchor.clientX, y: anchor.clientY, payload };
     },
     [riskSurface, configs, viewMode, riskTuning, heatmapOptsForMarketLens]
@@ -2101,7 +2343,7 @@ export function RunwayGrid({
       let nextIdx = idx + delta;
       while (nextIdx >= 0 && nextIdx < layoutDatesSorted.length) {
         const nextDate = layoutDatesSorted[nextIdx]!;
-        const nextTip = buildPayloadTipState(market, nextDate, anchor);
+        const nextTip = buildPayloadTipState(market, nextDate, anchor, cur.payload.viewMode);
         if (nextTip) {
           e.preventDefault();
           setTip(nextTip);
@@ -2152,6 +2394,8 @@ export function RunwayGrid({
       String(runwayFilterYear ?? ''),
       String(runwayFilterQuarter ?? ''),
       String(runwayIncludeFollowingQuarter),
+      runwayCustomRangeStartYmd ?? '',
+      runwayCustomRangeEndYmd ?? '',
       layoutDatesSorted[0] ?? '',
       layoutDatesSorted[layoutDatesSorted.length - 1] ?? '',
       String(riskSurface.length),
@@ -2159,20 +2403,25 @@ export function RunwayGrid({
 
     if (heatmapAutoDayAppliedKeyRef.current === key) return;
 
-    const todayStr = formatDateYmd(new Date());
+    heatmapAutoDayAppliedKeyRef.current = key;
+
     const persisted =
       runwaySelectedDayYmd &&
       layoutDatesSorted.includes(runwaySelectedDayYmd) &&
       focusMarketRiskByDate.has(runwaySelectedDayYmd)
         ? runwaySelectedDayYmd
         : null;
-    const pick =
-      persisted ?? pickLayoutDayForDefaultSelection(layoutDatesSorted, focusMarketRiskByDate, todayStr);
-    if (!pick) return;
 
-    heatmapAutoDayAppliedKeyRef.current = key;
-    const next = buildPayloadTipState(country, pick, { clientX: 0, clientY: 0 });
-    if (next) setTip(next);
+    if (persisted) {
+      const next = buildPayloadTipState(country, persisted, { clientX: 0, clientY: 0 });
+      if (next) setTip(next);
+      return;
+    }
+
+    setTip(null);
+    if (runwaySelectedDayYmd != null) {
+      setRunwaySelectedDayYmd(null);
+    }
   }, [
     landingMinimalChrome,
     useSideSummary,
@@ -2183,13 +2432,14 @@ export function RunwayGrid({
     runwayFilterYear,
     runwayFilterQuarter,
     runwayIncludeFollowingQuarter,
+    runwayCustomRangeStartYmd,
+    runwayCustomRangeEndYmd,
     riskSurface.length,
     country,
     runwaySelectedDayYmd,
     buildPayloadTipState,
   ]);
 
-  const gap = RUNWAY_CELL_GAP_PX;
   const monthStripW = runwayDayStripWidth(cellPx, gap, RUNWAY_DAY_COLUMNS);
 
   /** Sticker row (`h-[32px]`) + `mb-1.5` before the compare SVG. */
@@ -2374,10 +2624,13 @@ export function RunwayGrid({
   }, [compareAllMarkets, country, viewMode]);
 
   const handleDownloadPng = useCallback(async () => {
-    const el = heatmapCaptureRef.current;
+    /** Title + toolbar + heatmap (+ side summary when present); excludes workbench chrome and app header. */
+    const el = runwayMainContentCaptureRef.current;
     if (!el || !calendarLayout || countrySwitchLoading) return;
     setPngExporting(true);
     const stamped = stampRunwayScrollportsForPngExport([
+      el,
+      ...collectOverflowScrollAncestors(el),
       compareScrollRef.current,
       singleMarketFitRef.current,
     ]);
@@ -2404,8 +2657,12 @@ export function RunwayGrid({
         setRunway3dHeatmap={setRunway3dHeatmap}
         dimPastDays={dimPastDays}
         setDimPastDays={setDimPastDays}
-        runwayCellPx={runwayCellPx}
-        setRunwayCellPx={setRunwayCellPx}
+        runwayCellPx={runwayHeatmapUserCellPx}
+        setRunwayCellPx={setRunwayHeatmapCellPx}
+        runwayCellGapPx={runwayCellGapPx}
+        setRunwayCellGapPx={setRunwayCellGapPx}
+        runwayHeatmapCellRadiusPx={runwayHeatmapCellRadiusPx}
+        setRunwayHeatmapCellRadiusPx={setRunwayHeatmapCellRadiusPx}
         calendarLayoutPresent={!!calendarLayout}
         pngExporting={pngExporting}
         handleDownloadPng={handleDownloadPng}
@@ -2423,8 +2680,12 @@ export function RunwayGrid({
     setRunway3dHeatmap,
     dimPastDays,
     setDimPastDays,
-    runwayCellPx,
-    setRunwayCellPx,
+    runwayHeatmapUserCellPx,
+    setRunwayHeatmapCellPx,
+    runwayCellGapPx,
+    setRunwayCellGapPx,
+    runwayHeatmapCellRadiusPx,
+    setRunwayHeatmapCellRadiusPx,
     calendarLayout,
     pngExporting,
     handleDownloadPng,
@@ -2461,6 +2722,7 @@ export function RunwayGrid({
       )}
     >
       <div
+        ref={runwayMainContentCaptureRef}
         key={`${viewMode}-${country}`}
         className={cn(
           'mx-auto w-full max-w-full bg-transparent px-4 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-3.5',
@@ -2468,13 +2730,20 @@ export function RunwayGrid({
         )}
       >
         <div className="mb-3 flex flex-col gap-3 sm:mb-4">
-          <div className="flex min-w-0 flex-row flex-wrap items-center justify-center gap-2.5 min-[480px]:justify-start">
-            {!compareAllMarkets ? (
-              <MarketCircleFlag marketId={country} size={26} className="shrink-0" />
+          <div className="flex min-w-0 flex-row flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div className="flex min-w-0 flex-1 flex-row flex-wrap items-center justify-center gap-2.5 min-[480px]:justify-start">
+              {!compareAllMarkets ? (
+                <MarketCircleFlag marketId={country} size={26} className="shrink-0" />
+              ) : null}
+              <h2 className="min-w-0 text-center text-lg font-bold leading-snug tracking-tight text-foreground min-[480px]:text-left sm:text-xl">
+                {runwayTitleWithMarket}
+              </h2>
+            </div>
+            {runwayViewToolbarEl ? (
+              <div className="flex w-full min-w-0 shrink-0 justify-end min-[480px]:w-auto">
+                {runwayViewToolbarEl}
+              </div>
             ) : null}
-            <h2 className="min-w-0 text-center text-lg font-bold leading-snug tracking-tight text-foreground min-[480px]:text-left sm:text-xl">
-              {runwayTitleWithMarket}
-            </h2>
           </div>
         </div>
 
@@ -2499,17 +2768,14 @@ export function RunwayGrid({
                   reduceMotion={!!reduceMotion}
                   compareColumnCount={marketsOrdered.length}
                 />
-                {runwayViewToolbarEl ? (
-                  <div className="flex w-full justify-center">
-                    {runwayViewToolbarEl}
-                  </div>
-                ) : null}
               </motion.div>
             ) : calendarLayout ? (
               <motion.div
                 key={`grid-${country}-${compareAllMarkets ? 'compare' : 'single'}-${
                   showIso3dSingleMarket || showCompareIsoCityBlock ? '3d' : 'flat'
-                }-${singleMarketMultiLens ? 'multilens' : '1l'}-${useSvgHeatmap ? 'svg' : 'html'}`}
+                }-${singleMarketMultiLens ? 'multilens' : '1l'}-${useSvgHeatmap ? 'svg' : 'html'}-${
+                  calendarLayout.layoutKind === 'contribution_strip' ? 'contrib' : 'cal'
+                }`}
                 className={cn('w-full', runwayStackViewportFill && 'flex min-h-0 min-w-0 flex-1 flex-col')}
                 initial={reduceMotion ? false : { y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -2530,9 +2796,16 @@ export function RunwayGrid({
                   configs={configs}
                   sections={calendarLayout.sections}
                   contentWidth={calendarLayout.contentWidth}
+                  contentHeight={calendarLayout.contentHeight}
                   placedCells={calendarLayout.placedCells}
+                  layoutKind={calendarLayout.layoutKind}
+                  contributionMeta={calendarLayout.contributionMeta}
+                  contributionColumnContentWidth={calendarLayout.contributionColumnContentWidth}
+                  contributionStripCompactHeight={calendarLayout.contributionStripCompactHeight}
+                  contributionStripLayerHeight={calendarLayout.contributionStripLayerHeight}
                   cellPx={cellPx}
                   gap={gap}
+                  heatmapCellRadiusPx={runwayHeatmapCellRadiusPx}
                   monthStripW={monthStripW}
                   heatmapOptsBase={heatmapOptsBase}
                   heatmapOptsForMarket={heatmapOptsForMarket}
@@ -2545,6 +2818,7 @@ export function RunwayGrid({
                   country={country}
                   marketConfig={marketConfig}
                   activityLedger={activityLedger}
+                  activityLedgersByMarket={activityLedgersByMarket}
                   heatmap3d={showIso3dSingleMarket}
                   runway3dHeatmap={showCompareIsoCityBlock}
                   rowTowerPx={runway3dRowTowerPx}
@@ -2552,7 +2826,6 @@ export function RunwayGrid({
                   makeShowTip={makeShowTip}
                   heatmapInteractionRef={heatmapInteractionRef}
                   outerRef={outerRef}
-                  heatmapCaptureRef={heatmapCaptureRef}
                   scrollTopRef={scrollTopRef}
                   onSlotSelection={onSlotSelection}
                   onCompareMarketSelect={
@@ -2563,7 +2836,6 @@ export function RunwayGrid({
                   tip={tip}
                   summaryPanelRef={summaryPanelRef}
                   onClearDaySummary={dismissTip}
-                  runwayViewToolbar={runwayViewToolbarEl}
                   isoGrowResetKey={isoGrowResetKey}
                   singleMarketMultiLens={singleMarketMultiLens}
                   heatmapOptsForMarketLens={heatmapOptsForMarketLens}
@@ -2598,6 +2870,10 @@ type RunwayViewActionsToolbarProps = {
   setDimPastDays: Dispatch<SetStateAction<boolean>>;
   runwayCellPx: number;
   setRunwayCellPx: Dispatch<SetStateAction<number>>;
+  runwayCellGapPx: number;
+  setRunwayCellGapPx: Dispatch<SetStateAction<number>>;
+  runwayHeatmapCellRadiusPx: number;
+  setRunwayHeatmapCellRadiusPx: Dispatch<SetStateAction<number>>;
   calendarLayoutPresent: boolean;
   pngExporting: boolean;
   handleDownloadPng: () => void | Promise<void>;
@@ -2616,6 +2892,10 @@ function RunwayViewActionsToolbar({
   setDimPastDays,
   runwayCellPx,
   setRunwayCellPx,
+  runwayCellGapPx,
+  setRunwayCellGapPx,
+  runwayHeatmapCellRadiusPx,
+  setRunwayHeatmapCellRadiusPx,
   calendarLayoutPresent,
   pngExporting,
   handleDownloadPng,
@@ -2623,7 +2903,7 @@ function RunwayViewActionsToolbar({
 }: RunwayViewActionsToolbarProps) {
   return (
     <div
-      className="flex w-full min-w-0 shrink-0 flex-wrap items-center justify-center gap-0.5"
+      className="flex w-full min-w-0 shrink-0 flex-wrap items-center justify-end gap-0.5"
       role="toolbar"
       aria-label="Runway view actions"
     >
@@ -2703,6 +2983,26 @@ function RunwayViewActionsToolbar({
       >
         <ZoomIn className="h-3.5 w-3.5 opacity-90" aria-hidden />
       </button>
+      <RunwayHeatmapCellStylePopover
+        disabled={countrySwitchLoading}
+        iconButtonClassName={RUNWAY_TOOLBAR_ICON_BTN}
+        cellPx={runwayCellPx}
+        setCellPx={setRunwayCellPx}
+        cellPxMin={RUNWAY_CELL_PX_MIN}
+        cellPxMax={RUNWAY_CELL_PX_MAX}
+        cellPxStep={RUNWAY_CELL_PX_STEP}
+        snapCellPx={snapRunwayCellPx}
+        gapPx={runwayCellGapPx}
+        setGapPx={setRunwayCellGapPx}
+        gapPxMin={RUNWAY_CELL_GAP_ADJ_MIN}
+        gapPxMax={RUNWAY_CELL_GAP_ADJ_MAX}
+        radiusPx={runwayHeatmapCellRadiusPx}
+        setRadiusPx={setRunwayHeatmapCellRadiusPx}
+        radiusPxMax={RUNWAY_HEATMAP_CELL_RADIUS_MAX}
+        defaultCellPx={RUNWAY_HEATMAP_LAYOUT_DEFAULTS.cellPx}
+        defaultGapPx={RUNWAY_HEATMAP_LAYOUT_DEFAULTS.gapPx}
+        defaultRadiusPx={RUNWAY_HEATMAP_LAYOUT_DEFAULTS.radiusPx}
+      />
       <button
         type="button"
         disabled={
@@ -2738,9 +3038,16 @@ type RunwayGridBodyProps = {
   configs: MarketConfig[];
   sections: VerticalYearSection[];
   contentWidth: number;
+  contentHeight: number;
   placedCells: PlacedRunwayCell[];
+  layoutKind?: 'default' | 'contribution_strip';
+  contributionMeta?: ContributionStripLayoutMeta;
+  contributionColumnContentWidth?: number;
+  contributionStripCompactHeight?: number;
+  contributionStripLayerHeight?: number;
   cellPx: number;
   gap: number;
+  heatmapCellRadiusPx: number;
   monthStripW: number;
   heatmapOptsBase: HeatmapColorOpts;
   heatmapOptsForMarket: (marketId: string) => HeatmapColorOpts;
@@ -2754,6 +3061,8 @@ type RunwayGridBodyProps = {
   marketConfig: MarketConfig | undefined;
   /** Parsed-market activity ledger for receipt + attribution (single-market). */
   activityLedger: MarketActivityLedger | null;
+  /** Compare-all: per-market ledgers for column heatmaps (BAU + row exclusions). */
+  activityLedgersByMarket: Map<string, MarketActivityLedger> | null;
   makeShowTip: (
     market: string,
     riskByDate: Map<string, RiskRow>,
@@ -2764,7 +3073,6 @@ type RunwayGridBodyProps = {
   heatmapOptsForMarketLens: (marketId: string, mode: ViewModeId) => HeatmapColorOpts;
   heatmapInteractionRef: React.RefObject<HTMLDivElement | null>;
   outerRef: React.MutableRefObject<HTMLDivElement | null>;
-  heatmapCaptureRef: React.MutableRefObject<HTMLDivElement | null>;
   scrollTopRef: React.MutableRefObject<number>;
   onSlotSelection: (s: SlotSelection | null) => void;
   /** LIOM compare columns: clicking a market code switches picker to that single market. */
@@ -2781,8 +3089,6 @@ type RunwayGridBodyProps = {
   tip: RunwayTipState | null;
   summaryPanelRef: Ref<HTMLDivElement | null>;
   onClearDaySummary: () => void;
-  /** Flat/tooling row rendered under the heatmap column (SVG/HTML/3D/compare). */
-  runwayViewToolbar: ReactNode;
   /** 3D iso views: restarts column grow-in when this key changes. */
   isoGrowResetKey: string;
 };
@@ -2801,9 +3107,16 @@ function RunwayGridBody({
   configs,
   sections,
   contentWidth,
+  contentHeight,
   placedCells,
+  layoutKind,
+  contributionMeta,
+  contributionColumnContentWidth,
+  contributionStripCompactHeight,
+  contributionStripLayerHeight,
   cellPx,
   gap,
+  heatmapCellRadiusPx,
   monthStripW,
   heatmapOptsBase,
   heatmapOptsForMarket,
@@ -2816,10 +3129,10 @@ function RunwayGridBody({
   country,
   marketConfig,
   activityLedger,
+  activityLedgersByMarket,
   makeShowTip,
   heatmapInteractionRef,
   outerRef,
-  heatmapCaptureRef,
   scrollTopRef,
   onSlotSelection,
   onCompareMarketSelect,
@@ -2832,7 +3145,6 @@ function RunwayGridBody({
   tip,
   summaryPanelRef,
   onClearDaySummary,
-  runwayViewToolbar,
   isoGrowResetKey,
   singleMarketMultiLens,
   heatmapOptsForMarketLens,
@@ -2862,17 +3174,42 @@ function RunwayGridBody({
 
   const runwayLedgerExcludedEntryIds = useAtcStore((s) => s.runwayLedgerExcludedEntryIds);
   const runwayLedgerImplicitBaselineFootprint = useAtcStore((s) => s.runwayLedgerImplicitBaselineFootprint);
+  const restrictRunwayLedgerToDayContributors = useAtcStore((s) => s.restrictRunwayLedgerToDayContributors);
 
+  const runwayLedgerActiveEntryIds = useMemo(
+    () => (activityLedger ? activeLedgerEntryIds(activityLedger, runwayLedgerExcludedEntryIds) : []),
+    [activityLedger, runwayLedgerExcludedEntryIds],
+  );
+
+  /**
+   * BAU baseline (store): days with no included ledger row on this lens still count one stratum so cells
+   * show full model heat. With BAU off and no row touching a day, attribution paints neutral (empty grid).
+   */
+  const ledgerImplicitBaselineFootprintForHeatmap = runwayLedgerImplicitBaselineFootprint;
+
+  /** Match empty heatmap: no named rows and BAU baseline off → hide modeled tech trace above the strip. */
+  const techStripModelTraceSuppressed = useMemo(
+    () =>
+      Boolean(
+        activityLedger &&
+          runwayLedgerActiveEntryIds.length === 0 &&
+          !ledgerImplicitBaselineFootprintForHeatmap
+      ),
+    [activityLedger, runwayLedgerActiveEntryIds.length, ledgerImplicitBaselineFootprintForHeatmap],
+  );
+
+  /**
+   * When a ledger exists, drive cells through attribution: no included overlap + BAU off → neutral; + BAU on →
+   * baseline stratum (full model fill). Compare columns use `ledgerAttrForCompareMarket` instead.
+   */
   const ledgerOverlapByLens = useMemo(() => {
     if (!activityLedger) return null;
-    const activeIds = activeLedgerEntryIds(activityLedger, runwayLedgerExcludedEntryIds);
-    if (activeIds.length === 0 && !runwayLedgerImplicitBaselineFootprint) return null;
     return {
-      combined: buildLedgerLensOverlapMap(activityLedger, activeIds, 'combined'),
-      in_store: buildLedgerLensOverlapMap(activityLedger, activeIds, 'in_store'),
-      market_risk: buildLedgerLensOverlapMap(activityLedger, activeIds, 'market_risk'),
+      combined: buildLedgerLensOverlapMap(activityLedger, runwayLedgerActiveEntryIds, 'combined'),
+      in_store: buildLedgerLensOverlapMap(activityLedger, runwayLedgerActiveEntryIds, 'in_store'),
+      market_risk: buildLedgerLensOverlapMap(activityLedger, runwayLedgerActiveEntryIds, 'market_risk'),
     };
-  }, [activityLedger, runwayLedgerExcludedEntryIds, runwayLedgerImplicitBaselineFootprint]);
+  }, [activityLedger, runwayLedgerActiveEntryIds]);
 
   const ledgerAttrForLens = useCallback(
     (lens: ViewModeId): { overlapByDay: Map<string, number>; lens: Exclude<ViewModeId, 'code'> } | null => {
@@ -2883,30 +3220,82 @@ function RunwayGridBody({
     [ledgerOverlapByLens],
   );
 
+  /** Compare strip: footprint map for `market` at the current `viewMode` lens (same rules as single-market). */
+  const ledgerAttrForCompareMarket = useCallback(
+    (market: string): { overlapByDay: Map<string, number>; lens: Exclude<ViewModeId, 'code'> } | null => {
+      if (!activityLedgersByMarket || viewMode === 'code') return null;
+      const ledger = activityLedgersByMarket.get(market);
+      if (!ledger) return null;
+      const activeIds = activeLedgerEntryIds(ledger, runwayLedgerExcludedEntryIds);
+      return {
+        overlapByDay: buildLedgerLensOverlapMap(ledger, activeIds, viewMode as Exclude<ViewModeId, 'code'>),
+        lens: viewMode as Exclude<ViewModeId, 'code'>,
+      };
+    },
+    [activityLedgersByMarket, viewMode, runwayLedgerExcludedEntryIds],
+  );
+
   const singleMarketSelectedDayYmd =
     !compareAllMarkets && tip && 'payload' in tip ? tip.payload.dateStr : null;
 
-  const diagramViewModeForSummary: ViewModeId =
-    singleMarketMultiLens && tip && 'payload' in tip
-      ? tip.payload.viewMode
-      : singleMarketMultiLens
-        ? 'combined'
-        : viewMode;
-
-  const ledgerDayRowFilter: RunwayLedgerDayRowFilter | null =
+  const dayContributionPin: RunwayLedgerDayContributionPin | null =
     !compareAllMarkets &&
     tip &&
     'payload' in tip &&
     tip.payload.market === country &&
     tip.payload.viewMode !== 'code'
-      ? { dayYmd: tip.payload.dateStr, lensView: tip.payload.viewMode as Exclude<ViewModeId, 'code'> }
+      ? { dayYmd: tip.payload.dateStr, riskRow: tip.payload.row, tuning: riskTuning }
       : null;
 
-  const runwayToolbarSlot = runwayViewToolbar ? (
-    <div className="mt-2 flex w-full min-w-0 shrink-0 justify-center pt-1">
-      {runwayViewToolbar}
-    </div>
-  ) : null;
+  /** Triple-lens: left label rail is a fixed 7 cell-row span (not the full strip / axis row height). */
+  const tripleLensRailIdealPx = tripleLensStackRailHeightPx(cellPx, gap);
+
+  const heatmapLegendEl = (
+    <HeatmapLegend
+      className="w-fit max-w-full min-w-0 text-left"
+      viewMode={singleMarketMultiLens ? SINGLE_MARKET_STACK_SHARED_LEGEND_LENS : viewMode}
+      heatmapOpts={
+        singleMarketMultiLens
+          ? heatmapOptsForMarketLens(country, SINGLE_MARKET_STACK_SHARED_LEGEND_LENS)
+          : heatmapOptsBase
+      }
+      cellSizePx={
+        singleMarketMultiLens ? Math.max(RUNWAY_COMPARE_FIT_CELL_PX_MIN, cellPx - 2) : cellPx
+      }
+      cellGapPx={gap}
+    />
+  );
+
+  /** Legend sits beside the contribution strip(s); avoid duplicating it in the row below. */
+  const heatmapLegendBesideContributionStrip =
+    Boolean(contributionMeta) &&
+    (singleMarketMultiLens || (layoutKind === 'contribution_strip' && !singleMarketMultiLens));
+
+  /** Align side summary / ledger with the contribution SVG column (same x + width as the strip). */
+  const sideSummaryRunwayTrackStyle = useMemo((): CSSProperties => {
+    const stripW = contributionColumnContentWidth ?? contentWidth;
+    if (singleMarketMultiLens) {
+      return {
+        marginLeft: RUNWAY_TRIPLE_LENS_CONTRIBUTION_SVG_LEADING_OFFSET_PX,
+        width: stripW,
+        maxWidth: stripW,
+      };
+    }
+    if (layoutKind === 'contribution_strip' && contributionMeta) {
+      return {
+        marginLeft: RUNWAY_CONTRIBUTION_STRIP_FLEX_ROW_PAD_LEFT_PX,
+        width: stripW,
+        maxWidth: stripW,
+      };
+    }
+    return { maxWidth: contentWidth };
+  }, [
+    singleMarketMultiLens,
+    layoutKind,
+    contributionMeta,
+    contributionColumnContentWidth,
+    contentWidth,
+  ]);
 
   return (
     <div
@@ -2916,45 +3305,15 @@ function RunwayGridBody({
       )}
     >
       <div
-        ref={heatmapCaptureRef}
         className={cn(
-          'flex w-full min-w-0 max-w-full flex-col-reverse items-stretch gap-4 lg:flex-row lg:gap-4',
-          heatmap3d || compareAllMarkets ? 'lg:min-h-0 lg:items-stretch' : 'lg:items-start'
+          'flex w-full min-w-0 max-w-full flex-col items-stretch',
+          heatmap3d || compareAllMarkets ? 'lg:min-h-0' : ''
         )}
       >
-      <div
-        className={cn(
-          // Swatch-only legend: hug content; cap so large cell zoom still fits without eating the runway.
-          'box-border flex w-fit max-w-[min(100%,6.5rem)] shrink-0 grow-0 flex-col',
-          'mx-auto lg:mx-0 lg:self-start',
-          'lg:pr-2.5 lg:pl-0.5',
-          compareAllMarkets ? 'pt-0.5' : 'pt-0.5',
-          !compareAllMarkets && !heatmap3d && 'lg:pt-[var(--runway-year-strip)]'
-        )}
-        style={
-          !compareAllMarkets
-            ? ({ ['--runway-year-strip' as string]: `${CALENDAR_YEAR_STRIP_TOTAL_PX}px` } as React.CSSProperties)
-            : undefined
-        }
-      >
-        <HeatmapLegend
-          className="w-fit max-w-full min-w-0 text-left"
-          viewMode={singleMarketMultiLens ? SINGLE_MARKET_STACK_SHARED_LEGEND_LENS : viewMode}
-          heatmapOpts={
-            singleMarketMultiLens
-              ? heatmapOptsForMarketLens(country, SINGLE_MARKET_STACK_SHARED_LEGEND_LENS)
-              : heatmapOptsBase
-          }
-          cellSizePx={
-            singleMarketMultiLens ? Math.max(RUNWAY_COMPARE_FIT_CELL_PX_MIN, cellPx - 2) : cellPx
-          }
-          cellGapPx={gap}
-        />
-      </div>
       <div
         ref={heatmapInteractionRef as Ref<HTMLDivElement>}
         className={cn(
-          'flex min-w-0 flex-1 flex-col bg-transparent p-0 shadow-none',
+          'flex min-w-0 w-full flex-1 flex-col bg-transparent p-0 shadow-none',
           heatmap3d
             ? 'min-h-0 justify-stretch'
             : compareAllMarkets
@@ -2982,7 +3341,7 @@ function RunwayGridBody({
                 todayYmd={todayYmd}
                 dimPastDays={dimPastDays}
               />
-              {runwayToolbarSlot}
+              <div className="flex w-full shrink-0 justify-start px-0.5 pt-2">{heatmapLegendEl}</div>
             </div>
           ) : (
           <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
@@ -3036,6 +3395,7 @@ function RunwayGridBody({
                           sections={sections}
                           cellPx={cellPx}
                           gap={gap}
+                          cellRadiusPx={heatmapCellRadiusPx}
                           monthStripW={monthStripW}
                           riskByDate={map}
                           heatmapOpts={heatmapOptsForMarket(m)}
@@ -3060,6 +3420,11 @@ function RunwayGridBody({
                           preferReducedMotion={reduceMotion}
                           emergeResetKey={`${isoGrowResetKey}-${m}`}
                           emergeStaggerMs={colIdx * 52}
+                          ledgerAttribution={ledgerAttrForCompareMarket(m)}
+                          ledgerImplicitBaselineFootprint={ledgerImplicitBaselineFootprintForHeatmap}
+                          deploymentRiskBlackouts={
+                            viewMode === 'market_risk' ? cfg?.deployment_risk_blackouts ?? null : null
+                          }
                         />
                       ) : (
                         <RunwayVerticalHeatmapBody
@@ -3087,6 +3452,11 @@ function RunwayGridBody({
                           firstCalendarMonthKey={firstCompareCalendarMonthKey}
                           heatmap3d={false}
                           rowTowerPx={0}
+                          ledgerAttribution={ledgerAttrForCompareMarket(m)}
+                          ledgerImplicitBaselineFootprint={ledgerImplicitBaselineFootprintForHeatmap}
+                          deploymentRiskBlackouts={
+                            viewMode === 'market_risk' ? cfg?.deployment_risk_blackouts ?? null : null
+                          }
                         />
                       )}
                     </div>
@@ -3095,7 +3465,7 @@ function RunwayGridBody({
               })}
             </div>
           </div>
-          {runwayToolbarSlot}
+          <div className="flex w-full shrink-0 justify-start px-0.5 pt-2">{heatmapLegendEl}</div>
           </div>
           )
         ) : (
@@ -3103,8 +3473,9 @@ function RunwayGridBody({
             const singleMarketHeatmapColumn = (
               <div
                 className={cn(
-                  'flex min-w-0 w-full flex-1 flex-col',
-                  useSideSummary && 'lg:min-w-0 lg:flex-1 lg:basis-0',
+                  'flex min-w-0 w-full flex-col',
+                  // Side summary stacks under the heatmap (full-width ledger); no side-by-side flex row on lg.
+                  useSideSummary ? 'shrink-0' : 'flex-1',
                 )}
               >
                 <div
@@ -3145,117 +3516,141 @@ function RunwayGridBody({
                       onSlotSelection={onSlotSelection}
                       disabled={heatmap3d || singleMarketMultiLens}
                     />
-                    {singleMarketMultiLens ? (
+                    {singleMarketMultiLens && contributionMeta ? (
                       <div
-                        className="flex w-max max-w-none flex-row items-start justify-start px-0.5"
+                        className="flex w-max max-w-none flex-row items-stretch justify-start px-0.5"
                         style={{ gap: CALENDAR_QUARTER_GRID_COL_GAP_PX }}
                       >
-                        <div className="flex shrink-0 flex-col items-end">
-                          <div
-                            className="invisible relative z-20 mb-1.5 flex min-h-[34px] items-center justify-center"
-                            aria-hidden
-                          >
-                            <span className="rounded-full border px-2.5 py-1 text-[11px]">Spacer</span>
-                          </div>
-                          <div
-                            className="relative z-0 shrink-0 overflow-visible bg-transparent"
-                            style={{ width: CALENDAR_QUARTER_GUTTER_W }}
-                          >
-                            <RunwayCompareQuarterGutter sections={sections} cellPx={cellPx} gap={gap} />
-                          </div>
-                        </div>
-                        {SINGLE_MARKET_STACK_LENS_IDS.map((lensMode, colIdx) => {
-                          const LensIcon = lensStackHeadingIcon(lensMode);
-                          return (
-                            <div key={lensMode} className="flex shrink-0 flex-col items-center">
-                              <div className="relative z-20 mb-1.5 flex min-h-[34px] items-center justify-center px-0.5">
-                                <div
-                                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/55 bg-muted/40 px-2.5 py-1 text-center shadow-sm ring-1 ring-black/[0.04] backdrop-blur-sm dark:bg-muted/25 dark:ring-white/[0.06]"
-                                  title={runwayLensProductLabel(lensMode)}
-                                >
-                                  <LensIcon
-                                    className="h-3.5 w-3.5 shrink-0 text-primary/85"
-                                    strokeWidth={2.25}
-                                    aria-hidden
-                                  />
-                                  <span className="text-[11px] font-semibold leading-none tracking-tight text-foreground">
-                                    {lensStackRailLabel(lensMode)}
-                                  </span>
-                                </div>
-                              </div>
+                        <div
+                          className="shrink-0 self-stretch bg-transparent"
+                          style={{ width: CALENDAR_QUARTER_GUTTER_W }}
+                          aria-hidden
+                        />
+                        <div
+                          className="flex min-w-0 max-w-none shrink-0 flex-col items-stretch"
+                          style={{ gap: SINGLE_MARKET_TRIPLE_LENS_VERTICAL_GAP_PX }}
+                        >
+                          {SINGLE_MARKET_STACK_LENS_IDS.map((lensMode, rowIdx) => {
+                            const stripW = contributionColumnContentWidth ?? contentWidth;
+                            const isBottomRow = rowIdx === SINGLE_MARKET_STACK_LENS_IDS.length - 1;
+                            const stripH = isBottomRow
+                              ? contributionStripLayerHeight ?? contentHeight
+                              : contributionStripCompactHeight ?? contentHeight;
+                            const railH = Math.min(tripleLensRailIdealPx, stripH);
+                            const stripRow = (
                               <div
-                                className="relative z-0 shrink-0 overflow-visible bg-transparent"
-                                style={{
-                                  width:
-                                    monthStripW +
-                                    CALENDAR_MONTH_SIDE_LABEL_W +
-                                    CALENDAR_MONTH_SIDE_LABEL_GAP_PX,
-                                }}
+                                className="flex min-h-0 shrink-0 flex-row items-start gap-1.5"
+                                style={{ height: stripH }}
                               >
-                                {runwaySvgHeatmap ? (
-                                  <RunwayCompareSvgColumn
+                                <TripleLensStackRailCaption lensMode={lensMode} railH={railH} />
+                                <div
+                                  className="relative z-0 min-w-0 shrink-0 self-stretch overflow-visible bg-transparent"
+                                  style={{ width: stripW, height: stripH, minHeight: stripH, maxHeight: stripH }}
+                                >
+                                  <RunwayContributionStripSvg
                                     marketKey={`${country}-${lensMode}`}
-                                    sections={sections}
+                                    placedCells={placedCells}
+                                    contributionMeta={contributionMeta}
                                     cellPx={cellPx}
                                     gap={gap}
-                                    monthStripW={monthStripW}
+                                    cellRadiusPx={heatmapCellRadiusPx}
+                                    width={stripW}
+                                    height={stripH}
                                     riskByDate={singleRiskByDate!}
                                     heatmapOpts={heatmapOptsForMarketLens(country, lensMode)}
                                     riskTuning={riskTuning}
                                     viewMode={lensMode}
                                     todayYmd={todayYmd}
                                     dimPastDays={dimPastDays}
-                                    firstCalendarMonthKey={firstCompareCalendarMonthKey}
+                                    selectedDayYmd={singleMarketSelectedDayYmd}
                                     openDayDetailsFromCell={(anchor, ds, wc) =>
                                       makeShowTip(country, singleRiskByDate!, marketConfig)(anchor, ds, wc, {
                                         detailViewMode: lensMode,
                                       })
                                     }
-                                    preferReducedMotion={reduceMotion}
                                     emergeResetKey={`${isoGrowResetKey}-${lensMode}`}
-                                    emergeStaggerMs={colIdx * 52}
+                                    showAxisLabels={isBottomRow}
                                     ledgerAttribution={ledgerAttrForLens(lensMode)}
-                                    ledgerImplicitBaselineFootprint={runwayLedgerImplicitBaselineFootprint}
-                                  />
-                                ) : (
-                                  <RunwayVerticalHeatmapBody
-                                    sections={sections}
-                                    cellPx={cellPx}
-                                    gap={gap}
-                                    monthStripW={monthStripW}
-                                    riskByDate={singleRiskByDate!}
-                                    heatmapOpts={heatmapOptsForMarketLens(country, lensMode)}
-                                    riskTuning={riskTuning}
-                                    viewMode={lensMode}
-                                    todayYmd={todayYmd}
-                                    dimPastDays={dimPastDays}
-                                    shimmer={shimmer}
-                                    discoMode={discoMode}
-                                    enableColorSweep={enableColorSweep}
-                                    postSweep={postSweep}
-                                    sweepMarketOffsetSec={colIdx * SWOOSH_MARKET_COLUMN_GAP_SEC}
-                                    openDayDetailsFromCell={(anchor, ds, wc, o) =>
-                                      makeShowTip(country, singleRiskByDate!, marketConfig)(anchor, ds, wc, {
-                                        ...o,
-                                        detailViewMode: lensMode,
-                                      })
+                                    ledgerImplicitBaselineFootprint={ledgerImplicitBaselineFootprintForHeatmap}
+                                    deploymentRiskBlackouts={
+                                      lensMode === 'market_risk'
+                                        ? marketConfig?.deployment_risk_blackouts ?? null
+                                        : null
                                     }
-                                    layout="vertical_strip"
-                                    showQuarterGutter={false}
-                                    compareStripLabels
-                                    firstCalendarMonthKey={firstCompareCalendarMonthKey}
-                                    heatmap3d={false}
-                                    rowTowerPx={0}
-                                    selectedDayYmd={singleMarketSelectedDayYmd}
-                                    isoGrowResetKey={isoGrowResetKey}
-                                    ledgerAttribution={ledgerAttrForLens(lensMode)}
-                                    ledgerImplicitBaselineFootprint={runwayLedgerImplicitBaselineFootprint}
                                   />
-                                )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                            return (
+                              <div
+                                key={lensMode}
+                                className={cn(
+                                  'flex min-h-0 shrink-0 flex-col',
+                                  rowIdx === 0 ? 'gap-1' : '',
+                                )}
+                              >
+                                {rowIdx === 0 ? (
+                                  <div className="flex min-h-0 flex-row items-end gap-1.5">
+                                    <div
+                                      className="shrink-0"
+                                      style={{ width: SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX }}
+                                      aria-hidden
+                                    />
+                                    <RunwayTechCapacityDemandSparkline
+                                      contributionMeta={contributionMeta}
+                                      cellPx={cellPx}
+                                      gap={gap}
+                                      riskByDate={singleRiskByDate!}
+                                      width={stripW}
+                                      selectedDayYmd={singleMarketSelectedDayYmd}
+                                      className="min-w-0"
+                                      modelTraceSuppressed={techStripModelTraceSuppressed}
+                                    />
+                                  </div>
+                                ) : null}
+                                {stripRow}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="relative z-[4] ml-[25px] flex shrink-0 self-end">
+                          {heatmapLegendEl}
+                        </div>
+                      </div>
+                    ) : layoutKind === 'contribution_strip' && contributionMeta ? (
+                      <div
+                        className="flex w-max max-w-none flex-row items-stretch justify-start px-0.5"
+                        style={{ gap: CALENDAR_QUARTER_GRID_COL_GAP_PX }}
+                      >
+                        <RunwayContributionStripSvg
+                          marketKey={country}
+                          placedCells={placedCells}
+                          contributionMeta={contributionMeta}
+                          cellPx={cellPx}
+                          gap={gap}
+                          cellRadiusPx={heatmapCellRadiusPx}
+                          width={contentWidth}
+                          height={contentHeight}
+                          riskByDate={singleRiskByDate!}
+                          heatmapOpts={heatmapOptsForMarket(country)}
+                          riskTuning={riskTuning}
+                          viewMode={viewMode}
+                          todayYmd={todayYmd}
+                          dimPastDays={dimPastDays}
+                          selectedDayYmd={singleMarketSelectedDayYmd}
+                          openDayDetailsFromCell={makeShowTip(country, singleRiskByDate!, marketConfig)}
+                          emergeResetKey={isoGrowResetKey}
+                          ledgerAttribution={ledgerAttrForLens(viewMode)}
+                          ledgerImplicitBaselineFootprint={ledgerImplicitBaselineFootprintForHeatmap}
+                          deploymentRiskBlackouts={
+                            viewMode === 'market_risk'
+                              ? marketConfig?.deployment_risk_blackouts ?? null
+                              : null
+                          }
+                        />
+                        <div className="relative z-[4] ml-[25px] flex shrink-0 self-end">
+                          {heatmapLegendEl}
+                        </div>
                       </div>
                     ) : runwaySvgHeatmap ? (
                       <RunwayQuarterGridSvg
@@ -3263,6 +3658,7 @@ function RunwayGridBody({
                         sections={sections}
                         cellPx={cellPx}
                         gap={gap}
+                        cellRadiusPx={heatmapCellRadiusPx}
                         monthStripW={monthStripW}
                         riskByDate={singleRiskByDate!}
                         heatmapOpts={heatmapOptsForMarket(country)}
@@ -3273,6 +3669,13 @@ function RunwayGridBody({
                         selectedDayYmd={singleMarketSelectedDayYmd}
                         openDayDetailsFromCell={makeShowTip(country, singleRiskByDate!, marketConfig)}
                         emergeResetKey={isoGrowResetKey}
+                        ledgerAttribution={ledgerAttrForLens(viewMode)}
+                        ledgerImplicitBaselineFootprint={ledgerImplicitBaselineFootprintForHeatmap}
+                        deploymentRiskBlackouts={
+                          viewMode === 'market_risk'
+                            ? marketConfig?.deployment_risk_blackouts ?? null
+                            : null
+                        }
                       />
                     ) : (
                       <RunwayVerticalHeatmapBody
@@ -3298,12 +3701,21 @@ function RunwayGridBody({
                         selectedDayYmd={singleMarketSelectedDayYmd}
                         isoGrowResetKey={isoGrowResetKey}
                         ledgerAttribution={ledgerAttrForLens(viewMode)}
-                        ledgerImplicitBaselineFootprint={runwayLedgerImplicitBaselineFootprint}
+                        ledgerImplicitBaselineFootprint={ledgerImplicitBaselineFootprintForHeatmap}
+                        deploymentRiskBlackouts={
+                          viewMode === 'market_risk'
+                            ? marketConfig?.deployment_risk_blackouts ?? null
+                            : null
+                        }
                       />
                     )}
+                    {!heatmapLegendBesideContributionStrip ? (
+                      <div className="relative z-[4] mt-2 flex w-full shrink-0 justify-start self-start">
+                        {heatmapLegendEl}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-                {runwayToolbarSlot}
               </div>
             );
 
@@ -3311,47 +3723,52 @@ function RunwayGridBody({
 
             return (
               <>
-                <div className="flex w-full min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+                <div className="flex w-full min-w-0 min-h-0 flex-col gap-4 lg:gap-6">
                   {singleMarketHeatmapColumn}
-                  <div className="mt-4 flex w-full min-w-0 shrink-0 flex-col gap-6 lg:mt-0 lg:min-w-0 lg:flex-1 lg:max-w-none">
-                    <RunwayDaySummaryPanel
-                      tip={tip}
-                      onClear={onClearDaySummary}
-                      panelRef={summaryPanelRef}
-                    />
-                    {activityLedger && !singleMarketSelectedDayYmd ? (
-                      <div className="w-full min-w-0 shrink-0 border-b border-border/25 pb-6 dark:border-border/30 lg:pb-7">
-                        <RunwaySummaryLineDiagrams
-                          viewMode={diagramViewModeForSummary}
-                          className="w-full min-w-0 shrink-0 border-0 bg-transparent px-0 py-0 pt-0 shadow-none"
-                          selectedDayYmd={singleMarketSelectedDayYmd}
-                          activityLedger={activityLedger}
-                          tripleLensReceipt={singleMarketMultiLens}
-                          sparklineLayout="ledgerStrip"
-                        />
-                      </div>
-                    ) : null}
+                  <div
+                    ref={summaryPanelRef as LegacyRef<HTMLDivElement>}
+                    className="mt-4 flex w-full min-w-0 min-h-0 shrink-0 flex-col gap-6 lg:mt-0 lg:px-3"
+                  >
+                    {/* Same `lg:px-3` as the heatmap `singleMarketFitRef` wrapper; strip-aligned width + inset. */}
+                    <div
+                      className="flex w-full min-w-0 max-w-full flex-col gap-6"
+                      style={sideSummaryRunwayTrackStyle}
+                    >
+                      <RunwayDaySummaryPanel
+                        tip={tip}
+                        onClear={onClearDaySummary}
+                        onScopeHeatmapToThisDay={
+                          activityLedger &&
+                          tip &&
+                          'payload' in tip &&
+                          tip.payload.viewMode !== 'code'
+                            ? () => restrictRunwayLedgerToDayContributors(activityLedger, tip.payload.dateStr)
+                            : undefined
+                        }
+                      />
+                      {activityLedger ? (
+                        <>
+                          {!singleMarketMultiLens ? (
+                            <div className="w-full min-w-0 shrink-0 border-b border-border/25 pb-6 dark:border-border/30 lg:pb-7">
+                              <RunwaySummaryLineDiagrams
+                                viewMode={viewMode}
+                                className="w-full min-w-0 shrink-0 border-0 bg-transparent px-0 py-0 pt-0 shadow-none"
+                                selectedDayYmd={singleMarketSelectedDayYmd}
+                                activityLedger={activityLedger}
+                                sparklineLayout="ledgerStrip"
+                              />
+                            </div>
+                          ) : null}
+                          <RunwayActivityLedgerTable
+                            ledger={activityLedger}
+                            className="w-full min-w-0"
+                            dayContributionPin={dayContributionPin}
+                          />
+                        </>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-                {activityLedger && singleMarketSelectedDayYmd ? (
-                  <div className="mt-6 w-full min-w-0 shrink-0 border-b border-border/25 pb-8 pt-1 dark:border-border/30 lg:mt-8">
-                    <RunwaySummaryLineDiagrams
-                      viewMode={diagramViewModeForSummary}
-                      className="w-full min-w-0 shrink-0 border-0 bg-transparent px-0 py-2 sm:px-0 shadow-none"
-                      selectedDayYmd={singleMarketSelectedDayYmd}
-                      activityLedger={activityLedger}
-                      tripleLensReceipt={singleMarketMultiLens}
-                      sparklineLayout="ledgerStrip"
-                    />
-                  </div>
-                ) : null}
-                {activityLedger ? (
-                  <RunwayActivityLedgerTable
-                    ledger={activityLedger}
-                    className="w-full max-w-none"
-                    dayRowFilter={ledgerDayRowFilter}
-                  />
-                ) : null}
               </>
             );
           })()

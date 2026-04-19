@@ -2,8 +2,8 @@ import { parseDate } from '@/engine/calendar';
 
 export const RUNWAY_DAY_COLUMNS = 7;
 
-/** Gap between adjacent heat cells horizontally and vertically (px). */
-export const RUNWAY_CELL_GAP_PX = 3;
+/** Gap between adjacent heat cells horizontally and vertically (px) — layout default; workbench uses persisted gap. */
+export const RUNWAY_CELL_GAP_PX = 2;
 
 export function runwayDayStripWidth(cellPx: number, gapPx: number, dayCols: number): number {
   return dayCols * cellPx + Math.max(0, dayCols - 1) * gapPx;

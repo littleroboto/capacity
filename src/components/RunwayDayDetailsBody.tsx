@@ -90,6 +90,53 @@ function foregroundOnHeatmapFill(cssColor: string, mode: 'light' | 'dark'): stri
   return L > 0.52 ? 'rgb(15 23 42)' : 'rgb(255 252 250)';
 }
 
+/** Heatmap-style % tile (same colours as runway cells) for compact multi-lens summaries. */
+export function RunwayLensHeatmapChip({
+  displayValue01,
+  fillHex,
+  caption,
+  align = 'start',
+}: {
+  /** Display-space 0–1 (post-transfer where applicable), same as `fillMetricDisplayValue` on the payload. */
+  displayValue01: number;
+  fillHex: string;
+  /** Short label under the chip (e.g. “Technology”). */
+  caption: string;
+  /** Use `center` when chips sit in a horizontal row (e.g. triple-lens summary). */
+  align?: 'start' | 'center';
+}) {
+  const theme = useAtcStore((s) => s.theme);
+  const pct = Math.min(999, Math.round(Math.max(0, displayValue01) * 100));
+  const fg = foregroundOnHeatmapFill(fillHex, theme);
+  return (
+    <div
+      className={cn(
+        'flex min-w-0 flex-col gap-1.5',
+        align === 'center' ? 'items-center' : 'items-start',
+      )}
+    >
+      <div
+        className="shrink-0 rounded-lg border border-border/90 px-3 py-2 shadow-sm ring-2 ring-black/[0.06] dark:border-border/60 dark:ring-white/10"
+        style={{ backgroundColor: fillHex, color: fg }}
+        aria-label={`${caption}: ${pct} percent`}
+      >
+        <span className="block text-center text-2xl font-extrabold tabular-nums leading-none tracking-tight sm:text-[1.65rem]">
+          {pct}
+          <span className="align-top text-base font-extrabold tracking-tight sm:text-lg">%</span>
+        </span>
+      </div>
+      <span
+        className={cn(
+          'max-w-[6rem] text-[10px] font-semibold uppercase leading-tight tracking-wide text-muted-foreground',
+          align === 'center' && 'text-center',
+        )}
+      >
+        {caption}
+      </span>
+    </div>
+  );
+}
+
 function clampList<T>(items: T[], max: number): { shown: T[]; more: number } {
   if (items.length <= max) return { shown: items, more: 0 };
   return { shown: items.slice(0, max), more: items.length - max };
@@ -433,9 +480,12 @@ function formatLensFillScore(v: number, _viewMode: RunwayTooltipPayload['viewMod
 export function RunwayDayDetailsPayloadBody({
   p,
   presentation = 'popover',
+  /** When true (markdown only), skip the “What shaped this day” grid — e.g. when a compact rules table shows the same bullets above. */
+  omitMarkdownDriverSummary = false,
 }: {
   p: RunwayTooltipPayload;
   presentation?: DayDetailsPresentation;
+  omitMarkdownDriverSummary?: boolean;
 }) {
   const theme = useAtcStore((s) => s.theme);
   const displayForTile = p.fillMetricDisplayValue;
@@ -583,7 +633,7 @@ export function RunwayDayDetailsPayloadBody({
           </p>
         ) : null}
 
-        {presentation === 'markdown' ? (
+        {presentation === 'markdown' && !omitMarkdownDriverSummary ? (
           <MarkdownReveal cascadeIndex={0}>
             <h3 className="mt-0 text-sm font-semibold tracking-tight text-foreground">What shaped this day</h3>
             <div

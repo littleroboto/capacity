@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ViewModeId } from '@/lib/constants';
-import { runPipelineFromDsl } from '@/engine/pipeline';
+import { runPipeline, runPipelineFromDsl, type PipelineCalendarIsoRange } from '@/engine/pipeline';
 import type { RiskRow } from '@/engine/riskModel';
 import {
   applyRiskTuningPatch,
@@ -80,8 +80,14 @@ import {
   type HeatmapRenderStyle,
 } from '@/lib/riskHeatmapColors';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
-import type { MarketActivityLedger } from '@/lib/marketActivityLedger';
-import { ledgerEntryIdsContributingToDay } from '@/lib/runwayLedgerAttribution';
+import {
+  resolvePipelineCalendarRangeFromWorkbenchState,
+  type RunwayCalendarWorkbenchSlice,
+} from '@/lib/runwayPipelineCalendarRange';
+import { buildMarketActivityLedgerFromConfig, type MarketActivityLedger } from '@/lib/marketActivityLedger';
+import { applyLedgerExclusionsToMarketConfig } from '@/lib/marketConfigLedgerExclusions';
+import { unionLedgerContributorIdsForDay } from '@/lib/runwayLedgerDayContributions';
+import { activeLedgerEntryIds } from '@/lib/runwayLedgerAttribution';
 import { CAPACITY_ATC_PERSIST_KEY, CAPACITY_ATC_PERSIST_VERSION } from '@/lib/capacityAtcPersist';
 import { runPipelineInWorker } from '@/lib/pipelineWorkerClient';
 import { computeWorkbenchHydrateBundle } from '@/lib/workbenchHydrate';
@@ -95,6 +101,12 @@ import {
   type ViewSettingsPayloadKey,
   type ViewSettingsPayloadV1,
 } from '@/lib/viewSettingsPreset';
+import {
+  clampRunwayHeatmapGapPx,
+  clampRunwayHeatmapRadiusPx,
+  RUNWAY_HEATMAP_LAYOUT_DEFAULTS,
+  snapRunwayHeatmapCellPx,
+} from '@/lib/runwayHeatmapLayoutPrefs';
 
 /** Last bundle/server multi-doc passed to hydrateFromStorage (session only; not localStorage). */
 let lastBootstrapMultiDoc: string | undefined;
@@ -115,6 +127,11 @@ type AtcState = {
    */
   riskHeatmapTuningByLens: Record<HeatmapTuningLensId, PerLensHeatmapTuning>;
   riskSurface: RiskRow[];
+  /**
+   * Counterfactual daily rows when the activity ledger has exclusions (same shape as {@link riskSurface}).
+   * `null` means “not computed yet” — consumers should fall back to `riskSurface`.
+   */
+  riskSurfaceLedgerView: RiskRow[] | null;
   configs: MarketConfig[];
   parseError: string | null;
   /** Runway heatmap: optional sparkle / twinkle on every cell when on (dark theme, honour reduced-motion). */
@@ -143,6 +160,12 @@ type AtcState = {
    */
   runwayIncludeFollowingQuarter: boolean;
   /**
+   * Optional inclusive ISO planning window (`YYYY-MM-DD`). When both ends are set (start ≤ end), this
+   * overrides year/quarter for layout and drives the pipeline calendar. Persisted.
+   */
+  runwayCustomRangeStartYmd: string | null;
+  runwayCustomRangeEndYmd: string | null;
+  /**
    * Single-market runway: selected heatmap day (`YYYY-MM-DD`) for highlight + day summary. Persisted;
    * cleared when switching market or entering LIOM compare.
    */
@@ -167,6 +190,14 @@ type AtcState = {
    * instead of 10 solid bands (see `heatmapColorContinuous` in `riskHeatmapColors.ts`).
    */
   heatmapSpectrumContinuous: boolean;
+  /**
+   * Runway heatmap geometry (single-market + LIOM): preferred cell size (px), gap (px), corner radius (px).
+   * Cell size is capped to the current viewport fit in {@link RunwayGrid}; gap and radius apply as set.
+   * Persisted per browser (localStorage), not shared across users.
+   */
+  runwayHeatmapCellPx: number;
+  runwayHeatmapCellGapPx: number;
+  runwayHeatmapCellRadiusPx: number;
   /**
    * When non-null, workbench shows Back → this picker value (set when opening a single market from
    * LIOM column header). Not persisted.
@@ -193,6 +224,8 @@ type AtcState = {
   setRunwayFilterYear: (y: number | null) => void;
   setRunwayFilterQuarter: (q: RunwayQuarter | null) => void;
   setRunwayIncludeFollowingQuarter: (v: boolean) => void;
+  /** Partial update to custom ISO range; re-runs pipeline when the slice used for the calendar changes. */
+  setRunwayCustomRangeFields: (patch: { startYmd?: string | null; endYmd?: string | null }) => void;
   setRunwaySelectedDayYmd: (ymd: string | null) => void;
   toggleRunwayLedgerExcludedEntryId: (entryId: string) => void;
   /** Toggle exclusion for every id in the chunk (e.g. merged holiday span rows). */
@@ -201,6 +234,8 @@ type AtcState = {
   toggleRunwayLedgerExcludeBulkVisible: (visibleEntryIds: readonly string[]) => void;
   /** Clear exclusions so every ledger row contributes again. */
   clearRunwayLedgerExclusions: () => void;
+  /** Exclude every row in `ledger` (current runway scope) so nothing contributes until rows are included again. */
+  excludeAllRunwayLedgerEntries: (ledger: MarketActivityLedger) => void;
   setRunwayLedgerImplicitBaselineFootprint: (v: boolean) => void;
   /** Drop excluded ids that are not in the current visible (date-filtered) ledger. */
   pruneRunwayLedgerExclusionsToAllowedEntryIds: (allowedIds: ReadonlySet<string>) => void;
@@ -208,14 +243,14 @@ type AtcState = {
    * Exclude every ledger row that does not contribute to `dayYmd` for this lens (so checkboxes match “what
    * touched this day”). Rows irrelevant to the lens are excluded as well.
    */
-  restrictRunwayLedgerToDayContributors: (
-    ledger: MarketActivityLedger,
-    dayYmd: string,
-    lensView: Exclude<ViewModeId, 'code'>,
-  ) => void;
+  /** Auto-exclude ledger rows that do not touch `dayYmd` on any runway lens (union of Tech / Trading / Risk). */
+  restrictRunwayLedgerToDayContributors: (ledger: MarketActivityLedger, dayYmd: string) => void;
   setHeatmapRenderStyle: (v: HeatmapRenderStyle) => void;
   setHeatmapMonoColor: (hex: string) => void;
   setHeatmapSpectrumContinuous: (v: boolean) => void;
+  setRunwayHeatmapCellPx: (v: number | ((prev: number) => number)) => void;
+  setRunwayHeatmapCellGapPx: (v: number | ((prev: number) => number)) => void;
+  setRunwayHeatmapCellRadiusPx: (v: number | ((prev: number) => number)) => void;
   setDslText: (t: string) => void;
   setRunwayMarketOrder: (ids: string[]) => void;
   setDslByMarket: (m: Record<string, string>) => void;
@@ -259,16 +294,75 @@ function shouldBlockDslMutation(get: () => AtcState): boolean {
   return get().dslMutationLocked;
 }
 
-function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) => void) {
-  const full = mergeStateToFullMultiDoc(get());
-  if (!full.trim() || !looksLikeYamlDsl(full)) return;
-  const { riskTuning, country } = get();
-  const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, country));
+function pipelineCalendarRangeFromGet(get: () => AtcState): PipelineCalendarIsoRange | undefined {
+  return resolvePipelineCalendarRangeFromWorkbenchState(get() as unknown as RunwayCalendarWorkbenchSlice);
+}
+
+function normalizeIsoYmdInput(x: string | null | undefined): string | null {
+  if (x == null) return null;
+  const t = String(x).trim();
+  if (!t) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
+}
+
+function syncLedgerCounterfactualRiskSurface(get: () => AtcState, set: (partial: Partial<AtcState>) => void) {
+  const { configs, riskSurface, runwayLedgerExcludedEntryIds, riskTuning, country, parseError } = get();
+  if (parseError || !configs.length || !riskSurface.length) {
+    set({ riskSurfaceLedgerView: riskSurface });
+    return;
+  }
+  const ex = new Set(runwayLedgerExcludedEntryIds);
+  if (!ex.size) {
+    set({ riskSurfaceLedgerView: riskSurface });
+    return;
+  }
+  try {
+    const tuning = riskTuningForPipelineView(riskTuning, country);
+    const cfConfigs = configs.map((config) => {
+      const ledger = buildMarketActivityLedgerFromConfig(config);
+      const active = activeLedgerEntryIds(ledger, runwayLedgerExcludedEntryIds);
+      if (active.length === 0) return config;
+      return applyLedgerExclusionsToMarketConfig(config, ledger, ex);
+    });
+    const { riskSurface: cf } = runPipeline(cfConfigs, {}, tuning, pipelineCalendarRangeFromGet(get));
+    set({ riskSurfaceLedgerView: cf });
+  } catch {
+    set({ riskSurfaceLedgerView: riskSurface });
+  }
+}
+
+function commitPipelineRisk(
+  get: () => AtcState,
+  set: (partial: Partial<AtcState>) => void,
+  r: { riskSurface: RiskRow[]; configs: MarketConfig[]; parseError?: string },
+) {
   set({
     riskSurface: r.riskSurface,
     configs: r.configs,
     parseError: r.parseError ?? null,
   });
+  syncLedgerCounterfactualRiskSurface(get, set);
+}
+
+function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) => void) {
+  const full = mergeStateToFullMultiDoc(get());
+  if (!full.trim() || !looksLikeYamlDsl(full)) return;
+  const { riskTuning, country } = get();
+  const r = runPipelineFromDsl(
+    full,
+    riskTuningForPipelineView(riskTuning, country),
+    pipelineCalendarRangeFromGet(get)
+  );
+  commitPipelineRisk(get, set, r);
+}
+
+function withClampedRunwayHeatmapLayout(s: AtcState): AtcState {
+  return {
+    ...s,
+    runwayHeatmapCellPx: snapRunwayHeatmapCellPx(Number(s.runwayHeatmapCellPx)),
+    runwayHeatmapCellGapPx: clampRunwayHeatmapGapPx(Number(s.runwayHeatmapCellGapPx)),
+    runwayHeatmapCellRadiusPx: clampRunwayHeatmapRadiusPx(Number(s.runwayHeatmapCellRadiusPx)),
+  };
 }
 
 function mergePersistedViewSettings(
@@ -276,10 +370,10 @@ function mergePersistedViewSettings(
   currentState: AtcState
 ): AtcState {
   if (persistedState === undefined) {
-    return currentState;
+    return withClampedRunwayHeatmapLayout(currentState);
   }
   if (persistedState === null || typeof persistedState !== 'object') {
-    return currentState;
+    return withClampedRunwayHeatmapLayout(currentState);
   }
   const p = persistedState as Partial<Record<ViewSettingsPayloadKey, unknown>>;
   const next = { ...currentState };
@@ -288,7 +382,7 @@ function mergePersistedViewSettings(
     const v = p[key];
     (next as unknown as Record<string, unknown>)[key] = v;
   }
-  return next;
+  return withClampedRunwayHeatmapLayout(next as AtcState);
 }
 
 export const useAtcStore = create<AtcState>()(
@@ -308,13 +402,19 @@ export const useAtcStore = create<AtcState>()(
       runwayFilterYear: null,
       runwayFilterQuarter: null,
       runwayIncludeFollowingQuarter: false,
+      runwayCustomRangeStartYmd: null,
+      runwayCustomRangeEndYmd: null,
       runwaySelectedDayYmd: null,
       runwayLedgerExcludedEntryIds: [],
       runwayLedgerImplicitBaselineFootprint: true,
       heatmapRenderStyle: 'spectrum',
       heatmapMonoColor: DEFAULT_HEATMAP_MONO_COLOR,
       heatmapSpectrumContinuous: true,
+      runwayHeatmapCellPx: RUNWAY_HEATMAP_LAYOUT_DEFAULTS.cellPx,
+      runwayHeatmapCellGapPx: RUNWAY_HEATMAP_LAYOUT_DEFAULTS.gapPx,
+      runwayHeatmapCellRadiusPx: RUNWAY_HEATMAP_LAYOUT_DEFAULTS.radiusPx,
       riskSurface: [],
+      riskSurfaceLedgerView: null,
       configs: [],
       parseError: null,
       discoMode: false,
@@ -380,12 +480,12 @@ export const useAtcStore = create<AtcState>()(
           set({ dslText: segmentYaml });
           if (get().viewMode === 'code') return;
           const full = mergeStateToFullMultiDoc(get());
-          const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, c));
-          set({
-            riskSurface: r.riskSurface,
-            configs: r.configs,
-            parseError: r.parseError ?? null,
-          });
+          const r = runPipelineFromDsl(
+            full,
+            riskTuningForPipelineView(riskTuning, c),
+            pipelineCalendarRangeFromGet(get)
+          );
+          commitPipelineRisk(get, set, r);
           return;
         }
 
@@ -400,12 +500,12 @@ export const useAtcStore = create<AtcState>()(
         set({ dslText: nextSingle });
         if (get().viewMode === 'code') return;
         const full = mergeStateToFullMultiDoc(get());
-        const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, c));
-        set({
-          riskSurface: r.riskSurface,
-          configs: r.configs,
-          parseError: r.parseError ?? null,
-        });
+        const r = runPipelineFromDsl(
+          full,
+          riskTuningForPipelineView(riskTuning, c),
+          pipelineCalendarRangeFromGet(get)
+        );
+        commitPipelineRisk(get, set, r);
       },
 
       setViewMode: (v) => {
@@ -431,14 +531,37 @@ export const useAtcStore = create<AtcState>()(
       setRunway3dHeatmap: (v) => set({ runway3dHeatmap: v }),
       setRunwaySvgHeatmap: (v) => set({ runwaySvgHeatmap: v }),
       setDslLlmAssistantEnabled: (v) => set({ dslLlmAssistantEnabled: v }),
-      setRunwayFilterYear: (y) =>
+      setRunwayFilterYear: (y) => {
         set({
           runwayFilterYear: y,
           runwayFilterQuarter: y == null ? null : get().runwayFilterQuarter,
-          runwayIncludeFollowingQuarter: y == null ? false : get().runwayIncludeFollowingQuarter,
-        }),
-      setRunwayFilterQuarter: (q) => set({ runwayFilterQuarter: q }),
-      setRunwayIncludeFollowingQuarter: (v) => set({ runwayIncludeFollowingQuarter: v }),
+          runwayIncludeFollowingQuarter: get().runwayIncludeFollowingQuarter,
+          ...(y != null ? { runwayCustomRangeStartYmd: null, runwayCustomRangeEndYmd: null } : {}),
+        });
+        rerunPipeline(get, set);
+      },
+      setRunwayFilterQuarter: (q) => {
+        set({ runwayFilterQuarter: q });
+        rerunPipeline(get, set);
+      },
+      setRunwayIncludeFollowingQuarter: (v) => {
+        set({ runwayIncludeFollowingQuarter: v });
+        rerunPipeline(get, set);
+      },
+      setRunwayCustomRangeFields: (patch) => {
+        const cur = get();
+        const vs =
+          patch.startYmd !== undefined ? normalizeIsoYmdInput(patch.startYmd) : cur.runwayCustomRangeStartYmd;
+        const ve =
+          patch.endYmd !== undefined ? normalizeIsoYmdInput(patch.endYmd) : cur.runwayCustomRangeEndYmd;
+        const both = vs != null && ve != null && vs <= ve;
+        set({
+          runwayCustomRangeStartYmd: vs,
+          runwayCustomRangeEndYmd: ve,
+          ...(both ? { runwayFilterYear: null, runwayFilterQuarter: null } : {}),
+        });
+        rerunPipeline(get, set);
+      },
       setRunwaySelectedDayYmd: (ymd) => {
         if (ymd != null) {
           const t = String(ymd).trim();
@@ -459,6 +582,7 @@ export const useAtcStore = create<AtcState>()(
         if (cur.has(id)) cur.delete(id);
         else cur.add(id);
         set({ runwayLedgerExcludedEntryIds: [...cur] });
+        syncLedgerCounterfactualRiskSurface(get, set);
       },
       toggleRunwayLedgerExcludedEntryGroup: (entryIds) => {
         const ids = [...new Set(entryIds.map((x) => String(x).trim()).filter(Boolean))];
@@ -471,6 +595,7 @@ export const useAtcStore = create<AtcState>()(
           for (const id of ids) cur.add(id);
         }
         set({ runwayLedgerExcludedEntryIds: [...cur] });
+        syncLedgerCounterfactualRiskSurface(get, set);
       },
       toggleRunwayLedgerExcludeBulkVisible: (visibleEntryIds) => {
         const vis = [...new Set(visibleEntryIds.map((x) => String(x).trim()).filter(Boolean))];
@@ -483,27 +608,60 @@ export const useAtcStore = create<AtcState>()(
           for (const id of vis) cur.delete(id);
         }
         set({ runwayLedgerExcludedEntryIds: [...cur] });
+        syncLedgerCounterfactualRiskSurface(get, set);
       },
-      clearRunwayLedgerExclusions: () => set({ runwayLedgerExcludedEntryIds: [] }),
-      setRunwayLedgerImplicitBaselineFootprint: (v) =>
-        set({ runwayLedgerImplicitBaselineFootprint: Boolean(v) }),
+      clearRunwayLedgerExclusions: () => {
+        set({ runwayLedgerExcludedEntryIds: [] });
+        syncLedgerCounterfactualRiskSurface(get, set);
+      },
+      excludeAllRunwayLedgerEntries: (ledger) => {
+        const ids = [...new Set(ledger.entries.map((e) => String(e.entryId).trim()).filter(Boolean))];
+        if (!ids.length) return;
+        set({ runwayLedgerExcludedEntryIds: ids });
+        syncLedgerCounterfactualRiskSurface(get, set);
+      },
+      setRunwayLedgerImplicitBaselineFootprint: (v) => {
+        set({ runwayLedgerImplicitBaselineFootprint: Boolean(v) });
+        syncLedgerCounterfactualRiskSurface(get, set);
+      },
       pruneRunwayLedgerExclusionsToAllowedEntryIds: (allowedIds) => {
         const cur = get().runwayLedgerExcludedEntryIds;
         if (!cur.length) return;
         const next = cur.filter((id) => allowedIds.has(id));
-        if (next.length !== cur.length) set({ runwayLedgerExcludedEntryIds: next });
+        if (next.length !== cur.length) {
+          set({ runwayLedgerExcludedEntryIds: next });
+          syncLedgerCounterfactualRiskSurface(get, set);
+        }
       },
-      restrictRunwayLedgerToDayContributors: (ledger, dayYmd, lensView) => {
+      restrictRunwayLedgerToDayContributors: (ledger, dayYmd) => {
         const ymd = String(dayYmd).trim();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return;
-        const keep = new Set(ledgerEntryIdsContributingToDay(ledger, ymd, lensView));
+        const keep = unionLedgerContributorIdsForDay(ledger, ymd, new Set());
         const excluded = ledger.entries.map((e) => e.entryId).filter((id) => !keep.has(id));
         set({ runwayLedgerExcludedEntryIds: excluded });
+        syncLedgerCounterfactualRiskSurface(get, set);
       },
 
       setHeatmapRenderStyle: (v) => set({ heatmapRenderStyle: v }),
       setHeatmapMonoColor: (hex) => set({ heatmapMonoColor: normalizeHeatmapMonoHex(hex) }),
       setHeatmapSpectrumContinuous: (v) => set({ heatmapSpectrumContinuous: Boolean(v) }),
+
+      setRunwayHeatmapCellPx: (v) =>
+        set((s) => ({
+          runwayHeatmapCellPx: snapRunwayHeatmapCellPx(typeof v === 'function' ? v(s.runwayHeatmapCellPx) : v),
+        })),
+      setRunwayHeatmapCellGapPx: (v) =>
+        set((s) => ({
+          runwayHeatmapCellGapPx: clampRunwayHeatmapGapPx(
+            typeof v === 'function' ? v(s.runwayHeatmapCellGapPx) : v
+          ),
+        })),
+      setRunwayHeatmapCellRadiusPx: (v) =>
+        set((s) => ({
+          runwayHeatmapCellRadiusPx: clampRunwayHeatmapRadiusPx(
+            typeof v === 'function' ? v(s.runwayHeatmapCellRadiusPx) : v
+          ),
+        })),
 
       exportViewSettingsFile: (scope, label) =>
         buildViewSettingsFile(
@@ -807,12 +965,12 @@ export const useAtcStore = create<AtcState>()(
           dslText: nextEditorText,
           dslByMarket,
         });
-        const r = runPipelineFromDsl(full, riskTuningForPipelineView(get().riskTuning, co));
-        set({
-          riskSurface: r.riskSurface,
-          configs: r.configs,
-          parseError: r.parseError ?? null,
-        });
+        const r = runPipelineFromDsl(
+          full,
+          riskTuningForPipelineView(get().riskTuning, co),
+          pipelineCalendarRangeFromGet(get)
+        );
+        commitPipelineRisk(get, set, r);
       },
 
       resetDsl: () => {
@@ -837,12 +995,12 @@ export const useAtcStore = create<AtcState>()(
             nextByMarket[country] ??
             defaultDslForMarket(fallbackMarket);
         set({ dslText: looksLikeYamlDsl(editorText) ? editorText : full, dslByMarket: nextByMarket });
-        const r = runPipelineFromDsl(full, riskTuningForPipelineView(riskTuning, country));
-        set({
-          riskSurface: r.riskSurface,
-          configs: r.configs,
-          parseError: r.parseError ?? null,
-        });
+        const r = runPipelineFromDsl(
+          full,
+          riskTuningForPipelineView(riskTuning, country),
+          pipelineCalendarRangeFromGet(get)
+        );
+        commitPipelineRisk(get, set, r);
       },
 
       getLastBootstrapMultiDoc: () => lastBootstrapMultiDoc,
@@ -859,12 +1017,12 @@ export const useAtcStore = create<AtcState>()(
           multiDocFallback,
         });
         set({ dslText: bundle.dslText, dslByMarket: bundle.dslByMarket, runwayReturnPicker: null });
-        const r = await runPipelineInWorker(bundle.dslMultiDoc, riskTuningForPipelineView(riskTuning, country));
-        set({
-          riskSurface: r.riskSurface,
-          configs: r.configs,
-          parseError: r.parseError ?? null,
-        });
+        const r = await runPipelineInWorker(
+          bundle.dslMultiDoc,
+          riskTuningForPipelineView(riskTuning, country),
+          pipelineCalendarRangeFromGet(get)
+        );
+        commitPipelineRisk(get, set, r);
         const th = get().theme;
         document.documentElement.classList.toggle('dark', th === 'dark');
       },

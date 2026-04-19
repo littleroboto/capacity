@@ -52,6 +52,37 @@ export function clearRunwayPngScrollportStamps(stamped: readonly HTMLElement[]):
   }
 }
 
+const OVERFLOW_SCROLL_LIKE = new Set(['auto', 'scroll', 'overlay']);
+
+/**
+ * Walk from `start` toward `document.body` and collect elements whose overflow creates a scrollport
+ * with content larger than the client box. Needed so {@link stampRunwayScrollportsForPngExport} can
+ * expand workbench / page scroll regions — not only inner runway scrollports.
+ */
+export function collectOverflowScrollAncestors(start: HTMLElement, maxHops = 48): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  let p: HTMLElement | null = start.parentElement;
+  let hops = 0;
+  while (p && hops < maxHops) {
+    hops++;
+    if (p === document.body || p === document.documentElement) break;
+    const cs = window.getComputedStyle(p);
+    const scrollY = OVERFLOW_SCROLL_LIKE.has(cs.overflowY);
+    const scrollX = OVERFLOW_SCROLL_LIKE.has(cs.overflowX);
+    if (scrollY || scrollX) {
+      const sw = p.scrollWidth;
+      const sh = p.scrollHeight;
+      const cw = p.clientWidth;
+      const ch = p.clientHeight;
+      if (sw > cw + 1 || sh > ch + 1) {
+        out.push(p);
+      }
+    }
+    p = p.parentElement;
+  }
+  return out;
+}
+
 function applyStampedScrollportSizesInClone(root: HTMLElement): void {
   for (const el of root.querySelectorAll<HTMLElement>('[data-runway-png-expand-w], [data-runway-png-expand-h]')) {
     el.style.setProperty('overflow', 'visible', 'important');

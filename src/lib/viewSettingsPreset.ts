@@ -10,6 +10,11 @@ import {
 } from '@/lib/heatmapTuningPerLens';
 import { parseRiskHeatmapCurve } from '@/lib/riskHeatmapTransfer';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
+import {
+  clampRunwayHeatmapGapPx,
+  clampRunwayHeatmapRadiusPx,
+  snapRunwayHeatmapCellPx,
+} from '@/lib/runwayHeatmapLayoutPrefs';
 /** File wrapper for export/import (JSON). */
 export const VIEW_SETTINGS_FILE_KIND = 'capacity-view-settings-v1' as const;
 
@@ -30,6 +35,9 @@ export type ViewSettingsPayloadV1 = {
   runwayFilterYear?: number | null;
   runwayFilterQuarter?: RunwayQuarter | null;
   runwayIncludeFollowingQuarter?: boolean;
+  /** Inclusive ISO start when using the custom planning window (`YYYY-MM-DD`). */
+  runwayCustomRangeStartYmd?: string | null;
+  runwayCustomRangeEndYmd?: string | null;
   /**
    * Single-market heatmap: last selected calendar day (`YYYY-MM-DD`) for cell highlight + side summary.
    * Cleared when the runway focus market changes.
@@ -37,6 +45,10 @@ export type ViewSettingsPayloadV1 = {
   runwaySelectedDayYmd?: string | null;
   /** Per runway lens (Technology Teams, Restaurant Activity, Deployment Risk); same tuning for every column. */
   riskHeatmapTuningByLens?: Record<HeatmapTuningLensId, PerLensHeatmapTuning>;
+  /** Runway heatmap: preferred cell size (px); painted size may be capped to fit the viewport. */
+  runwayHeatmapCellPx?: number;
+  runwayHeatmapCellGapPx?: number;
+  runwayHeatmapCellRadiusPx?: number;
 };
 
 export type ViewSettingsFileV1 = {
@@ -64,8 +76,13 @@ export const VIEW_SETTINGS_PAYLOAD_KEYS = [
   'runwayFilterYear',
   'runwayFilterQuarter',
   'runwayIncludeFollowingQuarter',
+  'runwayCustomRangeStartYmd',
+  'runwayCustomRangeEndYmd',
   'runwaySelectedDayYmd',
   'riskHeatmapTuningByLens',
+  'runwayHeatmapCellPx',
+  'runwayHeatmapCellGapPx',
+  'runwayHeatmapCellRadiusPx',
 ] as const satisfies readonly (keyof ViewSettingsPayloadV1)[];
 
 export type ViewSettingsPayloadKey = (typeof VIEW_SETTINGS_PAYLOAD_KEYS)[number];
@@ -305,6 +322,23 @@ export function sanitizeSettingsPayload(raw: Record<string, unknown>): Partial<V
     out.runwayIncludeFollowingQuarter = raw.runwayIncludeFollowingQuarter;
   }
 
+  if (Object.prototype.hasOwnProperty.call(raw, 'runwayCustomRangeStartYmd')) {
+    const d = raw.runwayCustomRangeStartYmd;
+    if (d === null) {
+      out.runwayCustomRangeStartYmd = null;
+    } else if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.trim())) {
+      out.runwayCustomRangeStartYmd = d.trim();
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'runwayCustomRangeEndYmd')) {
+    const d = raw.runwayCustomRangeEndYmd;
+    if (d === null) {
+      out.runwayCustomRangeEndYmd = null;
+    } else if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.trim())) {
+      out.runwayCustomRangeEndYmd = d.trim();
+    }
+  }
+
   if (Object.prototype.hasOwnProperty.call(raw, 'runwaySelectedDayYmd')) {
     const d = raw.runwaySelectedDayYmd;
     if (d === null) {
@@ -320,6 +354,23 @@ export function sanitizeSettingsPayload(raw: Record<string, unknown>): Partial<V
       out.riskHeatmapTuningByLens = parsed;
     }
   }
+
+  if (Object.prototype.hasOwnProperty.call(raw, 'runwayHeatmapCellPx')) {
+    if (typeof raw.runwayHeatmapCellPx === 'number' && Number.isFinite(raw.runwayHeatmapCellPx)) {
+      out.runwayHeatmapCellPx = snapRunwayHeatmapCellPx(raw.runwayHeatmapCellPx);
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'runwayHeatmapCellGapPx')) {
+    if (typeof raw.runwayHeatmapCellGapPx === 'number' && Number.isFinite(raw.runwayHeatmapCellGapPx)) {
+      out.runwayHeatmapCellGapPx = clampRunwayHeatmapGapPx(raw.runwayHeatmapCellGapPx);
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, 'runwayHeatmapCellRadiusPx')) {
+    if (typeof raw.runwayHeatmapCellRadiusPx === 'number' && Number.isFinite(raw.runwayHeatmapCellRadiusPx)) {
+      out.runwayHeatmapCellRadiusPx = clampRunwayHeatmapRadiusPx(raw.runwayHeatmapCellRadiusPx);
+    }
+  }
+
   if (!out.riskHeatmapTuningByLens && rawHasLegacyHeatmapKeys(raw)) {
     out.riskHeatmapTuningByLens = riskHeatmapTuningByLensFromLegacyGlobals(legacyHeatmapGlobalsFromRaw(raw));
   }

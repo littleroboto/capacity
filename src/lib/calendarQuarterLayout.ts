@@ -117,12 +117,83 @@ export type VerticalYearSection = {
   months: CalendarMonthBlock[];
 };
 
+/** Extra fields when {@link buildContributionStripRunwayLayout} is used (GitHub-style horizontal strip). */
+export type ContributionStripLayoutMeta = {
+  gridStartYmd: string;
+  numWeeks: number;
+  rangeStartYmd: string;
+  rangeEndYmd: string;
+};
+
 export type RunwayVerticalCalendarLayout = {
   sections: VerticalYearSection[];
   contentWidth: number;
   contentHeight: number;
   placedCells: PlacedRunwayCell[];
+  layoutKind?: 'default' | 'contribution_strip';
+  contributionMeta?: ContributionStripLayoutMeta;
+  /** One contribution strip’s width when `contentWidth` is expanded for triple-lens row total. */
+  contributionColumnContentWidth?: number;
+  /** Triple-lens stacked mode: SVG height for upper strips (grid only, no month/weekday axis). */
+  contributionStripCompactHeight?: number;
+  /** Triple-lens stacked mode: one strip’s height (weekday gutter + grid + month axis), not the stacked total in `contentHeight`. */
+  contributionStripLayerHeight?: number;
 };
+
+/** Left gutter for Sun–Sat letters on the contribution strip. */
+export const CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W = 22;
+/** Gap between the bottom of day cells and the first axis tick row. */
+export const CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX = 6;
+/** Reference height for tick mark span in the shared axis row (tier fractions scale from this). */
+export const CONTRIBUTION_STRIP_AXIS_TICK_BAND_H = 9;
+/** Shared tick span for all period boundaries (`0.94 ×` tick band ref). */
+export const CONTRIBUTION_STRIP_AXIS_MONTH_TICK_LEN_PX = CONTRIBUTION_STRIP_AXIS_TICK_BAND_H * 0.94;
+/** Stroke width (px) for all axis ticks. */
+export const CONTRIBUTION_STRIP_AXIS_MONTH_TICK_STROKE_PX = 2.1;
+/** Inset from the top of the tick row before ticks grow downward. */
+export const CONTRIBUTION_STRIP_AXIS_TICK_ROW_TOP_INSET_PX = 1;
+/** Single row of period-boundary ticks under the grid (above the three label rows). */
+export const CONTRIBUTION_STRIP_AXIS_SINGLE_TICK_ROW_H =
+  CONTRIBUTION_STRIP_AXIS_TICK_ROW_TOP_INSET_PX +
+  Math.ceil(CONTRIBUTION_STRIP_AXIS_MONTH_TICK_LEN_PX);
+/** Height reserved for each month / quarter / year label row under the shared tick row. */
+export const CONTRIBUTION_STRIP_AXIS_LABEL_BAND_H = 14;
+/** One combined band when ticks and labels share a row (legacy / max of tick vs label). */
+export const CONTRIBUTION_STRIP_AXIS_COMBINED_ROW_H = Math.max(
+  CONTRIBUTION_STRIP_AXIS_TICK_BAND_H,
+  CONTRIBUTION_STRIP_AXIS_LABEL_BAND_H,
+);
+/** Vertical gap between axis tiers (tick row vs labels, and between label rows). */
+export const CONTRIBUTION_STRIP_AXIS_TIER_GAP_PX = 4;
+/**
+ * Space under the cell grid: one shared tick row, then month / quarter / year labels.
+ * Must match {@link layoutContributionStripRunwaySvg} band stacking.
+ */
+export const CONTRIBUTION_STRIP_MONTH_AXIS_H =
+  CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX +
+  CONTRIBUTION_STRIP_AXIS_SINGLE_TICK_ROW_H +
+  CONTRIBUTION_STRIP_AXIS_TIER_GAP_PX +
+  3 * CONTRIBUTION_STRIP_AXIS_LABEL_BAND_H +
+  2 * CONTRIBUTION_STRIP_AXIS_TIER_GAP_PX;
+/**
+ * Chronology-only stack (year → quarter → month → ticks) without the gap that sits under the cell grid.
+ * Used for the mirrored time axis above the tech capacity sparkline.
+ */
+export const CONTRIBUTION_STRIP_TIME_AXIS_STACK_H =
+  CONTRIBUTION_STRIP_MONTH_AXIS_H - CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX;
+export const CONTRIBUTION_STRIP_TOP_PAD = 4;
+
+/**
+ * Contribution strip SVG height when weekday + month axis labels are omitted (grid + small lower pad).
+ * Must stay aligned with {@link buildContributionStripRunwayLayout} cell `y` geometry.
+ */
+export function contributionStripGridOnlyContentHeightPx(
+  cellPx: number,
+  cellGapPx: number = RUNWAY_CELL_GAP_PX,
+): number {
+  const stride = cellPx + cellGapPx;
+  return CONTRIBUTION_STRIP_TOP_PAD + RUNWAY_DAY_COLUMNS * stride - cellGapPx + 2;
+}
 
 /** Gap between stacked month blocks (within a year). */
 export const CALENDAR_MONTH_STACK_GAP_PX = 10;
@@ -249,6 +320,8 @@ export type VerticalMonthsRunwayLayoutOpts = {
    * When set, month block height follows the isometric lattice SVG instead of flat week rows.
    */
   rowTowerPx?: number;
+  /** Gap between day cells in px (defaults to the shared runway cell gap constant). */
+  cellGapPx?: number;
 };
 
 /**
@@ -267,7 +340,7 @@ export function buildVerticalMonthsRunwayLayout(
   const sections = buildVerticalYearSectionsFromDates(sortedDatesYmd);
   if (!sections) return null;
 
-  const gap = RUNWAY_CELL_GAP_PX;
+  const gap = opts?.cellGapPx ?? RUNWAY_CELL_GAP_PX;
   const stripW = runwayDayStripWidth(cellPx, gap, RUNWAY_DAY_COLUMNS);
   const strideX = cellPx + gap;
   const rowTower = Math.max(0, Math.round(opts?.rowTowerPx ?? 0));
@@ -422,6 +495,93 @@ export function buildQuarterGridRunwayLayout(
   return { sections, contentWidth, contentHeight: yPos, placedCells };
 }
 
+/**
+ * Single-market **horizontal** strip: each column is one calendar week (Sun → Sat, top → bottom);
+ * weeks run **left → right** in time. Padding weeks use `false` cells. Month/year filters use the same
+ * `sortedDatesYmd` span as the quarter grid.
+ */
+export function buildContributionStripRunwayLayout(
+  sortedDatesYmd: string[],
+  cellPx: number,
+  cellGapPx: number = RUNWAY_CELL_GAP_PX
+): RunwayVerticalCalendarLayout | null {
+  if (!sortedDatesYmd.length) return null;
+  const sections = buildVerticalYearSectionsFromDates(sortedDatesYmd);
+  if (!sections) return null;
+
+  const rangeStartYmd = sortedDatesYmd[0]!;
+  const rangeEndYmd = sortedDatesYmd[sortedDatesYmd.length - 1]!;
+  const inLayout = new Set(sortedDatesYmd);
+
+  const gap = cellGapPx;
+  const stride = cellPx + gap;
+
+  const startD = parseDate(rangeStartYmd);
+  const endD = parseDate(rangeEndYmd);
+  startD.setHours(0, 0, 0, 0);
+  endD.setHours(0, 0, 0, 0);
+
+  const gridStart = new Date(startD);
+  {
+    const dow = gridStart.getDay();
+    gridStart.setDate(gridStart.getDate() - dow);
+  }
+  const gridEnd = new Date(endD);
+  {
+    const dow = gridEnd.getDay();
+    gridEnd.setDate(gridEnd.getDate() + (6 - dow));
+  }
+
+  const msPerDay = 86400000;
+  const totalDays = Math.round((gridEnd.getTime() - gridStart.getTime()) / msPerDay) + 1;
+  const numWeeks = totalDays / 7;
+  if (!Number.isInteger(numWeeks) || numWeeks < 1) return null;
+
+  const gridStartYmd = formatDateYmd(gridStart);
+
+  const placedCells: PlacedRunwayCell[] = [];
+  let flatIndex = 0;
+  for (let w = 0; w < numWeeks; w++) {
+    for (let dow = 0; dow < 7; dow++) {
+      const dt = new Date(gridStart.getTime() + (w * 7 + dow) * msPerDay);
+      const ymd = formatDateYmd(dt);
+      let cell: RunwayCalendarCellValue;
+      if (ymd < rangeStartYmd || ymd > rangeEndYmd) {
+        cell = false;
+      } else if (inLayout.has(ymd)) {
+        cell = ymd;
+      } else {
+        cell = null;
+      }
+      const x = CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W + w * stride;
+      const y = CONTRIBUTION_STRIP_TOP_PAD + dow * stride;
+      placedCells.push({ dateStr: cell, x, y, flatIndex: flatIndex++ });
+    }
+  }
+
+  const contentWidth =
+    CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W + numWeeks * stride - gap + 6;
+  const contentHeight =
+    CONTRIBUTION_STRIP_TOP_PAD +
+    RUNWAY_DAY_COLUMNS * stride -
+    gap +
+    CONTRIBUTION_STRIP_MONTH_AXIS_H;
+
+  return {
+    sections,
+    contentWidth,
+    contentHeight,
+    placedCells,
+    layoutKind: 'contribution_strip',
+    contributionMeta: {
+      gridStartYmd,
+      numWeeks,
+      rangeStartYmd,
+      rangeEndYmd,
+    },
+  };
+}
+
 /** Must match `RunwayGrid` runway zoom bounds. */
 export const RUNWAY_COMPARE_FIT_CELL_PX_MIN = 12;
 const RUNWAY_COMPARE_FIT_CELL_PX_MAX = 28;
@@ -449,6 +609,72 @@ export function compareAllRunwayTotalContentWidthPx(
 }
 
 /**
+ * Triple-lens **stacked** contribution strips: one full-width strip column + gutter (same horizontal
+ * accounting as a single compare column, `RunwayGridBody` `px-0.5`).
+ */
+/** Lens label rail to the left of each stacked strip (compact stacked heading + icon). */
+export const SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX = 28;
+
+/** Left padding on single-market contribution strip flex rows in `RunwayGrid` (`px-0.5` → 2px). */
+export const RUNWAY_CONTRIBUTION_STRIP_FLEX_ROW_PAD_LEFT_PX = 2;
+
+/** `gap-1.5` between triple-lens rail caption and contribution strip SVG (`RunwayGrid`). */
+export const RUNWAY_TRIPLE_LENS_RAIL_TO_STRIP_GAP_PX = 6;
+
+/**
+ * Horizontal offset from the triple-lens strip-row flex start to the contribution SVG’s left edge
+ * (must stay in sync with `RunwayGridBody` gutter + `gap` + rail + `gap-1.5`).
+ */
+export const RUNWAY_TRIPLE_LENS_CONTRIBUTION_SVG_LEADING_OFFSET_PX =
+  RUNWAY_CONTRIBUTION_STRIP_FLEX_ROW_PAD_LEFT_PX +
+  CALENDAR_QUARTER_GUTTER_W +
+  CALENDAR_QUARTER_GRID_COL_GAP_PX +
+  SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX +
+  RUNWAY_TRIPLE_LENS_RAIL_TO_STRIP_GAP_PX;
+
+/** Vertical gap between stacked triple-lens contribution rows (labels sit beside strips, not above). */
+export const SINGLE_MARKET_TRIPLE_LENS_VERTICAL_GAP_PX = 8;
+
+/**
+ * Tech capacity balance histogram (must match `RunwayTechCapacityDemandSparkline` SVG `viewBox` height).
+ * Taller plot so deficit/surplus bars read clearly above the Technology strip.
+ */
+export const RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CHART_PX = 96;
+/**
+ * Legacy reserved height for a controls row above the sparkline SVG (removed). Kept at 0 so
+ * `RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TOTAL_BLOCK_PX` still documents chart-only stack height.
+ */
+export const RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CONTROLS_PX = 0;
+/** Chart SVG height (must match `RunwayTechCapacityDemandSparkline` chart SVG only). */
+export const RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TOTAL_BLOCK_PX =
+  RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CONTROLS_PX + RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CHART_PX;
+/** `gap-1` between histogram block and Tech strip in `RunwayGrid`. */
+export const RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TO_STRIP_GAP_PX = 4;
+
+/**
+ * Tech sparkline column: mirrored time axis + gap + chart (matches `RunwayTechCapacityDemandSparkline` wrapper).
+ */
+export const RUNWAY_TECH_SPARKLINE_STACK_PX =
+  CONTRIBUTION_STRIP_TIME_AXIS_STACK_H +
+  CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX +
+  RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TOTAL_BLOCK_PX;
+
+/** Total vertical stack for sparkline column + gap before the Tech contribution strip. */
+export const SINGLE_MARKET_TRIPLE_LENS_TECH_SPARK_ABOVE_PX =
+  RUNWAY_TECH_SPARKLINE_STACK_PX + RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TO_STRIP_GAP_PX;
+
+export function tripleLensStackedContributionTotalContentWidthPx(contributionStripContentWidth: number): number {
+  const innerHorizontalPad = 4;
+  return (
+    innerHorizontalPad +
+    CALENDAR_QUARTER_GUTTER_W +
+    SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX +
+    contributionStripContentWidth +
+    CALENDAR_QUARTER_GRID_COL_GAP_PX
+  );
+}
+
+/**
  * Compare column: `mb-1.5` (6px) + market sticker row `h-[32px]` above each strip (`RunwayGridBody`).
  */
 export const RUNWAY_COMPARE_MARKET_STICKER_STACK_PX = 6 + 32;
@@ -456,9 +682,10 @@ export const RUNWAY_COMPARE_MARKET_STICKER_STACK_PX = 6 + 32;
 /** Total vertical pixel height of one LIOM compare column (sticker + calendar stack) for a given cell size. */
 export function compareAllRunwayTotalContentHeightPx(
   cellPx: number,
-  sortedDatesYmd: string[]
+  sortedDatesYmd: string[],
+  cellGapPx: number = RUNWAY_CELL_GAP_PX
 ): number {
-  const layout = buildVerticalMonthsRunwayLayout(sortedDatesYmd, cellPx);
+  const layout = buildVerticalMonthsRunwayLayout(sortedDatesYmd, cellPx, { cellGapPx });
   if (!layout) return RUNWAY_COMPARE_MARKET_STICKER_STACK_PX;
   return RUNWAY_COMPARE_MARKET_STICKER_STACK_PX + layout.contentHeight;
 }
@@ -474,7 +701,8 @@ export function bestCellPxForCompareAllRunwayFit(
   availableWidth: number,
   availableHeight: number,
   marketCount: number,
-  sortedDatesYmd: string[]
+  sortedDatesYmd: string[],
+  cellGapPx: number = RUNWAY_CELL_GAP_PX
 ): number {
   if (marketCount < 1 || !Number.isFinite(availableWidth) || availableWidth <= 0) {
     return RUNWAY_COMPARE_FIT_CELL_PX_MIN;
@@ -487,10 +715,10 @@ export function bestCellPxForCompareAllRunwayFit(
     px <= RUNWAY_COMPARE_FIT_CELL_PX_MAX;
     px += RUNWAY_COMPARE_FIT_CELL_PX_STEP
   ) {
-    if (compareAllRunwayTotalContentWidthPx(px, marketCount) > availableWidth) continue;
+    if (compareAllRunwayTotalContentWidthPx(px, marketCount, cellGapPx) > availableWidth) continue;
     if (
       useHeight &&
-      compareAllRunwayTotalContentHeightPx(px, sortedDatesYmd) > availableHeight
+      compareAllRunwayTotalContentHeightPx(px, sortedDatesYmd, cellGapPx) > availableHeight
     ) {
       continue;
     }
@@ -500,22 +728,14 @@ export function bestCellPxForCompareAllRunwayFit(
 }
 
 /**
- * Content width of a single-market quarter grid (3 months per row) for a given cell pixel size.
- */
-function singleMarketQuarterGridContentWidth(cellPx: number): number {
-  const gap = RUNWAY_CELL_GAP_PX;
-  const stripW = runwayDayStripWidth(cellPx, gap, RUNWAY_DAY_COLUMNS);
-  return CALENDAR_QUARTER_GUTTER_W + 3 * stripW + 2 * CALENDAR_QUARTER_GRID_COL_GAP_PX;
-}
-
-/**
- * Largest stepped cell size so a single-market quarter grid fits within
+ * Largest stepped cell size so a single-market **horizontal contribution strip** fits within
  * `availableWidth` x `availableHeight`.
  */
 export function bestCellPxForSingleMarketFit(
   availableWidth: number,
   availableHeight: number,
-  sortedDatesYmd: string[]
+  sortedDatesYmd: string[],
+  cellGapPx: number = RUNWAY_CELL_GAP_PX
 ): number {
   if (!sortedDatesYmd.length || !Number.isFinite(availableWidth) || availableWidth <= 0) {
     return RUNWAY_COMPARE_FIT_CELL_PX_MIN;
@@ -528,23 +748,57 @@ export function bestCellPxForSingleMarketFit(
     px <= RUNWAY_COMPARE_FIT_CELL_PX_MAX;
     px += RUNWAY_COMPARE_FIT_CELL_PX_STEP
   ) {
-    if (singleMarketQuarterGridContentWidth(px) > availableWidth) continue;
-    if (useHeight) {
-      const layout = buildQuarterGridRunwayLayout(sortedDatesYmd, px);
-      if (layout && layout.contentHeight > availableHeight) continue;
-    }
+    const layout = buildContributionStripRunwayLayout(sortedDatesYmd, px, cellGapPx);
+    if (!layout) continue;
+    if (layout.contentWidth > availableWidth) continue;
+    if (useHeight && layout.contentHeight > availableHeight) continue;
     best = px;
   }
   return best;
 }
 
-/** Number of side-by-side lens columns (Technology, Restaurant, Deployment Risk) in single-market mode. */
+/** Number of single-market triple-lens strips (Technology, Trading, Risk) — stacked vertically in contribution mode. */
 export const SINGLE_MARKET_TRIPLE_LENS_COLUMN_COUNT = 3;
 
 /**
  * Label row above each lens column: matches compare strip `mb-1.5` + `h-[28px]` (tighter than market stickers).
  */
 export const SINGLE_MARKET_TRIPLE_LENS_HEADER_STACK_PX = 6 + 28;
+
+/**
+ * Triple-lens stacked mode: vertical span of the left lens **label rail** (heatmap cell rows), not the full
+ * contribution strip row (which includes weekday gutter + axis on the bottom lens).
+ */
+export const SINGLE_MARKET_TRIPLE_LENS_RAIL_CELL_ROWS = 7;
+
+export function tripleLensStackRailHeightPx(
+  cellPx: number,
+  cellGapPx: number = RUNWAY_CELL_GAP_PX,
+): number {
+  const stride = cellPx + cellGapPx;
+  return SINGLE_MARKET_TRIPLE_LENS_RAIL_CELL_ROWS * stride - cellGapPx;
+}
+
+/**
+ * Triple-lens stacked contribution strips: tech weekly sparkline, two compact grid-only strips, one full strip
+ * (with month axis), and small vertical gaps. Lens titles sit in a short left rail (see
+ * {@link tripleLensStackRailHeightPx}), not full strip height.
+ */
+export function tripleLensStackedContributionTotalContentHeightPx(
+  fullStripContentHeight: number,
+  cellPx: number,
+  cellGapPx: number = RUNWAY_CELL_GAP_PX,
+  rowGapPx: number = SINGLE_MARKET_TRIPLE_LENS_VERTICAL_GAP_PX,
+): number {
+  const n = SINGLE_MARKET_TRIPLE_LENS_COLUMN_COUNT;
+  const compact = contributionStripGridOnlyContentHeightPx(cellPx, cellGapPx);
+  return (
+    SINGLE_MARKET_TRIPLE_LENS_TECH_SPARK_ABOVE_PX +
+    (n - 1) * compact +
+    fullStripContentHeight +
+    (n - 1) * rowGapPx
+  );
+}
 
 /**
  * Largest stepped cell size so three single-market lens columns (compare-style width) plus shared gutter
@@ -590,7 +844,8 @@ export function bestCellPxForSingleMarketStackedLensFit(
 export function bestCellPxForSingleMarketTripleColumnFit(
   availableWidth: number,
   availableHeight: number,
-  sortedDatesYmd: string[]
+  sortedDatesYmd: string[],
+  cellGapPx: number = RUNWAY_CELL_GAP_PX
 ): number {
   if (!sortedDatesYmd.length || !Number.isFinite(availableWidth) || availableWidth <= 0) {
     return RUNWAY_COMPARE_FIT_CELL_PX_MIN;
@@ -603,13 +858,17 @@ export function bestCellPxForSingleMarketTripleColumnFit(
     px <= RUNWAY_COMPARE_FIT_CELL_PX_MAX;
     px += RUNWAY_COMPARE_FIT_CELL_PX_STEP
   ) {
-    if (compareAllRunwayTotalContentWidthPx(px, SINGLE_MARKET_TRIPLE_LENS_COLUMN_COUNT) > availableWidth) {
+    const strip = buildContributionStripRunwayLayout(sortedDatesYmd, px, cellGapPx);
+    if (!strip) continue;
+    if (tripleLensStackedContributionTotalContentWidthPx(strip.contentWidth) > availableWidth) {
       continue;
     }
     if (useHeight) {
-      const layout = buildVerticalMonthsRunwayLayout(sortedDatesYmd, px);
-      if (!layout) continue;
-      const totalH = SINGLE_MARKET_TRIPLE_LENS_HEADER_STACK_PX + layout.contentHeight;
+      const totalH = tripleLensStackedContributionTotalContentHeightPx(
+        strip.contentHeight,
+        px,
+        cellGapPx
+      );
       if (totalH > availableHeight) continue;
     }
     best = px;

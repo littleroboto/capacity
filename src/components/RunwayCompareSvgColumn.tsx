@@ -2,6 +2,8 @@ import { memo, useCallback, useId, useMemo } from 'react';
 import { useRunwayHeatmapEmergence, runwayHeatmapEmergenceClipRect } from '@/hooks/useRunwayHeatmapEmergence';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
+import type { DeploymentRiskBlackout } from '@/engine/types';
+import { ymdInAnyDeploymentRiskBlackout } from '@/lib/deploymentRiskBlackoutCalendar';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import { layoutCompareMarketColumnSvg } from '@/lib/runwayCompareSvgLayout';
@@ -10,7 +12,9 @@ import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayView
 import {
   effectiveLedgerFootprintOverlap,
   LEDGER_EMPTY_DAY_OPACITY_FACTOR,
+  ledgerAttributionHeatmapMetric,
   ledgerAttributionNeutralFillHex,
+  maxRawLedgerOverlapInMap,
 } from '@/lib/runwayLedgerAttribution';
 
 type RunwayTipAnchor = { clientX: number; clientY: number };
@@ -44,6 +48,8 @@ export type RunwayCompareSvgColumnProps = {
   ledgerAttribution?: { overlapByDay: Map<string, number>; lens: Exclude<ViewModeId, 'code'> } | null;
   /** Matches store: N=0 raw overlap → one baseline stratum when true. */
   ledgerImplicitBaselineFootprint?: boolean;
+  cellRadiusPx?: number;
+  deploymentRiskBlackouts?: readonly DeploymentRiskBlackout[] | null;
 };
 
 function svgClientPoint(e: React.MouseEvent | React.KeyboardEvent, fallbackW: number, fallbackH: number) {
@@ -73,6 +79,8 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
   emergeStaggerMs = 0,
   ledgerAttribution = null,
   ledgerImplicitBaselineFootprint = true,
+  cellRadiusPx = 3,
+  deploymentRiskBlackouts = null,
 }: RunwayCompareSvgColumnProps) {
   const { width, height, cells, monthLabels, weekdayLabels } = useMemo(
     () => layoutCompareMarketColumnSvg(sections, cellPx, gap, monthStripW, firstCalendarMonthKey),
@@ -93,6 +101,11 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
   const insetTopPct = useRunwayHeatmapEmergence(emergeKey, { staggerMs: emergeStaggerMs });
   const cellClipId = useId().replace(/:/g, '');
   const clipR = runwayHeatmapEmergenceClipRect(width, height, insetTopPct);
+
+  const ledgerRawOverlapMax = useMemo(
+    () => (ledgerAttribution ? maxRawLedgerOverlapInMap(ledgerAttribution.overlapByDay) : 1),
+    [ledgerAttribution],
+  );
 
   return (
     <svg
@@ -148,13 +161,18 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
           : runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
         let fill = baseFill;
         let overlap = 0;
+        let rawLedger = 0;
         if (ledgerAttribution && dateStr) {
-          overlap = effectiveLedgerFootprintOverlap(
-            ledgerAttribution.overlapByDay.get(dateStr) ?? 0,
-            ledgerImplicitBaselineFootprint,
-          );
-          fill = overlap === 0 ? ledgerAttributionNeutralFillHex() : baseFill;
+          rawLedger = ledgerAttribution.overlapByDay.get(dateStr) ?? 0;
+          overlap = effectiveLedgerFootprintOverlap(rawLedger, ledgerImplicitBaselineFootprint);
+          const lm = ledgerAttributionHeatmapMetric(metric, rawLedger, overlap, ledgerRawOverlapMax);
+          fill =
+            lm === null
+              ? ledgerAttributionNeutralFillHex()
+              : runwayHeatmapCellFillAndDim(viewMode, lm, heatmapOpts, row).fill;
         }
+        const thickOverlapStroke =
+          Boolean(ledgerAttribution && dateStr && (rawLedger > 1 || overlap > 1));
         const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
         const ledgerEmptyNonOverlap = Boolean(ledgerAttribution && dateStr && overlap === 0);
         const opacity =
@@ -166,6 +184,12 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
           dateStr >= pulseDateRange.ymdStart &&
           dateStr <= pulseDateRange.ymdEnd;
         const pulseLow = Math.max(0.2, opacity * 0.62);
+        const rr = Math.min(cellRadiusPx, c.w / 2, c.h / 2);
+        const deployFreezeMark =
+          viewMode === 'market_risk' &&
+          typeof dateStr === 'string' &&
+          ymdInAnyDeploymentRiskBlackout(dateStr, deploymentRiskBlackouts ?? undefined);
+        const freezeStroke = Math.max(0.85, Math.min(2.6, cellPx * 0.11));
 
         return (
           <g key={`${marketKey}-svg-${i}-${c.x}-${c.y}`}>
@@ -174,18 +198,22 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
               y={c.y}
               width={c.w}
               height={c.h}
-              rx={3}
-              ry={3}
+              rx={rr}
+              ry={rr}
               fill={fill}
               opacity={opacity}
               className="stroke-border/35"
-              strokeWidth={ledgerAttribution && overlap > 1 ? 1.25 : 0.5}
+              strokeWidth={thickOverlapStroke ? 1.25 : 0.5}
               style={interactionDisabled ? undefined : { cursor: 'pointer' }}
               role={interactionDisabled ? 'presentation' : 'button'}
               tabIndex={interactionDisabled ? undefined : 0}
               aria-hidden={interactionDisabled ? true : undefined}
               aria-label={
-                interactionDisabled ? undefined : dateStr ? `Day details for ${dateStr}` : 'Day cell'
+                interactionDisabled
+                  ? undefined
+                  : dateStr
+                    ? `Day details for ${dateStr}${deployFreezeMark ? '; change-freeze window' : ''}`
+                    : 'Day cell'
               }
               onClick={
                 interactionDisabled
@@ -210,6 +238,17 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
                 />
               ) : null}
             </rect>
+            {deployFreezeMark ? (
+              <line
+                x1={c.x}
+                y1={c.y + c.h}
+                x2={c.x + c.w}
+                y2={c.y}
+                className="pointer-events-none stroke-foreground/55"
+                strokeWidth={freezeStroke}
+                opacity={opacity}
+              />
+            ) : null}
             {isToday ? (
               <circle
                 cx={c.x + c.w * 0.55}
@@ -219,23 +258,6 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
                 strokeWidth={0.75}
                 pointerEvents="none"
               />
-            ) : null}
-            {ledgerAttribution && overlap > 1 ? (
-              <text
-                x={c.x + c.w - 1}
-                y={c.y + c.h - 1}
-                textAnchor="end"
-                dominantBaseline="ideographic"
-                fill="#fff"
-                className="font-bold"
-                stroke="rgba(0,0,0,0.32)"
-                strokeWidth={0.45}
-                paintOrder="stroke fill"
-                style={{ fontSize: Math.max(6, c.w * 0.28) }}
-                pointerEvents="none"
-              >
-                {overlap}
-              </text>
             ) : null}
           </g>
         );

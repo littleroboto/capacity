@@ -10,12 +10,35 @@ function addMonths(d: Date, months: number): Date {
 
 export function buildCalendar(startFrom: Date | undefined, markets: string[]): CalendarRow[] {
   const start = startFrom ? new Date(startFrom) : getQuarterStart(new Date());
-  const rows: CalendarRow[] = [];
   const end = addMonths(start, MODEL_MONTHS);
+  return buildCalendarExclusiveEnd(start, end, markets);
+}
 
+function buildCalendarExclusiveEnd(start: Date, endExclusive: Date, markets: string[]): CalendarRow[] {
+  const rows: CalendarRow[] = [];
   for (const market of markets) {
     const d = new Date(start);
-    while (d < end) {
+    while (d < endExclusive) {
+      rows.push({
+        date: formatDate(d),
+        market,
+      });
+      d.setDate(d.getDate() + 1);
+    }
+  }
+  return rows;
+}
+
+/** Every calendar day from `startYmd` through `endYmd` inclusive, for each market (planning / reporting windows). */
+export function buildCalendarInclusiveIsoRange(startYmd: string, endYmd: string, markets: string[]): CalendarRow[] {
+  const rows: CalendarRow[] = [];
+  const start = parseDate(startYmd);
+  const end = parseDate(endYmd);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  for (const market of markets) {
+    const d = new Date(start);
+    while (d.getTime() <= end.getTime()) {
       rows.push({
         date: formatDate(d),
         market,

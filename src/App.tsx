@@ -22,6 +22,7 @@ import { isRunwayMultiMarketStrip } from '@/lib/markets';
 import { useAtcStore } from '@/store/useAtcStore';
 import { filterManifestOrderForAccess } from '@/lib/capacityAccess';
 import { useCapacityAccess } from '@/lib/capacityAccessContext';
+import { useWorkbenchUrlViewState } from '@/hooks/useWorkbenchUrlViewState';
 import { mergeStateToFullMultiDoc, splitToDslByMarket } from '@/lib/multiDocMarketYaml';
 import {
   fetchSharedDslDetailed,
@@ -40,6 +41,7 @@ type RunwayBootstrapUi = { message: string; progressLabel?: string };
 
 export default function App() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const persistReady = useWorkbenchUrlViewState(searchParams, setSearchParams);
   const access = useCapacityAccess();
   const accessBootstrapKey = useMemo(() => {
     if (access.legacyFullAccess || access.admin) return 'full';
@@ -48,7 +50,10 @@ export default function App() {
 
   const onSlotSelection = useCallback((_s: SlotSelection | null) => {}, []);
 
-  const riskSurface = useAtcStore((s) => s.riskSurface);
+  const riskSurfaceLedgerView = useAtcStore((s) => s.riskSurfaceLedgerView);
+  const riskSurfaceFull = useAtcStore((s) => s.riskSurface);
+  /** Counterfactual daily rows when ledger exclusions apply; else full pipeline (see ledger counterfactual spec). */
+  const riskSurface = riskSurfaceLedgerView !== null ? riskSurfaceLedgerView : riskSurfaceFull;
   const parseError = useAtcStore((s) => s.parseError);
   const viewMode = useAtcStore((s) => s.viewMode);
   const country = useAtcStore((s) => s.country);
@@ -107,17 +112,6 @@ export default function App() {
     document.title = 'Segment Workbench';
   }, []);
 
-  /** Deep-link from admin (or bookmarks): `/app?market=DE` focuses that market once, then strip the query. */
-  useEffect(() => {
-    const m = searchParams.get('market') ?? searchParams.get('country');
-    if (!m?.trim()) return;
-    useAtcStore.getState().setCountry(m.trim(), {});
-    const next = new URLSearchParams(searchParams);
-    next.delete('market');
-    next.delete('country');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
-
   useEffect(() => {
     if (isRunwayMultiMarketStrip(country) && viewMode === 'code') {
       setViewMode('combined');
@@ -145,6 +139,7 @@ export default function App() {
   }, [showMobileCodeFs]);
 
   useEffect(() => {
+    if (!persistReady) return;
     let cancelled = false;
     let stopOutboundSync: (() => void) | undefined;
     const { setDslByMarket, setRunwayMarketOrder, hydrateFromStorage } = useAtcStore.getState();
@@ -318,7 +313,7 @@ export default function App() {
     };
     // Re-run when segment ACL changes (e.g. Clerk session claims loaded).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- access object identity is unstable; key is canonical
-  }, [accessBootstrapKey]);
+  }, [accessBootstrapKey, persistReady]);
 
   return (
     <div className="flex h-screen min-h-0 flex-col bg-background">
@@ -412,7 +407,11 @@ export default function App() {
                             progressLabel={runwayBootstrap.progressLabel}
                           />
                         ) : (
-                          <RunwayGrid riskSurface={riskSurface} viewMode={viewMode} onSlotSelection={onSlotSelection} />
+                          <RunwayGrid
+                            riskSurface={riskSurface}
+                            viewMode={viewMode}
+                            onSlotSelection={onSlotSelection}
+                          />
                         )}
                       </div>
                     </div>

@@ -213,6 +213,36 @@ function addCalendarDaysIso(startYmd: string, deltaDays: number): string {
   return formatDateYmd(d);
 }
 
+/** Inclusive calendar-day count from ISO `YYYY-MM-DD` bounds. */
+function inclusiveIsoDayCount(dateStart: string, dateEnd: string): number {
+  const start = parseDate(dateStart);
+  const end = parseDate(dateEnd);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1);
+}
+
+/** Split sorted unique ISO days into maximal consecutive runs (calendar adjacency). */
+function partitionConsecutiveSortedIsoDays(sortedUniqueYmd: readonly string[]): Array<{ dateStart: string; dateEnd: string }> {
+  const out: Array<{ dateStart: string; dateEnd: string }> = [];
+  if (sortedUniqueYmd.length === 0) return out;
+  let runStart = sortedUniqueYmd[0]!;
+  let runEnd = sortedUniqueYmd[0]!;
+  for (let i = 1; i < sortedUniqueYmd.length; i++) {
+    const ymd = sortedUniqueYmd[i]!;
+    const nextAfterRun = addCalendarDaysIso(runEnd, 1);
+    if (ymd === nextAfterRun) {
+      runEnd = ymd;
+    } else {
+      out.push({ dateStart: runStart, dateEnd: runEnd });
+      runStart = ymd;
+      runEnd = ymd;
+    }
+  }
+  out.push({ dateStart: runStart, dateEnd: runEnd });
+  return out;
+}
+
 function clampDedupeKey(s: string): string {
   return s.replace(/[^a-zA-Z0-9_.-]+/g, '_').slice(0, 96);
 }
@@ -276,6 +306,7 @@ export function buildMarketActivityLedgerFromConfig(config: MarketConfig): Marke
       },
       lensHints: ['combined', 'in_store', 'market_risk'],
       metadata: {
+        configSliceIndex: i,
         durationDays: c.durationDays,
         prepBeforeLiveDays: c.prepBeforeLiveDays ?? null,
         presenceOnly: Boolean(c.presenceOnly),
@@ -304,7 +335,11 @@ export function buildMarketActivityLedgerFromConfig(config: MarketConfig): Marke
         risk: false,
       },
       lensHints: ['combined'],
-      metadata: { durationDays: p.durationDays, prepBeforeLiveDays: p.prepBeforeLiveDays ?? null },
+      metadata: {
+        configSliceIndex: i,
+        durationDays: p.durationDays,
+        prepBeforeLiveDays: p.prepBeforeLiveDays ?? null,
+      },
     });
   }
 
@@ -336,23 +371,33 @@ export function buildMarketActivityLedgerFromConfig(config: MarketConfig): Marke
         risk: false,
       },
       lensHints: ['in_store', 'combined', 'market_risk'],
+      metadata: { configSliceIndex: i },
     });
   }
 
   const schDates = config.schoolHolidayExtraDates ?? [];
-  for (let i = 0; i < schDates.length; i++) {
-    const d = schDates[i]!.trim();
-    if (!d) continue;
+  const schUnique = new Set<string>();
+  for (const raw of schDates) {
+    const d = raw.trim();
+    if (d) schUnique.add(d);
+  }
+  const schSorted = [...schUnique].sort((a, b) => a.localeCompare(b));
+  const schRuns = partitionConsecutiveSortedIsoDays(schSorted);
+  for (let i = 0; i < schRuns.length; i++) {
+    const { dateStart, dateEnd } = schRuns[i]!;
+    const point = dateStart === dateEnd;
+    const dedupe = point ? `${dateStart}_${i}` : `${dateStart}_${dateEnd}_${i}`;
+    const dayCount = inclusiveIsoDayCount(dateStart, dateEnd);
     push({
-      entryId: makeLedgerEntryId(market, 'school_holiday_date', `${d}_${i}`),
+      entryId: makeLedgerEntryId(market, 'school_holiday_date', dedupe),
       market,
       family: 'calendar',
       entityKind: 'school_holiday_date',
-      temporalKind: 'point',
-      dateStart: d,
-      dateEnd: d,
+      temporalKind: point ? 'point' : 'range',
+      dateStart,
+      dateEnd,
       title: `School holiday`,
-      subtitle: d,
+      subtitle: point ? dateStart : `${dayCount} days`,
       affects: {
         opsTrading: true,
         techDelivery: true,
@@ -361,6 +406,9 @@ export function buildMarketActivityLedgerFromConfig(config: MarketConfig): Marke
         risk: false,
       },
       lensHints: ['in_store', 'combined', 'market_risk'],
+      metadata: point
+        ? { configSliceIndex: i }
+        : { configSliceIndex: i, mergedSchoolHolidayDays: dayCount },
     });
   }
 
@@ -411,6 +459,7 @@ function leaveBandToEntry(market: string, b: NationalLeaveBand, index: number): 
     },
     lensHints: ['combined', 'market_risk'],
     metadata: {
+      configSliceIndex: index,
       capacityMultiplier: b.capacityMultiplier ?? null,
       weekCount: Array.isArray(b.weeks) ? b.weeks.length : 0,
     },
@@ -440,7 +489,7 @@ function deploymentEventToEntry(
       risk: true,
     },
     lensHints: ['market_risk'],
-    metadata: { severity: e.severity, kind: e.kind ?? null },
+    metadata: { configSliceIndex: index, severity: e.severity, kind: e.kind ?? null },
   };
 }
 
@@ -464,6 +513,7 @@ function blackoutToEntry(market: string, b: DeploymentRiskBlackout, index: numbe
     },
     lensHints: ['market_risk'],
     metadata: {
+      configSliceIndex: index,
       severity: b.severity,
       operational_note: b.operational_note ?? null,
     },
@@ -489,6 +539,7 @@ function windowToEntry(market: string, w: OperatingWindow, index: number): Marke
     },
     lensHints: ['in_store', 'combined'],
     metadata: {
+      configSliceIndex: index,
       store_pressure_mult: w.store_pressure_mult ?? null,
       lab_team_capacity_mult: w.lab_team_capacity_mult ?? null,
     },

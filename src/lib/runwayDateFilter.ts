@@ -122,3 +122,22 @@ export function yearsFromRiskSurface(rows: RiskRow[]): number[] {
   }
   return [...ys].sort((a, b) => a - b);
 }
+
+/**
+ * Default calendar year for single-market runway when no year filter is set: prefer the real-world
+ * calendar year when it appears in the model, otherwise the latest modelled year.
+ */
+export function defaultRunwayCalendarYearFromRiskSurface(rows: RiskRow[]): number | null {
+  const ys = yearsFromRiskSurface(rows);
+  if (ys.length === 0) return null;
+  const ty = new Date().getFullYear();
+  if (ys.includes(ty)) return ty;
+  return ys[ys.length - 1]!;
+}
+
+/** Move an ISO calendar day by `months` (month arithmetic; same day clamped when month shorter). */
+export function addMonthsToIsoYmd(ymd: string, months: number): string {
+  const d = parseDate(ymd);
+  d.setMonth(d.getMonth() + months);
+  return formatDateYmd(d);
+}

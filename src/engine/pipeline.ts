@@ -6,7 +6,7 @@ import { PRESSURE_SURFACE_IDS } from '@/domain/pressureSurfaces';
 import { emptySurfaceTotals } from '@/domain/pressureSurfaces';
 import { applyLoadCarryover } from '@/planning/carryover';
 import { campaignLoadBearingPrepLiveForDate } from './campaignPrepLive';
-import { buildCalendar, parseDate } from './calendar';
+import { buildCalendar, buildCalendarInclusiveIsoRange, parseDate } from './calendar';
 import { computeCapacity } from './capacityModel';
 import { nationalLeaveLabTeamCapMult } from './nationalLeaveBands';
 import { createHolidayCheck } from './holidayLoader';
@@ -56,10 +56,14 @@ export type PipelineResult = {
   parseError?: string;
 };
 
+/** Inclusive ISO `YYYY-MM-DD` bounds for the planning calendar (matches runway layout when set). */
+export type PipelineCalendarIsoRange = { startYmd: string; endYmd: string };
+
 export function runPipeline(
   configs: MarketConfig[],
   holidaysByMarket: Record<string, string[]> = {},
-  tuning: RiskModelTuning = DEFAULT_RISK_TUNING
+  tuning: RiskModelTuning = DEFAULT_RISK_TUNING,
+  calendarRange?: PipelineCalendarIsoRange | null
 ): PipelineResult {
   const mergedPublic: Record<string, string[]> = { ...holidaysByMarket };
   const mergedSchool: Record<string, string[]> = {};
@@ -106,7 +110,10 @@ export function runPipeline(
   }
 
   const markets = configs.map((c) => c.market);
-  const calendar = buildCalendar(undefined, markets);
+  const calendar =
+    calendarRange != null && calendarRange.startYmd <= calendarRange.endYmd
+      ? buildCalendarInclusiveIsoRange(calendarRange.startYmd, calendarRange.endYmd, markets)
+      : buildCalendar(undefined, markets);
   const isPublicHoliday = createHolidayCheck(mergedPublic);
   const isSchoolHoliday = createHolidayCheck(mergedSchool);
   const isAnyHoliday = (market: string, date: string) =>
@@ -303,7 +310,11 @@ export function runPipeline(
   return { riskSurface, configs };
 }
 
-export function runPipelineFromDsl(dslText: string, tuning: RiskModelTuning = DEFAULT_RISK_TUNING): PipelineResult {
+export function runPipelineFromDsl(
+  dslText: string,
+  tuning: RiskModelTuning = DEFAULT_RISK_TUNING,
+  calendarRange?: PipelineCalendarIsoRange | null
+): PipelineResult {
   try {
     if (!looksLikeYamlDsl(dslText)) {
       return {
@@ -317,7 +328,7 @@ export function runPipelineFromDsl(dslText: string, tuning: RiskModelTuning = DE
     if (configs.length === 0) {
       return { riskSurface: [], configs: [], parseError: 'No valid config' };
     }
-    return runPipeline(configs, {}, tuning);
+    return runPipeline(configs, {}, tuning, calendarRange);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { riskSurface: [], configs: [], parseError: msg };

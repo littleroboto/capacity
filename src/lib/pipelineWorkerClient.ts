@@ -1,4 +1,4 @@
-import { runPipelineFromDsl, type PipelineResult } from '@/engine/pipeline';
+import { runPipelineFromDsl, type PipelineCalendarIsoRange, type PipelineResult } from '@/engine/pipeline';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
 
 let worker: Worker | null = null;
@@ -16,7 +16,8 @@ function getWorker(): Worker {
  */
 export async function runPipelineInWorker(
   dsl: string,
-  tuning: RiskModelTuning
+  tuning: RiskModelTuning,
+  calendarRange?: PipelineCalendarIsoRange | null
 ): Promise<PipelineResult> {
   try {
     const w = getWorker();
@@ -44,10 +45,10 @@ export async function runPipelineInWorker(
       };
       w.addEventListener('message', onMessage);
       w.addEventListener('error', onError);
-      w.postMessage({ dsl, tuning });
+      w.postMessage({ dsl, tuning, calendarRange });
     });
     return result;
   } catch {
-    return runPipelineFromDsl(dsl, tuning);
+    return runPipelineFromDsl(dsl, tuning, calendarRange);
   }
 }

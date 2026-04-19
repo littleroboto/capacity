@@ -22,9 +22,9 @@ function LegendSquare({ color, cellSizePx }: { color: string; cellSizePx: number
 
 export type HeatmapLegendProps = {
   viewMode: ViewModeId;
-  /** Same as heatmap `CELL_PX`. */
+  /** Runway heatmap cell edge length (px) — matches rendered heatmap. */
   cellSizePx: number;
-  /** Same as `RUNWAY_CELL_GAP_PX` between heat cells. */
+  /** Gap between heat cells (px) — matches runway heatmap spacing. */
   cellGapPx: number;
   className?: string;
   /** Swatches use the same band colours / mono-alpha steps as the runway when set. */

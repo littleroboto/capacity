@@ -68,6 +68,43 @@ export function effectiveLedgerFootprintOverlap(
   return includeImplicitBaseline ? 1 : 0;
 }
 
+/** Largest raw overlap count in the map (at least 1 for stable scaling). */
+export function maxRawLedgerOverlapInMap(m: ReadonlyMap<string, number>): number {
+  let mx = 0;
+  for (const v of m.values()) mx = Math.max(mx, v);
+  return Math.max(1, mx);
+}
+
+/**
+ * How much hotter the heatmap metric is allowed to read on days with the deepest ledger stack in the strip
+ * (1 = no boost; only applies when raw max overlap in the strip is greater than 1).
+ */
+export const LEDGER_OVERLAP_METRIC_BOOST = 0.42;
+
+/**
+ * Ledger heatmap driver: same lens metric as the runway, scaled up when more enabled ledger rows overlap
+ * the day (normalized to the max raw stack in this strip so single-activity days stay honest).
+ *
+ * Returns `null` when there is no ledger footprint → caller should paint {@link ledgerAttributionNeutralFillHex}.
+ * Implicit-baseline days (`rawOverlap` 0, effective footprint on) return the base metric unchanged.
+ */
+export function ledgerAttributionHeatmapMetric(
+  baseMetric: number | undefined,
+  rawOverlap: number,
+  effectiveOverlap: number,
+  rawMaxAcrossStrip: number,
+): number | null {
+  if (effectiveOverlap <= 0) return null;
+  const m = Math.min(1, Math.max(0, baseMetric ?? 0));
+  if (rawOverlap <= 0) return m;
+  const maxR = Math.max(1, Math.floor(rawMaxAcrossStrip));
+  if (maxR <= 1) return m;
+  const span = maxR - 1;
+  const k = Math.max(1, Math.floor(rawOverlap));
+  const boost = 1 + LEDGER_OVERLAP_METRIC_BOOST * Math.min(span, k - 1) / span;
+  return Math.min(1, m * boost);
+}
+
 export function buildLedgerLensOverlapMap(
   ledger: MarketActivityLedger,
   selectedEntryIds: readonly string[],

@@ -1,10 +1,46 @@
+import { parseDate } from '@/engine/calendar';
 import type { RiskRow } from '@/engine/riskModel';
 import { DEFAULT_RISK_TUNING, type RiskModelTuning } from '@/engine/riskModelTuning';
 import { monthKeysOverlappingIsoRangeInclusive } from '@/lib/runwayDateFilter';
+import { formatDateYmd } from '@/lib/weekRunway';
 import { transformedHeatmapMetric, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import { inStoreHeatmapMetric, technologyHeatmapMetricForSurfaces } from '@/lib/runwayViewMetrics';
 
 const DEFAULT_PTS = 48;
+
+/** Cap for day-mode mini series length (performance / SVG path size). */
+export const MAX_DAY_MINI_SERIES_PTS = 512;
+
+/** `week`: rolling 7-day means (default). `day`: one sample per ISO row in the visible range. */
+export type MiniSeriesAggregation = 'week' | 'day';
+
+/** Point count after {@link extractRunwayMiniSeries}; day mode keeps one sample per visible row by default. */
+export function effectiveMiniSeriesTargetPts(
+  sortedLen: number,
+  aggregation: MiniSeriesAggregation,
+  opts?: ExtractRunwayMiniSeriesOpts,
+): number {
+  if (aggregation === 'day' && opts?.targetPts == null) {
+    return Math.min(Math.max(sortedLen, 2), MAX_DAY_MINI_SERIES_PTS);
+  }
+  return opts?.targetPts ?? DEFAULT_PTS;
+}
+
+function sortedRiskRowsForMiniChart(
+  rows: RiskRow[],
+  market: string,
+  opts?: ExtractRunwayMiniSeriesOpts,
+): RiskRow[] | null {
+  const vr = opts?.visibleDateRange;
+  const sorted = rows
+    .filter((r) => {
+      if (r.market !== market) return false;
+      if (!vr) return true;
+      return r.date >= vr.start && r.date <= vr.end;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return sorted.length >= 14 ? sorted : null;
+}
 
 function resampleToN(arr: number[], n: number): number[] {
   if (arr.length === 0) return Array(n).fill(0) as number[];
@@ -25,8 +61,8 @@ export type RunwayMiniSeries = {
   /** 0–1 after same display path as Restaurant Activity heatmap when {@link ExtractRunwayMiniSeriesOpts.inStoreHeatmapColorOpts} is set. */
   storeTrading01: number[];
   /**
-   * Technology lens only: weekly mean of uncapped demand ratios by surface group, resampled, then renormalised
-   * so the three shares sum to 1 at each point (BAU / campaign / programmes & coordination).
+   * Technology lens only: mean of uncapped demand ratios by surface group per bucket (week or day), resampled,
+   * then renormalised so the three shares sum to 1 at each point (BAU / campaign / programmes & coordination).
    */
   techWorkloadMix: {
     bauShare: number[];
@@ -53,29 +89,18 @@ export type ExtractRunwayMiniSeriesOpts = {
    * Deployment Risk heatmap cells.
    */
   marketRiskHeatmapColorOpts?: HeatmapColorOpts;
+  /** Default `week`. `day`: one sample per calendar row; when `targetPts` is omitted, output length follows visible days (capped). */
+  miniSeriesAggregation?: MiniSeriesAggregation;
 };
 
-/**
- * Weekly-aggregated, resampled series for small runway summary charts (single market).
- */
-export function extractRunwayMiniSeries(
-  rows: RiskRow[],
-  market: string,
-  opts?: ExtractRunwayMiniSeriesOpts,
-): RunwayMiniSeries | null {
-  const targetPts = opts?.targetPts ?? DEFAULT_PTS;
-  const tuning = opts?.tuning ?? DEFAULT_RISK_TUNING;
-  const vr = opts?.visibleDateRange;
-  const sorted = rows
-    .filter((r) => {
-      if (r.market !== market) return false;
-      if (!vr) return true;
-      return r.date >= vr.start && r.date <= vr.end;
-    })
-    .sort((a, b) => a.date.localeCompare(b.date));
-  if (sorted.length < 14) return null;
+type MiniAggRow = { d: number; c: number; dr: number; st: number; bau: number; camp: number; proj: number };
 
-  const weeks: { d: number; c: number; dr: number; st: number; bau: number; camp: number; proj: number }[] = [];
+function buildWeeklyBuckets(
+  sorted: RiskRow[],
+  tuning: RiskModelTuning,
+  opts?: ExtractRunwayMiniSeriesOpts,
+): MiniAggRow[] | null {
+  const weeks: MiniAggRow[] = [];
   for (let i = 0; i < sorted.length; i += 7) {
     const chunk = sorted.slice(i, Math.min(i + 7, sorted.length));
     if (chunk.length < 3) break;
@@ -120,37 +145,87 @@ export function extractRunwayMiniSeries(
     });
   }
   if (weeks.length < 4) return null;
+  return weeks;
+}
 
-  const peak = Math.max(...weeks.flatMap((w) => [w.d, w.c]), 1e-9);
+function buildDailyBuckets(sorted: RiskRow[], tuning: RiskModelTuning, opts?: ExtractRunwayMiniSeriesOpts): MiniAggRow[] | null {
+  const days: MiniAggRow[] = [];
+  for (const r of sorted) {
+    const bau = technologyHeatmapMetricForSurfaces(r, ['bau']);
+    const camp = technologyHeatmapMetricForSurfaces(r, ['campaign']);
+    const proj = technologyHeatmapMetricForSurfaces(r, ['change', 'coordination', 'carryover']);
+    const rawDr = Math.min(1, Math.max(0, r.deployment_risk_01 ?? 0));
+    const dr =
+      opts?.marketRiskHeatmapColorOpts != null
+        ? transformedHeatmapMetric('market_risk', rawDr, opts.marketRiskHeatmapColorOpts)
+        : rawDr;
+    const rawSt = inStoreHeatmapMetric(r, tuning);
+    const st =
+      opts?.inStoreHeatmapColorOpts != null
+        ? transformedHeatmapMetric('in_store', rawSt, opts.inStoreHeatmapColorOpts)
+        : rawSt;
+    days.push({
+      d: (r.lab_load ?? 0) + (r.team_load ?? 0),
+      c: (r.labs_effective_cap ?? 0) + (r.teams_effective_cap ?? 0),
+      dr: Math.min(1, Math.max(0, dr)),
+      st: Math.min(1, Math.max(0, st)),
+      bau,
+      camp,
+      proj,
+    });
+  }
+  if (days.length < 4) return null;
+  return days;
+}
+
+/**
+ * Weekly- or daily-aggregated, resampled series for small runway summary charts (single market).
+ */
+export function extractRunwayMiniSeries(
+  rows: RiskRow[],
+  market: string,
+  opts?: ExtractRunwayMiniSeriesOpts,
+): RunwayMiniSeries | null {
+  const tuning = opts?.tuning ?? DEFAULT_RISK_TUNING;
+  const sorted = sortedRiskRowsForMiniChart(rows, market, opts);
+  if (!sorted) return null;
+
+  const aggregation = opts?.miniSeriesAggregation ?? 'week';
+  const targetPts = effectiveMiniSeriesTargetPts(sorted.length, aggregation, opts);
+  const buckets =
+    aggregation === 'day' ? buildDailyBuckets(sorted, tuning, opts) : buildWeeklyBuckets(sorted, tuning, opts);
+  if (!buckets) return null;
+
+  const peak = Math.max(...buckets.flatMap((w) => [w.d, w.c]), 1e-9);
   const s = (v: number) => (v / peak) * 0.92;
 
   const demand = resampleToN(
-    weeks.map((w) => s(w.d)),
+    buckets.map((w) => s(w.d)),
     targetPts,
   );
   const capacity = resampleToN(
-    weeks.map((w) => s(w.c)),
+    buckets.map((w) => s(w.c)),
     targetPts,
   );
   const deploymentRisk = resampleToN(
-    weeks.map((w) => Math.min(1, Math.max(0, w.dr))),
+    buckets.map((w) => Math.min(1, Math.max(0, w.dr))),
     targetPts,
   );
   const storeTrading01 = resampleToN(
-    weeks.map((w) => Math.min(1, Math.max(0, w.st))),
+    buckets.map((w) => Math.min(1, Math.max(0, w.st))),
     targetPts,
   );
 
   const rsB = resampleToN(
-    weeks.map((w) => w.bau),
+    buckets.map((w) => w.bau),
     targetPts,
   );
   const rsC = resampleToN(
-    weeks.map((w) => w.camp),
+    buckets.map((w) => w.camp),
     targetPts,
   );
   const rsP = resampleToN(
-    weeks.map((w) => w.proj),
+    buckets.map((w) => w.proj),
     targetPts,
   );
   const bauShare: number[] = [];
@@ -179,6 +254,123 @@ export function extractRunwayMiniSeries(
     storeTrading01,
     techWorkloadMix: { bauShare, campaignShare, projectShare },
   };
+}
+
+function addOneIsoDay(ymd: string): string {
+  const d = parseDate(ymd);
+  d.setDate(d.getDate() + 1);
+  return formatDateYmd(d);
+}
+
+/** Exclusive calendar days between `rangeEndYmd` and `nextStartYmd` (each endpoint is an over-cap day). */
+function exclusiveCalendarGapDays(rangeEndYmd: string, nextStartYmd: string): number {
+  const a = parseDate(rangeEndYmd);
+  const b = parseDate(nextStartYmd);
+  a.setHours(0, 0, 0, 0);
+  b.setHours(0, 0, 0, 0);
+  const steps = Math.round((b.getTime() - a.getTime()) / 86_400_000);
+  return Math.max(0, steps - 1);
+}
+
+/**
+ * Join adjacent over-cap runs when the gap between them is only a few calendar days of at-or-under
+ * capacity (so weekend-sized dips or short relief do not explode the list).
+ */
+function mergeDemandOverCapRangesBridgingShortGaps(
+  ranges: DemandExceedsCapacityIsoRange[],
+  maxExclusiveGapDays: number,
+): DemandExceedsCapacityIsoRange[] {
+  if (ranges.length <= 1) return ranges;
+  const out = [ranges[0]!];
+  for (let i = 1; i < ranges.length; i++) {
+    const prev = out[out.length - 1]!;
+    const cur = ranges[i]!;
+    const gap = exclusiveCalendarGapDays(prev.dateEnd, cur.dateStart);
+    if (gap <= maxExclusiveGapDays) {
+      out[out.length - 1] = { dateStart: prev.dateStart, dateEnd: cur.dateEnd };
+    } else {
+      out.push(cur);
+    }
+  }
+  return out;
+}
+
+/** Inclusive ISO date span where daily lab+team load exceeds effective caps. */
+export type DemandExceedsCapacityIsoRange = { dateStart: string; dateEnd: string };
+
+/** Max calendar days strictly between two over-cap runs to still show them as one range in the UI list. */
+export const DEMAND_OVER_CAP_LIST_MAX_EXCLUSIVE_GAP_DAYS = 10;
+
+const FMT_DAY_MONTH = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+const FMT_DAY_MONTH_YEAR = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+/** Human-readable span for overload list rows (locale-aware short dates). */
+export function formatDemandOverCapRangeDisplay(r: DemandExceedsCapacityIsoRange): string {
+  const a = parseDate(r.dateStart);
+  const b = parseDate(r.dateEnd);
+  a.setHours(0, 0, 0, 0);
+  b.setHours(0, 0, 0, 0);
+  if (r.dateStart === r.dateEnd) {
+    return FMT_DAY_MONTH_YEAR.format(a);
+  }
+  const yA = a.getFullYear();
+  const yB = b.getFullYear();
+  const sameYear = yA === yB;
+  const sameMonth = sameYear && a.getMonth() === b.getMonth();
+  if (sameMonth) {
+    return `${a.getDate()}–${b.getDate()} ${FMT_DAY_MONTH.format(a)} ${yA}`;
+  }
+  if (sameYear) {
+    return `${FMT_DAY_MONTH.format(a)} – ${FMT_DAY_MONTH_YEAR.format(b)}`;
+  }
+  return `${FMT_DAY_MONTH_YEAR.format(a)} – ${FMT_DAY_MONTH_YEAR.format(b)}`;
+}
+
+/**
+ * Merge consecutive calendar days where `(lab_load + team_load) > (labs_effective_cap + teams_effective_cap)`.
+ * Matches the raw totals averaged into weekly demand/capacity in {@link extractRunwayMiniSeries} (before peak normalisation).
+ *
+ * After strict runs are built, adjacent runs separated by at most {@link DEMAND_OVER_CAP_LIST_MAX_EXCLUSIVE_GAP_DAYS}
+ * calendar days are merged for a shorter summary list (gap days may be at or under capacity).
+ */
+export function demandExceedsCapacityIsoRanges(
+  rows: RiskRow[],
+  market: string,
+  visibleDateRange: { start: string; end: string },
+): DemandExceedsCapacityIsoRange[] {
+  const sorted = rows
+    .filter(
+      (r) => r.market === market && r.date >= visibleDateRange.start && r.date <= visibleDateRange.end,
+    )
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const over = sorted.filter((r) => {
+    const demand = (r.lab_load ?? 0) + (r.team_load ?? 0);
+    const cap = (r.labs_effective_cap ?? 0) + (r.teams_effective_cap ?? 0);
+    return demand > cap;
+  });
+
+  if (over.length === 0) return [];
+
+  const ranges: DemandExceedsCapacityIsoRange[] = [];
+  let runStart = over[0]!.date;
+  let runEnd = over[0]!.date;
+  for (let i = 1; i < over.length; i++) {
+    const ymd = over[i]!.date;
+    if (ymd === addOneIsoDay(runEnd)) {
+      runEnd = ymd;
+    } else {
+      ranges.push({ dateStart: runStart, dateEnd: runEnd });
+      runStart = ymd;
+      runEnd = ymd;
+    }
+  }
+  ranges.push({ dateStart: runStart, dateEnd: runEnd });
+  return mergeDemandOverCapRangesBridgingShortGaps(ranges, DEMAND_OVER_CAP_LIST_MAX_EXCLUSIVE_GAP_DAYS);
 }
 
 /**
@@ -357,8 +549,8 @@ export function miniChartMonthBarCenterX(
 }
 
 /**
- * Resampled data-space index (0 … targetPts-1) for the week bucket containing `dayYmd`.
- * Used by XYChart-based charts where the x scale maps data indices to pixels.
+ * Resampled data-space index (0 … targetPts-1) for `dayYmd` (week bucket or calendar row, matching
+ * {@link extractRunwayMiniSeries} aggregation).
  */
 export function miniChartDataIndexForDayYmd(
   dayYmd: string,
@@ -366,16 +558,19 @@ export function miniChartDataIndexForDayYmd(
   market: string,
   opts?: ExtractRunwayMiniSeriesOpts,
 ): number | null {
-  const targetPts = opts?.targetPts ?? DEFAULT_PTS;
-  const vr = opts?.visibleDateRange;
-  const sorted = rows
-    .filter((r) => {
-      if (r.market !== market) return false;
-      if (!vr) return true;
-      return r.date >= vr.start && r.date <= vr.end;
-    })
-    .sort((a, b) => a.date.localeCompare(b.date));
-  if (sorted.length < 14) return null;
+  const sorted = sortedRiskRowsForMiniChart(rows, market, opts);
+  if (!sorted) return null;
+
+  const aggregation = opts?.miniSeriesAggregation ?? 'week';
+  const targetPts = effectiveMiniSeriesTargetPts(sorted.length, aggregation, opts);
+  const denomJ = Math.max(targetPts - 1, 1);
+
+  if (aggregation === 'day') {
+    const dayIdx = sorted.findIndex((r) => r.date === dayYmd);
+    if (dayIdx < 0) return null;
+    const denomD = Math.max(sorted.length - 1, 1);
+    return (dayIdx / denomD) * denomJ;
+  }
 
   let weekIdx = -1;
   let numWeeks = 0;
@@ -388,7 +583,6 @@ export function miniChartDataIndexForDayYmd(
   if (weekIdx < 0 || numWeeks < 4) return null;
 
   const denomW = Math.max(numWeeks - 1, 1);
-  const denomJ = Math.max(targetPts - 1, 1);
   return (weekIdx / denomW) * denomJ;
 }
 
@@ -401,7 +595,10 @@ export function miniChartXForDayYmd(
 ): number | null {
   const idx = miniChartDataIndexForDayYmd(dayYmd, rows, market, opts);
   if (idx == null) return null;
-  const targetPts = opts?.targetPts ?? DEFAULT_PTS;
+  const sorted = sortedRiskRowsForMiniChart(rows, market, opts);
+  if (!sorted) return null;
+  const aggregation = opts?.miniSeriesAggregation ?? 'week';
+  const targetPts = effectiveMiniSeriesTargetPts(sorted.length, aggregation, opts);
   const innerW = lay.vbW - lay.padL - lay.padR;
   const denomJ = Math.max(targetPts - 1, 1);
   const x = lay.padL + (innerW * idx) / denomJ;

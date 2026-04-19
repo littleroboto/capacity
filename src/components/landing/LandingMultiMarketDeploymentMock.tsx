@@ -41,6 +41,8 @@ type AtcSnapshot = {
   runwayFilterYear: number | null;
   runwayFilterQuarter: RunwayQuarter | null;
   runwayIncludeFollowingQuarter: boolean;
+  runwayCustomRangeStartYmd: string | null;
+  runwayCustomRangeEndYmd: string | null;
 };
 
 function cloneLandingState(): AtcSnapshot {
@@ -58,6 +60,8 @@ function cloneLandingState(): AtcSnapshot {
     runwayFilterYear: s.runwayFilterYear,
     runwayFilterQuarter: s.runwayFilterQuarter,
     runwayIncludeFollowingQuarter: s.runwayIncludeFollowingQuarter,
+    runwayCustomRangeStartYmd: s.runwayCustomRangeStartYmd,
+    runwayCustomRangeEndYmd: s.runwayCustomRangeEndYmd,
   };
 }
 
@@ -92,6 +96,8 @@ function restoreLandingState(snap: AtcSnapshot) {
     runwayFilterYear: snap.runwayFilterYear,
     runwayFilterQuarter: snap.runwayFilterQuarter,
     runwayIncludeFollowingQuarter: snap.runwayIncludeFollowingQuarter,
+    runwayCustomRangeStartYmd: snap.runwayCustomRangeStartYmd,
+    runwayCustomRangeEndYmd: snap.runwayCustomRangeEndYmd,
   });
 }
 
