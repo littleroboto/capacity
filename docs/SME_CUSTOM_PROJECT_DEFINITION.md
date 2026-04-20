@@ -2,6 +2,7 @@
 
 **Status:** design / iteration  
 **Audience:** product, SMEs editing market DSL in Monaco, implementers  
+**Scope note:** The **implementation wedge** today is market runway / tech-heavy demand, but the **notation and engine direction** aim at **generic transformation capacity** — any programme type, any declared demand axis (§13, §14).  
 **Related code today:** `tech_programmes` in YAML (`programme_support`, `live_programme_support`, `load`, `live_support_load`) parsed in `src/engine/yamlDslParser.ts`; editor chrome in `src/components/DslEditorCore.tsx`; assistant contract in `src/lib/dslAssistant/systemPrompt.ts`.
 
 ---
@@ -29,7 +30,7 @@ This document iterates the **YAML model** and the **Monaco UX** for that model. 
 | **No mystery coefficients** | SMEs who opt in to matrices use an **explicit encoding** (fixed-width or structured YAML), not unexplained scalar knobs. |
 | **Expert feel, low ceremony** | Scaffolds, snippets, and ghost text — not a mandatory wizard for every field. |
 | **Stable engine surface** | Parser maps new shapes into existing internal concepts (`PhaseLoad`, programme windows) where possible to limit engine churn. |
-| **Same pattern, many attach points** | **Capacity draw** = *who is pulled*, *how hard* (%), *when* (phases / dates), *what shape* (glyphs or curves). That tuple should generalise beyond `tech_programmes` (see §13). |
+| **Same pattern, many attach points** | **Capacity draw** = *who is pulled*, *how hard* (%), *when* (phases / dates), *what shape* (glyphs or curves). That tuple should generalise beyond `tech_programmes` (§13); **transformation-wide product intent** in §14. |
 
 ---
 
@@ -372,6 +373,7 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 10. **Gantt preview:** default-on vs opt-in; split **below** vs **beside** Monaco; show **all** programmes in buffer vs cursor-scoped only?
 11. **Lane taxonomy:** fixed department list vs YAML-driven row labels only; how to order streams vs departments in swimlanes?
 12. **Enterprise registry:** global department / cost-centre id list vs fully market-local row labels; versioning when HR renames org units?
+13. **Central vs market supply:** single YAML document vs shared **global capacity** file (central product dev, platform) referenced by many markets — how do we avoid double-booking shared pools?
 
 ---
 
@@ -402,9 +404,47 @@ Yes — the direction **does** make sense as the seed of a **small, opinionated 
 
 **Implementation posture:** ship the grammar in **one vertical** (`tech_programmes`) first; prove parser + preview + runway consumption; then **lift** the same block shape to other initiative types without inventing a second notation.
 
+For **positioning** (transformation-wide scope, central pools, OSS intent), see **§14** below.
+
 ---
 
-## 14. Summary
+## 14. Vision: transformation capacity → generic platform
+
+### 14.1 TRANSFORMATION_CAPACITY (the space we mean)
+
+**Transformation capacity** is the umbrella: **any change or run-the-business programme** that pulls on **finite people, teams, or machine-like slots** — not only “market IT + labs.” That includes:
+
+- **Market / segment** delivery (stores, local ops, local tech).
+- **Central / global** product and platform engineering, **undefined or evolving team names** (row labels in the matrix precede formal org design; the **registry** in §13 catches up when `resources` or a shared taxonomy defines the pool).
+- **Shared services** (finance change, HR, internal comms, risk, cyber) when the org wants them on the **same runway** as tech.
+
+The DSL’s job stays the same: **declare supply**, **declare demand as draw over time**, **show the squeeze** — whether the denominator is “testers in Poland” or “global platform squad hours.”
+
+### 14.2 Central, global, and “teams not invented yet”
+
+- **Undefined axes:** matrix **row labels** are allowed **before** those teams exist in `resources:`; the engine treats them as **demand lines** that resolve once supply is named (warn until mapped). That matches how transformation portfolios are written before headcount is final.
+- **Central capacity:** supply blocks can describe **global pools** (e.g. `central_product_engineering: { size: N }`) consumed by initiatives that are not tied to a single country document — multi-doc or `includes:` (see §12, item 13) are the likely mechanism; **draw** rows reference the same axis names as matrix rows.
+- **Non-specific “capacity”:** labs and FTE are **examples** of units; the model generalises to **any scalar or counted pool** the schema admits, as long as demand declares **which pool** and **what % / shape**.
+
+### 14.3 Path to a generic programme platform
+
+Short-term, the product stays anchored in **segment / market runway** (today’s app). Medium-term, the **same file format and UI patterns** (YAML, Monaco, Gantt preview, heatmaps) support **programmes of any kind across departments of any kind** — with initiative types and supply types growing by **registration**, not forked notations.
+
+Long-term **platform** traits (design goals, not commitments on a date):
+
+- Pluggable **initiative kinds** (tech programme, HR transformation, regulatory programme, …) sharing **one draw grammar**.
+- Pluggable **supply dimensions** (people, vendor throughput, environment slots, …) where the org defines pools.
+- Optional **federation**: market files that **reference** central capacity so global teams are not double-counted across regions.
+
+### 14.4 Open source and “no Smartsheet / M365 tax”
+
+**Intent:** release something teams can **run, fork, and extend** without a **Microsoft 365 / Smartsheet-class** subscription as the price of entry for honest capacity-on-a-calendar views. YAML-in-git already aligns with **inspectable, portable** planning.
+
+**What OSS does *not* replace:** portfolio governance, approvals, or HR systems — it **grounds the conversation** in a shared numeric and timeline surface. Commercial packaging (hosted SaaS, support) can coexist with an OSS core if the project goes that way; this section records **product intent**, not a licence choice (that remains a repo-level decision when you ship).
+
+---
+
+## 15. Summary
 
 - **Spectrum:** **Minimal** = one duration, one resource picture, one visible drain model; **maximal** = dependencies, **streams**, convergence (shared integration test), optional **dark / gated** cutover — still YAML-first and inspectable.
 - **YAML:** Optional `phase_capacity_matrix` (literal: **`|`-separated cells**, each **`[pct][glyphs]`** or glyph-only) **or** structured `phase_axes` + optional **`phase_department_load_pct`** + `phase_drawdown`; optional `tech_programme_defaults` for DRY axes and templates; **composite** modelling (parent + streams vs linked siblings) to be chosen from §4.3.
@@ -412,4 +452,7 @@ Yes — the direction **does** make sense as the seed of a **small, opinionated 
 - **Monaco:** Cursor-aware **scaffolds**, snippet placeholders, and later hovers/diagnostics make the expert workflow **fast and learnable**; composite cases get **progressive** inserts (stream, convergence, link).
 - **Gantt companion:** A **derived** swimlane + dependency diagram (bars + arrows) shares **runway-aligned time axes and tokens** (§9.5) so users see **project shape** while typing; heatmaps remain the detailed capacity view.
 - **Enterprise DSL seed:** §13 — same **% + phase + axis** pattern generalises to **any initiative type** once demand axes are registered; start with `tech_programmes`, lift notation later.
+- **Transformation → platform:** §14 — **TRANSFORMATION_CAPACITY** (umbrella for any change programme on finite pools); central / undefined teams; generic programme × department platform path; **OSS intent** so capacity-on-a-calendar is not M365/Smartsheet–gated (§14.4).
 - **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
+
+**One-line north star:** same draw notation, many initiative and supply types; transformation-wide in intent, generic platform over time; inspectable YAML in git as the portable contract.
