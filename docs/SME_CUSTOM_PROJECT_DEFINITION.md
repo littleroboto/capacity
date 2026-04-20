@@ -32,6 +32,7 @@ This document iterates the **YAML model** and the **Monaco UX** for that model. 
 | **Expert feel, low ceremony** | Scaffolds, snippets, and ghost text — not a mandatory wizard for every field. |
 | **Stable engine surface** | Parser maps new shapes into existing internal concepts (`PhaseLoad`, programme windows) where possible to limit engine churn. |
 | **Same pattern, many attach points** | **Capacity draw** = *who is pulled*, *how hard* (%), *when* (phases / dates), *what shape* (glyphs or curves). That tuple should generalise beyond `tech_programmes` (§13); **transformation-wide product intent** in §14. |
+| **One schema, segment-native surfaces** | **Compact** markets get **shorter default scaffolds** and fewer matrix rows; **enterprise** markets get richer stubs — same grammar, different **Monaco snippet packs** (§2.3, §9.1). |
 
 ### 2.1 System model — four ingredients
 
@@ -59,6 +60,27 @@ Campaigns are **not** “marketing department only.” A flagship promo **redist
 The **bearers of load change** by phase: the same campaign object should support a **`phase_capacity_matrix`** (or structured twin, §6) with **rows for every axis** that matters (including **stores / retail_footprint** as a pseudo-department if modelled as capacity), and **columns** for **PREP | LIVE | AFTER** (or finer). Prep/live split in today’s YAML (`campaign_support` vs `live_campaign_support`) is the **minimal** case; the matrix is the **rich** case when SMEs need cross-functional honesty.
 
 **Spec intent:** reuse the **same % + glyph + `|` phase grammar** for `campaigns:` entries as for `tech_programmes:` (one notation, two consumer kinds — §13). Engine mapping may weight retail vs tech differently; the **file** stays legible.
+
+### 2.3 Market scale and segment-specific authoring (US vs Spain, etc.)
+
+**Same activities, different shape of org:** a **US-scale** market might have **tech-related headcount in the hundreds**, many named teams, handoffs, and parallel streams. A **Spain-scale** (or other compact) market might have **&lt;10** people in the same functional bucket, **fewer named teams**, **fewer handoffs**, and the **same promotional or programme story** told with **much less YAML surface area**.
+
+**Principle — one schema, humane surfaces:** the **underlying DSL** does not fork by country. What changes is **how much the SME is asked to type by default**:
+
+| Concern | Large / enterprise-style market | Compact market (e.g. typical ES SME) |
+|---------|-----------------------------------|----------------------------------------|
+| **`resources.teams`** | Many named teams, sizes, optional central axes | **One or two** aggregated teams (e.g. `market_it` with `size: 8`) — sufficient when nobody is staffed as “squad A vs squad B” |
+| **Matrices** | Full **department × phase** grid when portfolio needs it | **2–3 row** matrix stub (Technology, Service_Desk, Ops) or **skip matrix entirely** in starter — rely on `programme_support` / `campaign_support` |
+| **Campaign scaffolds** | Optional **multi-row** PREP/LIVE/AFTER cross-functional block (§2.2) | **Single** prep/live block first; “**Add cross-functional matrix**” as a **second-tier** scaffold, not the default |
+| **Composite / streams** | Shown in advanced menu | Hidden until user runs “Insert composite…” or profile is `standard+` |
+
+**Monaco snippets must be segment-specific (or profile-specific):**
+
+1. **Primary signal:** `country:` (or focused market tab in multi-doc) selects a **snippet pack** (`US`, `ES`, …) maintained as data — default matrix row labels, default team names, which optional blocks appear in **starter document**.
+2. **Secondary signal:** optional top-level key e.g. `market_authoring_profile: compact | standard | enterprise` (or app UI toggle “**Authoring density**”) overrides country default when SMEs want US-depth in a small market or vice versa.
+3. **Heuristic (optional):** if `resources.teams` already has **N &gt; threshold** keys, suggest **enterprise** scaffolds on next insert; if **≤1** team, keep **compact** suggestions.
+
+**Non-goal:** forcing Spain SMEs to scroll past a **US-shaped** 20-line matrix every time they add a campaign. The **first** experience should look like **their** market file today — short, familiar keys — with a **clear path** to deepen (`Insert → Campaign → With cross-functional matrix`).
 
 ---
 
@@ -273,21 +295,24 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 - **Command palette:** “DSL: Insert scaffold…”
 - **Context menu** on YAML structure gutter (if we add custom margin glyph later)
 - **Keybinding** e.g. `Cmd+Shift+Y` (configurable) when focus is in Monaco
-- **High-level:** “**Insert starter market document**” — one action drops a **commented skeleton** with `country`, `resources`, holiday stubs, `bau`, `campaigns`, `tech_programmes`, and `deployment_risk_*` placeholders in a sensible order.
+- **High-level:** “**Insert starter market document**” — one action drops a **commented skeleton** with `country`, `resources`, holiday stubs, `bau`, `campaigns`, `tech_programmes`, and `deployment_risk_*` placeholders in a sensible order — **variant chosen by segment / profile** (§2.3).
 
 **Behaviour:**
 
-1. Detect **AST position** (tree-sitter YAML or lightweight line/heuristic parser): are we under `tech_programmes`, `campaigns`, `resources`, `bau`, `public_holidays`, `deployment_risk_*`, top-level?
-2. Offer **entity-specific** scaffold: e.g. under `- name:` inside `tech_programmes` → insert block for **minimal programme**, **programme + matrix stub**, or **campaign row**; at **document root** on empty buffer → offer **full starter bundle** (below).
-3. Insert as **snippet placeholders** (`${1:name}`, `${2:date}`) with Monaco snippet mode.
+1. Resolve **snippet tier** (`compact` \| `standard` \| `enterprise`) from **`country:`** (default pack per ISO market), optional **`market_authoring_profile`**, and/or **UI authoring density** — see §2.3.
+2. Detect **AST position** (tree-sitter YAML or lightweight line/heuristic parser): are we under `tech_programmes`, `campaigns`, `resources`, `bau`, `public_holidays`, `deployment_risk_*`, top-level?
+3. Offer **entity-specific** scaffold: e.g. under `- name:` inside `tech_programmes` → insert block for **minimal programme**, **programme + matrix stub** (row count depends on tier), or **campaign row**; at **document root** on empty buffer → offer **full starter bundle** (tiered, below).
+4. Insert as **snippet placeholders** (`${1:name}`, `${2:date}`) with Monaco snippet mode.
 
 **Scaffold catalogue (non-exhaustive):**
 
 | Context | Scaffold |
 |---------|----------|
-| **Starter market document** | Ordered stubs: `country` → `resources` (labs + one team) → `public_holidays` / `school_holidays` (commented `dates:`) → `bau` (optional weekly promo) → `campaigns` (one example) → `tech_programmes` (one example) → `deployment_risk_blackouts` / `deployment_risk_events` (commented examples) — each block valid YAML, `# TODO` where dates matter |
+| **Starter market document (compact)** | Shorter bundle for small markets: `country` → `resources` (**labs + one aggregated team**, comment “split teams when N grows”) → holidays → minimal `bau` → **one** `campaigns` example (**prep/live only**, no multi-row matrix) → **one** `tech_programmes` example (**no** `phase_capacity_matrix` in default) → optional single `deployment_risk_blackouts` comment block |
+| **Starter market document (standard)** | Current “full but sane” skeleton: labs + one team + one campaign + one programme + both holiday blocks + risk stubs |
+| **Starter market document (enterprise)** | Adds: **multiple** `resources.teams` lines (named squads), sample **`phase_capacity_matrix`** on programme, **campaign cross-functional matrix** stub (§2.2), optional composite stream comment |
 | New `tech_programmes` item | Minimal `name`, `start_date`, `duration`, `programme_support` |
-| Same + phases | Adds `phase_capacity_matrix: \|2` with header + example rows using **`|`-separated `pct+glyph` cells** (§5.1) |
+| Same + phases | Adds `phase_capacity_matrix: \|2` with header + example rows using **`|`-separated `pct+glyph` cells** (§5.1); **row count** scales with snippet tier (§2.3) — compact = fewer swimlanes |
 | Composite initiative | Stub for **second stream** + optional **convergence / integration** phase labels (see §4.3) |
 | `campaigns` row | Prep/live/support block matching shipped examples; **optional** second scaffold: **campaign + departmental phase matrix** (rows: Technology, Service_Desk, Finance_BI, Retail_ops, Marketing — cols: PREP \| LIVE \| AFTER) per §2.2 |
 | `resources.teams` | One team with `size` |
@@ -295,6 +320,8 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 | `public_holidays` / `school_holidays` | `auto: false`, empty `dates:` + comment on multipliers |
 | `deployment_risk_blackouts` / events | Named window + `dates` or month curve stub + comment “does not consume capacity — timing only” |
 | Multi-doc separator | Line with only `---` |
+
+*Implementation note:* default **country → tier** mapping is **data** (JSON / TS map), not hard-coded prejudice — e.g. ship `ES` → `compact`, `US` → `standard` until SMEs opt into `enterprise`; always overridable via `market_authoring_profile` or UI.
 
 ### 9.2 “Insert at cursor” vs “insert sibling”
 
@@ -411,6 +438,7 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 13. **Central vs market supply:** single YAML document vs shared **global capacity** file (central product dev, platform) referenced by many markets — how do we avoid double-booking shared pools?
 14. **Campaign matrix:** same top-level key `phase_capacity_matrix` on a campaign row vs nested `cross_functional_load:` — naming and parser precedence vs legacy `campaign_support` keys?
 15. **Retail / store capacity:** model as a named **demand axis** (footfall proxy) vs implicit trading load only — does it get its own row in the matrix?
+16. **Snippet tier defaults:** who owns **country → compact/standard/enterprise** defaults (product data vs per-tenant config); how to avoid stereotyping while keeping ES files **welcoming** by default?
 
 ---
 
@@ -490,7 +518,8 @@ Long-term **platform** traits (design goals, not commitments on a date):
 - **Gantt companion:** A **derived** swimlane + dependency diagram (bars + arrows) shares **runway-aligned time axes and tokens** (§9.5) so users see **project shape** while typing; heatmaps remain the detailed capacity view.
 - **Enterprise DSL seed:** §13 — same **% + phase + axis** pattern generalises to **any initiative type** once demand axes are registered; start with `tech_programmes`, lift notation later.
 - **Transformation → platform:** §14 — **TRANSFORMATION_CAPACITY** (umbrella for any change programme on finite pools); central / undefined teams; generic programme × department platform path; **OSS intent** so capacity-on-a-calendar is not M365/Smartsheet–gated (§14.4).
-- **Four ingredients + Monaco:** §2.1 (capacity, restrictors, consumers, risk informers); §9.1 **starter scaffolds** for a whole coherent file; **campaigns** as multi-lane phase-shifting consumers (§2.2).
+- **Four ingredients + Monaco:** §2.1 (capacity, restrictors, consumers, risk informers); §9.1 **tiered starter scaffolds** (compact / standard / enterprise) for a whole coherent file; **campaigns** as multi-lane phase-shifting consumers (§2.2).
+- **Segment-native YAML:** §2.3 — **one schema**, different **default snippet depth** (US-scale vs ES-scale); ES SMEs are not greeted with US-shaped walls of YAML; **same activities**, fewer named handoffs in compact files.
 - **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
 
 **One-line north star:** same draw notation, many initiative and supply types; transformation-wide in intent, generic platform over time; inspectable YAML in git as the portable contract.
