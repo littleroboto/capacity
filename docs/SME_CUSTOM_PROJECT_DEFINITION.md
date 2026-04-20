@@ -29,6 +29,7 @@ This document iterates the **YAML model** and the **Monaco UX** for that model. 
 | **No mystery coefficients** | SMEs who opt in to matrices use an **explicit encoding** (fixed-width or structured YAML), not unexplained scalar knobs. |
 | **Expert feel, low ceremony** | Scaffolds, snippets, and ghost text — not a mandatory wizard for every field. |
 | **Stable engine surface** | Parser maps new shapes into existing internal concepts (`PhaseLoad`, programme windows) where possible to limit engine churn. |
+| **Same pattern, many attach points** | **Capacity draw** = *who is pulled*, *how hard* (%), *when* (phases / dates), *what shape* (glyphs or curves). That tuple should generalise beyond `tech_programmes` (see §13). |
 
 ---
 
@@ -370,14 +371,45 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 9. **“Dark” delivery:** express as phase-gated visibility, separate virtual load channel, or documentation-only until engine supports it?
 10. **Gantt preview:** default-on vs opt-in; split **below** vs **beside** Monaco; show **all** programmes in buffer vs cursor-scoped only?
 11. **Lane taxonomy:** fixed department list vs YAML-driven row labels only; how to order streams vs departments in swimlanes?
+12. **Enterprise registry:** global department / cost-centre id list vs fully market-local row labels; versioning when HR renames org units?
 
 ---
 
-## 13. Summary
+## 13. Enterprise generalization (north star)
+
+Yes — the direction **does** make sense as the seed of a **small, opinionated enterprise DSL** focused on one job: describing **capacity draw** (who is pulled, how hard, over which time slices) in a way humans can type and diff.
+
+**Core abstraction (generic):**
+
+| Dimension | Role |
+|-----------|------|
+| **Initiative** | Something that consumes capacity: tech programme, campaign, BAU spike, risk response, central programme, … |
+| **Demand axis (“department”)** | Any named pool the org cares about: Technology, Service Desk, Operations, **Finance change**, **HR ops**, **Central platform**, store labour, **labs** (may be a different unit than FTE %), etc. |
+| **Time structure** | Phases, weeks, or explicit dates — aligned to a calendar span. |
+| **Draw** | **`%`** = headline load on that axis for that slice (once §12.3 picks the denominator: pool vs programme FTE). **`Glyphs`** (or numeric curves) = **shape** within the slice so the same 50% can still look “flat” vs “spiky” in the engine and Gantt. |
+
+**Why this is “almost generic” but not unconstrained:**
+
+- It is **not** trying to be MS Project in YAML — no full task network as the default path.
+- It **is** trying to be a **portable notation** for “this initiative stresses these axes, this much, then” — the same matrix grammar can attach to **`tech_programmes` today**, and later to **`campaigns`**, **BAU overlays**, or a top-level **`capacity_initiatives:`** list if the product splits concerns.
+- **Row labels** stay **YAML-driven** (SME-defined strings) until a **registry** maps them to engine pools (`resources.teams`, labs, central teams); unknown rows → warn + policy (ignore vs aggregate to “other”).
+
+**What you gain for the enterprise story:**
+
+- One **visual and editorial habit** (matrix + optional Gantt) for many entity types.
+- **Explicit %** removes the “trust the black box” problem when talking to IT, Ops, and Finance about the same plan.
+- **Structured twin** (`phase_department_load_pct` + `phase_drawdown`, §6) keeps **ETL / portfolio tools** happy while SMEs keep the ASCII table.
+
+**Implementation posture:** ship the grammar in **one vertical** (`tech_programmes`) first; prove parser + preview + runway consumption; then **lift** the same block shape to other initiative types without inventing a second notation.
+
+---
+
+## 14. Summary
 
 - **Spectrum:** **Minimal** = one duration, one resource picture, one visible drain model; **maximal** = dependencies, **streams**, convergence (shared integration test), optional **dark / gated** cutover — still YAML-first and inspectable.
 - **YAML:** Optional `phase_capacity_matrix` (literal: **`|`-separated cells**, each **`[pct][glyphs]`** or glyph-only) **or** structured `phase_axes` + optional **`phase_department_load_pct`** + `phase_drawdown`; optional `tech_programme_defaults` for DRY axes and templates; **composite** modelling (parent + streams vs linked siblings) to be chosen from §4.3.
 - **Defaults:** Unchanged simple programmes stay simple; **template + visible resolution** replaces mystery weighting in the product narrative.
 - **Monaco:** Cursor-aware **scaffolds**, snippet placeholders, and later hovers/diagnostics make the expert workflow **fast and learnable**; composite cases get **progressive** inserts (stream, convergence, link).
 - **Gantt companion:** A **derived** swimlane + dependency diagram (bars + arrows) shares **runway-aligned time axes and tokens** (§9.5) so users see **project shape** while typing; heatmaps remain the detailed capacity view.
+- **Enterprise DSL seed:** §13 — same **% + phase + axis** pattern generalises to **any initiative type** once demand axes are registered; start with `tech_programmes`, lift notation later.
 - **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
