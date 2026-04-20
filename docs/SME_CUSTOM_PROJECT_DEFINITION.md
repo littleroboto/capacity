@@ -13,6 +13,7 @@ SMEs need to describe **technology / change programmes** (non-campaign work) in 
 1. **Defaults are enough** — a programme can be “one block” (dates + duration + rough headcount) and the engine applies a credible **drawdown shape** (e.g. one lab + one tester as % of capacity over time).
 2. **Optional precision** — when the SME cares, they can spell out **phases** and **which departments** draw capacity in each phase, without hidden weighting or magic fudge factors in the UI copy.
 3. **Fast typing** — power users should be able to sketch matrices in the editor almost as quickly as a markdown table, with **scaffold insertion** so they never have to remember key names from scratch.
+4. **Optional coupling** — some real initiatives are **two or three streams** (e.g. digital + POS) that **sequence and converge** for integrated test; the DSL should allow that **without** forcing every SME to model dependencies (see §4).
 
 This document iterates the **YAML model** and the **Monaco UX** for that model. Nothing here is implemented until a separate implementation plan lands.
 
@@ -42,9 +43,56 @@ Think in three layers:
 
 ---
 
-## 4. Fixed-width matrix notation (human-first)
+## 4. Dataset spectrum: minimal → maximal
 
-### 4.1 Informal sketch (your starting point)
+### 4.1 Minimal dataset (single lump)
+
+At the **low end**, one SME-facing “project” is enough information for the engine to draw a plausible runway:
+
+- **Identity:** `name`, `start_date`
+- **Horizon:** one **`duration`** (single calendar window)
+- **Scale:** one notion of **labs** in use and **tech / market IT** headcount (today: `programme_support` / `live_programme_support` style keys)
+- **Drain:** an explicit **fraction of those people’s time** (or an equivalent live scale) tied to that window — ideally **one visible number** (or a documented default derived from template), not a stack of hidden coefficients
+
+The SME does **not** name phases. The product applies a **default drawdown shape** inside that one duration (see §8) and shows what it assumed.
+
+### 4.2 Maximal dataset (dependencies, many streams)
+
+At the **high end**, the same DSL needs to absorb initiatives that are **not** a single rectangle on the calendar:
+
+- **Dependencies** — work B cannot start (or cannot cut over) until work A reaches a gate
+- **Parallel streams** — two or three programmes progressing partly in parallel with different department mixes
+- **Convergence** — a shared **integration / SIT** window where several streams must be **in test together** even if their earlier phases were independent
+- **Coupled go-live** — e.g. digital backend “ready in the dark” while stores catch up; activation aligned to POS readiness rather than backend finish alone
+
+The maximal case is still **YAML-first** and **inspectable**: relationships should be readable in the file (or generated with comments preserved), not only in a proprietary graph UI.
+
+### 4.3 Composite programmes (“one initiative, several engines”)
+
+**Product pattern:** two or three “projects” in business language (e.g. **Digital release** + **POS upgrade**) are **one initiative** because they must **land as a sequence** and share an **integrated test** period. The SME should be able to model that **without** splitting capacity across unrelated top-level rows that accidentally double-count or miss the overlap week.
+
+**Modelling directions (to pick or combine in a later tranche):**
+
+| Approach | Idea | Trade-off |
+|----------|------|-----------|
+| **A. Parent + streams** | One parent `tech_programmes` item (or new `tech_initiatives:`) with nested **`streams:`** each with optional own `start_date` / `duration` / matrix | Clear hierarchy; parser merges loads with rules |
+| **B. Linked siblings** | Separate list entries with **`part_of:`** / **`requires:`** / **`converges_with:`** ids pointing at each other | Flexible; risk of inconsistent dates if not validated |
+| **C. Single matrix, extra rows** | One calendar, matrix rows include `Digital_backend`, `POS_client`, `Stores_ops` | Simple for two-track; messy for many dependencies |
+
+**Integrated test period:** however we represent streams, the spec should allow a **named phase or date-bounded window** where **multiple streams contribute simultaneously** to labs / teams (matrix columns overlap, or a dedicated `INTEGRATION` column applies to all listed streams).
+
+**“Dark” / staged enablement:** one stream can carry **prep load** while **customer-visible load** stays low until a gate (e.g. `enable_from_phase: PILOT` or `cutover_aligns_with_stream: pos_upgrade`). Exact keys are TBD; the requirement is that SMEs can describe **backend-before-store** behaviour without fake durations.
+
+### 4.4 Minimal vs maximal in the editor
+
+- **Scaffolds** should offer **minimal lump** first, then **“add stream”**, **“add convergence phase”**, **“link to programme id …”** as progressive inserts (Monaco §9).
+- **Validation** should catch impossible links (unknown id, circular `requires`, convergence window outside child durations) with fix suggestions.
+
+---
+
+## 5. Fixed-width matrix notation (human-first)
+
+### 5.1 Informal sketch (your starting point)
 
 ```text
 Project_type: e.g. POS_upgrade, Network_Upgrade, Hardware_Replacement, Store_Refurb
@@ -58,11 +106,11 @@ Project_type: e.g. POS_upgrade, Network_Upgrade, Hardware_Replacement, Store_Ref
 
 - **Row** = department or workstream (Technology, Service Desk, Operations, …).
 - **Column** = phase, in header order.
-- **Cell characters** = relative intensity in that phase (e.g. `w` = weak/low, `-` = none, longer runs or digit bands = stronger — exact legend is part of iteration §4.3).
+- **Cell characters** = relative intensity in that phase (e.g. `w` = weak/low, `-` = none, longer runs or digit bands = stronger — exact legend is part of iteration §5.3).
 
 This is **markdown-table-like** in spirit: fixed columns, scan-friendly, diff-friendly.
 
-### 4.2 Embedding in YAML (recommended carrier)
+### 5.2 Embedding in YAML (recommended carrier)
 
 Use a **literal block scalar** so SMEs do not escape characters:
 
@@ -85,7 +133,7 @@ tech_programmes:
 
 **Versioning (optional key):** `phase_capacity_matrix_format: ascii_v1` if we ever break encoding.
 
-### 4.3 Legend iteration (candidates)
+### 5.3 Legend iteration (candidates)
 
 Pick **one** primary scheme per version to avoid ambiguity:
 
@@ -97,17 +145,17 @@ Pick **one** primary scheme per version to avoid ambiguity:
 
 **Recommendation:** **A for authoring**, with editor **hover / status bar** showing numeric resolution (e.g. “Operations × DEPLOYMENT → 0.75 FTE equivalent”).
 
-### 4.4 Precedence rules (YAML)
+### 5.4 Precedence rules (YAML)
 
 When multiple sources exist on one `tech_programmes` item:
 
-1. If `phase_capacity_matrix` (or structured `phases:` list — see §5) is **present and valid** → it drives **relative shape** across phases; absolute scale still comes from `programme_support` / `labs_required` / `tech_staff` unless overridden.
+1. If `phase_capacity_matrix` (or structured `phases:` list — see §6) is **present and valid** → it drives **relative shape** across phases; absolute scale still comes from `programme_support` / `labs_required` / `tech_staff` unless overridden.
 2. If matrix **absent** → existing **`programme_support` + duration** behaviour remains (default template).
 3. If both matrix and `load:` / per-phase keys conflict → **matrix wins** for phases it covers; parser emits **warning** listing ignored keys.
 
 ---
 
-## 5. Structured YAML alternative (same semantics)
+## 6. Structured YAML alternative (same semantics)
 
 Some SMEs will prefer pure YAML. Equivalent expressiveness:
 
@@ -128,7 +176,7 @@ phase_drawdown:
 
 ---
 
-## 6. Optional market-level defaults (“programme defaults”)
+## 7. Optional market-level defaults (“programme defaults”)
 
 To avoid repeating axes on every programme:
 
@@ -146,7 +194,7 @@ Each `tech_programmes` entry inherits `phase_axes` and counts unless overridden.
 
 ---
 
-## 7. Default shape when SME types almost nothing
+## 8. Default shape when SME types almost nothing
 
 **Input:** `name`, `start_date`, `duration`, and `programme_support` with e.g. `labs_required: 1`, `tech_staff: 1`.
 
@@ -160,9 +208,9 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 
 ---
 
-## 8. Monaco / Code view UX — “expert but easy”
+## 9. Monaco / Code view UX — “expert but easy”
 
-### 8.1 Scaffold insertion (cursor-aware)
+### 9.1 Scaffold insertion (cursor-aware)
 
 **Trigger ideas:**
 
@@ -182,12 +230,13 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 |---------|----------|
 | New `tech_programmes` item | Minimal `name`, `start_date`, `duration`, `programme_support` |
 | Same + phases | Adds `phase_capacity_matrix: \|2` with header + 3 example rows |
+| Composite initiative | Stub for **second stream** + optional **convergence / integration** phase labels (see §4.3) |
 | `campaigns` row | Prep/live/support block matching shipped examples |
 | `resources.teams` | One team with `size` |
 | `bau` weekly promo | `day`, `labs`, `support_days` |
 | Multi-doc separator | Line with only `---` |
 
-### 8.2 “Insert at cursor” vs “insert sibling”
+### 9.2 “Insert at cursor” vs “insert sibling”
 
 - **Inside a mapping** → insert **key: value** at correct indent.
 - **After list item** → insert new `-` item with trailing newline.
@@ -195,7 +244,7 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 
 Requires **indent stack** from current line + known DSL schema (can ship as JSON Schema or hand-maintained “insertion points” map).
 
-### 8.3 Inline assistance (later tranche)
+### 9.3 Inline assistance (later tranche)
 
 | Feature | Purpose |
 |---------|---------|
@@ -204,7 +253,7 @@ Requires **indent stack** from current line + known DSL schema (can ship as JSON
 | **Fold regions** | Fold literal matrix block independently of rest of file |
 | **Diagnostics** | Matrix column count ≠ header → squiggle with fix action “pad or trim” |
 
-### 8.4 DSL assistant alignment
+### 9.4 DSL assistant alignment
 
 Extend assistant instructions so the model:
 
@@ -214,7 +263,7 @@ Extend assistant instructions so the model:
 
 ---
 
-## 9. Parser and engine notes (implementation-facing)
+## 10. Parser and engine notes (implementation-facing)
 
 1. **Parse step:** extract `phase_capacity_matrix` literal → trim → split lines → parse header row → fixed-width columns (positions from header text or explicit `|` column markers if we add them in v2).
 2. **Normalise** glyph cells to numeric weights using published legend.
@@ -224,7 +273,7 @@ Extend assistant instructions so the model:
 
 ---
 
-## 10. Alternative uses of the same interaction model
+## 11. Alternative uses of the same interaction model
 
 The **“fixed-width table in YAML + scaffold + hover decode”** pattern can extend to:
 
@@ -236,19 +285,23 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 
 ---
 
-## 11. Open questions (next iteration)
+## 12. Open questions (next iteration)
 
 1. **Phase calendar:** equal split of `duration` vs explicit `phase_weights:` or `phase_days:`?
 2. **Normalization:** row-wise vs column-wise vs global max for ASCII → numeric?
 3. **Central teams:** do they consume the same `resources.teams` pool or a separate virtual pool?
 4. **Multi-doc:** can `tech_programme_defaults` live in a shared fragment / `__include__` pattern, or only per market file?
 5. **Migration:** do we auto-generate ASCII matrix from existing `tech_programmes` for display-only “matrix view” toggle?
+6. **Composite shape:** prefer **parent + `streams:`** vs **linked sibling ids** for digital + POS style cases?
+7. **Convergence:** is `INTEGRATION` always a shared calendar slice across streams, or a separate explicit `convergence:` block with dates?
+8. **“Dark” delivery:** express as phase-gated visibility, separate virtual load channel, or documentation-only until engine supports it?
 
 ---
 
-## 12. Summary
+## 13. Summary
 
-- **YAML:** Optional `phase_capacity_matrix` (literal fixed-width) **or** structured `phase_drawdown` + `phase_axes`; optional `tech_programme_defaults` for DRY axes and templates.
+- **Spectrum:** **Minimal** = one duration, one resource picture, one visible drain model; **maximal** = dependencies, **streams**, convergence (shared integration test), optional **dark / gated** cutover — still YAML-first and inspectable.
+- **YAML:** Optional `phase_capacity_matrix` (literal fixed-width) **or** structured `phase_drawdown` + `phase_axes`; optional `tech_programme_defaults` for DRY axes and templates; **composite** modelling (parent + streams vs linked siblings) to be chosen from §4.3.
 - **Defaults:** Unchanged simple programmes stay simple; **template + visible resolution** replaces mystery weighting in the product narrative.
-- **Monaco:** Cursor-aware **scaffolds**, snippet placeholders, and later hovers/diagnostics make the expert workflow **fast and learnable**.
-- **Next step:** narrow §4.3 legend + §11 normalization in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
+- **Monaco:** Cursor-aware **scaffolds**, snippet placeholders, and later hovers/diagnostics make the expert workflow **fast and learnable**; composite cases get **progressive** inserts (stream, convergence, link).
+- **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
