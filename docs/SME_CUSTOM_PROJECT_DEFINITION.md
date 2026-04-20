@@ -16,6 +16,7 @@ SMEs need to describe **technology / change programmes** (non-campaign work) in 
 3. **Fast typing** — power users should be able to sketch matrices in the editor almost as quickly as a markdown table, with **scaffold insertion** so they never have to remember key names from scratch.
 4. **Optional coupling** — some real initiatives are **two or three streams** (e.g. digital + POS) that **sequence and converge** for integrated test; the DSL should allow that **without** forcing every SME to model dependencies (see §4).
 5. **Shape at a glance** — while editing, a **Gantt-style companion** (swimlanes, bars, dependency arrows) derived from the same YAML makes the **calendar shape** obvious; it should **look like runway time axes**, not an alien chart (see §9.5).
+6. **Full-stack authoring** — Monaco (and the DSL assistant) should be able to **insert scaffolds for all four system ingredients** (§2.1): capacity, restrictors, consumers, and risk/timing — so users can bootstrap a coherent market file without memorising the entire schema (§9.1).
 
 This document iterates the **YAML model** and the **Monaco UX** for that model. Nothing here is implemented until a separate implementation plan lands.
 
@@ -32,11 +33,38 @@ This document iterates the **YAML model** and the **Monaco UX** for that model. 
 | **Stable engine surface** | Parser maps new shapes into existing internal concepts (`PhaseLoad`, programme windows) where possible to limit engine churn. |
 | **Same pattern, many attach points** | **Capacity draw** = *who is pulled*, *how hard* (%), *when* (phases / dates), *what shape* (glyphs or curves). That tuple should generalise beyond `tech_programmes` (§13); **transformation-wide product intent** in §14. |
 
+### 2.1 System model — four ingredients
+
+The runway is built from four **roles** of YAML (names map to today’s market DSL; exact keys evolve with implementation):
+
+| Ingredient | Plain language | Typical YAML today (illustrative) |
+|------------|----------------|-------------------------------------|
+| **1. Defined capacity** | How much room exists **before** calendar effects. | `resources:` (`labs`, `teams` / staff counts, optional future pools). |
+| **2. Capacity restrictors** | Calendar or policy **shrinks** effective supply (does not “want” work — it **reduces** the envelope). | `public_holidays`, `school_holidays`, capacity taper / staffing multipliers, leave bands, etc. |
+| **3. Capacity consumers** | Things that **pull** on named pools over time. | **`tech_programmes`**, **`campaigns`**, **`bau`** rhythms — each should be able to declare **durations**, **phases**, and **% draw + swimlane** (matrix grammar, §5) against axes that map to supply. |
+| **4. Risk / timing informers** | Events that **do not consume capacity** but **constrain when** things may happen (or how risky a window is). | e.g. `deployment_risk_blackouts`, `deployment_risk_events`, fragile windows — “no go-live week before AGM / global convention.” |
+
+**Monaco’s job (authoring):** the editor should be able to **scaffold every ingredient** so a new market file is **syntactically valid and semantically meaningful** from the first insert — not a blank file and a README hunt (see §9.1 starter catalogue).
+
+### 2.2 Marketing campaigns — multi-lane, phase-shifting consumers
+
+Campaigns are **not** “marketing department only.” A flagship promo **redistributes load across departments and across the campaign lifecycle**:
+
+| Phase / window | Who bears load (examples) |
+|----------------|---------------------------|
+| **Before live** | Technology (prep, integrations), Marketing (creative), Finance / BI (forecasting, baseline), Retail ops (briefings, layout). |
+| **During live** | **Retail locations** (customer traffic, in-store execution), Service Desk (volume spike), Technology (incident / stability), Finance / BI (**daily** reporting / pacing), Marketing (in-flight optimisation). |
+| **After / tail** | Service Desk (returns, queries), Finance / BI (close, reconciliation), Technology (decommission toggles, hardening), Insights (post-mortem). |
+
+The **bearers of load change** by phase: the same campaign object should support a **`phase_capacity_matrix`** (or structured twin, §6) with **rows for every axis** that matters (including **stores / retail_footprint** as a pseudo-department if modelled as capacity), and **columns** for **PREP | LIVE | AFTER** (or finer). Prep/live split in today’s YAML (`campaign_support` vs `live_campaign_support`) is the **minimal** case; the matrix is the **rich** case when SMEs need cross-functional honesty.
+
+**Spec intent:** reuse the **same % + glyph + `|` phase grammar** for `campaigns:` entries as for `tech_programmes:` (one notation, two consumer kinds — §13). Engine mapping may weight retail vs tech differently; the **file** stays legible.
+
 ---
 
 ## 3. Conceptual model (mental map for SMEs)
 
-Think in three layers:
+Within a **single consumer** (e.g. one tech programme), think in three layers:
 
 1. **Programme shell** — name, `start_date`, `duration` (already familiar from `tech_programmes`).
 2. **Default shape** — if the SME omits phase detail, the app applies a **programme profile** (template): e.g. “integration-heavy early, deployment spike, aftercare tail” with **fixed fractional draw** on labs and market IT/testing derived from `programme_support`-style counts.
@@ -238,28 +266,34 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 
 ### 9.1 Scaffold insertion (cursor-aware)
 
+**Product goal:** Monaco should be able to **create all YAML components** needed to start populating **meaningful** runway data — not only `tech_programmes`, but **supply, restrictors, consumers, and risk** (§2.1), in an order that parses and applies.
+
 **Trigger ideas:**
 
 - **Command palette:** “DSL: Insert scaffold…”
 - **Context menu** on YAML structure gutter (if we add custom margin glyph later)
 - **Keybinding** e.g. `Cmd+Shift+Y` (configurable) when focus is in Monaco
+- **High-level:** “**Insert starter market document**” — one action drops a **commented skeleton** with `country`, `resources`, holiday stubs, `bau`, `campaigns`, `tech_programmes`, and `deployment_risk_*` placeholders in a sensible order.
 
 **Behaviour:**
 
-1. Detect **AST position** (tree-sitter YAML or lightweight line/heuristic parser): are we under `tech_programmes`, `campaigns`, `resources`, `bau`, top-level?
-2. Offer **entity-specific** scaffold: e.g. under `- name:` inside `tech_programmes` → insert block for **minimal programme**, **programme + matrix stub**, or **campaign row**.
+1. Detect **AST position** (tree-sitter YAML or lightweight line/heuristic parser): are we under `tech_programmes`, `campaigns`, `resources`, `bau`, `public_holidays`, `deployment_risk_*`, top-level?
+2. Offer **entity-specific** scaffold: e.g. under `- name:` inside `tech_programmes` → insert block for **minimal programme**, **programme + matrix stub**, or **campaign row**; at **document root** on empty buffer → offer **full starter bundle** (below).
 3. Insert as **snippet placeholders** (`${1:name}`, `${2:date}`) with Monaco snippet mode.
 
 **Scaffold catalogue (non-exhaustive):**
 
 | Context | Scaffold |
 |---------|----------|
+| **Starter market document** | Ordered stubs: `country` → `resources` (labs + one team) → `public_holidays` / `school_holidays` (commented `dates:`) → `bau` (optional weekly promo) → `campaigns` (one example) → `tech_programmes` (one example) → `deployment_risk_blackouts` / `deployment_risk_events` (commented examples) — each block valid YAML, `# TODO` where dates matter |
 | New `tech_programmes` item | Minimal `name`, `start_date`, `duration`, `programme_support` |
 | Same + phases | Adds `phase_capacity_matrix: \|2` with header + example rows using **`|`-separated `pct+glyph` cells** (§5.1) |
 | Composite initiative | Stub for **second stream** + optional **convergence / integration** phase labels (see §4.3) |
-| `campaigns` row | Prep/live/support block matching shipped examples |
+| `campaigns` row | Prep/live/support block matching shipped examples; **optional** second scaffold: **campaign + departmental phase matrix** (rows: Technology, Service_Desk, Finance_BI, Retail_ops, Marketing — cols: PREP \| LIVE \| AFTER) per §2.2 |
 | `resources.teams` | One team with `size` |
 | `bau` weekly promo | `day`, `labs`, `support_days` |
+| `public_holidays` / `school_holidays` | `auto: false`, empty `dates:` + comment on multipliers |
+| `deployment_risk_blackouts` / events | Named window + `dates` or month curve stub + comment “does not consume capacity — timing only” |
 | Multi-doc separator | Line with only `---` |
 
 ### 9.2 “Insert at cursor” vs “insert sibling”
@@ -287,10 +321,11 @@ Extend assistant instructions so the model:
 - Prefers **patch edits** for matrix blocks (replace whole literal block as one patch when needed).
 - Never silently drops `phase_capacity_matrix` when editing unrelated keys.
 - When user says “add deployment spike for Operations”, **patch the ASCII row** rather than inventing new scalar fudge keys.
+- For **campaigns**, when the user adds cross-functional load, **extend the same matrix grammar** (§2.2) rather than introducing campaign-only fudge keys.
 
 ### 9.5 Programme shape preview (Gantt companion)
 
-While drafting a `tech_programmes` block (or future composite initiative), the SME should see a **generated diagram** of the **calendar shape** without switching mental models to heatmap cells. This is a **companion view**, not a second source of truth: it is **derived from the YAML** (plus documented defaults), debounced off the editor buffer.
+While drafting a **`tech_programmes`** or **`campaigns`** block (or future composite initiative), the SME should see a **generated diagram** of the **calendar shape** without switching mental models to heatmap cells. This is a **companion view**, not a second source of truth: it is **derived from the YAML** (plus documented defaults), debounced off the editor buffer.
 
 #### Goals
 
@@ -351,9 +386,9 @@ The **preview model** should be the same structural intermediate we want for **d
 
 The **“fixed-width table in YAML + scaffold + hover decode”** pattern can extend to:
 
-- **Campaign** prep/live intensity grids (marketing vs tech emphasis).
+- **Campaign** prep / live / after **multi-department** intensity grids (§2.2) — same `% + glyph + \|` grammar as programmes.
 - **BAU** seasonal overlays (“Q4 extra service desk load” as a small matrix on weeks).
-- **Risk / deployment** annotations where SMEs mark sensitive windows per region.
+- **Risk / deployment** annotations where SMEs mark sensitive windows per region (informers, not consumers — §2.1).
 
 Reuse the same Monaco commands and legend infrastructure; only insertion templates and parsers change.
 
@@ -374,6 +409,8 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 11. **Lane taxonomy:** fixed department list vs YAML-driven row labels only; how to order streams vs departments in swimlanes?
 12. **Enterprise registry:** global department / cost-centre id list vs fully market-local row labels; versioning when HR renames org units?
 13. **Central vs market supply:** single YAML document vs shared **global capacity** file (central product dev, platform) referenced by many markets — how do we avoid double-booking shared pools?
+14. **Campaign matrix:** same top-level key `phase_capacity_matrix` on a campaign row vs nested `cross_functional_load:` — naming and parser precedence vs legacy `campaign_support` keys?
+15. **Retail / store capacity:** model as a named **demand axis** (footfall proxy) vs implicit trading load only — does it get its own row in the matrix?
 
 ---
 
@@ -453,6 +490,7 @@ Long-term **platform** traits (design goals, not commitments on a date):
 - **Gantt companion:** A **derived** swimlane + dependency diagram (bars + arrows) shares **runway-aligned time axes and tokens** (§9.5) so users see **project shape** while typing; heatmaps remain the detailed capacity view.
 - **Enterprise DSL seed:** §13 — same **% + phase + axis** pattern generalises to **any initiative type** once demand axes are registered; start with `tech_programmes`, lift notation later.
 - **Transformation → platform:** §14 — **TRANSFORMATION_CAPACITY** (umbrella for any change programme on finite pools); central / undefined teams; generic programme × department platform path; **OSS intent** so capacity-on-a-calendar is not M365/Smartsheet–gated (§14.4).
+- **Four ingredients + Monaco:** §2.1 (capacity, restrictors, consumers, risk informers); §9.1 **starter scaffolds** for a whole coherent file; **campaigns** as multi-lane phase-shifting consumers (§2.2).
 - **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
 
 **One-line north star:** same draw notation, many initiative and supply types; transformation-wide in intent, generic platform over time; inspectable YAML in git as the portable contract.
