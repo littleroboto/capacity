@@ -14,6 +14,7 @@ SMEs need to describe **technology / change programmes** (non-campaign work) in 
 2. **Optional precision** — when the SME cares, they can spell out **phases** and **which departments** draw capacity in each phase, without hidden weighting or magic fudge factors in the UI copy.
 3. **Fast typing** — power users should be able to sketch matrices in the editor almost as quickly as a markdown table, with **scaffold insertion** so they never have to remember key names from scratch.
 4. **Optional coupling** — some real initiatives are **two or three streams** (e.g. digital + POS) that **sequence and converge** for integrated test; the DSL should allow that **without** forcing every SME to model dependencies (see §4).
+5. **Shape at a glance** — while editing, a **Gantt-style companion** (swimlanes, bars, dependency arrows) derived from the same YAML makes the **calendar shape** obvious; it should **look like runway time axes**, not an alien chart (see §9.5).
 
 This document iterates the **YAML model** and the **Monaco UX** for that model. Nothing here is implemented until a separate implementation plan lands.
 
@@ -252,6 +253,7 @@ Requires **indent stack** from current line + known DSL schema (can ship as JSON
 | **Hover** on `phase_capacity_matrix` | Decode legend + numeric preview for cell under cursor |
 | **Fold regions** | Fold literal matrix block independently of rest of file |
 | **Diagnostics** | Matrix column count ≠ header → squiggle with fix action “pad or trim” |
+| **Gantt companion** | Live **shape preview** under or beside the editor (§9.5) |
 
 ### 9.4 DSL assistant alignment
 
@@ -260,6 +262,53 @@ Extend assistant instructions so the model:
 - Prefers **patch edits** for matrix blocks (replace whole literal block as one patch when needed).
 - Never silently drops `phase_capacity_matrix` when editing unrelated keys.
 - When user says “add deployment spike for Operations”, **patch the ASCII row** rather than inventing new scalar fudge keys.
+
+### 9.5 Programme shape preview (Gantt companion)
+
+While drafting a `tech_programmes` block (or future composite initiative), the SME should see a **generated diagram** of the **calendar shape** without switching mental models to heatmap cells. This is a **companion view**, not a second source of truth: it is **derived from the YAML** (plus documented defaults), debounced off the editor buffer.
+
+#### Goals
+
+| Goal | Detail |
+|------|--------|
+| **Familiar** | Horizontal **time** axis, **bars** for work packages / phases, **arrows** for finish-to-start (or other) **dependencies** between bars. |
+| **Swimlanes** | **Rows = departments** (Technology, Service Desk, Operations, …) and/or **streams** when composite (§4.3); multiple bars in one lane allowed when the same department is active on parallel threads. |
+| **Shape, not capacity truth** | Bar length and lane placement show **when** work sits and **how pieces chain**; optional second encoding (bar height or opacity) can hint **relative load** from matrix glyphs — full runway heatmap remains the “capacity truth” view elsewhere. |
+| **Consistent look** | **Same visual language as runway time axes** so Code view and Runway feel like one product: tick marks, quarter/year labels, muted gridlines, typography weights aligned with existing runway SVGs — not a generic third-party Gantt skin. |
+
+#### Visual system (align with existing runway code)
+
+Implementation should **reuse** established pieces where possible rather than inventing parallel styling:
+
+- **Time mapping:** linear calendar X over `[previewStartYmd, previewEndYmd]` derived from the programme(s) in focus (pad a few weeks before/after for context), using the same **quarter / Jan-1 year** mark philosophy as `buildRunwayMiniTimeAxisMarks` in `src/lib/runwayMiniChartTimeAxis.ts`.
+- **Tokens:** stroke and label colours should follow **`--runway-spark-*`** and related CSS variables from `src/index.css` (e.g. grid, axis tick, programme tint `--runway-spark-mix-programme`) so light/dark themes stay coherent with `RunwaySummaryLineDiagrams` / contribution strips.
+- **Axis chrome:** month / weekday / tick treatment should echo `RunwayContributionStripSvg` (`src/components/RunwayContributionStripSvg.tsx`) — same “muted foreground ticks + semibold month labels” tiering, adapted to the wider Gantt width.
+
+#### Diagram content
+
+1. **Tasks / segments** — Each drawable segment has: start/end date (from explicit YAML dates, phase slices of `duration`, or resolved template phases), **label** (stream name, phase name, or programme name), **lane key** (department).
+2. **Bars** — Rounded rects per segment; **critical-style** outline optional when the parser marks a stream on the critical path (future).
+3. **Dependency edges** — SVG paths from **bar end** (or milestone marker) to **successor start**: prefer short orthogonal elbows or slight bezier; arrowhead at successor; **cycle** and **dangling** refs → diagnostic in editor + dashed “invalid” edge in preview.
+4. **Milestones** — Optional diamond nodes for “cutover”, “SIT start”, when YAML exposes milestone dates.
+5. **Today / selection** — Vertical line for “today” if in range; optional sync with runway **selected day** when both panes visible.
+
+#### Placement and behaviour
+
+- **Layout:** **Split pane** under Monaco (or collapsible **side rail**) so YAML and Gantt scroll independently; optional **narrow mode** collapses to a single-row **spark-Gantt** when height is tight.
+- **Focus:** When the cursor is **inside** a `tech_programmes` list item, highlight that programme’s bars (stroke or glow); multi-doc → **country / document** selector or “all programmes in buffer” with overflow scroll.
+- **Sync:** **Click bar** → jump cursor to the **approximate YAML line** (name row or matrix block); **invalid YAML** → show last good diagram greyed with banner “Preview stale — fix parse error”.
+- **Update cadence:** Debounce (e.g. 300–500 ms) after keystrokes; avoid blocking the main thread for large buffers (Web Worker layout later if needed).
+
+#### Data pipeline (conceptual)
+
+```text
+Editor buffer → YAML parse (tolerant) → canonical “preview model”
+  (tasks, lanes, edges, date range) → layout (lane assignment, x scale) → SVG
+```
+
+The **preview model** should be the same structural intermediate we want for **documentation export** later (one graph, two consumers: Gantt + docs).
+
+**Scaffold / opt-in:** default preview scope is **infer from cursor** inside `tech_programmes`; only if we add explicit ids would an optional comment such as `# preview: programme_id: …` be needed.
 
 ---
 
@@ -295,6 +344,8 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 6. **Composite shape:** prefer **parent + `streams:`** vs **linked sibling ids** for digital + POS style cases?
 7. **Convergence:** is `INTEGRATION` always a shared calendar slice across streams, or a separate explicit `convergence:` block with dates?
 8. **“Dark” delivery:** express as phase-gated visibility, separate virtual load channel, or documentation-only until engine supports it?
+9. **Gantt preview:** default-on vs opt-in; split **below** vs **beside** Monaco; show **all** programmes in buffer vs cursor-scoped only?
+10. **Lane taxonomy:** fixed department list vs YAML-driven row labels only; how to order streams vs departments in swimlanes?
 
 ---
 
@@ -304,4 +355,5 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 - **YAML:** Optional `phase_capacity_matrix` (literal fixed-width) **or** structured `phase_drawdown` + `phase_axes`; optional `tech_programme_defaults` for DRY axes and templates; **composite** modelling (parent + streams vs linked siblings) to be chosen from §4.3.
 - **Defaults:** Unchanged simple programmes stay simple; **template + visible resolution** replaces mystery weighting in the product narrative.
 - **Monaco:** Cursor-aware **scaffolds**, snippet placeholders, and later hovers/diagnostics make the expert workflow **fast and learnable**; composite cases get **progressive** inserts (stream, convergence, link).
+- **Gantt companion:** A **derived** swimlane + dependency diagram (bars + arrows) shares **runway-aligned time axes and tokens** (§9.5) so users see **project shape** while typing; heatmaps remain the detailed capacity view.
 - **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
