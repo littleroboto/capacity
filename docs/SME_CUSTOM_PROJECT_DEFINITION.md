@@ -95,21 +95,30 @@ The maximal case is still **YAML-first** and **inspectable**: relationships shou
 
 ### 5.1 Informal sketch (your starting point)
 
+**Evolved form (per-phase % load + glyphs):** each **cell** is an optional **1–3 digit percent** (0–100) immediately followed by a **glyph run**; **`|`** separates phases so columns stay obvious without fragile space alignment.
+
 ```text
 Project_type: e.g. POS_upgrade, Network_Upgrade, Hardware_Replacement, Store_Refurb
-    - Phases: INTEGRATION | MARKET_TEST | PILOT | DEPLOYMENT | AFTERCARE
-    - Technology:    wwww | www | wwwwww | wwwwwwww | wwww
-    - Service Desk:  ---- | --- | ----ww   | ----wwww | wwww
-    - Operations:    ---- | -ww | wwwwww   | wwwwwwww | wwww
+    - Phases:        INTEGRATION | MARKET_TEST | PILOT      | DEPLOYMENT   | AFTERCARE
+    - Technology:    50wwww      | 65www       | 65wwwwww   | 45wwwwwwww   | 35wwww
+    - Service Desk:  10----      | 15---       | 40----ww   | 55----wwww   | 30wwww
+    - Operations:    5----       | 25-ww       | 50wwwwww   | 70wwwwwwww   | 40wwww
 ```
 
-**Encoding idea (to be finalized):**
+**Glyph-only cells (backward compatible):** if the SME omits the leading number, behaviour matches the earlier sketch — relative intensity only; the engine may still impute % from `programme_support` + template (§8).
+
+```text
+    - Technology:    wwww | www | wwwwww | wwwwwwww | wwww
+```
+
+**Encoding (to finalize in §5.3):**
 
 - **Row** = department or workstream (Technology, Service Desk, Operations, …).
-- **Column** = phase, in header order.
-- **Cell characters** = relative intensity in that phase (e.g. `w` = weak/low, `-` = none, longer runs or digit bands = stronger — exact legend is part of iteration §5.3).
+- **Column** = phase, in header order, separated by **`|`** (recommended) or aligned whitespace (parser may accept both; **`|` is preferred** for clarity).
+- **Cell** = `[pct][glyphs…]` where **`pct`** is **0–100**: *share of that department’s capacity this programme draws during that phase* (see §12 for “% of what exactly?”). **`glyphs`** carry **relative shape / emphasis** within the phase (same ladder as before — duration spread, week-to-week texture, or Gantt bar “fullness”; exact mapping is legend + engine).
+- **No leading digits** → glyphs-only cell; % comes from defaults or is derived.
 
-This is **markdown-table-like** in spirit: fixed columns, scan-friendly, diff-friendly.
+This stays **scan-friendly and diff-friendly**: changing `50` → `65` is an obvious capacity tweak without hunting scalar keys elsewhere.
 
 ### 5.2 Embedding in YAML (recommended carrier)
 
@@ -124,10 +133,10 @@ tech_programmes:
       labs_required: 1
       tech_staff: 1
     phase_capacity_matrix: |2
-          INTEGRATION  MARKET_TEST  PILOT        DEPLOYMENT   AFTERCARE
-      Technology     wwww         www          wwwwww       wwwwwwww     wwww
-      Service_Desk   ----         ---          ----ww       ----wwww     wwww
-      Operations     ----         -ww          wwwwww       wwwwwwww     wwww
+      Phases:           INTEGRATION | MARKET_TEST | PILOT       | DEPLOYMENT  | AFTERCARE
+      Technology:       50wwww      | 65www       | 65wwwwww    | 45wwwwwwww  | 35wwww
+      Service_Desk:     10----      | 15---       | 40----ww    | 55----wwww  | 30wwww
+      Operations:       5----       | 25-ww       | 50wwwwww    | 70wwwwwwww  | 40wwww
 ```
 
 **Why literal block:** preserves spaces; aligns with Monaco column editing; easy to paste from email/Confluence.
@@ -136,7 +145,13 @@ tech_programmes:
 
 ### 5.3 Legend iteration (candidates)
 
-Pick **one** primary scheme per version to avoid ambiguity:
+**Percent prefix (recommended with glyphs):**
+
+- **1–3 ASCII digits** at the start of a cell = **load %** for that **department × phase** (clamp 0–100). Trailing **non-digit** characters = glyph ladder (below).
+- **Ambiguity rule:** if a cell is **all digits**, it is **100% numeric** (treat as `%` only, uniform within phase — rare).
+- **Editor affordance:** hover shows e.g. `Technology · INTEGRATION → 50% capacity · shape wwww (…decoded…)`.
+
+Pick **one** primary **glyph** scheme per version to avoid ambiguity:
 
 | Scheme | Pros | Cons |
 |--------|------|------|
@@ -144,15 +159,16 @@ Pick **one** primary scheme per version to avoid ambiguity:
 | **B. Digits 0–9 per cell** | Unambiguous | Narrow columns only; less “at a glance” |
 | **C. Quarter steps** (`0`, `1`, `2`, `3`, `4` = 0%, 25%, …) | Maps cleanly to engine | Slightly more typing |
 
-**Recommendation:** **A for authoring**, with editor **hover / status bar** showing numeric resolution (e.g. “Operations × DEPLOYMENT → 0.75 FTE equivalent”).
+**Recommendation:** **`[pct][glyph ladder]`** for SMEs who want both **headline %** (department draw) and **shape**; **glyph-only** remains valid for relative-only rows; structured YAML (§6) remains the escape hatch for tools.
 
 ### 5.4 Precedence rules (YAML)
 
 When multiple sources exist on one `tech_programmes` item:
 
-1. If `phase_capacity_matrix` (or structured `phases:` list — see §6) is **present and valid** → it drives **relative shape** across phases; absolute scale still comes from `programme_support` / `labs_required` / `tech_staff` unless overridden.
+1. If `phase_capacity_matrix` (or structured `phases:` list — see §6) is **present and valid** → it drives **phase-wise behaviour**. **Leading % in a cell** (when present) is the **authoritative department load %** for that phase; **glyphs** refine **shape** within the phase. Where a cell has **glyphs only**, relative shape still applies and % may be imputed from `programme_support` + template (§8).
 2. If matrix **absent** → existing **`programme_support` + duration** behaviour remains (default template).
 3. If both matrix and `load:` / per-phase keys conflict → **matrix wins** for phases it covers; parser emits **warning** listing ignored keys.
+4. If **structured `phase_department_load_pct`** (§6) and the literal matrix both set % for the same cell → **literal matrix wins** (single source of truth in file order) or **error** — pick one at implementation time and document it.
 
 ---
 
@@ -163,17 +179,24 @@ Some SMEs will prefer pure YAML. Equivalent expressiveness:
 ```yaml
 phase_axes: [INTEGRATION, MARKET_TEST, PILOT, DEPLOYMENT, AFTERCARE]
 
+# Optional: explicit % per department × phase (0–100), mirrors "50" in "50wwww"
+phase_department_load_pct:
+  Technology:     [50, 65, 65, 45, 35]
+  Service_Desk:   [10, 15, 40, 55, 30]
+  Operations:     [5,  25, 50, 70, 40]
+
+# Relative shape only (0–1); combine with pct row-by-row in engine, or omit if glyphs-only matrix carries shape
 phase_drawdown:
   Technology:     [0.35, 0.25, 0.55, 0.85, 0.40]
-  Service_Desk:     [0.0,  0.1,  0.25, 0.45, 0.40]
-  Operations:       [0.0,  0.2,  0.55, 0.85, 0.40]
+  Service_Desk:   [0.0,  0.1,  0.25, 0.45, 0.40]
+  Operations:     [0.0,  0.2,  0.55, 0.85, 0.40]
 ```
 
-**Mapping:** arrays must align with `phase_axes` length; values are **0–1 relative draw** within that department row, normalized per phase or globally per a documented rule (implementation must fix one normalization — recommend **per-phase max = 1** so deployment can be “everyone at peak” without forcing maths on SMEs).
+**Mapping:** `phase_department_load_pct` arrays align with `phase_axes` (integers **0–100**). **`phase_drawdown`** values remain **0–1 relative shape** within each phase for that row. If **only** `phase_drawdown` exists (no `%` block), treat as legacy relative-only row (same normalization as before — recommend **per-phase max = 1** across departments for that slice). When **both** `%` and `phase_drawdown` exist, **% sets scale**, **drawdown sets intra-phase curve** (document the combine rule at implementation, e.g. multiply vs week-fraction only).
 
 **Trade-off:** unambiguous but slower to type; good for tooling export/import.
 
-**Spec decision:** support **both** literal matrix and structured arrays; canonical internal form is numeric matrix post-parse.
+**Spec decision:** support **both** literal matrix (`[pct][glyphs]` per cell) and structured arrays; canonical internal form is numeric matrix post-parse.
 
 ---
 
@@ -230,7 +253,7 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 | Context | Scaffold |
 |---------|----------|
 | New `tech_programmes` item | Minimal `name`, `start_date`, `duration`, `programme_support` |
-| Same + phases | Adds `phase_capacity_matrix: \|2` with header + 3 example rows |
+| Same + phases | Adds `phase_capacity_matrix: \|2` with header + example rows using **`|`-separated `pct+glyph` cells** (§5.1) |
 | Composite initiative | Stub for **second stream** + optional **convergence / integration** phase labels (see §4.3) |
 | `campaigns` row | Prep/live/support block matching shipped examples |
 | `resources.teams` | One team with `size` |
@@ -250,7 +273,7 @@ Requires **indent stack** from current line + known DSL schema (can ship as JSON
 | Feature | Purpose |
 |---------|---------|
 | **Ghost text** (inline suggest) | After `tech_programmes:` newline, ghost `  - name: ` … |
-| **Hover** on `phase_capacity_matrix` | Decode legend + numeric preview for cell under cursor |
+| **Hover** on `phase_capacity_matrix` | Decode **% + glyph** for cell / segment under cursor (§5.3) |
 | **Fold regions** | Fold literal matrix block independently of rest of file |
 | **Diagnostics** | Matrix column count ≠ header → squiggle with fix action “pad or trim” |
 | **Gantt companion** | Live **shape preview** under or beside the editor (§9.5) |
@@ -314,11 +337,11 @@ The **preview model** should be the same structural intermediate we want for **d
 
 ## 10. Parser and engine notes (implementation-facing)
 
-1. **Parse step:** extract `phase_capacity_matrix` literal → trim → split lines → parse header row → fixed-width columns (positions from header text or explicit `|` column markers if we add them in v2).
-2. **Normalise** glyph cells to numeric weights using published legend.
-3. **Combine** with `programme_support` counts to produce **absolute** lab/team units per phase window.
+1. **Parse step:** extract `phase_capacity_matrix` literal → trim → split lines → header row → **split each body row on `|`** (trim segments). Whitespace-only alignment mode (no `|`) can be a fallback parser path if we keep supporting pasted tables.
+2. **Per cell:** apply `^(\d{1,3})?(.*)$` to trimmed segment → optional **integer %** (clamp 0–100) + **glyph tail** (may be empty if cell is digits-only). Normalise glyph tail with published legend to **shape weights**.
+3. **Combine:** `%` × department capacity (or programme-attributed slice — see §12) × shape weights → **absolute** lab/team units per sub-phase or per week inside each phase window.
 4. **Map** phase windows onto calendar: either **equal-length slices** of `duration` or explicit `phase_duration_days:` map if SME provides it (optional future key).
-5. **Warnings:** unknown row label → warn + skip row; unknown column → warn + ignore column.
+5. **Warnings:** unknown row label → warn + skip row; **wrong segment count** vs header → error or warn; **% > 100** → clamp + warn.
 
 ---
 
@@ -338,21 +361,22 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 
 1. **Phase calendar:** equal split of `duration` vs explicit `phase_weights:` or `phase_days:`?
 2. **Normalization:** row-wise vs column-wise vs global max for ASCII → numeric?
-3. **Central teams:** do they consume the same `resources.teams` pool or a separate virtual pool?
-4. **Multi-doc:** can `tech_programme_defaults` live in a shared fragment / `__include__` pattern, or only per market file?
-5. **Migration:** do we auto-generate ASCII matrix from existing `tech_programmes` for display-only “matrix view” toggle?
-6. **Composite shape:** prefer **parent + `streams:`** vs **linked sibling ids** for digital + POS style cases?
-7. **Convergence:** is `INTEGRATION` always a shared calendar slice across streams, or a separate explicit `convergence:` block with dates?
-8. **“Dark” delivery:** express as phase-gated visibility, separate virtual load channel, or documentation-only until engine supports it?
-9. **Gantt preview:** default-on vs opt-in; split **below** vs **beside** Monaco; show **all** programmes in buffer vs cursor-scoped only?
-10. **Lane taxonomy:** fixed department list vs YAML-driven row labels only; how to order streams vs departments in swimlanes?
+3. **% semantics:** % of **department pool** (market IT / SD / Ops capacity) vs % of **programme-attributed FTE** from `programme_support` — must be one documented rule (and shown in Gantt hover, §9.5).
+4. **Central teams:** do they consume the same `resources.teams` pool or a separate virtual pool?
+5. **Multi-doc:** can `tech_programme_defaults` live in a shared fragment / `__include__` pattern, or only per market file?
+6. **Migration:** do we auto-generate ASCII matrix from existing `tech_programmes` for display-only “matrix view” toggle?
+7. **Composite shape:** prefer **parent + `streams:`** vs **linked sibling ids** for digital + POS style cases?
+8. **Convergence:** is `INTEGRATION` always a shared calendar slice across streams, or a separate explicit `convergence:` block with dates?
+9. **“Dark” delivery:** express as phase-gated visibility, separate virtual load channel, or documentation-only until engine supports it?
+10. **Gantt preview:** default-on vs opt-in; split **below** vs **beside** Monaco; show **all** programmes in buffer vs cursor-scoped only?
+11. **Lane taxonomy:** fixed department list vs YAML-driven row labels only; how to order streams vs departments in swimlanes?
 
 ---
 
 ## 13. Summary
 
 - **Spectrum:** **Minimal** = one duration, one resource picture, one visible drain model; **maximal** = dependencies, **streams**, convergence (shared integration test), optional **dark / gated** cutover — still YAML-first and inspectable.
-- **YAML:** Optional `phase_capacity_matrix` (literal fixed-width) **or** structured `phase_drawdown` + `phase_axes`; optional `tech_programme_defaults` for DRY axes and templates; **composite** modelling (parent + streams vs linked siblings) to be chosen from §4.3.
+- **YAML:** Optional `phase_capacity_matrix` (literal: **`|`-separated cells**, each **`[pct][glyphs]`** or glyph-only) **or** structured `phase_axes` + optional **`phase_department_load_pct`** + `phase_drawdown`; optional `tech_programme_defaults` for DRY axes and templates; **composite** modelling (parent + streams vs linked siblings) to be chosen from §4.3.
 - **Defaults:** Unchanged simple programmes stay simple; **template + visible resolution** replaces mystery weighting in the product narrative.
 - **Monaco:** Cursor-aware **scaffolds**, snippet placeholders, and later hovers/diagnostics make the expert workflow **fast and learnable**; composite cases get **progressive** inserts (stream, convergence, link).
 - **Gantt companion:** A **derived** swimlane + dependency diagram (bars + arrows) shares **runway-aligned time axes and tokens** (§9.5) so users see **project shape** while typing; heatmaps remain the detailed capacity view.
