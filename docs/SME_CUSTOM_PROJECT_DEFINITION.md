@@ -33,6 +33,7 @@ This document iterates the **YAML model** and the **Monaco UX** for that model. 
 | **Stable engine surface** | Parser maps new shapes into existing internal concepts (`PhaseLoad`, programme windows) where possible to limit engine churn. |
 | **Same pattern, many attach points** | **Capacity draw** = *who is pulled*, *how hard* (%), *when* (phases / dates), *what shape* (glyphs or curves). That tuple should generalise beyond `tech_programmes` (§13); **transformation-wide product intent** in §14. |
 | **One schema, segment-native surfaces** | **Compact** markets get **shorter default scaffolds** and fewer matrix rows; **enterprise** markets get richer stubs — same grammar, different **Monaco snippet packs** (§2.3, §9.1). |
+| **Examples as data** | Scaffolds ship as **manifest + `.yaml.example` files** (§2.5) — easy to extend per country/BU without app redeploy for every tweak. |
 
 ### 2.1 System model — four ingredients
 
@@ -118,6 +119,34 @@ Apply the same idea to **`school_holidays`** (e.g. “Semana santa”, “Summer
 **Validation (non-negotiable):** parse dates, reject invalid ranges (`end` &lt; `start`), dedupe overlaps with policy (merge or warn), and keep **audit metadata** optional (`source: official_pdf_2025`, `generated_at`, `model_id`) so enterprise users know what to trust.
 
 **Monaco integration:** autocomplete **labels** and **date ranges** from the cache; scaffolds insert **one commented example** with `windows:` + `label` (§9.1). School holidays get parallel treatment.
+
+### 2.5 Scaffold manifest and example seeds (`.yaml.example` pattern)
+
+Keep this **lightweight:** no second DSL — just **data the editor loads** so the right shapes appear for the right **segment**, without hard-coding everything in TypeScript.
+
+**Idea — internal manifest:** a small **index** (JSON or YAML — implementation choice) lists **named scaffolds** and how they resolve:
+
+| Axis | Purpose |
+|------|---------|
+| **User** (optional) | **Recently used** or **starred** inserts bubble to the top of the palette — `localStorage` or signed-in prefs, not the golden market file. |
+| **Country / market** | Same as §2.3 — `ES`, `US`, … picks default **starter** and default **holiday / campaign** example tone. |
+| **Business unit / segment** (optional) | Finer key, e.g. `ES_retail` vs `ES_wholesale`, when one `country:` file is not enough; manifest entries can override country defaults. |
+
+**Physical form — “just a sample file”:** each scaffold can be a **committed sample** in-repo, same spirit as **`.env.example`** in web projects: **shows structure and plausible placeholder “events”** (fake campaign names, `TODO` dates, labelled holiday windows) **without** pretending to be anyone’s production numbers or secrets. SMEs **copy / insert** into the real buffer; the example never needs to parse as a live market unless you want it to for demos.
+
+Example layout (illustrative paths only):
+
+```text
+scaffolds/
+  manifest.json          # id → path, applies_to: { country?, segment?, tier? }
+  ES.market.compact.yaml.example
+  US.market.standard.yaml.example
+  fragments/campaign_cross_functional.yaml.example
+```
+
+**Resolution order (simple):** `segment` match → else `country` → else **global default** → optional **user favourites** merged at the top of the menu only (does not replace segment defaults unless user pins).
+
+**Monaco:** on “Insert starter…” or fragment command, **read manifest → load `.yaml.example` text** → paste or merge. No extra complexity in the engine — **plain strings** until Apply runs the normal parser.
 
 ---
 
@@ -340,6 +369,7 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 2. Detect **AST position** (tree-sitter YAML or lightweight line/heuristic parser): are we under `tech_programmes`, `campaigns`, `resources`, `bau`, `public_holidays`, `deployment_risk_*`, top-level?
 3. Offer **entity-specific** scaffold: e.g. under `- name:` inside `tech_programmes` → insert block for **minimal programme**, **programme + matrix stub** (row count depends on tier), or **campaign row**; at **document root** on empty buffer → offer **full starter bundle** (tiered, below).
 4. Insert as **snippet placeholders** (`${1:name}`, `${2:date}`) with Monaco snippet mode.
+5. Resolve **which string to insert** for “starter” and named fragments via the **scaffold manifest** and on-disk **`.yaml.example`** bundles (§2.5) — keeps tier/country/BU logic out of scattered string literals.
 
 **Scaffold catalogue (non-exhaustive):**
 
@@ -478,6 +508,7 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 15. **Retail / store capacity:** model as a named **demand axis** (footfall proxy) vs implicit trading load only — does it get its own row in the matrix?
 16. **Snippet tier defaults:** who owns **country → compact/standard/enterprise** defaults (product data vs per-tenant config); how to avoid stereotyping while keeping ES files **welcoming** by default?
 17. **Holiday authority:** primary source = **government ICS / API** vs **LLM-only** proposal with mandatory human sign-off; legal/regional subdivisions (state vs federal) — single `country:` key enough?
+18. **Scaffold manifest:** single repo `manifest.json` vs per-tenant overrides; how to sync **user favourites** across devices without an account-backed product?
 
 ---
 
@@ -560,6 +591,7 @@ Long-term **platform** traits (design goals, not commitments on a date):
 - **Four ingredients + Monaco:** §2.1 (capacity, restrictors, consumers, risk informers); §9.1 **tiered starter scaffolds** (compact / standard / enterprise) for a whole coherent file; **campaigns** as multi-lane phase-shifting consumers (§2.2).
 - **Segment-native YAML:** §2.3 — **one schema**, different **default snippet depth** (US-scale vs ES-scale); ES SMEs are not greeted with US-shaped walls of YAML; **same activities**, fewer named handoffs in compact files.
 - **Holidays:** §2.4 — **date or inclusive range + label**; optional **LLM-assisted** national lists **cached** for Monaco; **labelled** restrictors for runway clarity; human accept before write.
+- **Scaffold data:** §2.5 — **manifest + `.yaml.example`** seeds (country / BU / user ordering); like `.env.example` for shape and sample events, not production secrets.
 - **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
 
 **One-line north star:** same draw notation, many initiative and supply types; transformation-wide in intent, generic platform over time; inspectable YAML in git as the portable contract.
