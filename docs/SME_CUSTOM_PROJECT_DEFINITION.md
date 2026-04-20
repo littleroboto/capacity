@@ -2,7 +2,7 @@
 
 **Status:** design / iteration  
 **Audience:** product, SMEs editing market DSL in Monaco, implementers  
-**Scope note:** The **implementation wedge** today is market runway / tech-heavy demand, but the **notation and engine direction** aim at **generic transformation capacity** — any programme type, any declared demand axis (§13, §14).  
+**Scope note:** The **implementation wedge** today is market runway / tech-heavy demand, but the **notation and engine direction** aim at **generic transformation capacity** — any programme type, any declared demand axis (§13, §14). Rolling this out is **not a thin parser patch** — expect a **major `yamlDslParser` / pipeline upgrade** with staged migration (§10.1–10.2).  
 **Related code today:** `tech_programmes` in YAML (`programme_support`, `live_programme_support`, `load`, `live_support_load`) parsed in `src/engine/yamlDslParser.ts`; editor chrome in `src/components/DslEditorCore.tsx`; assistant contract in `src/lib/dslAssistant/systemPrompt.ts`.
 
 ---
@@ -469,6 +469,32 @@ The **preview model** should be the same structural intermediate we want for **d
 
 ## 10. Parser and engine notes (implementation-facing)
 
+### 10.1 Expect a major parser / pipeline upgrade
+
+This spec stacks several **non-trivial** changes on top of today’s **`yaml.load` → `normalizeYamlObject` → `yamlToPipelineConfig`** path (`src/engine/yamlDslParser.ts` and downstream pipeline). Together they justify treating the work as a **refactor programme**, not incremental one-liners:
+
+| Change area | Why it hurts |
+|-------------|----------------|
+| **`phase_capacity_matrix`** | Literal-block extraction, **`|`-split** cells, **`pct` + glyph** parsing, header/body validation, integration with existing **`load` / `programme_support`** precedence (§5.4). |
+| **Same grammar on `campaigns:`** | Parallel attach points; must not break **`campaign_support` / `live_campaign_support`** while adding optional matrices (§2.2, §12.14). |
+| **Structured twins** | `phase_department_load_pct`, composite keys — merge rules into **`PhaseLoad`** (or successor type). |
+| **Labelled holiday `windows:`** | New shape alongside legacy **`dates:`** arrays; engine must **normalise both** to the same internal calendar representation (§2.4). |
+| **Composite programmes** | Dependencies, streams, convergence — graph logic above today’s flat list maps (§4.3). |
+| **Axis registry** | Row labels → pool resolution, warnings, optional central pools (§13). |
+| **Preview / Gantt** | Tolerant parse or **parallel “preview AST”** so the editor stays responsive when main parse fails (§9.5). |
+
+**Risk:** every new optional key increases **`mapTechProgrammeFromYamlRow`-style** branching unless we **introduce a normalised intermediate model** (e.g. “resolved initiative”) that the heatmap and risk layers consume.
+
+### 10.2 Migration and delivery strategy (keep shipping)
+
+1. **Backward compatibility first:** shipped `public/data/markets/*.yaml` must **keep parsing** unchanged until migrated; support **`dates:`** and **`windows:`** in parallel for holidays.
+2. **Optional `dsl_version:`** (or feature flags) at document root if we ever need a **hard break**; prefer **additive** keys until proven.
+3. **Phased vertical slices:** e.g. (a) labelled holiday windows only → (b) matrix on `tech_programmes` only → (c) campaign matrices → (d) composites — each slice with **golden tests** on real market files.
+4. **Property tests / fixtures:** round-trip “example YAML → internal model → assert runway segment” for ES/US snippets.
+5. **Editor before engine (optional):** scaffolds + Gantt preview can ship on **tolerant partial parse** while engine catches up — but **Apply** must stay strict.
+
+### 10.3 Matrix-specific parse steps (reference)
+
 1. **Parse step:** extract `phase_capacity_matrix` literal → trim → split lines → header row → **split each body row on `|`** (trim segments). Whitespace-only alignment mode (no `|`) can be a fallback parser path if we keep supporting pasted tables.
 2. **Per cell:** apply `^(\d{1,3})?(.*)$` to trimmed segment → optional **integer %** (clamp 0–100) + **glyph tail** (may be empty if cell is digits-only). Normalise glyph tail with published legend to **shape weights**.
 3. **Combine:** `%` × department capacity (or programme-attributed slice — see §12) × shape weights → **absolute** lab/team units per sub-phase or per week inside each phase window.
@@ -485,7 +511,7 @@ The **“fixed-width table in YAML + scaffold + hover decode”** pattern can ex
 - **BAU** seasonal overlays (“Q4 extra service desk load” as a small matrix on weeks).
 - **Risk / deployment** annotations where SMEs mark sensitive windows per region (informers, not consumers — §2.1).
 
-Reuse the same Monaco commands and legend infrastructure; only insertion templates and parsers change.
+Reuse the same Monaco commands and legend infrastructure; only insertion templates and parsers change — collectively still a **major parser/pipeline** effort when enabled end-to-end (§10.1).
 
 ---
 
@@ -509,6 +535,7 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 16. **Snippet tier defaults:** who owns **country → compact/standard/enterprise** defaults (product data vs per-tenant config); how to avoid stereotyping while keeping ES files **welcoming** by default?
 17. **Holiday authority:** primary source = **government ICS / API** vs **LLM-only** proposal with mandatory human sign-off; legal/regional subdivisions (state vs federal) — single `country:` key enough?
 18. **Scaffold manifest:** single repo `manifest.json` vs per-tenant overrides; how to sync **user favourites** across devices without an account-backed product?
+19. **`dsl_version`:** do we ever bump a **breaking** parser version, or stay **additive-only** for the life of the OSS core?
 
 ---
 
@@ -592,6 +619,7 @@ Long-term **platform** traits (design goals, not commitments on a date):
 - **Segment-native YAML:** §2.3 — **one schema**, different **default snippet depth** (US-scale vs ES-scale); ES SMEs are not greeted with US-shaped walls of YAML; **same activities**, fewer named handoffs in compact files.
 - **Holidays:** §2.4 — **date or inclusive range + label**; optional **LLM-assisted** national lists **cached** for Monaco; **labelled** restrictors for runway clarity; human accept before write.
 - **Scaffold data:** §2.5 — **manifest + `.yaml.example`** seeds (country / BU / user ordering); like `.env.example` for shape and sample events, not production secrets.
+- **Parser / engine:** §10.1–10.2 — treat as **major `yamlDslParser` + pipeline upgrade**; phased slices, dual holiday shapes, optional **`dsl_version`**, golden tests on shipped markets.
 - **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
 
 **One-line north star:** same draw notation, many initiative and supply types; transformation-wide in intent, generic platform over time; inspectable YAML in git as the portable contract.
