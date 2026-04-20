@@ -33,7 +33,7 @@ This document iterates the **YAML model** and the **Monaco UX** for that model. 
 | **Stable engine surface** | Parser maps new shapes into existing internal concepts (`PhaseLoad`, programme windows) where possible to limit engine churn. |
 | **Same pattern, many attach points** | **Capacity draw** = *who is pulled*, *how hard* (%), *when* (phases / dates), *what shape* (glyphs or curves). That tuple should generalise beyond `tech_programmes` (§13); **transformation-wide product intent** in §14. |
 | **One schema, segment-native surfaces** | **Compact** markets get **shorter default scaffolds** and fewer matrix rows; **enterprise** markets get richer stubs — same grammar, different **Monaco snippet packs** (§2.3, §9.1). |
-| **Examples as data** | Scaffolds ship as **manifest + `.yaml.example` files** (§2.5) — easy to extend per country/BU without app redeploy for every tweak. |
+| **Examples as data** | Scaffolds ship as **manifest + `.yaml.example` files** (§2.5); hosted installs can **override bodies from Postgres** (cached in Redis) so buttons stay current **without** redeploy (§2.5). |
 
 ### 2.1 System model — four ingredients
 
@@ -146,7 +146,21 @@ scaffolds/
 
 **Resolution order (simple):** `segment` match → else `country` → else **global default** → optional **user favourites** merged at the top of the menu only (does not replace segment defaults unless user pins).
 
-**Monaco:** on “Insert starter…” or fragment command, **read manifest → load `.yaml.example` text** → paste or merge. No extra complexity in the engine — **plain strings** until Apply runs the normal parser.
+**Monaco — first cut:** on “Insert starter…” or fragment command, **read manifest → load `.yaml.example` text** from disk → paste or merge. No extra complexity in the engine — **plain strings** until Apply runs the normal parser.
+
+#### Storage backends (repo vs Postgres / Redis)
+
+For **hosted** or multi-tenant products, **toolbar buttons** above (or beside) Monaco should map 1:1 to **manifest scaffold ids** (“Starter compact”, “Insert campaign matrix”, …) and load bodies from a **remote store**; repo files remain the **OSS / offline** fallback.
+
+| Layer | Typical role |
+|-------|----------------|
+| **Postgres** | **Source of truth:** rows keyed by `(tenant_or_org_id?, segment_key, tier, scaffold_id)` with **`body_text`**, version, `updated_at`, optional **who published**. Admins or “segment owners” edit templates without shipping a new app build. |
+| **Redis** (or platform cache) | **Hot cache** of `GET /api/scaffolds` responses or individual bodies — fast path for **every button click**; invalidate on Postgres update (pub/sub, version bump, or short TTL). |
+| **Repo `*.yaml.example`** | **Bundled default** when API unavailable, **local dev**, or **pure OSS** installs — same manifest `id`, `path` or inline hash; **no secrets** in these files (same spirit as `.env.example`). |
+
+**Fetch flow (suggested):** button click → **read Redis** (hit) → else **GET API** (load Postgres, write Redis) → else **read bundled `.yaml.example`** from `public/scaffolds/` or static import → **insert at cursor** (or open diff preview). Show **spinner / disabled state** while fetching; toast on failure with fallback text.
+
+**Why Postgres is “more sensible” than only files:** segment-specific copy changes **without** redeploy; **per business unit** variants; audit trail; optional **draft → publish** workflow. Files stay ideal for **defaults** and **air-gapped** installs.
 
 ---
 
@@ -358,10 +372,11 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 
 **Trigger ideas:**
 
-- **Command palette:** “DSL: Insert scaffold…”
+- **Toolbar buttons** (editor chrome): one button per high-value scaffold — **loads body** from **API/cache** first, else **bundled `.yaml.example`** (§2.5). Labels short: “Starter”, “Campaign”, “Holidays”, …
+- **Command palette:** “DSL: Insert scaffold…” (full list, including low-frequency fragments)
 - **Context menu** on YAML structure gutter (if we add custom margin glyph later)
 - **Keybinding** e.g. `Cmd+Shift+Y` (configurable) when focus is in Monaco
-- **High-level:** “**Insert starter market document**” — one action drops a **commented skeleton** with `country`, `resources`, holiday stubs, `bau`, `campaigns`, `tech_programmes`, and `deployment_risk_*` placeholders in a sensible order — **variant chosen by segment / profile** (§2.3).
+- **High-level:** “**Insert starter market document**” — same as a **toolbar** action; drops a **commented skeleton** with `country`, `resources`, holiday stubs, `bau`, `campaigns`, `tech_programmes`, and `deployment_risk_*` placeholders — **variant chosen by segment / profile** (§2.3).
 
 **Behaviour:**
 
@@ -369,7 +384,7 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 2. Detect **AST position** (tree-sitter YAML or lightweight line/heuristic parser): are we under `tech_programmes`, `campaigns`, `resources`, `bau`, `public_holidays`, `deployment_risk_*`, top-level?
 3. Offer **entity-specific** scaffold: e.g. under `- name:` inside `tech_programmes` → insert block for **minimal programme**, **programme + matrix stub** (row count depends on tier), or **campaign row**; at **document root** on empty buffer → offer **full starter bundle** (tiered, below).
 4. Insert as **snippet placeholders** (`${1:name}`, `${2:date}`) with Monaco snippet mode.
-5. Resolve **which string to insert** for “starter” and named fragments via the **scaffold manifest** and on-disk **`.yaml.example`** bundles (§2.5) — keeps tier/country/BU logic out of scattered string literals.
+5. Resolve **which scaffold id** and **payload** via the **manifest** (§2.5): **try API → Redis cache → bundled `.yaml.example`**; insert returned **plain text** at cursor. Keeps tier/country/BU logic out of TS string literals and allows **Postgres-backed** templates in production.
 
 **Scaffold catalogue (non-exhaustive):**
 
@@ -536,6 +551,7 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 17. **Holiday authority:** primary source = **government ICS / API** vs **LLM-only** proposal with mandatory human sign-off; legal/regional subdivisions (state vs federal) — single `country:` key enough?
 18. **Scaffold manifest:** single repo `manifest.json` vs per-tenant overrides; how to sync **user favourites** across devices without an account-backed product?
 19. **`dsl_version`:** do we ever bump a **breaking** parser version, or stay **additive-only** for the life of the OSS core?
+20. **Scaffold tenancy:** single global Postgres table vs **per-tenant** rows; who can **publish** a new scaffold version to buttons — segment owner only?
 
 ---
 
@@ -618,7 +634,7 @@ Long-term **platform** traits (design goals, not commitments on a date):
 - **Four ingredients + Monaco:** §2.1 (capacity, restrictors, consumers, risk informers); §9.1 **tiered starter scaffolds** (compact / standard / enterprise) for a whole coherent file; **campaigns** as multi-lane phase-shifting consumers (§2.2).
 - **Segment-native YAML:** §2.3 — **one schema**, different **default snippet depth** (US-scale vs ES-scale); ES SMEs are not greeted with US-shaped walls of YAML; **same activities**, fewer named handoffs in compact files.
 - **Holidays:** §2.4 — **date or inclusive range + label**; optional **LLM-assisted** national lists **cached** for Monaco; **labelled** restrictors for runway clarity; human accept before write.
-- **Scaffold data:** §2.5 — **manifest + `.yaml.example`** seeds (country / BU / user ordering); like `.env.example` for shape and sample events, not production secrets.
+- **Scaffold data:** §2.5 — **manifest** + **bundled `.yaml.example`**; production path **Postgres** (source of truth) + **Redis** (hot cache) + **toolbar buttons** in Monaco; OSS/offline falls back to repo files only.
 - **Parser / engine:** §10.1–10.2 — treat as **major `yamlDslParser` + pipeline upgrade**; phased slices, dual holiday shapes, optional **`dsl_version`**, golden tests on shipped markets.
 - **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
 
