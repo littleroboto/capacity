@@ -41,7 +41,7 @@ The runway is built from four **roles** of YAML (names map to today’s market D
 | Ingredient | Plain language | Typical YAML today (illustrative) |
 |------------|----------------|-------------------------------------|
 | **1. Defined capacity** | How much room exists **before** calendar effects. | `resources:` (`labs`, `teams` / staff counts, optional future pools). |
-| **2. Capacity restrictors** | Calendar or policy **shrinks** effective supply (does not “want” work — it **reduces** the envelope). | `public_holidays`, `school_holidays`, capacity taper / staffing multipliers, leave bands, etc. |
+| **2. Capacity restrictors** | Calendar or policy **shrinks** effective supply (does not “want” work — it **reduces** the envelope). | `public_holidays`, `school_holidays`, capacity taper / staffing multipliers, leave bands, etc. — holidays should carry **human-readable labels** and support **single days or ranges** (§2.4). |
 | **3. Capacity consumers** | Things that **pull** on named pools over time. | **`tech_programmes`**, **`campaigns`**, **`bau`** rhythms — each should be able to declare **durations**, **phases**, and **% draw + swimlane** (matrix grammar, §5) against axes that map to supply. |
 | **4. Risk / timing informers** | Events that **do not consume capacity** but **constrain when** things may happen (or how risky a window is). | e.g. `deployment_risk_blackouts`, `deployment_risk_events`, fragile windows — “no go-live week before AGM / global convention.” |
 
@@ -81,6 +81,43 @@ The **bearers of load change** by phase: the same campaign object should support
 3. **Heuristic (optional):** if `resources.teams` already has **N &gt; threshold** keys, suggest **enterprise** scaffolds on next insert; if **≤1** team, keep **compact** suggestions.
 
 **Non-goal:** forcing Spain SMEs to scroll past a **US-shaped** 20-line matrix every time they add a campaign. The **first** experience should look like **their** market file today — short, familiar keys — with a **clear path** to deepen (`Insert → Campaign → With cross-functional matrix`).
+
+### 2.4 Labelled holidays (date or range) and LLM-assisted national lists
+
+**Why labels matter:** restrictors are shared context for SMEs, risk, and stores. A heatmap or Gantt should be able to say **“Navidad”**, **“Golden Week”**, **“Thanksgiving weekend”** — not only a mute red cell on `2026-12-25`. **Labels are first-class** in the model, not comments lost to tooling.
+
+**YAML shape (spec direction — evolution from flat `dates:`):**
+
+- Prefer a list of **windows**, each with **`start`** (`YYYY-MM-DD`), optional **`end`** (inclusive range; omit for single day), and **`label`** (short string, UTF-8 OK).
+- Remain **backward compatible** with today’s **`dates:`** array of bare strings where labels are unknown; the UI may show generated labels (“Public holiday”) until the SME upgrades entries.
+
+Illustrative (not necessarily final key names — align with parser migration):
+
+```yaml
+public_holidays:
+  auto: false
+  windows:
+    - start: '2026-01-01'
+      label: Año Nuevo
+    - start: '2026-12-25'
+      end: '2026-12-26'
+      label: Navidad
+  staffing_multiplier: 0.25
+```
+
+Apply the same idea to **`school_holidays`** (e.g. “Semana santa”, “Summer break”) where ranges are already natural.
+
+**System-maintained national holiday catalog (LLM on the backend):**
+
+- The product may run an **offline or on-demand backend job** (including an **LLM step**) to **propose** national (or regional) public holidays for a given **`country` + year**, returning **dated entries with labels** and optional **`notes`** (“verify against official gazette”).
+- **Do not** call the LLM on every Monaco keystroke. Instead:
+  1. **Cache** approved suggestions per `(country, year)` (versioned JSON in repo, blob store, or DB — implementation choice).
+  2. **Monaco** and scaffolds **read the cache** for completions, “insert next window”, and tooltips — fast, deterministic.
+  3. **Refresh flow:** SME or admin triggers **“Suggest / refresh public holidays”** → backend runs LLM + rules → UI shows a **diff preview** → user **accepts** merged lines into YAML (or rejects). Same posture as the existing DSL rule: **never silently fabricate** authoritative dates; **human confirmation** for anything written to the golden file.
+
+**Validation (non-negotiable):** parse dates, reject invalid ranges (`end` &lt; `start`), dedupe overlaps with policy (merge or warn), and keep **audit metadata** optional (`source: official_pdf_2025`, `generated_at`, `model_id`) so enterprise users know what to trust.
+
+**Monaco integration:** autocomplete **labels** and **date ranges** from the cache; scaffolds insert **one commented example** with `windows:` + `label` (§9.1). School holidays get parallel treatment.
 
 ---
 
@@ -317,7 +354,7 @@ SMEs who never add `phase_capacity_matrix` should still see **why** the runway d
 | `campaigns` row | Prep/live/support block matching shipped examples; **optional** second scaffold: **campaign + departmental phase matrix** (rows: Technology, Service_Desk, Finance_BI, Retail_ops, Marketing — cols: PREP \| LIVE \| AFTER) per §2.2 |
 | `resources.teams` | One team with `size` |
 | `bau` weekly promo | `day`, `labs`, `support_days` |
-| `public_holidays` / `school_holidays` | `auto: false`, empty `dates:` + comment on multipliers |
+| `public_holidays` / `school_holidays` | Prefer **`windows:`** with **`start` / optional `end` / `label`** (§2.4); fallback stub: `auto: false`, empty `dates:` + comment on multipliers + “Insert labelled windows from catalog” |
 | `deployment_risk_blackouts` / events | Named window + `dates` or month curve stub + comment “does not consume capacity — timing only” |
 | Multi-doc separator | Line with only `---` |
 
@@ -349,6 +386,7 @@ Extend assistant instructions so the model:
 - Never silently drops `phase_capacity_matrix` when editing unrelated keys.
 - When user says “add deployment spike for Operations”, **patch the ASCII row** rather than inventing new scalar fudge keys.
 - For **campaigns**, when the user adds cross-functional load, **extend the same matrix grammar** (§2.2) rather than introducing campaign-only fudge keys.
+- For **holidays**, **never** invent official dates without user intent; if using LLM-backed suggestions, output only as **preview / patch** for acceptance (§2.4). Labels must survive the edit.
 
 ### 9.5 Programme shape preview (Gantt companion)
 
@@ -439,6 +477,7 @@ Reuse the same Monaco commands and legend infrastructure; only insertion templat
 14. **Campaign matrix:** same top-level key `phase_capacity_matrix` on a campaign row vs nested `cross_functional_load:` — naming and parser precedence vs legacy `campaign_support` keys?
 15. **Retail / store capacity:** model as a named **demand axis** (footfall proxy) vs implicit trading load only — does it get its own row in the matrix?
 16. **Snippet tier defaults:** who owns **country → compact/standard/enterprise** defaults (product data vs per-tenant config); how to avoid stereotyping while keeping ES files **welcoming** by default?
+17. **Holiday authority:** primary source = **government ICS / API** vs **LLM-only** proposal with mandatory human sign-off; legal/regional subdivisions (state vs federal) — single `country:` key enough?
 
 ---
 
@@ -520,6 +559,7 @@ Long-term **platform** traits (design goals, not commitments on a date):
 - **Transformation → platform:** §14 — **TRANSFORMATION_CAPACITY** (umbrella for any change programme on finite pools); central / undefined teams; generic programme × department platform path; **OSS intent** so capacity-on-a-calendar is not M365/Smartsheet–gated (§14.4).
 - **Four ingredients + Monaco:** §2.1 (capacity, restrictors, consumers, risk informers); §9.1 **tiered starter scaffolds** (compact / standard / enterprise) for a whole coherent file; **campaigns** as multi-lane phase-shifting consumers (§2.2).
 - **Segment-native YAML:** §2.3 — **one schema**, different **default snippet depth** (US-scale vs ES-scale); ES SMEs are not greeted with US-shaped walls of YAML; **same activities**, fewer named handoffs in compact files.
+- **Holidays:** §2.4 — **date or inclusive range + label**; optional **LLM-assisted** national lists **cached** for Monaco; **labelled** restrictors for runway clarity; human accept before write.
 - **Next step:** narrow §5.3 legend + §12 normalization and composite choice in a short review, then move to `docs/superpowers/specs/` implementation spec + `writing-plans` when you want engineering scheduled.
 
 **One-line north star:** same draw notation, many initiative and supply types; transformation-wide in intent, generic platform over time; inspectable YAML in git as the portable contract.
