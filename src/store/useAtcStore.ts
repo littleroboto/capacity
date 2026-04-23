@@ -23,7 +23,6 @@ import {
   FALLBACK_RUNWAY_MARKET_IDS,
   gammaFocusMarket,
   isRunwayMultiMarketStrip,
-  RUNWAY_ALL_MARKETS_VALUE,
   runwayCompareMarketIds,
 } from '@/lib/markets';
 
@@ -388,9 +387,10 @@ function mergePersistedViewSettings(
 export const useAtcStore = create<AtcState>()(
   persist(
     (set, get) => ({
-      country: RUNWAY_ALL_MARKETS_VALUE,
+      /** Default first visit: single-market Australia (persisted `country` overrides for returning users). */
+      country: FALLBACK_RUNWAY_MARKET_IDS[0]!,
       viewMode: 'in_store',
-      theme: 'dark',
+      theme: 'light',
       runwayMarketOrder: [...FALLBACK_RUNWAY_MARKET_IDS],
       dslText: '',
       dslByMarket: {},
@@ -1038,6 +1038,8 @@ export const useAtcStore = create<AtcState>()(
         const th = state?.theme;
         if (th === 'light' || th === 'dark') {
           document.documentElement.classList.toggle('dark', th === 'dark');
+        } else {
+          document.documentElement.classList.toggle('dark', false);
         }
       },
     }

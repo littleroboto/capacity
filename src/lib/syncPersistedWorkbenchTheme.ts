@@ -5,7 +5,7 @@ import { CAPACITY_ATC_PERSIST_KEY } from '@/lib/capacityAtcPersist';
  * Runs on **all** routes (including `/`) so semantic tokens (`bg-background`, etc.) match the workbench;
  * without this, the marketing page embeds real components with light `:root` variables.
  *
- * No persistence or unknown `theme` → **dark** (product default).
+ * No persistence or unknown `theme` → **light** (product default).
  */
 export function applyPersistedWorkbenchThemeClass(): void {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
@@ -15,7 +15,7 @@ export function applyPersistedWorkbenchThemeClass(): void {
   try {
     const raw = localStorage.getItem(CAPACITY_ATC_PERSIST_KEY);
     if (!raw) {
-      setDark(true);
+      setDark(false);
       return;
     }
     const parsed = JSON.parse(raw) as { state?: { theme?: unknown } };
@@ -28,8 +28,8 @@ export function applyPersistedWorkbenchThemeClass(): void {
       setDark(true);
       return;
     }
-    setDark(true);
+    setDark(false);
   } catch {
-    setDark(true);
+    setDark(false);
   }
 }
