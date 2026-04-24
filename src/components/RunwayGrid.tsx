@@ -141,6 +141,7 @@ import {
   compareStripMarketColumnLeftPx,
 } from '@/lib/runwayCompareSvgLayout';
 import { RunwayContributionStripSvg } from '@/components/RunwayContributionStripSvg';
+import { RunwayProgrammeGanttBlock } from '@/components/RunwayProgrammeGanttBlock';
 import { RunwayHeatmapCellStylePopover } from '@/components/RunwayHeatmapCellStylePopover';
 import { RunwayQuarterGridSvg } from '@/components/RunwayQuarterGridSvg';
 import { Box, CalendarDays, Download, Grid2x2, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
@@ -3561,6 +3562,20 @@ function RunwayGridBody({
                           className="flex min-w-0 max-w-none shrink-0 flex-col items-stretch"
                           style={{ gap: SINGLE_MARKET_TRIPLE_LENS_VERTICAL_GAP_PX }}
                         >
+                          {!landingMinimalChrome ? (
+                            <RunwayProgrammeGanttBlock
+                              country={country}
+                              marketConfig={marketConfig}
+                              placedCells={placedCells}
+                              contributionMeta={contributionMeta}
+                              cellPx={cellPx}
+                              gap={gap}
+                              stripWidth={contributionColumnContentWidth ?? contentWidth}
+                              riskByDate={singleRiskByDate!}
+                              blackouts={marketConfig?.deployment_risk_blackouts ?? null}
+                              railSpacerWidthPx={SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX + 6}
+                            />
+                          ) : null}
                           {SINGLE_MARKET_STACK_LENS_IDS.map((lensMode, rowIdx) => {
                             const stripW = contributionColumnContentWidth ?? contentWidth;
                             const isBottomRow = rowIdx === SINGLE_MARKET_STACK_LENS_IDS.length - 1;
