@@ -903,13 +903,31 @@ function chronWeekIndexByYmd(chronWeeks: RunwayCalendarCellValue[][]): Map<strin
   return m;
 }
 
+/**
+ * The strip renderer renders cells with a missing row entry as the bare month-stripe band
+ * colour (a light grey) — that's how we keep "unpainted" cells showing as a neutral grey
+ * canvas before any layer starts contributing. So this builder produces TWO maps:
+ *
+ *  • `stripRiskByDate`     — only cells whose cumulative stress > 0 (i.e. at least one
+ *                            layer has reached this cell). Anything else is omitted, so the
+ *                            heatmap falls back to the grey band per-cell.
+ *  • `sparklineRiskByDate` — every cell is present so the sparkline can still read
+ *                            `labs_effective_cap` / `teams_effective_cap` and trace zero
+ *                            load for unpainted days without dropouts.
+ */
+const TWIN_PAINTED_STRESS_EPSILON = 1e-4;
+
 function buildTwinDisplayRiskByDate(
   base: Map<string, RiskRow>,
   chronWeeks: RunwayCalendarCellValue[][],
   phases: LayerRecord<number>
-): Map<string, RiskRow> {
+): {
+  stripRiskByDate: Map<string, RiskRow>;
+  sparklineRiskByDate: Map<string, RiskRow>;
+} {
   const ymdChron = chronWeekIndexByYmd(chronWeeks);
-  const out = new Map<string, RiskRow>();
+  const stripOut = new Map<string, RiskRow>();
+  const sparkOut = new Map<string, RiskRow>();
   for (const [ymd, row] of base) {
     const chron = ymdChron.get(ymd);
     // Raw stress can exceed 1.0 (lab+team_load > effective capacity) so the sparkline
@@ -925,16 +943,20 @@ function buildTwinDisplayRiskByDate(
     // exceed 1.0 — this is what pushes the trace into the shaded red overload band.
     const labL = capSum > 1e-9 ? rawStress * labsC : 0;
     const teamL = capSum > 1e-9 ? rawStress * teamsC : 0;
-    out.set(ymd, {
+    const updated: RiskRow = {
       ...row,
       lab_load: labL,
       team_load: teamL,
       // Cell colour stays inside the heatmap [0..1] range; sparkline reads loads directly.
       tech_demand_ratio: cellStress,
       tech_pressure: cellStress,
-    });
+    };
+    sparkOut.set(ymd, updated);
+    if (rawStress > TWIN_PAINTED_STRESS_EPSILON) {
+      stripOut.set(ymd, updated);
+    }
   }
-  return out;
+  return { stripRiskByDate: stripOut, sparklineRiskByDate: sparkOut };
 }
 
 function sortedDatesFromChronWeeks(chronWeeks: RunwayCalendarCellValue[][]): string[] {
@@ -1069,7 +1091,7 @@ function TwinWorkbenchRunwayReplica({
     [sortedDatesYmd, cellPx, gap]
   );
 
-  const riskByDateDisplay = useMemo(
+  const { stripRiskByDate, sparklineRiskByDate } = useMemo(
     () => buildTwinDisplayRiskByDate(riskByDateBase, chronWeeks, phases),
     [riskByDateBase, chronWeeks, phases]
   );
@@ -1142,7 +1164,7 @@ function TwinWorkbenchRunwayReplica({
             contributionMeta={meta}
             cellPx={cellPx}
             gap={gap}
-            riskByDate={riskByDateDisplay}
+            riskByDate={sparklineRiskByDate}
             width={stripW}
             className="min-w-0"
             modelTraceSuppressed={false}
@@ -1160,7 +1182,7 @@ function TwinWorkbenchRunwayReplica({
             cellRadiusPx={cellRadiusPx}
             width={stripW}
             height={stripH}
-            riskByDate={riskByDateDisplay}
+            riskByDate={stripRiskByDate}
             heatmapOpts={heatmapOptsTwinPreview}
             riskTuning={DEFAULT_RISK_TUNING}
             viewMode="combined"
