@@ -30,9 +30,12 @@ export type RunwayProgrammeGanttStripProps = {
   prefs: ProgrammeGanttDisplayPrefs;
 };
 
-export function runwayProgrammeGanttStripHeightPx(prefs: ProgrammeGanttDisplayPrefs): number {
+/** Vertical space for `laneCount` stacked programme rows (0 = track padding only). */
+export function runwayProgrammeGanttStripHeightPx(prefs: ProgrammeGanttDisplayPrefs, laneCount: number): number {
   const { stripTopPadPx, stripBottomPadPx, barHeightPx, laneGapPx } = prefs;
-  return stripTopPadPx + barHeightPx + laneGapPx + barHeightPx + stripBottomPadPx;
+  const n = Math.max(0, laneCount);
+  const bodyPx = n === 0 ? 0 : n * barHeightPx + (n - 1) * laneGapPx;
+  return stripTopPadPx + bodyPx + stripBottomPadPx;
 }
 
 export function RunwayProgrammeGanttStrip({
@@ -50,16 +53,12 @@ export function RunwayProgrammeGanttStrip({
   const uid = useId().replace(/:/g, '');
   const hatchId = `gantt-hatch-45-${uid}`;
 
-  const { clipStart, clipEnd, layout, campaignLaneY, techLaneY, svgHeight } = useMemo(() => {
+  const { clipStart, clipEnd, layout } = useMemo(() => {
     const layout = contributionStripYmdToCellLayout(placedCells, cellPx);
     const clipStart = contributionMeta.rangeStartYmd;
     const clipEnd = contributionMeta.rangeEndYmd;
-    const { stripTopPadPx, barHeightPx, laneGapPx, stripBottomPadPx } = prefs;
-    const campaignLaneY = stripTopPadPx;
-    const techLaneY = stripTopPadPx + barHeightPx + laneGapPx;
-    const svgHeight = stripTopPadPx + barHeightPx + laneGapPx + barHeightPx + stripBottomPadPx;
-    return { clipStart, clipEnd, layout, campaignLaneY, techLaneY, svgHeight };
-  }, [placedCells, cellPx, contributionMeta.rangeStartYmd, contributionMeta.rangeEndYmd, prefs]);
+    return { clipStart, clipEnd, layout };
+  }, [placedCells, cellPx, contributionMeta.rangeStartYmd, contributionMeta.rangeEndYmd]);
 
   const overlayRects = useMemo(() => {
     const out: { kind: 'school' | 'blackout'; x0: number; x1: number }[] = [];
@@ -76,38 +75,42 @@ export function RunwayProgrammeGanttStrip({
     return out;
   }, [clipStart, clipEnd, layout, riskByDate, blackouts, prefs.showBlackouts, prefs.showSchoolHolidays]);
 
-  const barRects = useMemo(() => {
-    const { barHeightPx, barOpacity } = prefs;
-    return bars
-      .map((b) => {
-        const span = xSpanForInclusiveYmdRangeClipped(b.startYmd, b.endYmdInclusive, layout, clipStart, clipEnd);
-        if (!span) return null;
-        const y = b.kind === 'campaign' ? campaignLaneY : techLaneY;
-        const fill = b.kind === 'campaign' ? prefs.campaignFill : prefs.techFill;
-        return {
-          key: b.id,
-          x: span.x0,
-          y,
-          w: span.x1 - span.x0,
-          h: barHeightPx,
-          fill,
-          name: b.name,
-          kind: b.kind,
-          opacity: barOpacity,
-        };
-      })
-      .filter(Boolean) as Array<{
-      key: string;
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      fill: string;
-      name: string;
-      kind: string;
-      opacity: number;
-    }>;
-  }, [bars, layout, clipStart, clipEnd, prefs, campaignLaneY, techLaneY]);
+  const { barRects, svgHeight } = useMemo(() => {
+    const { stripTopPadPx, barHeightPx, laneGapPx, stripBottomPadPx, barOpacity } = prefs;
+    const stride = barHeightPx + laneGapPx;
+
+    type Row = { b: ProgrammeGanttBar; span: { x0: number; x1: number } };
+    const rows: Row[] = [];
+    for (const b of bars) {
+      const span = xSpanForInclusiveYmdRangeClipped(b.startYmd, b.endYmdInclusive, layout, clipStart, clipEnd);
+      if (!span) continue;
+      rows.push({ b, span });
+    }
+
+    rows.sort((a, b) => {
+      if (a.b.startYmd !== b.b.startYmd) return a.b.startYmd.localeCompare(b.b.startYmd);
+      if (a.b.kind !== b.b.kind) return a.b.kind === 'campaign' ? -1 : 1;
+      return a.b.name.localeCompare(b.b.name);
+    });
+
+    const barRects = rows.map((row, i) => ({
+      key: row.b.id,
+      x: row.span.x0,
+      y: stripTopPadPx + i * stride,
+      w: row.span.x1 - row.span.x0,
+      h: barHeightPx,
+      fill: row.b.kind === 'campaign' ? prefs.campaignFill : prefs.techFill,
+      name: row.b.name,
+      kind: row.b.kind,
+      opacity: barOpacity,
+    }));
+
+    const n = barRects.length;
+    const bodyPx = n === 0 ? 0 : n * barHeightPx + (n - 1) * laneGapPx;
+    const svgHeight = stripTopPadPx + bodyPx + stripBottomPadPx;
+
+    return { barRects, svgHeight };
+  }, [bars, layout, clipStart, clipEnd, prefs]);
 
   const contentWidth = useMemo(() => {
     let m = width;
