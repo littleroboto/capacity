@@ -14,8 +14,8 @@ export const RUNWAY_HEATMAP_CELL_RADIUS_MAX = 12;
 
 /** New-user / “Reset to defaults” in the heatmap style popover. */
 export const RUNWAY_HEATMAP_LAYOUT_DEFAULTS = {
-  cellPx: 12,
-  gapPx: 2,
+  cellPx: 10,
+  gapPx: 1,
   radiusPx: 0,
 } as const;
 

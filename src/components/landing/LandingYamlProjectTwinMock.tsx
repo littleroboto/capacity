@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import {
   Box,
   CalendarOff,
+  FlaskConical,
   Hammer,
   Landmark,
   Layers,
@@ -50,13 +51,38 @@ function clamp01(n: number): number {
 
 type YamlToken = { t: string; c?: string };
 
-function YamlLine({ num, tokens }: { num: number; tokens: readonly YamlToken[] }) {
+/**
+ * `select`  — yellow editor-style selection (used when the lab + tester step is about to act on the block).
+ * `comment` — line is rendered as a YAML comment (dimmed + leading `# `) — used after the boost step
+ *             "comments out" the original resources block before inserting a new one.
+ */
+type YamlLineHighlight = 'select' | 'comment';
+
+function YamlLine({
+  num,
+  tokens,
+  highlight,
+}: {
+  num: number;
+  tokens: readonly YamlToken[];
+  highlight?: YamlLineHighlight;
+}) {
+  const isSelect = highlight === 'select';
+  const isComment = highlight === 'comment';
   return (
-    <div className="flex min-h-[1.35em] font-mono text-[9px] leading-[1.35] sm:text-[10px]">
+    <div
+      className={cn(
+        'flex min-h-[1.35em] rounded-[3px] font-mono text-[9px] leading-[1.35] transition-colors duration-300 sm:text-[10px]',
+        isSelect &&
+          'bg-[#FFC72C]/40 ring-1 ring-inset ring-[#FFC72C]/55 shadow-[0_0_18px_-10px_rgba(255,199,44,0.55)]',
+        isComment && 'bg-zinc-100/70 opacity-70'
+      )}
+    >
       <span className="w-5 shrink-0 select-none pr-2 text-right text-zinc-400 tabular-nums sm:w-6">{num}</span>
-      <span className="min-w-0 whitespace-pre-wrap break-all">
+      <span className={cn('min-w-0 whitespace-pre-wrap break-all', isComment && 'text-zinc-500')}>
+        {isComment ? <span className="text-zinc-500">{'# '}</span> : null}
         {tokens.map((tok, i) => (
-          <span key={i} className={tok.c}>
+          <span key={i} className={isComment ? 'text-zinc-500' : tok.c}>
             {tok.t}
           </span>
         ))}
@@ -67,8 +93,13 @@ function YamlLine({ num, tokens }: { num: number; tokens: readonly YamlToken[] }
 
 type YamlDocLine = readonly YamlToken[];
 
-/** Shared top of the landing preview: comments, resources, then `bau` (DE-style order). */
-const LANDING_YAML_DOC_CORE: readonly YamlDocLine[] = [
+type RenderedYamlLine = {
+  tokens: YamlDocLine;
+  highlight?: YamlLineHighlight;
+};
+
+/** Top-of-doc comments — fixed regardless of which layers are enabled. */
+const LANDING_YAML_DOC_HEADER: readonly YamlDocLine[] = [
   [
     { t: '# ', c: 'text-zinc-600' },
     { t: 'Baseline Technology load is driven by ', c: 'text-zinc-600' },
@@ -84,6 +115,10 @@ const LANDING_YAML_DOC_CORE: readonly YamlDocLine[] = [
     { t: '.', c: 'text-zinc-600' },
   ],
   [{ t: '', c: undefined }],
+];
+
+/** Default `resources:` block (labs 6, staff 4) — heading + two rows kept together so they can be selected/commented as a unit. */
+const LANDING_YAML_RESOURCES_BAU_BLOCK: readonly YamlDocLine[] = [
   [{ t: 'resources', c: 'text-violet-700' }, { t: ':', c: 'text-zinc-500' }],
   [
     { t: '  ', c: undefined },
@@ -105,6 +140,46 @@ const LANDING_YAML_DOC_CORE: readonly YamlDocLine[] = [
     { t: '4', c: 'text-amber-800' },
     { t: ' }', c: 'text-zinc-500' },
   ],
+];
+
+/**
+ * Boosted `resources:` block (labs 7, staff 5) — appears below the original (now commented-out) block
+ * during the final step of the auto-demo. Inline `# +1 …` comments call out the delta.
+ */
+const LANDING_YAML_RESOURCES_BOOSTED_BLOCK: readonly YamlDocLine[] = [
+  [
+    { t: '# ', c: 'text-zinc-600' },
+    { t: 'Add a sandbox lab + dedicated tester — widen ', c: 'text-zinc-600' },
+    { t: 'resources', c: 'text-cyan-700' },
+    { t: ', overload retreats.', c: 'text-zinc-600' },
+  ],
+  [{ t: 'resources', c: 'text-violet-700' }, { t: ':', c: 'text-zinc-500' }],
+  [
+    { t: '  ', c: undefined },
+    { t: 'labs', c: 'text-violet-700' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '{ ', c: 'text-zinc-500' },
+    { t: 'capacity', c: 'text-emerald-800' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '7', c: 'text-amber-800' },
+    { t: ' }   ', c: 'text-zinc-500' },
+    { t: '# +1 sandbox lab', c: 'text-zinc-500' },
+  ],
+  [
+    { t: '  ', c: undefined },
+    { t: 'staff', c: 'text-violet-700' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '{ ', c: 'text-zinc-500' },
+    { t: 'capacity', c: 'text-emerald-800' },
+    { t: ': ', c: 'text-zinc-500' },
+    { t: '5', c: 'text-amber-800' },
+    { t: ' }   ', c: 'text-zinc-500' },
+    { t: '# +1 dedicated tester', c: 'text-zinc-500' },
+  ],
+];
+
+/** `bau:` block + weekday-intensity table — same regardless of capacity uplift. */
+const LANDING_YAML_DOC_BAU: readonly YamlDocLine[] = [
   [{ t: '', c: undefined }],
   [{ t: 'bau', c: 'text-violet-700' }, { t: ':', c: 'text-zinc-500' }],
   [
@@ -670,7 +745,8 @@ type LayerKey =
   | 'school'
   | 'leaveBand'
   | 'yearEnd'
-  | 'deployFreeze';
+  | 'deployFreeze'
+  | 'capacityBoost';
 
 const ALL_LAYER_KEYS: readonly LayerKey[] = [
   'baseline',
@@ -684,6 +760,7 @@ const ALL_LAYER_KEYS: readonly LayerKey[] = [
   'leaveBand',
   'yearEnd',
   'deployFreeze',
+  'capacityBoost',
 ];
 
 type LayerRecord<T> = Record<LayerKey, T>;
@@ -700,7 +777,15 @@ const LAYER_HASH_SEED: LayerRecord<number> = {
   leaveBand: 47,
   yearEnd: 53,
   deployFreeze: 59,
+  capacityBoost: 67,
 };
+
+/**
+ * Relief strength when {@link LayerKey.capacityBoost} is fully on. Cells that were riding
+ * `TWIN_OVERLOAD_MAX_RATIO` (~1.55) drop to ~`1.55 / (1 + 0.7) ≈ 0.91`, pulling reds
+ * back into amber/yellow band — visible "uplift" rather than a wholesale cool-down.
+ */
+const TWIN_CAPACITY_BOOST_RELIEF = 0.7;
 
 function emptyLayerBools(value = false): LayerRecord<boolean> {
   return ALL_LAYER_KEYS.reduce<LayerRecord<boolean>>(
@@ -773,7 +858,7 @@ function technologyStressForCell(
   const freezeMix = perCellLayerMix(phases.deployFreeze, chronWi, di, LAYER_HASH_SEED.deployFreeze);
   const freeze = deployFreezeStressAddition(chronWi, di) * freezeMix;
 
-  const total =
+  const summed =
     baseline +
     trading +
     campaign +
@@ -785,6 +870,19 @@ function technologyStressForCell(
     leave +
     yearEnd +
     freeze;
+
+  // Capacity uplift (extra lab + tester) widens effective capacity so per-cell utilisation
+  // shrinks proportionally. Per-cell hash delays produce the same staggered "wash" as the
+  // additive layers, but in reverse — overload retreats cell-by-cell instead of stacking.
+  const boostMix = perCellLayerMix(
+    phases.capacityBoost,
+    chronWi,
+    di,
+    LAYER_HASH_SEED.capacityBoost
+  );
+  const reliefMultiplier = 1 / (1 + TWIN_CAPACITY_BOOST_RELIEF * boostMix);
+  const total = summed * reliefMultiplier;
+
   // Bounded above 100% of caps so the tech-capacity sparkline can ride into the shaded
   // red over-cap zone; cell colour separately clamps to the heatmap range below.
   return Math.max(0, Math.min(TWIN_OVERLOAD_MAX_RATIO, total));
@@ -1110,6 +1208,20 @@ const PAINT_OFF_MS = 360;
 /** Auto-demo step gap (must comfortably exceed scroll delay + minimal paint). */
 const AUTO_DEMO_STEP_MS = 1180;
 
+/**
+ * Lab + tester (capacityBoost) is the closing beat — it gets a longer, more legible
+ * sub-animation: select the original `resources:` block, comment it out, then insert
+ * a fresh boosted block underneath. Stage transitions happen at these offsets after
+ * the chip is pressed.
+ */
+const CAPACITY_BOOST_SELECT_DELAY_MS = 600; // wait for scroll-to-top to settle
+const CAPACITY_BOOST_COMMENT_DELAY_MS = 1300; // selection has been visible long enough
+const CAPACITY_BOOST_INSERT_DELAY_MS = 1900; // comment-out has registered, drop in the new block
+/** Total capacityBoost YAML animation duration — used to extend the auto-demo "done" hold. */
+const CAPACITY_BOOST_TOTAL_MS = 2700;
+
+type CapacityBoostStage = 'idle' | 'select' | 'comment' | 'insert';
+
 type ChipDef = {
   key: LayerKey;
   label: string;
@@ -1129,6 +1241,7 @@ const CHIPS: readonly ChipDef[] = [
   { key: 'leaveBand', label: 'Leave band', Icon: Sun, title: 'Collective summer leave squeezes lab + team caps' },
   { key: 'yearEnd', label: 'Year-end', Icon: Snowflake, title: 'Q4 year-end ramp — 12-week ladder into 31 Dec' },
   { key: 'deployFreeze', label: 'Deploy freeze', Icon: CalendarOff, title: 'Change freeze raises deploy risk on those cells' },
+  { key: 'capacityBoost', label: 'Lab + tester', Icon: FlaskConical, title: 'Add a sandbox lab and a dedicated tester — relief washes the reds back into range' },
 ];
 
 /** Layers whose YAML lives BELOW the campaign block but ABOVE holiday/footer; stacked in toolbar order. */
@@ -1148,11 +1261,25 @@ export function LandingYamlProjectTwinMock() {
   const phaseRef = useRef<LayerRecord<number>>(emptyLayerPhases(0));
   /** When the layer was most recently flipped on/off (drives scroll-then-paint scheduling per layer). */
   const layerToggledAtRef = useRef<LayerRecord<number>>(emptyLayerPhases(0));
+  /**
+   * Most recently flipped layer. Drives YAML scroll target: most layers append new YAML
+   * blocks at the bottom (so we scroll the editor to the bottom), but `capacityBoost`
+   * mutates the existing `resources:` block at the top (so we scroll back to the top
+   * to reveal the labs/staff capacity update in place).
+   */
+  const lastToggledLayerRef = useRef<LayerKey | null>(null);
 
   const [layerDemoDone, setLayerDemoDone] = useState(false);
   const [toolbarSeen, setToolbarSeen] = useState(false);
   const [pressKey, setPressKey] = useState<LayerKey | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Multi-phase animation state for the final `capacityBoost` chip. Drives the YAML
+   * editor through select → comment → insert so the user can clearly see the original
+   * `resources:` block being commented out before a new boosted block is inserted.
+   */
+  const [boostStage, setBoostStage] = useState<CapacityBoostStage>('idle');
 
   useLayoutEffect(() => {
     const el = toolbarRef.current;
@@ -1178,6 +1305,7 @@ export function LandingYamlProjectTwinMock() {
       ...layerToggledAtRef.current,
       [key]: performance.now(),
     };
+    lastToggledLayerRef.current = key;
   }, []);
 
   const flashChip = useCallback(
@@ -1220,7 +1348,10 @@ export function LandingYamlProjectTwinMock() {
         flipLayer(chip.key, true);
       });
     });
-    schedule(initialDelay + AUTO_DEMO_STEP_MS * CHIPS.length + 320, () => {
+    // Hold "watch once" hint until the lab + tester sub-animation has fully played out:
+    // last chip fires at index (CHIPS.length - 1); add the boost total + paint sweep + buffer.
+    const lastChipFireMs = initialDelay + AUTO_DEMO_STEP_MS * (CHIPS.length - 1);
+    schedule(lastChipFireMs + CAPACITY_BOOST_TOTAL_MS + PAINT_DURATION_MS + 320, () => {
       if (!cancelled) setLayerDemoDone(true);
     });
 
@@ -1285,15 +1416,44 @@ export function LandingYamlProjectTwinMock() {
     return () => cancelAnimationFrame(raf);
   }, [layerOn, reducedMotion]);
 
+  /**
+   * Advance the capacityBoost sub-stages whenever the chip flips on; reset to idle the
+   * moment the user (or the auto-demo) flips it off so a re-toggle replays the sequence.
+   */
+  useEffect(() => {
+    if (!layerOn.capacityBoost) {
+      setBoostStage('idle');
+      return;
+    }
+    if (reducedMotion) {
+      setBoostStage('insert');
+      return;
+    }
+    setBoostStage('idle');
+    const timers: number[] = [];
+    timers.push(
+      window.setTimeout(() => setBoostStage('select'), CAPACITY_BOOST_SELECT_DELAY_MS)
+    );
+    timers.push(
+      window.setTimeout(() => setBoostStage('comment'), CAPACITY_BOOST_COMMENT_DELAY_MS)
+    );
+    timers.push(
+      window.setTimeout(() => setBoostStage('insert'), CAPACITY_BOOST_INSERT_DELAY_MS)
+    );
+    return () => {
+      for (const t of timers) window.clearTimeout(t);
+    };
+  }, [layerOn.capacityBoost, reducedMotion]);
+
   /** Chip lights when its phase has visibly landed on the strip. */
   const STRIP_PHASE_LIT = 0.18;
   const chipLit = (key: LayerKey) => layerOn[key] && layerPhases[key] >= STRIP_PHASE_LIT;
 
   const layerHint = !toolbarSeen
-    ? 'Stack layers on the strip: BAU baseline, then campaign, programme, calendars, and risk overlays.'
+    ? 'Stack layers on the strip: BAU baseline, then campaign, programme, calendars, and risk overlays — finish with a lab + tester uplift.'
     : !layerDemoDone && !reducedMotion
-      ? 'Watch once: each layer scrolls its YAML into view, then paints into the heatmap cell-by-cell.'
-      : 'Toggle freely — cells fade from grey to colour as each layer enables; nothing else redraws.';
+      ? 'Watch once: each layer scrolls its YAML into view, paints cell-by-cell — then a lab + tester uplift pulls the overload back into range.'
+      : 'Toggle freely — cells fade from grey to colour as each layer enables; the lab + tester chip relieves the reds.';
 
   const layerToolbarVariants = useMemo(() => {
     const instant = !!reducedMotion;
@@ -1354,39 +1514,65 @@ export function LandingYamlProjectTwinMock() {
         : 'border-zinc-200/90 bg-white text-zinc-600 shadow-sm hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-800'
     );
 
-  const yamlDocLines = useMemo(() => {
-    const parts: YamlDocLine[] = [...LANDING_YAML_DOC_CORE];
+  const yamlDocLines = useMemo<RenderedYamlLine[]>(() => {
+    const parts: RenderedYamlLine[] = [];
 
-    if (layerOn.tradingPeak) parts.push(...LANDING_YAML_TRADING_PEAK);
+    for (const tokens of LANDING_YAML_DOC_HEADER) parts.push({ tokens });
 
-    parts.push(...(layerOn.campaign ? LANDING_YAML_CAMPAIGN_ON : LANDING_YAML_CAMPAIGN_OFF));
+    // Original `resources:` block — highlight tracks the boost sub-stage:
+    //  • idle             → no highlight
+    //  • select           → yellow editor selection wraps the heading + 2 rows
+    //  • comment / insert → block is dimmed and prefixed with `# ` (commented out)
+    const bauHighlight: YamlLineHighlight | undefined =
+      boostStage === 'select'
+        ? 'select'
+        : boostStage === 'comment' || boostStage === 'insert'
+          ? 'comment'
+          : undefined;
+    for (const tokens of LANDING_YAML_RESOURCES_BAU_BLOCK) {
+      parts.push({ tokens, highlight: bauHighlight });
+    }
+
+    // Once the original block is commented out, drop in the new boosted block underneath.
+    if (boostStage === 'insert') {
+      parts.push({ tokens: [{ t: '', c: undefined }] });
+      for (const tokens of LANDING_YAML_RESOURCES_BOOSTED_BLOCK) parts.push({ tokens });
+    }
+
+    for (const tokens of LANDING_YAML_DOC_BAU) parts.push({ tokens });
+
+    if (layerOn.tradingPeak) for (const tokens of LANDING_YAML_TRADING_PEAK) parts.push({ tokens });
+
+    for (const tokens of layerOn.campaign ? LANDING_YAML_CAMPAIGN_ON : LANDING_YAML_CAMPAIGN_OFF) {
+      parts.push({ tokens });
+    }
 
     if (PROGRAMME_LAYERS.some((k) => layerOn[k])) {
-      if (layerOn.progIntegration) parts.push(...LANDING_YAML_PROGRAMME_INTEGRATION);
-      if (layerOn.progSupport) parts.push(...LANDING_YAML_PROGRAMME_SUPPORT);
+      if (layerOn.progIntegration) for (const tokens of LANDING_YAML_PROGRAMME_INTEGRATION) parts.push({ tokens });
+      if (layerOn.progSupport) for (const tokens of LANDING_YAML_PROGRAMME_SUPPORT) parts.push({ tokens });
     }
 
     if (OPERATIONAL_LAYERS.some((k) => layerOn[k])) {
-      if (layerOn.opWindow) parts.push(...LANDING_YAML_OPERATING_WINDOW);
+      if (layerOn.opWindow) for (const tokens of LANDING_YAML_OPERATING_WINDOW) parts.push({ tokens });
     }
 
     const calendarOn = CALENDAR_LAYERS.some((k) => layerOn[k]);
     if (calendarOn) {
-      if (layerOn.national) parts.push(...LANDING_YAML_PUBLIC_HOLIDAYS);
-      if (layerOn.school) parts.push(...LANDING_YAML_SCHOOL_HOLIDAYS);
-      if (layerOn.leaveBand) parts.push(...LANDING_YAML_LEAVE_BAND);
+      if (layerOn.national) for (const tokens of LANDING_YAML_PUBLIC_HOLIDAYS) parts.push({ tokens });
+      if (layerOn.school) for (const tokens of LANDING_YAML_SCHOOL_HOLIDAYS) parts.push({ tokens });
+      if (layerOn.leaveBand) for (const tokens of LANDING_YAML_LEAVE_BAND) parts.push({ tokens });
     } else {
-      parts.push(...LANDING_YAML_CALENDAR_PLACEHOLDER);
+      for (const tokens of LANDING_YAML_CALENDAR_PLACEHOLDER) parts.push({ tokens });
     }
 
     if (RISK_LAYERS.some((k) => layerOn[k])) {
-      if (layerOn.yearEnd) parts.push(...LANDING_YAML_YEAR_END);
-      if (layerOn.deployFreeze) parts.push(...LANDING_YAML_DEPLOY_FREEZE);
+      if (layerOn.yearEnd) for (const tokens of LANDING_YAML_YEAR_END) parts.push({ tokens });
+      if (layerOn.deployFreeze) for (const tokens of LANDING_YAML_DEPLOY_FREEZE) parts.push({ tokens });
     }
 
-    parts.push(...LANDING_YAML_DOC_FOOTER);
+    for (const tokens of LANDING_YAML_DOC_FOOTER) parts.push({ tokens });
     return parts;
-  }, [layerOn]);
+  }, [layerOn, boostStage]);
 
   const yamlScrollRef = useRef<HTMLDivElement>(null);
   const yamlLayoutSig = ALL_LAYER_KEYS.map((k) => (layerOn[k] ? '1' : '0')).join('');
@@ -1403,12 +1589,16 @@ export function LandingYamlProjectTwinMock() {
     }
     if (prevYamlLayoutSigRef.current === yamlLayoutSig) return;
     prevYamlLayoutSigRef.current = yamlLayoutSig;
+    // `capacityBoost` mutates the resources block at the top in place; every other
+    // layer appends a fresh block at the bottom. Scroll target follows where the
+    // visible change happened so the user's eye lands on it.
+    const scrollToTop = lastToggledLayerRef.current === 'capacityBoost';
     let cancelled = false;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (cancelled) return;
         el.scrollTo({
-          top: el.scrollHeight,
+          top: scrollToTop ? 0 : el.scrollHeight,
           behavior: reducedMotion ? 'auto' : 'smooth',
         });
       });
@@ -1461,18 +1651,18 @@ export function LandingYamlProjectTwinMock() {
           Campaigns, BAU, and programmes draw on the same resources
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-          Each toggle scrolls its block into the YAML, then paints only the cells it touches —
-          baseline rhythm, campaign integration vs support, multi-month programmes, holiday
-          calendars, leave bands, operating windows, year-end ramps, and deploy freezes — all
-          stacking on the same runway. Nothing else redraws; greys fill in where the model has
-          something to say.
+          Every block is a model of how that activity draws on the team — baseline rhythm,
+          campaign integration and support, multi-month programmes, year-end ramps. They stack on
+          the same runway with the things that take capacity away — holiday calendars, leave bands,
+          operating windows, and deploy freezes — layer on layer, until what&rsquo;s left is the
+          predicted load on each day. Greys fill in where the model has something to say.
         </p>
       </div>
 
       <div
         className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] lg:items-stretch lg:gap-5"
         role="group"
-        aria-label="Stacked strip preview: baseline BAU, campaigns, tech programmes, holiday calendars, operating windows, year-end ramps and deploy freezes"
+        aria-label="Stacked strip preview: baseline BAU, campaigns, tech programmes, holiday calendars, operating windows, year-end ramps, deploy freezes, then a lab + tester uplift that pulls overload back into range"
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-[0_16px_50px_-18px_rgba(15,23,42,0.1)] ring-1 ring-zinc-950/[0.04]">
           <div className="flex items-center gap-2 border-b border-zinc-200/90 bg-zinc-100/90 px-3 py-2">
@@ -1496,10 +1686,11 @@ export function LandingYamlProjectTwinMock() {
           >
             <div className="rounded-lg border border-zinc-200/90 bg-white p-2.5 shadow-inner shadow-zinc-950/[0.03] sm:p-3">
               {yamlDocLines.map((row, i) => {
-                if (!row || row.every((t) => t.t === '')) {
+                const tokens = row.tokens;
+                if (!tokens || tokens.every((t) => t.t === '')) {
                   return <div key={i} className="min-h-[1.35em]" />;
                 }
-                return <YamlLine key={i} num={i + 1} tokens={row} />;
+                return <YamlLine key={i} num={i + 1} tokens={tokens} highlight={row.highlight} />;
               })}
             </div>
           </div>
@@ -1507,7 +1698,7 @@ export function LandingYamlProjectTwinMock() {
             ref={toolbarRef}
             className="mt-auto flex flex-col gap-2 border-t border-zinc-200/90 bg-zinc-100/70 px-3 py-2.5"
             role="toolbar"
-            aria-label="Stack layers — eleven capacity model factors"
+            aria-label="Stack layers — eleven capacity model factors plus a final lab + tester uplift"
             aria-describedby={`${panelId}-layer-hint`}
             variants={layerToolbarVariants.container}
             initial="hidden"

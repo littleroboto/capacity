@@ -12,6 +12,7 @@ import { LandingPage } from '@/pages/LandingPage';
 import { AdminClerkBridge } from '@/components/AdminClerkBridge';
 import { AdminMarketOverview } from '@/pages/admin/AdminMarketOverview';
 import { AdminMarketDetail } from '@/pages/admin/AdminMarketDetail';
+import { LaptopOnlyGate } from '@/components/LaptopOnlyGate';
 import { applyPersistedWorkbenchThemeClass } from '@/lib/syncPersistedWorkbenchTheme';
 import './index.css';
 
@@ -49,21 +50,23 @@ function WorkbenchLoading() {
 
 function WorkbenchRoutes() {
   return (
-    <SignInGate enabled={gate}>
-      {clerkKey ? (
-        <ClerkSharedDslBridge>
-          <Suspense fallback={<WorkbenchLoading />}>
-            <App />
-          </Suspense>
-        </ClerkSharedDslBridge>
-      ) : (
-        <FullCapacityAccessProvider>
-          <Suspense fallback={<WorkbenchLoading />}>
-            <App />
-          </Suspense>
-        </FullCapacityAccessProvider>
-      )}
-    </SignInGate>
+    <LaptopOnlyGate>
+      <SignInGate enabled={gate}>
+        {clerkKey ? (
+          <ClerkSharedDslBridge>
+            <Suspense fallback={<WorkbenchLoading />}>
+              <App />
+            </Suspense>
+          </ClerkSharedDslBridge>
+        ) : (
+          <FullCapacityAccessProvider>
+            <Suspense fallback={<WorkbenchLoading />}>
+              <App />
+            </Suspense>
+          </FullCapacityAccessProvider>
+        )}
+      </SignInGate>
+    </LaptopOnlyGate>
   );
 }
 
@@ -76,8 +79,8 @@ function AppRoutes() {
       {/* Some Clerk setups use this path for the OAuth return URL */}
       <Route path="/sign-in/sso-callback" element={<ClerkOAuthCallbackPage />} />
       <Route path="/app" element={<WorkbenchRoutes />} />
-      <Route path="/admin" element={<SignInGate enabled={gate}><AdminClerkBridge><AdminMarketOverview /></AdminClerkBridge></SignInGate>} />
-      <Route path="/admin/market/:id" element={<SignInGate enabled={gate}><AdminClerkBridge><AdminMarketDetail /></AdminClerkBridge></SignInGate>} />
+      <Route path="/admin" element={<LaptopOnlyGate><SignInGate enabled={gate}><AdminClerkBridge><AdminMarketOverview /></AdminClerkBridge></SignInGate></LaptopOnlyGate>} />
+      <Route path="/admin/market/:id" element={<LaptopOnlyGate><SignInGate enabled={gate}><AdminClerkBridge><AdminMarketDetail /></AdminClerkBridge></SignInGate></LaptopOnlyGate>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
