@@ -675,6 +675,14 @@ export function tripleLensStackedContributionTotalContentWidthPx(contributionStr
 }
 
 /**
+ * Horizontal offset from the start of the triple-lens **inner** column (the flex stack under the quarter
+ * gutter) to the left edge of the contribution strip / programme Gantt SVG — rail + `gap-1.5`.
+ * Keep in sync with `RunwayGrid` + `RunwayProgrammeGanttBlock` rail + strip rows.
+ */
+export const RUNWAY_TRIPLE_LENS_INNER_COL_TO_STRIP_LEFT_PX =
+  SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX + RUNWAY_TRIPLE_LENS_RAIL_TO_STRIP_GAP_PX;
+
+/**
  * Compare column: `mb-1.5` (6px) + market sticker row `h-[32px]` above each strip (`RunwayGridBody`).
  */
 export const RUNWAY_COMPARE_MARKET_STICKER_STACK_PX = 6 + 32;

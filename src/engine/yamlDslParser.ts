@@ -895,14 +895,23 @@ function mapDeploymentRiskMonthCurve(
   return Object.keys(out).length ? out : undefined;
 }
 
+function pickYamlWindowStart(row: Record<string, unknown>): unknown {
+  return row.start ?? row.start_date ?? row.startDate ?? row.from;
+}
+
+function pickYamlWindowEnd(row: Record<string, unknown>, startResolved: unknown): unknown {
+  return row.end ?? row.end_date ?? row.endDate ?? row.to ?? startResolved;
+}
+
 function mapDeploymentRiskEvents(raw: unknown[] | undefined): DeploymentRiskEvent[] | undefined {
   if (!raw?.length) return undefined;
   const out: DeploymentRiskEvent[] = [];
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
     const row = item as Record<string, unknown>;
-    const start = coerceYamlDateString(row.start);
-    const end = coerceYamlDateString(row.end ?? row.start);
+    const startRaw = pickYamlWindowStart(row);
+    const start = coerceYamlDateString(startRaw);
+    const end = coerceYamlDateString(pickYamlWindowEnd(row, startRaw));
     if (!start || !end) continue;
     const sev = Number(row.severity ?? 0.5);
     out.push({
@@ -922,8 +931,9 @@ function mapDeploymentRiskBlackouts(raw: unknown[] | undefined): DeploymentRiskB
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
     const row = item as Record<string, unknown>;
-    const start = coerceYamlDateString(row.start);
-    const end = coerceYamlDateString(row.end ?? row.start);
+    const startRaw = pickYamlWindowStart(row);
+    const start = coerceYamlDateString(startRaw);
+    const end = coerceYamlDateString(pickYamlWindowEnd(row, startRaw));
     if (!start || !end) continue;
     const sev = Number(row.severity ?? 0.4);
     const pr = row.public_reason ?? row.publicReason;

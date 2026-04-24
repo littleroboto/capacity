@@ -59,6 +59,7 @@ import {
   contributionStripGridOnlyContentHeightPx,
   RUNWAY_CONTRIBUTION_STRIP_FLEX_ROW_PAD_LEFT_PX,
   RUNWAY_TRIPLE_LENS_CONTRIBUTION_SVG_LEADING_OFFSET_PX,
+  RUNWAY_TRIPLE_LENS_INNER_COL_TO_STRIP_LEFT_PX,
   SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX,
   SINGLE_MARKET_TRIPLE_LENS_VERTICAL_GAP_PX,
   tripleLensStackRailHeightPx,
@@ -142,6 +143,12 @@ import {
 } from '@/lib/runwayCompareSvgLayout';
 import { RunwayContributionStripSvg } from '@/components/RunwayContributionStripSvg';
 import { RunwayProgrammeGanttBlock } from '@/components/RunwayProgrammeGanttBlock';
+import type { ProgrammeGanttDisplayPrefs } from '@/lib/runwayProgrammeGanttPrefs';
+import { RUNWAY_EMERGE_DURATION_SEC, RUNWAY_EMERGE_PAUSE_MS } from '@/hooks/useRunwayHeatmapEmergence';
+import {
+  contributionDayIndexForYmd,
+  contributionStripDayColumnCenterX,
+} from '@/lib/runwayTechContributionOverloadHistogram';
 import { RunwayHeatmapCellStylePopover } from '@/components/RunwayHeatmapCellStylePopover';
 import { RunwayQuarterGridSvg } from '@/components/RunwayQuarterGridSvg';
 import { Box, CalendarDays, Download, Grid2x2, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
@@ -590,7 +597,7 @@ function HeatCutoffOpacityWrap({ dimOpacity, children }: { dimOpacity: number; c
 function HeatCellDeployFreezeOverlay() {
   return (
     <svg
-      className="pointer-events-none absolute inset-0 h-full w-full text-foreground/55"
+      className="pointer-events-none absolute inset-0 h-full w-full"
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
       aria-hidden
@@ -600,7 +607,8 @@ function HeatCellDeployFreezeOverlay() {
         y1="100"
         x2="100"
         y2="0"
-        stroke="currentColor"
+        stroke="white"
+        strokeOpacity={0.92}
         strokeWidth={8}
         vectorEffect="non-scaling-stroke"
       />
@@ -1648,6 +1656,20 @@ type RunwayGridProps = {
   landingTechSparklineSweep?: boolean;
   /** Landing hero: rose fill for high-but-not-overload utilization on the tech sparkline. */
   landingTechSparklineTightFill?: boolean;
+  /**
+   * With {@link landingMinimalChrome}: still render the programme plan Gantt above the triple-lens stack
+   * (homepage hero). Use {@link landingProgrammePlanRevealReady} for timed “Show plan”.
+   */
+  landingProgrammePlan?: boolean;
+  /** After parent delay (e.g. hero mount), set true so the ephemeral Gantt auto-opens. */
+  landingProgrammePlanRevealReady?: boolean;
+  /** Overrides merged into programme Gantt defaults when {@link landingProgrammePlan} is on. */
+  landingProgrammePlanPrefs?: Partial<ProgrammeGanttDisplayPrefs>;
+  /**
+   * Homepage hero: fired once contribution-strip heatmaps have finished their landing intro
+   * (cell stagger or emerge), so the programme Gantt can open after.
+   */
+  onLandingContributionHeatmapSettled?: () => void;
 };
 
 export function RunwayGrid({
@@ -1664,6 +1686,10 @@ export function RunwayGrid({
   landingCompareColumnHighlight,
   landingTechSparklineSweep = false,
   landingTechSparklineTightFill = false,
+  landingProgrammePlan = false,
+  landingProgrammePlanRevealReady = false,
+  landingProgrammePlanPrefs,
+  onLandingContributionHeatmapSettled,
 }: RunwayGridProps) {
   const country = useAtcStore((s) => s.country);
   const setCountry = useAtcStore((s) => s.setCountry);
@@ -2852,6 +2878,10 @@ export function RunwayGrid({
                   singleMarketMultiLens={singleMarketMultiLens}
                   heatmapOptsForMarketLens={heatmapOptsForMarketLens}
                   landingMinimalChrome={landingMinimalChrome}
+                  landingProgrammePlan={landingProgrammePlan}
+                  landingProgrammePlanRevealReady={landingProgrammePlanRevealReady}
+                  landingProgrammePlanPrefs={landingProgrammePlanPrefs}
+                  onLandingContributionHeatmapSettled={onLandingContributionHeatmapSettled}
                   landingTechSparklineSweep={landingTechSparklineSweep}
                   landingTechSparklineTightFill={landingTechSparklineTightFill}
                   landingStaggerCellPulse={landingMinimalChrome && !reduceMotion}
@@ -3108,6 +3138,10 @@ type RunwayGridBodyProps = {
   /** 3D iso views: restarts column grow-in when this key changes. */
   isoGrowResetKey: string;
   landingMinimalChrome: boolean;
+  landingProgrammePlan: boolean;
+  landingProgrammePlanRevealReady: boolean;
+  landingProgrammePlanPrefs?: Partial<ProgrammeGanttDisplayPrefs>;
+  onLandingContributionHeatmapSettled?: () => void;
   landingTechSparklineSweep: boolean;
   landingTechSparklineTightFill: boolean;
   /** Landing: per-cell heatmap pulse + smooth fill (no vertical clip flicker). */
@@ -3170,6 +3204,10 @@ function RunwayGridBody({
   singleMarketMultiLens,
   heatmapOptsForMarketLens,
   landingMinimalChrome,
+  landingProgrammePlan,
+  landingProgrammePlanRevealReady,
+  landingProgrammePlanPrefs,
+  onLandingContributionHeatmapSettled,
   landingTechSparklineSweep,
   landingTechSparklineTightFill,
   landingStaggerCellPulse,
@@ -3186,6 +3224,41 @@ function RunwayGridBody({
     const t = window.setTimeout(() => setPostSweep(true), SWOOSH_POST_MS);
     return () => clearTimeout(t);
   }, [reduceMotion, viewMode]);
+
+  /** Match `landing-heatmap-cell-in` 0.58s in index.css and stagger in RunwayContributionStripSvg. */
+  const LANDING_HEATMAP_CELL_IN_MS = 580;
+
+  useEffect(() => {
+    const cb = onLandingContributionHeatmapSettled;
+    if (!landingMinimalChrome || !landingProgrammePlan || !cb || !singleMarketMultiLens) return;
+    if (placedCells.length === 0) return;
+
+    if (reduceMotion) {
+      const t = window.setTimeout(cb, 0);
+      return () => window.clearTimeout(t);
+    }
+
+    let ms: number;
+    if (landingStaggerCellPulse) {
+      const lastIdx = Math.min(Math.max(0, placedCells.length - 1), 440);
+      ms = lastIdx * 8 + LANDING_HEATMAP_CELL_IN_MS + 120;
+    } else {
+      const rowCount = SINGLE_MARKET_STACK_LENS_IDS.length;
+      const lastRowStagger = (rowCount - 1) * LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS;
+      ms = RUNWAY_EMERGE_PAUSE_MS + lastRowStagger + RUNWAY_EMERGE_DURATION_SEC * 1000 + 120;
+    }
+
+    const t = window.setTimeout(cb, ms);
+    return () => window.clearTimeout(t);
+  }, [
+    landingMinimalChrome,
+    landingProgrammePlan,
+    onLandingContributionHeatmapSettled,
+    singleMarketMultiLens,
+    placedCells.length,
+    reduceMotion,
+    landingStaggerCellPulse,
+  ]);
 
   const firstCompareCalendarMonthKey = useMemo(
     () => firstCalendarMonthKeyFromSections(sections),
@@ -3269,6 +3342,35 @@ function RunwayGridBody({
 
   const singleMarketSelectedDayYmd =
     !compareAllMarkets && tip && 'payload' in tip ? tip.payload.dateStr : null;
+
+  /** Triple-lens: one dashed column through Gantt + sparkline + strips; inner per-strip lines hidden. */
+  const suppressTripleLensSplitSelectionLines =
+    singleMarketMultiLens &&
+    Boolean(contributionMeta) &&
+    Boolean(singleMarketSelectedDayYmd?.trim());
+
+  const tripleLensUnifiedSelectionLineInnerX = useMemo(() => {
+    if (!suppressTripleLensSplitSelectionLines || !contributionMeta || !singleMarketSelectedDayYmd) return null;
+    const di = contributionDayIndexForYmd(contributionMeta, singleMarketSelectedDayYmd);
+    if (di == null) return null;
+    const centerX = contributionStripDayColumnCenterX(cellPx, gap, di);
+    return RUNWAY_TRIPLE_LENS_INNER_COL_TO_STRIP_LEFT_PX + centerX;
+  }, [
+    suppressTripleLensSplitSelectionLines,
+    contributionMeta,
+    singleMarketSelectedDayYmd,
+    cellPx,
+    gap,
+  ]);
+
+  useEffect(() => {
+    if (!singleMarketMultiLens || !tip) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClearDaySummary();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [singleMarketMultiLens, tip, onClearDaySummary]);
 
   const dayContributionPin: RunwayLedgerDayContributionPin | null =
     !compareAllMarkets &&
@@ -3559,10 +3661,29 @@ function RunwayGridBody({
                           aria-hidden
                         />
                         <div
-                          className="flex min-w-0 max-w-none shrink-0 flex-col items-stretch"
+                          className="relative flex min-w-0 max-w-none shrink-0 flex-col items-stretch"
                           style={{ gap: SINGLE_MARKET_TRIPLE_LENS_VERTICAL_GAP_PX }}
                         >
-                          {!landingMinimalChrome ? (
+                          {tripleLensUnifiedSelectionLineInnerX != null ? (
+                            <svg
+                              className="pointer-events-none absolute inset-0 z-[6] h-full min-h-full w-full overflow-visible"
+                              preserveAspectRatio="none"
+                              aria-hidden
+                            >
+                              <line
+                                x1={tripleLensUnifiedSelectionLineInnerX}
+                                x2={tripleLensUnifiedSelectionLineInnerX}
+                                y1={0}
+                                y2="100%"
+                                stroke="hsl(var(--primary) / 0.85)"
+                                strokeWidth={1.75}
+                                strokeDasharray="3 3"
+                                vectorEffect="non-scaling-stroke"
+                                opacity={0.88}
+                              />
+                            </svg>
+                          ) : null}
+                          {!landingMinimalChrome || landingProgrammePlan ? (
                             <RunwayProgrammeGanttBlock
                               country={country}
                               marketConfig={marketConfig}
@@ -3573,7 +3694,17 @@ function RunwayGridBody({
                               stripWidth={contributionColumnContentWidth ?? contentWidth}
                               riskByDate={singleRiskByDate!}
                               blackouts={marketConfig?.deployment_risk_blackouts ?? null}
-                              railSpacerWidthPx={SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX + 6}
+                              railSpacerWidthPx={SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX}
+                              ephemeral={Boolean(landingMinimalChrome && landingProgrammePlan)}
+                              revealPlanWhen={Boolean(
+                                landingMinimalChrome &&
+                                  landingProgrammePlan &&
+                                  landingProgrammePlanRevealReady
+                              )}
+                              revealPlanDelayMs={
+                                landingMinimalChrome && landingProgrammePlan ? 0 : 900
+                              }
+                              ephemeralInitialPrefs={landingProgrammePlanPrefs}
                             />
                           ) : null}
                           {SINGLE_MARKET_STACK_LENS_IDS.map((lensMode, rowIdx) => {
@@ -3629,6 +3760,7 @@ function RunwayGridBody({
                                         : null
                                     }
                                     landingStaggerCellPulse={landingStaggerCellPulse}
+                                    suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
                                   />
                                 </div>
                               </div>
@@ -3663,6 +3795,7 @@ function RunwayGridBody({
                                       landingMarketingTightCapacityFill={
                                         landingMinimalChrome && landingTechSparklineTightFill
                                       }
+                                      suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
                                     />
                                   </div>
                                 ) : null}
@@ -3793,18 +3926,20 @@ function RunwayGridBody({
                       className="flex w-full min-w-0 max-w-full flex-col gap-6"
                       style={sideSummaryRunwayTrackStyle}
                     >
-                      <RunwayDaySummaryPanel
-                        tip={tip}
-                        onClear={onClearDaySummary}
-                        onScopeHeatmapToThisDay={
-                          activityLedger &&
-                          tip &&
-                          'payload' in tip &&
-                          tip.payload.viewMode !== 'code'
-                            ? () => restrictRunwayLedgerToDayContributors(activityLedger, tip.payload.dateStr)
-                            : undefined
-                        }
-                      />
+                      {!singleMarketMultiLens ? (
+                        <RunwayDaySummaryPanel
+                          tip={tip}
+                          onClear={onClearDaySummary}
+                          onScopeHeatmapToThisDay={
+                            activityLedger &&
+                            tip &&
+                            'payload' in tip &&
+                            tip.payload.viewMode !== 'code'
+                              ? () => restrictRunwayLedgerToDayContributors(activityLedger, tip.payload.dateStr)
+                              : undefined
+                          }
+                        />
+                      ) : null}
                       {activityLedger ? (
                         <>
                           {!singleMarketMultiLens ? (

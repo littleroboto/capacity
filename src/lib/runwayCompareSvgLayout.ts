@@ -35,6 +35,22 @@ import { RUNWAY_DAY_COLUMNS, WEEKDAY_HEADERS, formatDateYmd } from '@/lib/weekRu
 /** Same abbreviations as `RunwayMonthMiniGrid` weekday row. */
 const WEEKDAY_GRID_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
 
+/**
+ * Contribution strip weeks start on Sunday (`gridStartSunday`); month / quarter / year chrome is keyed off
+ * **Wednesday** in that column so split weeks (Sun still in prior month, Mon+ in the next) get the dominant
+ * month name — otherwise deployment blackouts and cells under “November” sat under an “October” label.
+ */
+function contributionWeekColumnAnchorYmd(
+  gridStartSunday: Date,
+  weekIdx: number,
+  msPerDay: number,
+): string {
+  const wedOffsetFromSunday = 3;
+  return formatDateYmd(
+    new Date(gridStartSunday.getTime() + (weekIdx * 7 + wedOffsetFromSunday) * msPerDay),
+  );
+}
+
 function monthsInCalendarQuarter(sec: VerticalYearSection, qRow: number): CalendarMonthBlock[] {
   const m0 = qRow * 3;
   return sec.months.filter((m) => m.monthIndex >= m0 && m.monthIndex <= m0 + 2);
@@ -470,11 +486,11 @@ export function layoutContributionStripRunwaySvg(args: {
   const gridBottomY = top + (RUNWAY_DAY_COLUMNS - 1) * stride + cellPx;
   /** Horizontal centre of the week column `weekIdx` (aligns ticks with cells, not column gaps). */
   const columnCenterX = (weekIdx: number) => gutter + weekIdx * stride + cellPx / 2;
-  const sundayYmd = (weekIdx: number) =>
-    formatDateYmd(new Date(grid0.getTime() + weekIdx * 7 * msPerDay));
-  const ymKey = (weekIdx: number) => sundayYmd(weekIdx).slice(0, 7);
-  const quarterIdx0 = (weekIdx: number) => Math.floor(parseDate(sundayYmd(weekIdx)).getMonth() / 3);
-  const yearNum = (weekIdx: number) => parseDate(sundayYmd(weekIdx)).getFullYear();
+  const ymKey = (weekIdx: number) => contributionWeekColumnAnchorYmd(grid0, weekIdx, msPerDay).slice(0, 7);
+  const quarterIdx0 = (weekIdx: number) =>
+    Math.floor(parseDate(contributionWeekColumnAnchorYmd(grid0, weekIdx, msPerDay)).getMonth() / 3);
+  const yearNum = (weekIdx: number) =>
+    parseDate(contributionWeekColumnAnchorYmd(grid0, weekIdx, msPerDay)).getFullYear();
 
   const pushBoundaryWeeks = (changed: (w: number) => boolean): number[] => {
     const out: number[] = [0];
@@ -562,7 +578,7 @@ export function layoutContributionStripRunwaySvg(args: {
   for (let i = 0; i < nMonthSeg; i++) {
     const w0 = monthBounds[i]!;
     const w1 = monthBounds[i + 1]!;
-    const d0 = parseDate(sundayYmd(w0));
+    const d0 = parseDate(contributionWeekColumnAnchorYmd(grid0, w0, msPerDay));
     const pStart = ymdStartOfMonthFromDate(d0);
     const pEnd = ymdEndOfMonthFromDate(d0);
     if ((i === 0 && rs > pStart) || (i === nMonthSeg - 1 && re < pEnd)) continue;
@@ -578,7 +594,7 @@ export function layoutContributionStripRunwaySvg(args: {
   for (let i = 0; i < nQSeg; i++) {
     const w0 = quarterBounds[i]!;
     const w1 = quarterBounds[i + 1]!;
-    const d0 = parseDate(sundayYmd(w0));
+    const d0 = parseDate(contributionWeekColumnAnchorYmd(grid0, w0, msPerDay));
     const pStart = ymdStartOfQuarterFromDate(d0);
     const pEnd = ymdEndOfQuarterFromDate(d0);
     if ((i === 0 && rs > pStart) || (i === nQSeg - 1 && re < pEnd)) continue;
@@ -615,7 +631,7 @@ export function layoutContributionStripRunwaySvg(args: {
   for (let w = 1; w < numWeeks; w++) {
     if (quarterIdx0(w) !== quarterIdx0(w - 1)) {
       quarterRailBoundaryTicks.push({
-        /** First Sunday column of the new quarter — same x as heat-map cells for that week. */
+        /** Week column where Wednesday crosses a quarter boundary (matches strip month anchor). */
         x: columnCenterX(w),
         y: quarterLabelY,
       });
@@ -676,11 +692,11 @@ export function layoutContributionStripRunwayTimeAxisAbove(args: {
   const tierGap = CONTRIBUTION_STRIP_AXIS_TIER_GAP_PX;
 
   const columnCenterX = (weekIdx: number) => gutter + weekIdx * stride + cellPx / 2;
-  const sundayYmd = (weekIdx: number) =>
-    formatDateYmd(new Date(grid0.getTime() + weekIdx * 7 * msPerDay));
-  const ymKey = (weekIdx: number) => sundayYmd(weekIdx).slice(0, 7);
-  const quarterIdx0 = (weekIdx: number) => Math.floor(parseDate(sundayYmd(weekIdx)).getMonth() / 3);
-  const yearNum = (weekIdx: number) => parseDate(sundayYmd(weekIdx)).getFullYear();
+  const ymKey = (weekIdx: number) => contributionWeekColumnAnchorYmd(grid0, weekIdx, msPerDay).slice(0, 7);
+  const quarterIdx0 = (weekIdx: number) =>
+    Math.floor(parseDate(contributionWeekColumnAnchorYmd(grid0, weekIdx, msPerDay)).getMonth() / 3);
+  const yearNum = (weekIdx: number) =>
+    parseDate(contributionWeekColumnAnchorYmd(grid0, weekIdx, msPerDay)).getFullYear();
 
   const pushBoundaryWeeks = (changed: (w: number) => boolean): number[] => {
     const out: number[] = [0];
@@ -763,7 +779,7 @@ export function layoutContributionStripRunwayTimeAxisAbove(args: {
   for (let i = 0; i < nMonthSeg; i++) {
     const w0 = monthBounds[i]!;
     const w1 = monthBounds[i + 1]!;
-    const d0 = parseDate(sundayYmd(w0));
+    const d0 = parseDate(contributionWeekColumnAnchorYmd(grid0, w0, msPerDay));
     const pStart = ymdStartOfMonthFromDate(d0);
     const pEnd = ymdEndOfMonthFromDate(d0);
     if ((i === 0 && rs > pStart) || (i === nMonthSeg - 1 && re < pEnd)) continue;
@@ -779,7 +795,7 @@ export function layoutContributionStripRunwayTimeAxisAbove(args: {
   for (let i = 0; i < nQSeg; i++) {
     const w0 = quarterBounds[i]!;
     const w1 = quarterBounds[i + 1]!;
-    const d0 = parseDate(sundayYmd(w0));
+    const d0 = parseDate(contributionWeekColumnAnchorYmd(grid0, w0, msPerDay));
     const pStart = ymdStartOfQuarterFromDate(d0);
     const pEnd = ymdEndOfQuarterFromDate(d0);
     if ((i === 0 && rs > pStart) || (i === nQSeg - 1 && re < pEnd)) continue;

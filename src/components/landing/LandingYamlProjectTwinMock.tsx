@@ -732,7 +732,7 @@ function schoolHolidayStressContribution(row: RiskRow | undefined): number {
   return row && row.school_holiday_flag ? TWIN_HOLIDAY_STRESS_SCHOOL_COEFF : 0;
 }
 
-const LANDING_TWIN_MARKET = 'DE';
+const LANDING_TWIN_MARKET = 'UK';
 
 type LayerKey =
   | 'baseline'
@@ -1061,14 +1061,14 @@ function FreezeHatchOverlay({
 function TwinWorkbenchRunwayReplica({
   chronWeeks,
   riskByDateBase,
-  deConfig,
+  marketConfig,
   phases,
   enabledLayerKey,
   reducedMotion,
 }: {
   chronWeeks: RunwayCalendarCellValue[][];
   riskByDateBase: Map<string, RiskRow>;
-  deConfig: MarketConfig | undefined;
+  marketConfig: MarketConfig | undefined;
   phases: LayerRecord<number>;
   /** Stable string key derived from enable-state, used to debounce strip emergence. */
   enabledLayerKey: string;
@@ -1110,24 +1110,24 @@ function TwinWorkbenchRunwayReplica({
     };
   }, [riskHeatmapTuningByLens, heatmapRenderStyle, heatmapMonoColor, heatmapSpectrumContinuous]);
 
-  const heatmapOptsDe = useMemo(
-    () => heatmapColorOptsWithMarketYaml('combined', heatmapOptsBase, deConfig, 0, 0),
-    [heatmapOptsBase, deConfig]
+  const heatmapOptsMarket = useMemo(
+    () => heatmapColorOptsWithMarketYaml('combined', heatmapOptsBase, marketConfig, 0, 0),
+    [heatmapOptsBase, marketConfig]
   );
 
   /** Slightly hotter spectrum for the YAML twin preview (more red at a given stress vs workbench defaults). */
   const heatmapOptsTwinPreview = useMemo((): HeatmapColorOpts => {
-    const g0 = heatmapOptsDe.riskHeatmapGamma ?? 1;
-    const t0 = heatmapOptsDe.riskHeatmapTailPower ?? 1;
+    const g0 = heatmapOptsMarket.riskHeatmapGamma ?? 1;
+    const t0 = heatmapOptsMarket.riskHeatmapTailPower ?? 1;
     return {
-      ...heatmapOptsDe,
+      ...heatmapOptsMarket,
       businessHeatmapPressureOffset: clampHeatmapPressureOffset(
-        (heatmapOptsDe.businessHeatmapPressureOffset ?? 0) + 0.12
+        (heatmapOptsMarket.businessHeatmapPressureOffset ?? 0) + 0.12
       ),
       riskHeatmapGamma: Math.max(0.35, Math.min(3, g0 * 0.86)),
       riskHeatmapTailPower: Math.min(2.75, Math.max(1, t0 * 1.22)),
     };
-  }, [heatmapOptsDe]);
+  }, [heatmapOptsMarket]);
 
   const todayYmd = useMemo(() => formatDateYmd(new Date()), []);
 
@@ -1635,15 +1635,19 @@ export function LandingYamlProjectTwinMock() {
     []
   );
 
-  const { riskByDateDe, deConfig } = useMemo(() => {
-    const { riskSurface, parseError, configs } = runPipelineFromDsl(defaultDslForMarket('DE'), DEFAULT_RISK_TUNING);
+  const { riskByDateTwin, twinMarketConfig } = useMemo(() => {
+    const { riskSurface, parseError, configs } = runPipelineFromDsl(
+      defaultDslForMarket(LANDING_TWIN_MARKET),
+      DEFAULT_RISK_TUNING
+    );
     const m = new Map<string, RiskRow>();
-    if (parseError) return { riskByDateDe: m, deConfig: undefined as MarketConfig | undefined };
-    const deConfig = configs.find((c) => c.market === 'DE');
+    if (parseError)
+      return { riskByDateTwin: m, twinMarketConfig: undefined as MarketConfig | undefined };
+    const twinMarketConfig = configs.find((c) => c.market === LANDING_TWIN_MARKET);
     for (const r of riskSurface) {
-      if (r.market === 'DE') m.set(r.date, r);
+      if (r.market === LANDING_TWIN_MARKET) m.set(r.date, r);
     }
-    return { riskByDateDe: m, deConfig };
+    return { riskByDateTwin: m, twinMarketConfig };
   }, []);
 
   /**
@@ -1788,8 +1792,8 @@ export function LandingYamlProjectTwinMock() {
               <div className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 items-start justify-start">
                 <TwinWorkbenchRunwayReplica
                   chronWeeks={storyChronWeeks}
-                  riskByDateBase={riskByDateDe}
-                  deConfig={deConfig}
+                  riskByDateBase={riskByDateTwin}
+                  marketConfig={twinMarketConfig}
                   phases={layerPhases}
                   enabledLayerKey={enabledLayerKey}
                   reducedMotion={!!reducedMotion}

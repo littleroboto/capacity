@@ -67,6 +67,8 @@ export type RunwayContributionStripSvgProps = {
    * plus smooth `fill` transitions when stress updates (no strip-wide flicker).
    */
   landingStaggerCellPulse?: boolean;
+  /** When true, omit the dashed day column line (e.g. triple-lens uses a parent overlay line). */
+  suppressSelectionColumnLine?: boolean;
 };
 
 function svgClientPoint(e: MouseEvent | KeyboardEvent, fallbackW: number, fallbackH: number) {
@@ -132,6 +134,7 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
   cellRadiusPx = 3,
   deploymentRiskBlackouts = null,
   landingStaggerCellPulse = false,
+  suppressSelectionColumnLine = false,
 }: RunwayContributionStripSvgProps) {
   const theme = useAtcStore((s) => s.theme);
   const reduceMotion = useReducedMotion();
@@ -208,7 +211,7 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
   );
 
   const selectedColumnLine =
-    selectedDayColumnX != null ? (
+    selectedDayColumnX != null && !suppressSelectionColumnLine ? (
       <line
         x1={selectedDayColumnX}
         x2={selectedDayColumnX}
@@ -325,7 +328,8 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
                   y1={c.h}
                   x2={c.w}
                   y2={0}
-                  className="stroke-foreground/55"
+                  stroke="white"
+                  strokeOpacity={0.92}
                   strokeWidth={freezeStroke}
                   vectorEffect="non-scaling-stroke"
                 />
@@ -388,9 +392,12 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
               y1={c.y + c.h}
               x2={c.x + c.w}
               y2={c.y}
-              className="pointer-events-none stroke-foreground/55"
+              className="pointer-events-none"
+              stroke="white"
+              strokeOpacity={0.92}
               strokeWidth={freezeStroke}
               opacity={opacity}
+              vectorEffect="non-scaling-stroke"
             />
           ) : null}
           {isToday ? (

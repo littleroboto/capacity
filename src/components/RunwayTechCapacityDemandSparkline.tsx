@@ -186,6 +186,8 @@ export type RunwayTechCapacityDemandSparklineProps = {
   landingMarketingSweepReveal?: boolean;
   /** Landing / YAML preview: rose fill between the trace and 100% when utilization is high but not overloaded. */
   landingMarketingTightCapacityFill?: boolean;
+  /** When true, omit dashed selection lines (parent draws one overlay through the stack). */
+  suppressSelectionColumnLine?: boolean;
 };
 
 function yForUtilizationStroke(
@@ -220,6 +222,7 @@ export function RunwayTechCapacityDemandSparkline({
   modelTraceSuppressed = false,
   landingMarketingSweepReveal = false,
   landingMarketingTightCapacityFill = false,
+  suppressSelectionColumnLine = false,
 }: RunwayTechCapacityDemandSparklineProps) {
   const prefersReducedMotion = useReducedMotion();
   const gutter = CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W;
@@ -487,7 +490,7 @@ export function RunwayTechCapacityDemandSparkline({
             />
           ))}
         </g>
-        {selX != null ? (
+        {selX != null && !suppressSelectionColumnLine ? (
           <line
             x1={xo(selX)}
             x2={xo(selX)}
@@ -655,7 +658,7 @@ export function RunwayTechCapacityDemandSparkline({
           vectorEffect="non-scaling-stroke"
           opacity={0.55}
         />
-        {selX != null ? (
+        {selX != null && !suppressSelectionColumnLine ? (
           <line
             x1={xo(selX)}
             x2={xo(selX)}

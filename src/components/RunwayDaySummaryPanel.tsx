@@ -1,6 +1,5 @@
 import type { LegacyRef, Ref } from 'react';
 import { Filter, X } from 'lucide-react';
-import { RunwayDayDetailsPayloadBody } from '@/components/RunwayDayDetailsBody';
 import type { RunwayTipState } from '@/lib/runwayTooltipBreakdown';
 import { cn } from '@/lib/utils';
 
@@ -66,35 +65,9 @@ export function RunwayDaySummaryPanel({
           </header>
         ) : null}
 
-        {tip ? (
+        {tip && 'simple' in tip ? (
           <div className="overflow-visible pt-0 pb-3 sm:pb-4">
-            {'simple' in tip ? (
-              <p className="text-base leading-relaxed text-foreground sm:text-[17px]">{tip.simple}</p>
-            ) : (
-              <details className="group rounded-lg border border-border/50 bg-muted/10 open:bg-muted/15">
-                <summary className="cursor-pointer select-none list-none px-3 py-2 text-sm font-medium text-foreground outline-none marker:content-none [&::-webkit-details-marker]:hidden">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="text-muted-foreground group-open:hidden">▸</span>
-                    <span className="hidden text-muted-foreground group-open:inline">▾</span>
-                    Full calculation narrative
-                  </span>
-                </summary>
-                <div
-                  className={cn(
-                    'border-t border-border/40 px-2 pb-3 pt-3 sm:px-3',
-                    'max-w-none text-base leading-[1.65] text-foreground sm:text-[17px] sm:leading-[1.7]',
-                    'space-y-4 [&_strong]:font-semibold [&_p]:mb-3 [&_p:last-child]:mb-0',
-                    '[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1',
-                  )}
-                >
-                  <RunwayDayDetailsPayloadBody
-                    p={tip.payload}
-                    presentation="markdown"
-                    omitMarkdownDriverSummary={false}
-                  />
-                </div>
-              </details>
-            )}
+            <p className="text-base leading-relaxed text-foreground sm:text-[17px]">{tip.simple}</p>
           </div>
         ) : null}
       </article>

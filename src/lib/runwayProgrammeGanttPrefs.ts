@@ -6,7 +6,7 @@ export type ProgrammeGanttDisplayPrefs = {
   laneGapPx: number;
   stripTopPadPx: number;
   stripBottomPadPx: number;
-  /** Solid bar colour (no stroke). */
+  /** Solid bar fill (outline is drawn in the strip: 1px grey, non-scaling). */
   campaignFill: string;
   techFill: string;
   /** Very subtle column wash under 45° hatch. */
@@ -14,20 +14,37 @@ export type ProgrammeGanttDisplayPrefs = {
   /** Opacity of 45° light-grey hatch lines (shared blackout / school). */
   overlayHatchOpacity: number;
   barOpacity: number;
+  /**
+   * Programme bar hatch: square tile size in px (45° diagonal; line through tile centre).
+   * Same geometry as the default 3×3 overlay hatch, scaled when this value changes.
+   */
+  barHatchSpacingPx: number;
+  /** How strong the 45° hatch reads on top of the bar fill (0 = solid fill only). */
+  barHatchOpacity: number;
+  /** When true, trailing label includes ISO date span after the name (`Name · start–end`). */
+  showBarTrailingCaption: boolean;
   showBlackouts: boolean;
   showSchoolHolidays: boolean;
 };
 
 export const RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS: ProgrammeGanttDisplayPrefs = {
-  barHeightPx: 12,
+  barHeightPx: 15,
   laneGapPx: 5,
   stripTopPadPx: 4,
   stripBottomPadPx: 6,
-  campaignFill: '#e11d48',
-  techFill: '#2563eb',
-  overlayColumnFill: 'rgba(228, 228, 231, 0.45)',
-  overlayHatchOpacity: 0.35,
+  /** `rgb(199, 244, 240)` — mint campaign bars. */
+  campaignFill: '#c7f4f0',
+  /** `rgb(255, 255, 255)` — white tech bars. */
+  techFill: '#ffffff',
+  /** Column wash under 45° hatch (school / blackout overlay columns). */
+  overlayColumnFill: 'rgba(24, 24, 27, 0.12)',
+  /** School-holiday (and shared overlay) hatch line strength — 0–1. */
+  overlayHatchOpacity: 0.5,
   barOpacity: 1,
+  barHatchSpacingPx: 3,
+  /** Programme bar diagonal hatch strength — 0–1. */
+  barHatchOpacity: 0.5,
+  showBarTrailingCaption: false,
   showBlackouts: true,
   showSchoolHolidays: true,
 };
@@ -77,6 +94,10 @@ export function loadProgrammeGanttPrefs(): ProgrammeGanttDisplayPrefs {
     overlayColumnFill: overlayFill,
     overlayHatchOpacity: Number.isFinite(ho) ? clamp(ho, 0.08, 1) : d.overlayHatchOpacity,
     barOpacity: clamp(Number(p.barOpacity) ?? d.barOpacity, 0.25, 1),
+    barHatchSpacingPx: clamp(Number(p.barHatchSpacingPx) || d.barHatchSpacingPx, 2, 14),
+    barHatchOpacity: clamp(Number(p.barHatchOpacity) ?? d.barHatchOpacity, 0, 1),
+    showBarTrailingCaption:
+      typeof p.showBarTrailingCaption === 'boolean' ? p.showBarTrailingCaption : d.showBarTrailingCaption,
     showBlackouts: typeof p.showBlackouts === 'boolean' ? p.showBlackouts : d.showBlackouts,
     showSchoolHolidays: typeof p.showSchoolHolidays === 'boolean' ? p.showSchoolHolidays : d.showSchoolHolidays,
   };

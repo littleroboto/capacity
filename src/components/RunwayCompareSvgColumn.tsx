@@ -244,9 +244,12 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
                 y1={c.y + c.h}
                 x2={c.x + c.w}
                 y2={c.y}
-                className="pointer-events-none stroke-foreground/55"
+                className="pointer-events-none"
+                stroke="white"
+                strokeOpacity={0.92}
                 strokeWidth={freezeStroke}
                 opacity={opacity}
+                vectorEffect="non-scaling-stroke"
               />
             ) : null}
             {isToday ? (

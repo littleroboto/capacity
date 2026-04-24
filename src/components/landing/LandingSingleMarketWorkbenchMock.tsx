@@ -1,16 +1,24 @@
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import type { RiskRow } from '@/engine/riskModel';
 import type { MarketConfig } from '@/engine/types';
 import { RunwayGrid, type SlotSelection } from '@/components/RunwayGrid';
 import { defaultDslForMarket } from '@/lib/marketDslSeeds';
+import type { ProgrammeGanttDisplayPrefs } from '@/lib/runwayProgrammeGanttPrefs';
 import { WORKBENCH_URL_KEYS } from '@/lib/workbenchUrlViewState';
 import { useAtcStore } from '@/store/useAtcStore';
 import type { ViewModeId } from '@/lib/constants';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
 
-const LANDING_HERO_MARKET = 'AU';
+const LANDING_HERO_MARKET = 'UK';
+
+/** Homepage hero: school column off, deployment blackouts on, campaign bars a pale blue (less mint/teal). */
+const LANDING_HERO_PROGRAMME_GANTT_PREFS = {
+  showSchoolHolidays: false,
+  showBlackouts: true,
+  campaignFill: '#d5e8fa',
+} satisfies Partial<ProgrammeGanttDisplayPrefs>;
 const LANDING_HERO_FROM = '2026-04-23';
 const LANDING_HERO_TO = '2027-09-23';
 
@@ -80,7 +88,7 @@ function restoreLandingWorkbenchSnap(snap: LandingWorkbenchSnap) {
   document.documentElement.classList.remove('dark');
 }
 
-function seedAuSingleMarketWorkbenchDemo() {
+function seedLandingHeroSingleMarketWorkbenchDemo() {
   const st = useAtcStore.getState();
   st.setTheme('light');
   st.setRunwayMarketOrder([LANDING_HERO_MARKET]);
@@ -115,8 +123,13 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
   const viewMode = useAtcStore((s) => s.viewMode);
   const parseError = useAtcStore((s) => s.parseError);
   const configs = useAtcStore((s) => s.configs);
+  const [programmePlanRevealReady, setProgrammePlanRevealReady] = useState(false);
 
   const noopSlot = useCallback((_s: SlotSelection | null) => {}, []);
+
+  const onContributionHeatmapsSettled = useCallback(() => {
+    setProgrammePlanRevealReady(true);
+  }, []);
 
   const ready = useMemo(() => {
     if (parseError) return false;
@@ -126,9 +139,13 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
     return riskSurface.some((r) => r.market === LANDING_HERO_MARKET);
   }, [parseError, country, viewMode, configs, riskSurface]);
 
+  useEffect(() => {
+    if (!ready) setProgrammePlanRevealReady(false);
+  }, [ready]);
+
   useLayoutEffect(() => {
     savedRef.current = cloneLandingWorkbenchSnap();
-    seedAuSingleMarketWorkbenchDemo();
+    seedLandingHeroSingleMarketWorkbenchDemo();
     return () => {
       if (savedRef.current) restoreLandingWorkbenchSnap(savedRef.current);
     };
@@ -192,6 +209,10 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
                     viewMode="combined"
                     onSlotSelection={noopSlot}
                     landingMinimalChrome
+                    landingProgrammePlan
+                    landingProgrammePlanRevealReady={programmePlanRevealReady}
+                    landingProgrammePlanPrefs={LANDING_HERO_PROGRAMME_GANTT_PREFS}
+                    onLandingContributionHeatmapSettled={onContributionHeatmapsSettled}
                     landingCompareDisableCellDetails
                     landingTechSparklineSweep={!reducedMotion}
                     landingTechSparklineTightFill
@@ -209,9 +230,9 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
 
             <div className="border-t border-border bg-muted/30 px-3 py-2.5 sm:px-4 sm:py-3">
               <p className="mx-auto max-w-3xl text-center font-landing text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
-                Triple-lens stack, contribution strip, and activity ledger — identical components to{' '}
-                <span className="font-medium text-foreground/80">/app</span> with bundled Australia YAML and a fixed planning
-                window.
+                Triple-lens stack, contribution strip, programme plan, and activity ledger — identical components to{' '}
+                <span className="font-medium text-foreground/80">/app</span> with bundled United Kingdom YAML and a fixed
+                planning window.
               </p>
             </div>
           </div>
