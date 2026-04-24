@@ -70,7 +70,7 @@ function AuthGateInner({ children }: { children: ReactNode }) {
         )}
       >
         <p className="mb-6 max-w-md text-center text-sm text-muted-foreground">
-          Sign in to open Segment Workbench.
+          Sign in to open Capacity Workbench.
         </p>
         <SignIn
           routing="hash"

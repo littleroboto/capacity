@@ -521,9 +521,11 @@ export const useAtcStore = create<AtcState>()(
         });
       },
 
-      setTheme: (t) => {
-        set({ theme: t });
-        document.documentElement.classList.toggle('dark', t === 'dark');
+      setTheme: (_t) => {
+        // Light mode is now permanent. We keep the action so persisted/URL state
+        // shapes don't break, but always coerce to 'light' and strip any 'dark' class.
+        set({ theme: 'light' });
+        document.documentElement.classList.remove('dark');
       },
 
       setDiscoMode: (v) => set({ discoMode: v }),
@@ -1023,8 +1025,7 @@ export const useAtcStore = create<AtcState>()(
           pipelineCalendarRangeFromGet(get)
         );
         commitPipelineRisk(get, set, r);
-        const th = get().theme;
-        document.documentElement.classList.toggle('dark', th === 'dark');
+        document.documentElement.classList.remove('dark');
       },
     }),
     {
@@ -1035,12 +1036,12 @@ export const useAtcStore = create<AtcState>()(
       merge: (persistedState, currentState) =>
         mergePersistedViewSettings(persistedState, currentState as AtcState),
       onRehydrateStorage: () => (state) => {
-        const th = state?.theme;
-        if (th === 'light' || th === 'dark') {
-          document.documentElement.classList.toggle('dark', th === 'dark');
-        } else {
-          document.documentElement.classList.toggle('dark', false);
+        // Light mode only — coerce any persisted 'dark' theme back to 'light'
+        // and ensure the html class never carries the dark variant.
+        if (state) {
+          state.theme = 'light';
         }
+        document.documentElement.classList.remove('dark');
       },
     }
   )

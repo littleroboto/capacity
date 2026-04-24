@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useId, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Show, SignInButton, UserButton } from '@clerk/react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
@@ -208,7 +208,6 @@ function LandingBomTable() {
 export function LandingPage() {
   const reducedMotion = useReducedMotion();
   const clerkOn = isClerkConfigured();
-  const location = useLocation();
   const landingSymbolPatternId = useId().replace(/:/g, '');
   const landingNoiseFilterId = useId().replace(/:/g, '');
   const workbenchHref = useMemo(() => workbenchEntryHref(), []);
@@ -220,16 +219,6 @@ export function LandingPage() {
     const t = window.setTimeout(() => prefetchWorkbenchApp(), 1200);
     return () => window.clearTimeout(t);
   }, []);
-
-  /** Marketing route: force light document tokens so Clerk / nav match the page (restore prior dark class on leave). */
-  useEffect(() => {
-    if (location.pathname !== '/') return;
-    const hadDark = document.documentElement.classList.contains('dark');
-    document.documentElement.classList.remove('dark');
-    return () => {
-      if (hadDark) document.documentElement.classList.add('dark');
-    };
-  }, [location.pathname]);
 
   return (
     <div className="landing-root relative min-h-screen overflow-x-visible overflow-y-auto bg-zinc-50 text-zinc-900 antialiased selection:bg-[#FFC72C]/40">
@@ -538,17 +527,22 @@ export function LandingPage() {
             A browser-native view of organisational pressure: scenario lives in YAML, the runway stays readable for
             anyone who needs to reason about risk before the plan is cast in stone.
           </p>
-          <p className="mx-auto mt-3 max-w-4xl text-pretty text-center text-[11px] font-normal leading-relaxed tracking-normal text-zinc-500 sm:mx-0 sm:text-left">
+          <p
+            className="mx-auto mt-3 max-w-4xl text-pretty text-center text-[11px] font-normal leading-relaxed tracking-normal text-zinc-500 sm:mx-0 sm:text-left"
+            title={GIT_COMMIT_MESSAGE && GIT_COMMIT_MESSAGE !== '—' ? GIT_COMMIT_MESSAGE : undefined}
+          >
             <span className="sr-only">Release — </span>
             v<span className="text-zinc-600">{APP_VERSION}</span>
             <span aria-hidden> · </span>
             <span className="whitespace-nowrap">
               git <span className="font-mono text-zinc-600">{GIT_COMMIT_SHORT}</span>
             </span>
-            <span className="text-zinc-500">
-              {' '}
-              — {GIT_COMMIT_MESSAGE}
-            </span>
+            {GIT_COMMIT_MESSAGE && GIT_COMMIT_MESSAGE !== '—' ? (
+              <span className="text-zinc-500">
+                {' '}
+                — {GIT_COMMIT_MESSAGE.length > 75 ? `${GIT_COMMIT_MESSAGE.slice(0, 75)}…` : GIT_COMMIT_MESSAGE}
+              </span>
+            ) : null}
           </p>
           <LandingBomTable />
           <p className="mt-8 text-center text-zinc-500">

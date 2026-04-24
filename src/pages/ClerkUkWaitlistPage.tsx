@@ -55,7 +55,7 @@ export function ClerkUkWaitlistPage() {
             className="inline-flex items-center gap-2.5 font-landing text-base font-extrabold tracking-[-0.02em] text-zinc-50 sm:text-lg"
           >
             <SegmentWorkbenchMark className="h-7 w-7 shrink-0 text-zinc-50 sm:h-8 sm:w-8" />
-            Segment Workbench
+            Capacity Workbench
           </Link>
           <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-semibold text-zinc-300">
             <MarketCircleFlag marketId="UK" size={18} className="ring-white/15" />

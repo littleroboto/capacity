@@ -71,7 +71,7 @@ function restoreLandingWorkbenchSnap(snap: LandingWorkbenchSnap) {
     runwayCustomRangeStartYmd: snap.runwayCustomRangeStartYmd,
     runwayCustomRangeEndYmd: snap.runwayCustomRangeEndYmd,
   });
-  document.documentElement.classList.toggle('dark', snap.theme === 'dark');
+  document.documentElement.classList.remove('dark');
 }
 
 function seedAuSingleMarketWorkbenchDemo() {

@@ -58,7 +58,6 @@ export default function App() {
   const viewMode = useAtcStore((s) => s.viewMode);
   const country = useAtcStore((s) => s.country);
   const setViewMode = useAtcStore((s) => s.setViewMode);
-  const theme = useAtcStore((s) => s.theme);
 
   const [dslPanelCollapsed, setDslPanelCollapsed] = useState(false);
   const lgUp = useMediaMinWidth(1024);
@@ -105,11 +104,13 @@ export default function App() {
   }, [lgUp, dslPanelLayoutCollapsed]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-  }, [theme]);
+    // Light mode is permanent; defensively strip any 'dark' class injected by
+    // older persisted state, third-party scripts, or system colour-scheme heuristics.
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   useEffect(() => {
-    document.title = 'Segment Workbench';
+    document.title = 'Capacity Workbench';
   }, []);
 
   useEffect(() => {
