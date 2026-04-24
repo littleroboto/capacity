@@ -1,10 +1,12 @@
 import { useId, useMemo } from 'react';
+import { parseDate } from '@/engine/calendar';
 import type { DeploymentRiskBlackout } from '@/engine/types';
 import type { RiskRow } from '@/engine/riskModel';
 import type { ContributionStripLayoutMeta, PlacedRunwayCell } from '@/lib/calendarQuarterLayout';
 import { CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W } from '@/lib/calendarQuarterLayout';
 import { ymdInAnyDeploymentRiskBlackout } from '@/lib/deploymentRiskBlackoutCalendar';
 import { enumerateIsoDatesInclusive } from '@/lib/runwayDateFilter';
+import { formatDateYmd } from '@/lib/weekRunway';
 import {
   contributionStripYmdToCellLayout,
   xSpanForInclusiveYmdRangeClipped,
@@ -16,6 +18,12 @@ const LABEL_GAP_PX = 5;
 /** Rough advance for 11px UI sans labels (waterfall read). */
 const LABEL_CHAR_ADVANCE_PX = 6.15;
 const LABEL_FONT_SIZE_PX = 11;
+
+function nextYmd(ymd: string): string {
+  const d = parseDate(ymd);
+  d.setDate(d.getDate() + 1);
+  return formatDateYmd(d);
+}
 
 export type RunwayProgrammeGanttStripProps = {
   marketKey: string;
@@ -60,22 +68,7 @@ export function RunwayProgrammeGanttStrip({
     return { clipStart, clipEnd, layout };
   }, [placedCells, cellPx, contributionMeta.rangeStartYmd, contributionMeta.rangeEndYmd]);
 
-  const overlayRects = useMemo(() => {
-    const out: { kind: 'school' | 'blackout'; x0: number; x1: number }[] = [];
-    for (const ymd of enumerateIsoDatesInclusive(clipStart, clipEnd)) {
-      const cell = layout.get(ymd);
-      if (!cell) continue;
-      const row = riskByDate.get(ymd);
-      const inB = prefs.showBlackouts && ymdInAnyDeploymentRiskBlackout(ymd, blackouts ?? null);
-      const inS = prefs.showSchoolHolidays && Boolean(row?.school_holiday_flag);
-      if (!inB && !inS) continue;
-      const kind: 'school' | 'blackout' = inB ? 'blackout' : 'school';
-      out.push({ kind, x0: cell.x, x1: cell.x + cell.cellPx });
-    }
-    return out;
-  }, [clipStart, clipEnd, layout, riskByDate, blackouts, prefs.showBlackouts, prefs.showSchoolHolidays]);
-
-  const { barRects, svgHeight } = useMemo(() => {
+  const { barRects, svgHeight, overlaySpans } = useMemo(() => {
     const { stripTopPadPx, barHeightPx, laneGapPx, stripBottomPadPx, barOpacity } = prefs;
     const stride = barHeightPx + laneGapPx;
 
@@ -109,8 +102,41 @@ export function RunwayProgrammeGanttStrip({
     const bodyPx = n === 0 ? 0 : n * barHeightPx + (n - 1) * laneGapPx;
     const svgHeight = stripTopPadPx + bodyPx + stripBottomPadPx;
 
-    return { barRects, svgHeight };
-  }, [bars, layout, clipStart, clipEnd, prefs]);
+    const overlayYmdSet = new Set<string>();
+    for (const ymd of enumerateIsoDatesInclusive(clipStart, clipEnd)) {
+      if (!layout.has(ymd)) continue;
+      const row = riskByDate.get(ymd);
+      const inB = prefs.showBlackouts && ymdInAnyDeploymentRiskBlackout(ymd, blackouts ?? null);
+      const inS = prefs.showSchoolHolidays && Boolean(row?.school_holiday_flag);
+      if (inB || inS) overlayYmdSet.add(ymd);
+    }
+
+    const sorted = [...overlayYmdSet].sort();
+    const groups: string[][] = [];
+    for (const ymd of sorted) {
+      const g = groups[groups.length - 1];
+      const last = g?.[g.length - 1];
+      if (!g || !last || nextYmd(last) !== ymd) groups.push([ymd]);
+      else g.push(ymd);
+    }
+
+    const overlaySpans = groups
+      .map((g, i) => {
+        const c0 = layout.get(g[0]!);
+        const c1 = layout.get(g[g.length - 1]!);
+        if (!c0 || !c1) return null;
+        return {
+          key: `overlay-${i}-${g[0]}`,
+          x0: c0.x,
+          x1: c1.x + c1.cellPx,
+          ymdStart: g[0]!,
+          ymdEnd: g[g.length - 1]!,
+        };
+      })
+      .filter(Boolean) as Array<{ key: string; x0: number; x1: number; ymdStart: string; ymdEnd: string }>;
+
+    return { barRects, svgHeight, overlaySpans };
+  }, [bars, layout, clipStart, clipEnd, prefs, riskByDate, blackouts]);
 
   const contentWidth = useMemo(() => {
     let m = width;
@@ -136,19 +162,19 @@ export function RunwayProgrammeGanttStrip({
       <defs>
         <pattern
           id={hatchId}
-          width="7"
-          height="7"
+          width="8"
+          height="8"
           patternUnits="userSpaceOnUse"
           patternTransform="rotate(45)"
         >
-            <line
+          <line
             x1="0"
             y1="0"
             x2="0"
-            y2="10"
+            y2="12"
             className="stroke-zinc-400 dark:stroke-zinc-500"
-            strokeWidth={1}
-            strokeOpacity={prefs.overlayHatchOpacity}
+            strokeWidth={0.9}
+            strokeOpacity={Math.min(0.35, prefs.overlayHatchOpacity * 0.45)}
           />
         </pattern>
       </defs>
@@ -164,21 +190,28 @@ export function RunwayProgrammeGanttStrip({
       />
 
       <g className="pointer-events-none">
-        {overlayRects.map((r, i) => (
-          <g key={`${r.kind}-${i}-${r.x0}`}>
+        {overlaySpans.map((s) => (
+          <g key={s.key}>
+            <title>{`Blackout / school context: ${s.ymdStart}${s.ymdEnd !== s.ymdStart ? ` → ${s.ymdEnd}` : ''}`}</title>
             <rect
-              x={r.x0}
+              x={s.x0}
               y={1}
-              width={r.x1 - r.x0}
-              height={svgHeight - 2}
-              fill={prefs.overlayColumnFill}
+              width={Math.max(0, s.x1 - s.x0)}
+              height={Math.max(0, svgHeight - 2)}
+              fill={`url(#${hatchId})`}
+              fillOpacity={0.06 + prefs.overlayHatchOpacity * 0.14}
             />
             <rect
-              x={r.x0}
+              x={s.x0}
               y={1}
-              width={r.x1 - r.x0}
-              height={svgHeight - 2}
-              fill={`url(#${hatchId})`}
+              width={Math.max(0, s.x1 - s.x0)}
+              height={Math.max(0, svgHeight - 2)}
+              fill="none"
+              className="stroke-zinc-400 dark:stroke-zinc-500"
+              strokeWidth={0.85}
+              strokeOpacity={0.2 + prefs.overlayHatchOpacity * 0.25}
+              strokeDasharray="5 4"
+              vectorEffect="non-scaling-stroke"
             />
           </g>
         ))}
