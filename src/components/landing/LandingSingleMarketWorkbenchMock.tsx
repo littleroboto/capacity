@@ -30,6 +30,8 @@ type LandingWorkbenchSnap = {
   runwayIncludeFollowingQuarter: boolean;
   runwayCustomRangeStartYmd: string | null;
   runwayCustomRangeEndYmd: string | null;
+  runwayLedgerExcludedEntryIds: string[];
+  runwayLedgerImplicitBaselineFootprint: boolean;
 };
 
 function cloneLandingWorkbenchSnap(): LandingWorkbenchSnap {
@@ -50,6 +52,8 @@ function cloneLandingWorkbenchSnap(): LandingWorkbenchSnap {
     runwayIncludeFollowingQuarter: s.runwayIncludeFollowingQuarter,
     runwayCustomRangeStartYmd: s.runwayCustomRangeStartYmd,
     runwayCustomRangeEndYmd: s.runwayCustomRangeEndYmd,
+    runwayLedgerExcludedEntryIds: [...s.runwayLedgerExcludedEntryIds],
+    runwayLedgerImplicitBaselineFootprint: s.runwayLedgerImplicitBaselineFootprint,
   };
 }
 
@@ -70,6 +74,8 @@ function restoreLandingWorkbenchSnap(snap: LandingWorkbenchSnap) {
     runwayIncludeFollowingQuarter: snap.runwayIncludeFollowingQuarter,
     runwayCustomRangeStartYmd: snap.runwayCustomRangeStartYmd,
     runwayCustomRangeEndYmd: snap.runwayCustomRangeEndYmd,
+    runwayLedgerExcludedEntryIds: [...snap.runwayLedgerExcludedEntryIds],
+    runwayLedgerImplicitBaselineFootprint: snap.runwayLedgerImplicitBaselineFootprint,
   });
   document.documentElement.classList.remove('dark');
 }
@@ -86,6 +92,8 @@ function seedAuSingleMarketWorkbenchDemo() {
   st.setRunwayIncludeFollowingQuarter(true);
   st.setViewMode('combined');
   st.setCountry(LANDING_HERO_MARKET, {});
+  st.clearRunwayLedgerExclusions();
+  st.setRunwayLedgerImplicitBaselineFootprint(true);
 }
 
 function demoUrlQuery(): string {

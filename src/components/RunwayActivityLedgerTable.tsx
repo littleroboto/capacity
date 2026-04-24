@@ -131,9 +131,11 @@ function formatShareCell(v: number | null | undefined): string {
 function SelectAllHeaderCheckbox({
   visibleEntryIds,
   onToggleBulk,
+  staticPreview,
 }: {
   visibleEntryIds: readonly string[];
   onToggleBulk: (ids: readonly string[]) => void;
+  staticPreview: boolean;
 }) {
   const excludedIds = useAtcStore((s) => s.runwayLedgerExcludedEntryIds);
   const excludedSet = useMemo(() => new Set(excludedIds), [excludedIds]);
@@ -144,11 +146,26 @@ function SelectAllHeaderCheckbox({
   const indeterminate = someIncluded && someExcluded;
 
   useEffect(() => {
-    if (ref.current) ref.current.indeterminate = indeterminate;
-  }, [indeterminate]);
+    if (ref.current) ref.current.indeterminate = staticPreview ? false : indeterminate;
+  }, [indeterminate, staticPreview]);
 
   if (visibleEntryIds.length === 0) {
     return <span className="inline-block h-3.5 w-3.5 shrink-0" aria-hidden />;
+  }
+
+  if (staticPreview) {
+    return (
+      <input
+        type="checkbox"
+        className="h-3.5 w-3.5 shrink-0 cursor-default rounded border-input accent-primary opacity-80"
+        aria-label="Include all visible activity rows in runway calendar colours"
+        checked
+        disabled
+        readOnly
+        title="Preview: all rows included"
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
   }
 
   return (
@@ -169,13 +186,29 @@ function SelectAllHeaderCheckbox({
 function LedgerRowSelectCheckbox({
   selectHeaderId,
   entryId,
+  staticPreview,
 }: {
   selectHeaderId: string;
   entryId: string;
+  staticPreview: boolean;
 }) {
   const excludedIds = useAtcStore((s) => s.runwayLedgerExcludedEntryIds);
   const toggleExcluded = useAtcStore((s) => s.toggleRunwayLedgerExcludedEntryId);
   const checked = !excludedIds.includes(entryId);
+  if (staticPreview) {
+    return (
+      <input
+        type="checkbox"
+        className="h-3.5 w-3.5 cursor-default rounded border-input accent-primary opacity-80"
+        aria-labelledby={`${selectHeaderId} ledger-row-${entryId}`}
+        title="Preview: all rows included"
+        checked
+        disabled
+        readOnly
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  }
   return (
     <input
       type="checkbox"
@@ -195,10 +228,11 @@ function buildColumns(
   options: {
     onBulkVisible: (ids: readonly string[]) => void;
     contributionById: Map<string, DayContributionTriple> | null;
+    staticLedgerPreview: boolean;
   },
 ): ColumnDef<MarketActivityLedgerEntry, any>[] {
   const selectHeaderId = 'ledger-report-col-select';
-  const { onBulkVisible, contributionById } = options;
+  const { onBulkVisible, contributionById, staticLedgerPreview } = options;
 
   const greekCols: ColumnDef<MarketActivityLedgerEntry, unknown>[] = contributionById
     ? [
@@ -260,7 +294,11 @@ function buildColumns(
         const visibleEntryIds = table.getFilteredRowModel().rows.map((r) => r.original.entryId);
         return (
           <div className="flex flex-col items-center gap-1 py-0.5">
-            <SelectAllHeaderCheckbox visibleEntryIds={visibleEntryIds} onToggleBulk={onBulkVisible} />
+            <SelectAllHeaderCheckbox
+              visibleEntryIds={visibleEntryIds}
+              onToggleBulk={onBulkVisible}
+              staticPreview={staticLedgerPreview}
+            />
             <span className="sr-only" id={selectHeaderId}>
               Include on runway heatmap
             </span>
@@ -268,7 +306,11 @@ function buildColumns(
         );
       },
       cell: ({ row }) => (
-        <LedgerRowSelectCheckbox selectHeaderId={selectHeaderId} entryId={row.original.entryId} />
+        <LedgerRowSelectCheckbox
+          selectHeaderId={selectHeaderId}
+          entryId={row.original.entryId}
+          staticPreview={staticLedgerPreview}
+        />
       ),
       enableSorting: false,
       size: 28,
@@ -322,9 +364,19 @@ type RunwayActivityLedgerTableProps = {
   className?: string;
   /** Pinned heatmap day: union of contributors across Tech / Trading / Risk, with τ ρ σ columns. */
   dayContributionPin?: RunwayLedgerDayContributionPin | null;
+  /**
+   * Landing / embed: every row appears included, heatmap-driving controls are disabled,
+   * default tab is All activity.
+   */
+  staticLedgerPreview?: boolean;
 };
 
-export function RunwayActivityLedgerTable({ ledger, className, dayContributionPin = null }: RunwayActivityLedgerTableProps) {
+export function RunwayActivityLedgerTable({
+  ledger,
+  className,
+  dayContributionPin = null,
+  staticLedgerPreview = false,
+}: RunwayActivityLedgerTableProps) {
   const excludedIds = useAtcStore((s) => s.runwayLedgerExcludedEntryIds);
   const clearExclusions = useAtcStore((s) => s.clearRunwayLedgerExclusions);
   const excludeAllEntries = useAtcStore((s) => s.excludeAllRunwayLedgerEntries);
@@ -332,7 +384,10 @@ export function RunwayActivityLedgerTable({ ledger, className, dayContributionPi
   const setImplicitBaselineFootprint = useAtcStore((s) => s.setRunwayLedgerImplicitBaselineFootprint);
   const toggleBulkVisible = useAtcStore((s) => s.toggleRunwayLedgerExcludeBulkVisible);
 
-  const excludedSet = useMemo(() => new Set(excludedIds), [excludedIds]);
+  const excludedSet = useMemo(
+    () => (staticLedgerPreview ? new Set<string>() : new Set(excludedIds)),
+    [staticLedgerPreview, excludedIds],
+  );
 
   const allLedgerRowsExcluded = useMemo(() => {
     if (!ledger.entries.length) return false;
@@ -381,11 +436,20 @@ export function RunwayActivityLedgerTable({ ledger, className, dayContributionPi
     return c;
   }, [tableRows]);
 
-  const [activeTab, setActiveTab] = useState<LedgerActivityTabId>('campaigns');
+  const [activeTab, setActiveTab] = useState<LedgerActivityTabId>(() =>
+    staticLedgerPreview ? 'all' : 'campaigns',
+  );
   const lastPinnedYmdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const pinYmd = dayContributionPin?.dayYmd ?? null;
+
+    if (staticLedgerPreview && !pinYmd) {
+      lastPinnedYmdRef.current = null;
+      setActiveTab((prev) => (tabCounts[prev] > 0 ? prev : 'all'));
+      return;
+    }
+
     setActiveTab((prev) => {
       const nonemptyCategories = LEDGER_CATEGORY_TAB_ORDER.filter((id) => tabCounts[id] > 0);
       if (nonemptyCategories.length === 0 && tabCounts.all === 0) {
@@ -419,6 +483,7 @@ export function RunwayActivityLedgerTable({ ledger, className, dayContributionPi
       );
     });
   }, [
+    staticLedgerPreview,
     dayContributionPin?.dayYmd,
     tabCounts.all,
     tabCounts.campaigns,
@@ -440,8 +505,13 @@ export function RunwayActivityLedgerTable({ ledger, className, dayContributionPi
   const [globalFilter, setGlobalFilter] = useState('');
 
   const columns = useMemo(
-    () => buildColumns({ onBulkVisible: toggleBulkVisible, contributionById }),
-    [toggleBulkVisible, contributionById],
+    () =>
+      buildColumns({
+        onBulkVisible: toggleBulkVisible,
+        contributionById,
+        staticLedgerPreview,
+      }),
+    [toggleBulkVisible, contributionById, staticLedgerPreview],
   );
 
   const table = useReactTable({
@@ -551,14 +621,23 @@ export function RunwayActivityLedgerTable({ ledger, className, dayContributionPi
             />
           </div>
 
-          <label className="inline-flex h-8 shrink-0 cursor-pointer select-none items-center gap-1 rounded-md border border-transparent px-1 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-border/40 hover:bg-muted/25 hover:text-foreground">
+          <label
+            className={cn(
+              'inline-flex h-8 shrink-0 select-none items-center gap-1 rounded-md border border-transparent px-1 py-0.5 text-[10px] font-medium text-muted-foreground',
+              staticLedgerPreview
+                ? 'cursor-default opacity-80'
+                : 'cursor-pointer hover:border-border/40 hover:bg-muted/25 hover:text-foreground',
+            )}
+          >
             <Blend className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
             <input
               type="checkbox"
-              className="h-3 w-3 shrink-0 rounded border-input accent-primary"
-              checked={implicitBaselineFootprint}
+              className="h-3 w-3 shrink-0 cursor-default rounded border-input accent-primary"
+              checked={staticLedgerPreview ? true : implicitBaselineFootprint}
               onChange={(e) => setImplicitBaselineFootprint(e.target.checked)}
               aria-describedby="ledger-baseline-footprint-hint"
+              disabled={staticLedgerPreview}
+              title={staticLedgerPreview ? 'Preview: BAU baseline on' : undefined}
             />
             <span className="whitespace-nowrap">BAU baseline</span>
             <span id="ledger-baseline-footprint-hint" className="sr-only">
@@ -567,7 +646,7 @@ export function RunwayActivityLedgerTable({ ledger, className, dayContributionPi
             </span>
           </label>
 
-          {ledger.entries.length > 0 ? (
+          {ledger.entries.length > 0 && !staticLedgerPreview ? (
             <div className="flex shrink-0 items-center gap-0.5">
               {!allLedgerRowsExcluded ? (
                 <button
@@ -596,16 +675,26 @@ export function RunwayActivityLedgerTable({ ledger, className, dayContributionPi
         </div>
         </div>
         <p className="max-w-3xl text-[11px] leading-snug text-muted-foreground">
-          <span className="font-medium text-foreground/85">How it works:</span> checked rows paint the runway
-          calendar; uncheck a row to remove its dates from the coloured footprint. With{' '}
-          <span className="font-medium text-foreground/85">no rows included</span>, turn off{' '}
-          <span className="whitespace-nowrap">
-            <Blend className="mb-px inline h-3 w-3 align-middle opacity-70" aria-hidden />
-            <span className="font-medium text-foreground/85"> BAU baseline</span>
-          </span>{' '}
-          for an empty neutral grid; turn it on for full baseline heat on every day (same pipeline as the non-ledger
-          heatmap for that market). With one or more rows included, BAU off leaves non-overlap days neutral; BAU on
-          keeps baseline colour on those days while overlapping rows stack and boost per the overlap rules.
+          {staticLedgerPreview ? (
+            <>
+              <span className="font-medium text-foreground/85">Preview:</span> the live workbench lets you include or
+              exclude activity rows and toggle BAU baseline; here every row stays included so the strip matches the
+              bundled market model.
+            </>
+          ) : (
+            <>
+              <span className="font-medium text-foreground/85">How it works:</span> checked rows paint the runway
+              calendar; uncheck a row to remove its dates from the coloured footprint. With{' '}
+              <span className="font-medium text-foreground/85">no rows included</span>, turn off{' '}
+              <span className="whitespace-nowrap">
+                <Blend className="mb-px inline h-3 w-3 align-middle opacity-70" aria-hidden />
+                <span className="font-medium text-foreground/85"> BAU baseline</span>
+              </span>{' '}
+              for an empty neutral grid; turn it on for full baseline heat on every day (same pipeline as the non-ledger
+              heatmap for that market). With one or more rows included, BAU off leaves non-overlap days neutral; BAU on
+              keeps baseline colour on those days while overlapping rows stack and boost per the overlap rules.
+            </>
+          )}
         </p>
       </div>
 
@@ -671,7 +760,7 @@ export function RunwayActivityLedgerTable({ ledger, className, dayContributionPi
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => {
-                const sel = !excludedIds.includes(row.original.entryId);
+                const sel = staticLedgerPreview || !excludedIds.includes(row.original.entryId);
                 return (
                   <tr
                     key={row.id}

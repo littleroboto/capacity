@@ -161,6 +161,9 @@ const RUNWAY_CELL_GAP_ADJ_MAX = RUNWAY_HEATMAP_CELL_GAP_MAX;
  */
 const RUNWAY_ISO_3D_ENABLED = false;
 
+/** Stable empty list for landing minimal-chrome heatmap (no ledger row exclusions). */
+const LANDING_LEDGER_NO_EXCLUDED_IDS: readonly string[] = [];
+
 const snapRunwayCellPx = snapRunwayHeatmapCellPx;
 
 /** Pointer anchor for the day-details popover (click or keyboard). */
@@ -3197,16 +3200,23 @@ function RunwayGridBody({
   const runwayLedgerImplicitBaselineFootprint = useAtcStore((s) => s.runwayLedgerImplicitBaselineFootprint);
   const restrictRunwayLedgerToDayContributors = useAtcStore((s) => s.restrictRunwayLedgerToDayContributors);
 
+  /** Landing hero: ledger checkboxes are decorative; heatmap always uses every row + BAU on. */
+  const ledgerExcludedForHeatmap = landingMinimalChrome
+    ? LANDING_LEDGER_NO_EXCLUDED_IDS
+    : runwayLedgerExcludedEntryIds;
+
   const runwayLedgerActiveEntryIds = useMemo(
-    () => (activityLedger ? activeLedgerEntryIds(activityLedger, runwayLedgerExcludedEntryIds) : []),
-    [activityLedger, runwayLedgerExcludedEntryIds],
+    () => (activityLedger ? activeLedgerEntryIds(activityLedger, ledgerExcludedForHeatmap) : []),
+    [activityLedger, ledgerExcludedForHeatmap],
   );
 
   /**
    * BAU baseline (store): days with no included ledger row on this lens still count one stratum so cells
    * show full model heat. With BAU off and no row touching a day, attribution paints neutral (empty grid).
    */
-  const ledgerImplicitBaselineFootprintForHeatmap = runwayLedgerImplicitBaselineFootprint;
+  const ledgerImplicitBaselineFootprintForHeatmap = landingMinimalChrome
+    ? true
+    : runwayLedgerImplicitBaselineFootprint;
 
   /** Match empty heatmap: no named rows and BAU baseline off → hide modeled tech trace above the strip. */
   const techStripModelTraceSuppressed = useMemo(
@@ -3247,13 +3257,13 @@ function RunwayGridBody({
       if (!activityLedgersByMarket || viewMode === 'code') return null;
       const ledger = activityLedgersByMarket.get(market);
       if (!ledger) return null;
-      const activeIds = activeLedgerEntryIds(ledger, runwayLedgerExcludedEntryIds);
+      const activeIds = activeLedgerEntryIds(ledger, ledgerExcludedForHeatmap);
       return {
         overlapByDay: buildLedgerLensOverlapMap(ledger, activeIds, viewMode as Exclude<ViewModeId, 'code'>),
         lens: viewMode as Exclude<ViewModeId, 'code'>,
       };
     },
-    [activityLedgersByMarket, viewMode, runwayLedgerExcludedEntryIds],
+    [activityLedgersByMarket, viewMode, ledgerExcludedForHeatmap],
   );
 
   const singleMarketSelectedDayYmd =
@@ -3797,6 +3807,7 @@ function RunwayGridBody({
                             ledger={activityLedger}
                             className="w-full min-w-0"
                             dayContributionPin={dayContributionPin}
+                            staticLedgerPreview={landingMinimalChrome}
                           />
                         </>
                       ) : null}

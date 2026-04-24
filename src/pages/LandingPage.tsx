@@ -209,7 +209,8 @@ export function LandingPage() {
   const reducedMotion = useReducedMotion();
   const clerkOn = isClerkConfigured();
   const landingSymbolPatternId = useId().replace(/:/g, '');
-  const landingNoiseFilterId = useId().replace(/:/g, '');
+  const landingNoiseFineId = useId().replace(/:/g, '');
+  const landingNoiseCoarseId = useId().replace(/:/g, '');
   const workbenchHref = useMemo(() => workbenchEntryHref(), []);
   useEffect(() => {
     document.title = 'Capacity Workbench · Multi-market capacity on one runway';
@@ -221,107 +222,132 @@ export function LandingPage() {
   }, []);
 
   return (
-    <div className="landing-root relative min-h-screen overflow-x-visible overflow-y-auto bg-zinc-50 text-zinc-900 antialiased selection:bg-[#FFC72C]/40">
+    <div className="landing-root relative min-h-screen overflow-x-visible overflow-y-auto bg-[#f7f7f5] text-zinc-900 antialiased selection:bg-[#FFC72C]/40">
       {/*
-        Background stack (light): soft grid + symbol wash + grain + pastel blobs. z-0, pointer-events-none.
+        Background stack (light): warm base, micro-dot + soft grid, sparse symbol wash, dual grain, airy colour.
       */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
+        {/* Warm paper wash — sits under everything */}
+        <div className="absolute inset-0 bg-[linear-gradient(165deg,#fafaf8_0%,#f4f4f1_42%,#f7f6f4_100%)]" />
+        {/* Micro-dot + orthogonal grid (calm “blueprint” read, lower contrast than before) */}
         <div
-          className="absolute inset-0 opacity-[0.55]"
+          className="absolute inset-0 opacity-[0.85]"
           style={{
             backgroundImage: [
-              'linear-gradient(to right, rgba(24, 24, 27, 0.06) 1px, transparent 1px)',
-              'linear-gradient(to bottom, rgba(24, 24, 27, 0.06) 1px, transparent 1px)',
-              'repeating-linear-gradient(45deg, transparent 0, transparent 34px, rgba(24, 24, 27, 0.025) 34px, rgba(24, 24, 27, 0.025) 35px)',
-              'repeating-linear-gradient(-45deg, transparent 0, transparent 52px, rgba(24, 24, 27, 0.018) 52px, rgba(24, 24, 27, 0.018) 53px)',
+              'radial-gradient(circle at 1px 1px, rgba(39, 39, 42, 0.065) 1px, transparent 1.25px)',
+              'linear-gradient(to right, rgba(24, 24, 27, 0.032) 1px, transparent 1px)',
+              'linear-gradient(to bottom, rgba(24, 24, 27, 0.032) 1px, transparent 1px)',
             ].join(', '),
-            backgroundSize: '44px 44px, 44px 44px, auto, auto',
+            backgroundSize: '24px 24px, 80px 80px, 80px 80px',
+            backgroundPosition: '0 0, 0 0, 0 0',
+          }}
+        />
+        {/* Single faint diagonal — depth without busy cross-hatch */}
+        <div
+          className="absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(125deg, transparent 0, transparent 72px, rgba(24, 24, 27, 0.018) 72px, rgba(24, 24, 27, 0.018) 73px)',
           }}
         />
         <svg
-          className="absolute inset-0 h-full w-full opacity-[0.14] sm:opacity-[0.16]"
+          className="absolute inset-0 h-full w-full opacity-[0.075] sm:opacity-[0.09]"
           aria-hidden
         >
           <defs>
             <pattern
               id={landingSymbolPatternId}
-              width="88"
-              height="88"
+              width="132"
+              height="132"
               patternUnits="userSpaceOnUse"
             >
               <g
-                fill="rgba(24, 24, 27, 0.055)"
+                fill="rgba(39, 39, 42, 0.07)"
                 style={{
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                  fontSize: '11px',
+                  fontSize: '10px',
                   fontWeight: 300,
                 }}
               >
-                <text x="12" y="20" transform="rotate(-11 12 20)">
+                <text x="18" y="28" transform="rotate(-11 18 28)">
                   +
                 </text>
-                <text x="48" y="26" transform="rotate(8 48 26)" opacity={0.88}>
-                  +
-                </text>
-                <text x="76" y="44" transform="rotate(-6 76 44)" opacity={0.72}>
+                <text x="92" y="36" transform="rotate(7 92 36)" opacity={0.75}>
                   −
                 </text>
-                <text x="26" y="54" transform="rotate(10 26 54)" opacity={0.78}>
+                <text x="54" y="78" transform="rotate(-8 54 78)" opacity={0.65}>
                   ·
                 </text>
-                <text x="60" y="66" transform="rotate(-9 60 66)" opacity={0.68}>
+                <text x="108" y="96" transform="rotate(6 108 96)" opacity={0.7}>
                   ×
-                </text>
-                <text x="40" y="82" transform="rotate(5 40 82)" opacity={0.82}>
-                  +
                 </text>
               </g>
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill={`url(#${landingSymbolPatternId})`} />
         </svg>
-        <svg className="absolute inset-0 h-full w-full opacity-[0.04] mix-blend-multiply" aria-hidden>
+        {/* Fine film grain */}
+        <svg className="absolute inset-0 h-full w-full opacity-[0.035] mix-blend-multiply" aria-hidden>
           <defs>
-            <filter id={landingNoiseFilterId} x="-20%" y="-20%" width="140%" height="140%">
+            <filter id={landingNoiseFineId} x="-20%" y="-20%" width="140%" height="140%">
               <feTurbulence
                 type="fractalNoise"
-                baseFrequency="0.9"
-                numOctaves="4"
+                baseFrequency="0.85"
+                numOctaves="3"
                 stitchTiles="stitch"
                 result="t"
               />
               <feColorMatrix
                 in="t"
                 type="matrix"
-                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.35 0"
-                result="a"
+                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.32 0"
               />
             </filter>
           </defs>
-          <rect width="100%" height="100%" filter={`url(#${landingNoiseFilterId})`} />
+          <rect width="100%" height="100%" filter={`url(#${landingNoiseFineId})`} />
         </svg>
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_100%_70%_at_50%_108%,rgba(228,228,231,0.65),transparent_55%)]" />
+        {/* Large-scale paper fibre */}
+        <svg className="absolute inset-0 h-full w-full opacity-[0.055] mix-blend-multiply" aria-hidden>
+          <defs>
+            <filter id={landingNoiseCoarseId} x="-20%" y="-20%" width="140%" height="140%">
+              <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.32"
+                numOctaves="2"
+                stitchTiles="stitch"
+                result="t"
+              />
+              <feColorMatrix
+                in="t"
+                type="matrix"
+                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.22 0"
+              />
+            </filter>
+          </defs>
+          <rect width="100%" height="100%" filter={`url(#${landingNoiseCoarseId})`} />
+        </svg>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_110%_72%_at_50%_102%,rgba(228,228,231,0.5),transparent_58%)]" />
         <div
-          className="landing-nebula-motion absolute -left-[22%] -top-[28%] h-[90vh] w-[min(110vw,900px)] opacity-[0.32] blur-[88px] animate-landing-nebula-drift sm:blur-[104px]"
+          className="landing-nebula-motion absolute -left-[22%] -top-[28%] h-[90vh] w-[min(110vw,900px)] opacity-[0.26] blur-[88px] animate-landing-nebula-drift sm:blur-[104px]"
           style={{
             background:
-              'radial-gradient(circle at 38% 42%, rgba(99, 102, 241, 0.14), transparent 56%), radial-gradient(circle at 72% 58%, rgba(139, 92, 246, 0.09), transparent 52%)',
+              'radial-gradient(circle at 38% 42%, rgba(99, 102, 241, 0.11), transparent 58%), radial-gradient(circle at 72% 58%, rgba(139, 92, 246, 0.07), transparent 54%)',
           }}
         />
         <div
-          className="landing-nebula-motion absolute -bottom-[24%] -right-[18%] h-[75vh] w-[min(95vw,820px)] opacity-[0.28] blur-[80px] animate-landing-nebula-drift-slow sm:blur-[96px]"
+          className="landing-nebula-motion absolute -bottom-[24%] -right-[18%] h-[75vh] w-[min(95vw,820px)] opacity-[0.22] blur-[80px] animate-landing-nebula-drift-slow sm:blur-[96px]"
           style={{
             background:
-              'radial-gradient(circle at 52% 48%, rgba(14, 165, 233, 0.08), transparent 54%), radial-gradient(circle at 28% 68%, rgba(79, 70, 229, 0.06), transparent 50%)',
+              'radial-gradient(circle at 52% 48%, rgba(14, 165, 233, 0.065), transparent 56%), radial-gradient(circle at 28% 68%, rgba(79, 70, 229, 0.045), transparent 52%)',
           }}
         />
         <div
           className="landing-nebula-motion absolute left-[5%] top-[32%] h-[min(60vh,520px)] w-[min(78vw,640px)] blur-[96px] animate-landing-nebula-breathe sm:blur-[112px]"
           style={{
-            background: 'radial-gradient(ellipse at center, rgba(129, 140, 248, 0.06), transparent 62%)',
+            background: 'radial-gradient(ellipse at center, rgba(129, 140, 248, 0.045), transparent 64%)',
           }}
         />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_55%_at_50%_-8%,rgba(255,255,255,0.5),transparent_42%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_92%_58%_at_50%_-6%,rgba(255,255,255,0.58),transparent_46%)]" />
       </div>
       <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-5 pb-20 pt-6 sm:px-8 sm:pt-10">
         <header className="mb-16 flex flex-wrap items-center justify-between gap-4 sm:mb-20">
@@ -380,7 +406,7 @@ export function LandingPage() {
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             >
               <h1 className="font-landing text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-zinc-900 sm:text-5xl lg:text-[3.25rem]">
-                Stress-test each market. Quantify the ask.
+                Stress-test each roadmap, quantify, validate
               </h1>
               <p className="mt-5 max-w-3xl text-pretty text-base leading-relaxed text-zinc-700 sm:text-lg lg:max-w-none">
                 Declared capacity is a number in a document. Here it becomes a{' '}
