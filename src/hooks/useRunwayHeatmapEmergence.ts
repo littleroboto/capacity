@@ -30,14 +30,15 @@ export function runwayHeatmapEmergenceClipRect(
  */
 export function useRunwayHeatmapEmergence(
   resetKey: string,
-  opts?: { staggerMs?: number },
+  opts?: { staggerMs?: number; disabled?: boolean },
 ): number {
   const staggerMs = opts?.staggerMs ?? 0;
+  const disabled = opts?.disabled ?? false;
   const reduceMotion = useReducedMotion();
-  const [insetTopPct, setInsetTopPct] = useState(reduceMotion ? 0 : 100);
+  const [insetTopPct, setInsetTopPct] = useState(reduceMotion || disabled ? 0 : 100);
 
   useEffect(() => {
-    if (reduceMotion) {
+    if (reduceMotion || disabled) {
       setInsetTopPct(0);
       return;
     }
@@ -53,7 +54,7 @@ export function useRunwayHeatmapEmergence(
     });
 
     return () => controls.stop();
-  }, [resetKey, reduceMotion, staggerMs]);
+  }, [resetKey, reduceMotion, staggerMs, disabled]);
 
   return insetTopPct;
 }

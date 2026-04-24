@@ -445,12 +445,14 @@ While drafting a **`tech_programmes`** or **`campaigns`** block (or future compo
 | **Swimlanes** | **Rows = departments** (Technology, Service Desk, Operations, …) and/or **streams** when composite (§4.3); multiple bars in one lane allowed when the same department is active on parallel threads. |
 | **Shape, not capacity truth** | Bar length and lane placement show **when** work sits and **how pieces chain**; optional second encoding (bar height or opacity) can hint **relative load** from matrix glyphs — full runway heatmap remains the “capacity truth” view elsewhere. |
 | **Consistent look** | **Same visual language as runway time axes** so Code view and Runway feel like one product: tick marks, quarter/year labels, muted gridlines, typography weights aligned with existing runway SVGs — not a generic third-party Gantt skin. |
+| **Enterprise calendar context** | Same diagram carries **campaigns** and **tech programmes** plus **deployment freezes** and **holiday / restrictor** periods (from the same resolved model as the heatmaps)—not a programme-only island. |
+| **Single date scale** | When the Gantt shares a viewport with runway heatmaps, **alignment and x-scale** match the heatmap cell grid (`ymd` → column) so a vertical line reads **one day** across lenses, freezes, holidays, and bars. |
 
 #### Visual system (align with existing runway code)
 
 Implementation should **reuse** established pieces where possible rather than inventing parallel styling:
 
-- **Time mapping:** linear calendar X over `[previewStartYmd, previewEndYmd]` derived from the programme(s) in focus (pad a few weeks before/after for context), using the same **quarter / Jan-1 year** mark philosophy as `buildRunwayMiniTimeAxisMarks` in `src/lib/runwayMiniChartTimeAxis.ts`.
+- **Time mapping:** linear calendar X over `[previewStartYmd, previewEndYmd]` derived from the programme(s) in focus (pad a few weeks before/after for context), using the same **quarter / Jan-1 year** mark philosophy as `buildRunwayMiniTimeAxisMarks` in `src/lib/runwayMiniChartTimeAxis.ts`. Prefer **one shared mapping** with the contribution strip / `placedCells` layout when both are visible so exports and screenshots stay **one coordinate system** (users can crop or mask downstream).
 - **Tokens:** stroke and label colours should follow **`--runway-spark-*`** and related CSS variables from `src/index.css` (e.g. grid, axis tick, programme tint `--runway-spark-mix-programme`) so light/dark themes stay coherent with `RunwaySummaryLineDiagrams` / contribution strips.
 - **Axis chrome:** month / weekday / tick treatment should echo `RunwayContributionStripSvg` (`src/components/RunwayContributionStripSvg.tsx`) — same “muted foreground ticks + semibold month labels” tiering, adapted to the wider Gantt width.
 
@@ -461,6 +463,8 @@ Implementation should **reuse** established pieces where possible rather than in
 3. **Dependency edges** — SVG paths from **bar end** (or milestone marker) to **successor start**: prefer short orthogonal elbows or slight bezier; arrowhead at successor; **cycle** and **dangling** refs → diagnostic in editor + dashed “invalid” edge in preview.
 4. **Milestones** — Optional diamond nodes for “cutover”, “SIT start”, when YAML exposes milestone dates.
 5. **Today / selection** — Vertical line for “today” if in range; optional sync with runway **selected day** when both panes visible.
+6. **Deployment freezes** — Bands or hatched regions from **`deployment_risk_blackouts`** (and any engine-resolved freeze semantics), visually related to existing deploy-freeze treatment on the runway.
+7. **Holidays / restrictors** — Spans and optional **labels** from the same holiday / window resolution the heatmap uses (public, school, market-specific restrictors)—never a duplicate ad-hoc holiday table in the preview layer.
 
 #### Placement and behaviour
 
@@ -477,6 +481,8 @@ Editor buffer → YAML parse (tolerant) → canonical “preview model”
 ```
 
 The **preview model** should be the same structural intermediate we want for **documentation export** later (one graph, two consumers: Gantt + docs).
+
+**Export (product direction):** prefer exporting **one composite graphic** (heatmap stack + programme layer + shared time axis) with a **single coordinate system**; **cropping and masking** for slides or documents can happen in external tools rather than maintaining many bespoke export crops in-app.
 
 **Scaffold / opt-in:** default preview scope is **infer from cursor** inside `tech_programmes`; only if we add explicit ids would an optional comment such as `# preview: programme_id: …` be needed.
 

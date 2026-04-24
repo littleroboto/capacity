@@ -42,6 +42,45 @@
     --runway-spark-mix-programme: hsl(199 70% 36%);
   }
 
+  /**
+   * Landing: embed real RunwayGrid with light semantic tokens while `html` may still
+   * carry `.dark` from persisted workbench preference (child inherits these overrides).
+   */
+  .landing-workbench-light-scope {
+    color-scheme: light;
+    --background: 220 14% 97%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --muted: 220 14% 93%;
+    --muted-foreground: 220 9% 40%;
+    --primary: 222 47% 20%;
+    --primary-foreground: 210 40% 98%;
+    --accent: 220 14% 90%;
+    --accent-foreground: 222 47% 11%;
+    --border: 220 13% 88%;
+    --radius: 0.5rem;
+    --iso-empty-top: 220 14% 91%;
+    --iso-empty-left: 220 13% 85%;
+    --iso-empty-right: 220 15% 78%;
+    --iso-pad-top: 220 14% 89%;
+    --iso-pad-left: 220 13% 83%;
+    --iso-pad-right: 220 14% 76%;
+    --iso-label-stroke-width: 3.35px;
+    --runway-spark-grid: hsl(var(--muted-foreground) / 0.3);
+    --runway-spark-axis-tick: hsl(var(--muted-foreground) / 0.88);
+    --runway-spark-line: hsl(var(--foreground) / 0.88);
+    --runway-spark-line-muted: hsl(var(--muted-foreground) / 0.62);
+    --runway-spark-capacity-line: hsl(var(--foreground) / 0.52);
+    --runway-spark-scalar-area: hsl(var(--foreground) / 0.07);
+    --runway-spark-gap-under: hsl(var(--foreground) / 0.09);
+    --runway-spark-attrib: hsl(var(--primary) / 0.09);
+    --runway-spark-legend-under: hsl(var(--foreground) / 0.1);
+    --runway-spark-mix-bau: hsl(var(--foreground) / 0.9);
+    --runway-spark-mix-campaign: hsl(265 52% 40%);
+    --runway-spark-mix-programme: hsl(199 70% 36%);
+  }
+
   .dark {
     --background: 222 47% 7%;
     --foreground: 210 40% 98%;
@@ -86,6 +125,54 @@
   @media (prefers-reduced-motion: reduce) {
     .landing-nebula-motion {
       animation: none !important;
+    }
+  }
+
+  /** Landing previews: opacity stack-in for tech sparkline (avoids width-clip flicker). */
+  .landing-sparkline-stack-in {
+    opacity: 0;
+    animation: landing-sparkline-stack-in 1.05s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes landing-sparkline-stack-in {
+    from {
+      opacity: 0.1;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /**
+   * Landing contribution strip: cell-by-cell pulse-in (opacity on the animated node). SVG rects
+   * use `transition: fill`; DOM cells use `transition: background-color` on the inner paint div.
+   */
+  .landing-heatmap-cell-in {
+    opacity: 0.2;
+    animation: landing-heatmap-cell-in 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes landing-heatmap-cell-in {
+    0% {
+      opacity: 0.18;
+      filter: brightness(1.08);
+    }
+    55% {
+      opacity: 1;
+      filter: brightness(1.03);
+    }
+    100% {
+      opacity: 1;
+      filter: brightness(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-sparkline-stack-in,
+    .landing-heatmap-cell-in {
+      animation: none !important;
+      opacity: 1 !important;
+      filter: none !important;
     }
   }
 }

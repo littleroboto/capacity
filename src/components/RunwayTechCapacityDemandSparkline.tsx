@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useReducedMotion } from 'motion/react';
 import type { RiskRow } from '@/engine/riskModel';
 import {
   CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX,
@@ -38,6 +39,9 @@ const Y_AXIS_LABEL_ANCHOR_X = Y_AXIS_TICK_X0 - 2;
 const LEFT_AXIS_OVERFLOW_PX = 14;
 
 const DEFICIT_FILL = 'fill-[hsl(350_88%_40%)] dark:fill-[hsl(348_92%_58%)]';
+const TIGHT_HEADROOM_FILL = 'fill-rose-500/[0.32] dark:fill-rose-400/[0.28]';
+/** Utilization at or above this (and still ≤ 100% of caps) draws the “thin headroom” band up to the 100% line. */
+const TIGHT_HEADROOM_UTIL_LOW = 0.86;
 
 type SparkPt = { x: number; y: number };
 
@@ -152,6 +156,19 @@ function pathDFromPoints(pts: SparkPt[]): string {
   return d;
 }
 
+/** Headroom band from the 100% line up to the trace when utilization is high but still on the “under cap” side of the line. */
+function ribbonPathsTightHeadroomToCap(pts: SparkPt[], mask: boolean[], yCap: number): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i]!;
+    const b = pts[i + 1]!;
+    if (!mask[i] || !mask[i + 1]) continue;
+    if (a.y <= yCap || b.y <= yCap) continue;
+    out.push(`M ${a.x} ${yCap} L ${a.x} ${a.y} L ${b.x} ${b.y} L ${b.x} ${yCap} Z`);
+  }
+  return out;
+}
+
 export type RunwayTechCapacityDemandSparklineProps = {
   contributionMeta: ContributionStripLayoutMeta;
   cellPx: number;
@@ -165,6 +182,10 @@ export type RunwayTechCapacityDemandSparklineProps = {
    * (matches empty heatmap); user can enable BAU to see repeating lab+Market-IT load on caps.
    */
   modelTraceSuppressed?: boolean;
+  /** Landing / YAML preview: loop an x-axis reveal along the strip timeline. */
+  landingMarketingSweepReveal?: boolean;
+  /** Landing / YAML preview: rose fill between the trace and 100% when utilization is high but not overloaded. */
+  landingMarketingTightCapacityFill?: boolean;
 };
 
 function yForUtilizationStroke(
@@ -197,7 +218,10 @@ export function RunwayTechCapacityDemandSparkline({
   selectedDayYmd = null,
   className,
   modelTraceSuppressed = false,
+  landingMarketingSweepReveal = false,
+  landingMarketingTightCapacityFill = false,
 }: RunwayTechCapacityDemandSparklineProps) {
+  const prefersReducedMotion = useReducedMotion();
   const gutter = CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W;
 
   const chronologyAbove = useMemo(
@@ -262,6 +286,20 @@ export function RunwayTechCapacityDemandSparkline({
     [sparkPtsRawSvg, yCapPx],
   );
 
+  const tightHeadroomMask = useMemo(() => {
+    if (!landingMarketingTightCapacityFill) return null;
+    return days.map((d) => {
+      if (modelTraceSuppressed || !d.hasData) return false;
+      const u = d.capacityUtilizationRatio;
+      return u >= TIGHT_HEADROOM_UTIL_LOW && u <= 1 + 1e-9;
+    });
+  }, [days, modelTraceSuppressed, landingMarketingTightCapacityFill]);
+
+  const tightRibbonDsSvg = useMemo(() => {
+    if (!tightHeadroomMask) return [];
+    return ribbonPathsTightHeadroomToCap(sparkPtsRawSvg, tightHeadroomMask, yCapPx);
+  }, [tightHeadroomMask, sparkPtsRawSvg, yCapPx]);
+
   const sparkStrokeRuns = useMemo(
     () => polylineRunsByCapBaseline(sparkPtsRawSvg, yCapPx),
     [sparkPtsRawSvg, yCapPx],
@@ -289,6 +327,12 @@ export function RunwayTechCapacityDemandSparkline({
   const yAxisMidLabel = '100%';
   const yAxisBotLabel = 'Low';
 
+  const softStackIn =
+    landingMarketingSweepReveal &&
+    !prefersReducedMotion &&
+    width >= 24 &&
+    contributionMeta.numWeeks >= 1;
+
   if (width < 24 || contributionMeta.numWeeks < 1) {
     return (
       <div
@@ -301,7 +345,9 @@ export function RunwayTechCapacityDemandSparkline({
 
   const xo = (x: number) => x + LEFT_AXIS_OVERFLOW_PX;
 
-  const ariaChart = `Daily technology load as a share of effective lab and Market IT capacity along the strip; vertical scale stretches across the lowest and highest share in this window (span about ${axisBandPct} percentage points of cap); middle tick marks 100% of modeled caps; red fill only where load exceeds 100% of caps; dotted stroke where there is headroom below 100%`;
+  const ariaChart = `Daily technology load as a share of effective lab and Market IT capacity along the strip; vertical scale stretches across the lowest and highest share in this window (span about ${axisBandPct} percentage points of cap); middle tick marks 100% of modeled caps; red fill only where load exceeds 100% of caps${
+    landingMarketingTightCapacityFill ? '; rose fill where load is high but still at or below 100% of caps' : ''
+  }; dotted stroke where there is headroom below 100%`;
 
   const ch = chronologyAbove.height;
 
@@ -310,6 +356,9 @@ export function RunwayTechCapacityDemandSparkline({
       className={cn('flex select-none flex-col overflow-visible', className)}
       style={{ width, rowGap: CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX }}
     >
+      <div
+        className={cn('flex flex-col', softStackIn && 'landing-sparkline-stack-in')}
+      >
       <svg
         width={width + LEFT_AXIS_OVERFLOW_PX}
         height={ch}
@@ -537,6 +586,15 @@ export function RunwayTechCapacityDemandSparkline({
           </text>
         </g>
         <g pointerEvents="none">
+          {tightRibbonDsSvg.map((d, i) => (
+            <path
+              key={`tight-ribbon-${i}`}
+              d={d}
+              className={TIGHT_HEADROOM_FILL}
+              fillOpacity={0.95}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
           {deficitRibbonDsSvg.map((d, i) => (
             <path
               key={`def-ribbon-${i}`}
@@ -611,6 +669,7 @@ export function RunwayTechCapacityDemandSparkline({
           />
         ) : null}
       </svg>
+      </div>
     </div>
   );
 }

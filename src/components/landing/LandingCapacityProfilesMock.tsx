@@ -691,18 +691,18 @@ export function LandingCapacityProfilesMock() {
     >
       {/* ── section heading ── */}
       <div className="mb-6 sm:mb-8">
-        <p className="mb-2 font-landing text-xs font-semibold uppercase tracking-[0.14em] text-[#FFC72C]/90">
+        <p className="mb-2 font-landing text-xs font-semibold uppercase tracking-[0.14em] text-[#b45309]">
           Capacity profiles
         </p>
-        <h2 className="font-landing text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+        <h2 className="font-landing text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
           Not all demand looks the same
         </h2>
-        <p className="mt-3 max-w-2xl text-pretty text-sm leading-relaxed text-zinc-400 sm:text-base">
-          <span className="text-zinc-300">Roadmaps show sequence; the runway shows draw.</span> Gantt bars answer{' '}
-          <span className="text-zinc-300">who</span> and <span className="text-zinc-300">when</span>—they rarely show{' '}
-          <span className="text-zinc-300">how thin the lane is</span> when BAU support, campaign waves, and technology
+        <p className="mt-3 max-w-2xl text-pretty text-sm leading-relaxed text-zinc-600 sm:text-base">
+          <span className="font-medium text-zinc-800">Roadmaps show sequence; the runway shows draw.</span> Gantt bars answer{' '}
+          <span className="font-medium text-zinc-800">who</span> and <span className="font-medium text-zinc-800">when</span>—they rarely show{' '}
+          <span className="font-medium text-zinc-800">how thin the lane is</span> when BAU support, campaign waves, and technology
           programmes overlap with holidays, peaks, and shared services. Here, all three kinds of demand share one
-          calendar, so you see <span className="text-zinc-300">cumulative pull</span>—people, time, and
+          calendar, so you see <span className="font-medium text-zinc-800">cumulative pull</span>—people, time, and
           equipment—where it actually stacks.
         </p>
       </div>

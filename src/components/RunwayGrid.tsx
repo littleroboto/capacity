@@ -177,6 +177,8 @@ type OpenDayDetailsFromCellFn = (
 
 /** Single-market vertical runway: tech, trading, and deployment-risk lenses stacked per month. */
 const SINGLE_MARKET_STACK_LENS_IDS: readonly ViewModeId[] = ['combined', 'in_store', 'market_risk'];
+/** Landing preview: extra delay per stacked lens so heatmap colour emerges Tech → Trading → Risk. */
+const LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS = 300;
 /** Main page title when all three lenses are stacked (matches heatmap lens names). */
 const SINGLE_MARKET_MULTI_LENS_HEADLINE = 'Tech Capacity, Trading Pressure, Deployment Risk';
 /** One legend for the whole stack; ramp matches the first (Technology) lens colour tuning. */
@@ -1638,6 +1640,10 @@ type RunwayGridProps = {
   landingCompareSmoothPan?: boolean;
   /** Compare strip: soft pulse on day cells in an inclusive date range for one market (e.g. landing AU). */
   landingCompareColumnHighlight?: { market: string; ymdStart: string; ymdEnd: string };
+  /** Landing hero single-market strip: sweep the tech sparkline along the time axis (loops). */
+  landingTechSparklineSweep?: boolean;
+  /** Landing hero: rose fill for high-but-not-overload utilization on the tech sparkline. */
+  landingTechSparklineTightFill?: boolean;
 };
 
 export function RunwayGrid({
@@ -1652,6 +1658,8 @@ export function RunwayGrid({
   landingCompareDisableCellDetails = false,
   landingCompareSmoothPan = false,
   landingCompareColumnHighlight,
+  landingTechSparklineSweep = false,
+  landingTechSparklineTightFill = false,
 }: RunwayGridProps) {
   const country = useAtcStore((s) => s.country);
   const setCountry = useAtcStore((s) => s.setCountry);
@@ -2839,6 +2847,10 @@ export function RunwayGrid({
                   isoGrowResetKey={isoGrowResetKey}
                   singleMarketMultiLens={singleMarketMultiLens}
                   heatmapOptsForMarketLens={heatmapOptsForMarketLens}
+                  landingMinimalChrome={landingMinimalChrome}
+                  landingTechSparklineSweep={landingTechSparklineSweep}
+                  landingTechSparklineTightFill={landingTechSparklineTightFill}
+                  landingStaggerCellPulse={landingMinimalChrome && !reduceMotion}
                 />
               </motion.div>
             ) : null}
@@ -3091,6 +3103,11 @@ type RunwayGridBodyProps = {
   onClearDaySummary: () => void;
   /** 3D iso views: restarts column grow-in when this key changes. */
   isoGrowResetKey: string;
+  landingMinimalChrome: boolean;
+  landingTechSparklineSweep: boolean;
+  landingTechSparklineTightFill: boolean;
+  /** Landing: per-cell heatmap pulse + smooth fill (no vertical clip flicker). */
+  landingStaggerCellPulse: boolean;
 };
 
 function RunwayGridBody({
@@ -3148,6 +3165,10 @@ function RunwayGridBody({
   isoGrowResetKey,
   singleMarketMultiLens,
   heatmapOptsForMarketLens,
+  landingMinimalChrome,
+  landingTechSparklineSweep,
+  landingTechSparklineTightFill,
+  landingStaggerCellPulse,
 }: RunwayGridBodyProps) {
   const enableColorSweep = !reduceMotion;
   const [postSweep, setPostSweep] = useState(reduceMotion);
@@ -3569,6 +3590,11 @@ function RunwayGridBody({
                                       })
                                     }
                                     emergeResetKey={`${isoGrowResetKey}-${lensMode}`}
+                                    emergeStaggerMs={
+                                      landingMinimalChrome
+                                        ? rowIdx * LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS
+                                        : 0
+                                    }
                                     showAxisLabels={isBottomRow}
                                     ledgerAttribution={ledgerAttrForLens(lensMode)}
                                     ledgerImplicitBaselineFootprint={ledgerImplicitBaselineFootprintForHeatmap}
@@ -3577,6 +3603,7 @@ function RunwayGridBody({
                                         ? marketConfig?.deployment_risk_blackouts ?? null
                                         : null
                                     }
+                                    landingStaggerCellPulse={landingStaggerCellPulse}
                                   />
                                 </div>
                               </div>
@@ -3605,6 +3632,12 @@ function RunwayGridBody({
                                       selectedDayYmd={singleMarketSelectedDayYmd}
                                       className="min-w-0"
                                       modelTraceSuppressed={techStripModelTraceSuppressed}
+                                      landingMarketingSweepReveal={
+                                        landingMinimalChrome && landingTechSparklineSweep && !reduceMotion
+                                      }
+                                      landingMarketingTightCapacityFill={
+                                        landingMinimalChrome && landingTechSparklineTightFill
+                                      }
                                     />
                                   </div>
                                 ) : null}
@@ -3647,6 +3680,7 @@ function RunwayGridBody({
                               ? marketConfig?.deployment_risk_blackouts ?? null
                               : null
                           }
+                          landingStaggerCellPulse={landingStaggerCellPulse}
                         />
                         <div className="relative z-[4] ml-[25px] flex shrink-0 self-end">
                           {heatmapLegendEl}
