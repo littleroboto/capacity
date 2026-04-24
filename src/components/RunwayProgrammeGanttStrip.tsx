@@ -160,21 +160,22 @@ export function RunwayProgrammeGanttStrip({
       aria-label={`Programme timeline for ${marketKey}`}
     >
       <defs>
+        {/* 45° lines, 3px repeat (tile 3×3 in user space, line through centre, pattern rotated 45°). */}
         <pattern
           id={hatchId}
-          width="8"
-          height="8"
+          width="3"
+          height="3"
           patternUnits="userSpaceOnUse"
-          patternTransform="rotate(45)"
+          patternTransform="rotate(45 1.5 1.5)"
         >
           <line
-            x1="0"
-            y1="0"
-            x2="0"
-            y2="12"
+            x1="1.5"
+            y1="-0.5"
+            x2="1.5"
+            y2="3.5"
             className="stroke-zinc-400 dark:stroke-zinc-500"
-            strokeWidth={0.9}
-            strokeOpacity={Math.min(0.35, prefs.overlayHatchOpacity * 0.45)}
+            strokeWidth={0.45}
+            strokeOpacity={Math.min(0.28, 0.08 + prefs.overlayHatchOpacity * 0.22)}
           />
         </pattern>
       </defs>
