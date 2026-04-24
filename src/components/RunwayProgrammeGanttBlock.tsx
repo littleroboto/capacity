@@ -108,15 +108,15 @@ export function RunwayProgrammeGanttBlock({
               </button>
               {settingsOpen ? (
                 <div
-                  className="absolute right-0 z-50 mt-1 w-[min(100vw-2rem,18rem)] rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg"
+                  className="absolute right-0 z-50 mt-1 w-[min(100vw-2rem,18rem)] rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-zinc-900 shadow-xl opacity-100 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   role="dialog"
                   aria-label="Programme timeline settings"
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold">Display</span>
+                    <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Display</span>
                     <button
                       type="button"
-                      className="text-[10px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                      className="text-[10px] font-medium text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100"
                       onClick={resetPrefs}
                     >
                       Reset
@@ -124,65 +124,67 @@ export function RunwayProgrammeGanttBlock({
                   </div>
                   <div className="max-h-[min(70vh,22rem)] space-y-3 overflow-y-auto pr-0.5 text-[11px]">
                     <label className="flex flex-col gap-1">
-                      <span className="text-muted-foreground">Bar height (px)</span>
+                      <span className="text-zinc-600 dark:text-zinc-400">Bar height (px)</span>
                       <input
                         type="number"
                         min={6}
                         max={28}
-                        className="h-8 rounded-md border border-input bg-background px-2 font-mono text-xs"
+                        className="h-8 rounded-md border border-zinc-300 bg-white px-2 font-mono text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
                         value={prefs.barHeightPx}
                         onChange={(e) => setPref('barHeightPx', Number(e.target.value) || prefs.barHeightPx)}
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-muted-foreground">Lane gap (px)</span>
+                      <span className="text-zinc-600 dark:text-zinc-400">Lane gap (px)</span>
                       <input
                         type="number"
                         min={2}
                         max={16}
-                        className="h-8 rounded-md border border-input bg-background px-2 font-mono text-xs"
+                        className="h-8 rounded-md border border-zinc-300 bg-white px-2 font-mono text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
                         value={prefs.laneGapPx}
                         onChange={(e) => setPref('laneGapPx', Number(e.target.value) || prefs.laneGapPx)}
                       />
                     </label>
-                    <label className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
                       <input
                         type="checkbox"
                         checked={prefs.showBlackouts}
                         onChange={(e) => setPref('showBlackouts', e.target.checked)}
+                        className="accent-zinc-900 dark:accent-zinc-100"
                       />
                       <span>Show deployment blackouts</span>
                     </label>
-                    <label className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
                       <input
                         type="checkbox"
                         checked={prefs.showSchoolHolidays}
                         onChange={(e) => setPref('showSchoolHolidays', e.target.checked)}
+                        className="accent-zinc-900 dark:accent-zinc-100"
                       />
                       <span>Show school holidays</span>
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="flex flex-col gap-1">
-                        <span className="text-muted-foreground">Campaign fill</span>
+                        <span className="text-zinc-600 dark:text-zinc-400">Campaign colour</span>
                         <input
                           type="color"
-                          className="h-8 w-full cursor-pointer rounded border border-input bg-background p-0.5"
-                          value={rgbaToHexLoose(prefs.campaignFill)}
-                          onChange={(e) => setPref('campaignFill', hexToRgba(e.target.value, 0.22))}
+                          className="h-8 w-full cursor-pointer rounded border border-zinc-300 bg-white p-0.5 dark:border-zinc-600 dark:bg-zinc-900"
+                          value={solidOrHexForPicker(prefs.campaignFill, '#e11d48')}
+                          onChange={(e) => setPref('campaignFill', e.target.value)}
                         />
                       </label>
                       <label className="flex flex-col gap-1">
-                        <span className="text-muted-foreground">Tech fill</span>
+                        <span className="text-zinc-600 dark:text-zinc-400">Tech colour</span>
                         <input
                           type="color"
-                          className="h-8 w-full cursor-pointer rounded border border-input bg-background p-0.5"
-                          value={rgbaToHexLoose(prefs.techFill)}
-                          onChange={(e) => setPref('techFill', hexToRgba(e.target.value, 0.2))}
+                          className="h-8 w-full cursor-pointer rounded border border-zinc-300 bg-white p-0.5 dark:border-zinc-600 dark:bg-zinc-900"
+                          value={solidOrHexForPicker(prefs.techFill, '#2563eb')}
+                          onChange={(e) => setPref('techFill', e.target.value)}
                         />
                       </label>
                     </div>
                     <label className="flex flex-col gap-1">
-                      <span className="text-muted-foreground">Bar opacity</span>
+                      <span className="text-zinc-600 dark:text-zinc-400">Bar opacity</span>
                       <input
                         type="range"
                         min={0.25}
@@ -190,28 +192,30 @@ export function RunwayProgrammeGanttBlock({
                         step={0.05}
                         value={prefs.barOpacity}
                         onChange={(e) => setPref('barOpacity', Number(e.target.value))}
+                        className="accent-zinc-900 dark:accent-zinc-100"
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-muted-foreground">Blackout hatch strength</span>
+                      <span className="text-zinc-600 dark:text-zinc-400">45° hatch strength</span>
                       <input
                         type="range"
-                        min={0.1}
+                        min={0.08}
                         max={1}
                         step={0.05}
-                        value={prefs.blackoutHatchOpacity}
-                        onChange={(e) => setPref('blackoutHatchOpacity', Number(e.target.value))}
+                        value={prefs.overlayHatchOpacity}
+                        onChange={(e) => setPref('overlayHatchOpacity', Number(e.target.value))}
+                        className="accent-zinc-900 dark:accent-zinc-100"
                       />
                     </label>
                     <label className="flex flex-col gap-1">
-                      <span className="text-muted-foreground">School hatch strength</span>
+                      <span className="text-zinc-600 dark:text-zinc-400">Column wash (under hatch)</span>
                       <input
-                        type="range"
-                        min={0.1}
-                        max={1}
-                        step={0.05}
-                        value={prefs.schoolHatchOpacity}
-                        onChange={(e) => setPref('schoolHatchOpacity', Number(e.target.value))}
+                        type="text"
+                        spellCheck={false}
+                        className="h-8 rounded-md border border-zinc-300 bg-white px-2 font-mono text-[10px] text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                        value={prefs.overlayColumnFill}
+                        onChange={(e) => setPref('overlayColumnFill', e.target.value)}
+                        placeholder="e.g. rgba(228,228,231,0.45)"
                       />
                     </label>
                   </div>
@@ -244,21 +248,13 @@ export function RunwayProgrammeGanttBlock({
   );
 }
 
-/** Best-effort hex for color input when value is `rgba(...)`. */
-function rgbaToHexLoose(rgba: string): string {
-  const m = rgba.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-  if (!m) return '#f43f5e';
+/** Normalise stored fill to `#rrggbb` for `<input type="color">`. */
+function solidOrHexForPicker(value: string, fallbackHex: string): string {
+  if (value.startsWith('#') && (value.length === 7 || value.length === 4)) return value.slice(0, 7);
+  const m = value.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (!m) return fallbackHex;
   const r = Number(m[1]).toString(16).padStart(2, '0');
   const g = Number(m[2]).toString(16).padStart(2, '0');
   const b = Number(m[3]).toString(16).padStart(2, '0');
   return `#${r}${g}${b}`;
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const h = hex.replace('#', '');
-  if (h.length !== 6) return `rgba(244, 63, 94, ${alpha})`;
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
