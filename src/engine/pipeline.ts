@@ -35,6 +35,7 @@ import { parseAllYamlDocuments } from './yamlDslParser';
 import {
   blendTowardMultiplier,
   holidayProximityStrength,
+  upcomingPublicHolidayPrepStrength,
   inclusiveWindowSpan,
   applyAustraliaPostChristmasSummerLift,
   applyDecemberRestaurantSeasoning,
@@ -102,11 +103,13 @@ export function runPipeline(
   }
 
   const holidayDateSets: Record<string, Set<string>> = {};
+  const publicHolidayDateSets: Record<string, Set<string>> = {};
   for (const m of allMarkets) {
     const s = new Set<string>();
     for (const d of mergedPublic[m] ?? []) s.add(d);
     for (const d of mergedSchool[m] ?? []) s.add(d);
     holidayDateSets[m] = s;
+    publicHolidayDateSets[m] = new Set(mergedPublic[m] ?? []);
   }
 
   const markets = configs.map((c) => c.market);
@@ -244,6 +247,10 @@ export function runPipeline(
   applyLoadCarryover(aggregated, configs);
   applyOperatingWindows(aggregated, metaByIndex, configByMarket);
   applySchoolStressCorrelations(aggregated, metaByIndex, configByMarket);
+  /** Align lab+team *loads* with collective-leave cap pinch so Dec shutdown does not inflate tech utilisation. */
+  applyNationalLeaveTechLoadSoft(aggregated, metaByIndex, configByMarket);
+  applyPrePublicHolidayLoadRamp(aggregated, metaByIndex, configByMarket, publicHolidayDateSets);
+  applyPublicHolidayTechLoadAttenuation(aggregated, metaByIndex, configByMarket, tuning);
 
   /** School-holiday YAML cap mult × each active `operating_windows.lab_team_capacity_mult` (e.g. Oktoberfest). */
   const labTeamCapMultForDay = (market: string, date: string): number => {
@@ -332,6 +339,93 @@ export function runPipelineFromDsl(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { riskSurface: [], configs: [], parseError: msg };
+  }
+}
+
+function resolvePublicHolidayTechLoadMultiplier(
+  config: MarketConfig | undefined,
+  tuning: RiskModelTuning
+): number {
+  const explicit = config?.publicHolidayTechLoadMultiplier;
+  if (explicit != null && Number.isFinite(explicit)) {
+    return Math.min(1, Math.max(0.02, explicit));
+  }
+  const staff = config?.publicHolidayStaffingMultiplier;
+  if (staff != null && Number.isFinite(staff)) {
+    const sq = staff * staff;
+    return Math.min(1, Math.max(0.04, Math.min(0.22, sq)));
+  }
+  const base = tuning.holidayCapacityScale;
+  const sq = base * base;
+  return Math.min(1, Math.max(0.05, Math.min(0.2, sq)));
+}
+
+function scaleSurfaceLabsAndTeams(row: AggregatedDay, factor: number): void {
+  if (!Number.isFinite(factor) || (factor >= 1 - 1e-12 && factor <= 1 + 1e-12)) return;
+  for (const id of PRESSURE_SURFACE_IDS) {
+    const sl = row.surfaceTotals[id];
+    sl.lab_readiness *= factor;
+    sl.lab_sustain *= factor;
+    sl.team_readiness *= factor;
+    sl.team_sustain *= factor;
+  }
+  recomputeAggregatedTotals(row);
+}
+
+/**
+ * When `national_leave_bands` pull lab+team *capacity* down, scale lab+team *loads* by ~the same factor
+ * (slightly softer) so the tech sparkline does not show false “overload” while HQ is largely out.
+ * Skips public-holiday days — {@link applyPublicHolidayTechLoadAttenuation} handles those.
+ */
+function applyNationalLeaveTechLoadSoft(
+  aggregated: AggregatedDay[],
+  metaByIndex: { public_holiday_flag: boolean }[],
+  configByMarket: Record<string, MarketConfig>
+): void {
+  for (let i = 0; i < aggregated.length; i++) {
+    if (metaByIndex[i]!.public_holiday_flag) continue;
+    const row = aggregated[i]!;
+    const lm = nationalLeaveLabTeamCapMult(configByMarket[row.market]?.nationalLeaveBands, row.date);
+    if (lm >= 1 - 1e-9) continue;
+    const f = Math.max(0.14, Math.min(1, 0.9 * lm));
+    scaleSurfaceLabsAndTeams(row, f);
+  }
+}
+
+function applyPrePublicHolidayLoadRamp(
+  aggregated: AggregatedDay[],
+  metaByIndex: { public_holiday_flag: boolean }[],
+  configByMarket: Record<string, MarketConfig>,
+  publicHolidayDateSets: Record<string, Set<string>>
+): void {
+  for (let i = 0; i < aggregated.length; i++) {
+    if (metaByIndex[i]!.public_holiday_flag) continue;
+    const row = aggregated[i]!;
+    const cfg = configByMarket[row.market];
+    const taper = cfg?.prePublicHolidayLoadTaperDays;
+    const target = cfg?.prePublicHolidayLoadMultiplier;
+    if (taper == null || taper <= 0 || target == null || target <= 1) continue;
+    const pubSet = publicHolidayDateSets[row.market] ?? new Set<string>();
+    const strength = upcomingPublicHolidayPrepStrength(row.date, pubSet, taper);
+    if (strength <= 0) continue;
+    const m = blendTowardMultiplier(target, strength);
+    if (m <= 1 + 1e-9) continue;
+    scaleSurfaceLabsAndTeams(row, m);
+  }
+}
+
+function applyPublicHolidayTechLoadAttenuation(
+  aggregated: AggregatedDay[],
+  metaByIndex: { public_holiday_flag: boolean }[],
+  configByMarket: Record<string, MarketConfig>,
+  tuning: RiskModelTuning
+): void {
+  for (let i = 0; i < aggregated.length; i++) {
+    if (!metaByIndex[i]!.public_holiday_flag) continue;
+    const row = aggregated[i]!;
+    const mult = resolvePublicHolidayTechLoadMultiplier(configByMarket[row.market], tuning);
+    if (mult >= 1 - 1e-9) continue;
+    scaleSurfaceLabsAndTeams(row, mult);
   }
 }
 

@@ -792,6 +792,22 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     capTaperRaw != null && capTaperRaw !== '' && Number.isFinite(capTaper) && capTaper > 0
       ? Math.min(14, Math.floor(capTaper))
       : undefined;
+  const prepTaperRaw = hol.pre_public_holiday_load_taper_days ?? hol.prePublicHolidayLoadTaperDays;
+  const prepTaperN = Number(prepTaperRaw);
+  const prePublicHolidayLoadTaperDays =
+    prepTaperRaw != null && prepTaperRaw !== '' && Number.isFinite(prepTaperN) && prepTaperN > 0
+      ? Math.min(21, Math.floor(prepTaperN))
+      : undefined;
+  const prepMultRaw = hol.pre_public_holiday_load_mult ?? hol.prePublicHolidayLoadMult;
+  const prepMultN = Number(prepMultRaw);
+  let prePublicHolidayLoadMultiplier: number | undefined;
+  if (prePublicHolidayLoadTaperDays != null) {
+    if (prepMultRaw != null && prepMultRaw !== '' && Number.isFinite(prepMultN) && prepMultN > 1) {
+      prePublicHolidayLoadMultiplier = Math.min(1.25, prepMultN);
+    } else {
+      prePublicHolidayLoadMultiplier = 1.04;
+    }
+  }
   const holScaleRaw = hol.lab_capacity_scale ?? hol.labCapacityScale;
   const holScaleN = Number(holScaleRaw);
   const holidayLabCapacityScale =
@@ -804,6 +820,7 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
   const pubBlock = parsed.public_holidays;
   let publicHolidayStaffingMultiplier: number | undefined;
   let publicHolidayTradingMultiplier: number | undefined;
+  let publicHolidayTechLoadMultiplier: number | undefined;
   let publicHolidayExtraDates: string[] | undefined;
   if (pubBlock && typeof pubBlock === 'object') {
     const smRaw = pubBlock.staffing_multiplier ?? pubBlock.staffingMultiplier;
@@ -813,6 +830,13 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     }
     const pt = Number(pubBlock.trading_multiplier ?? pubBlock.tradingMultiplier);
     if (Number.isFinite(pt) && pt > 0) publicHolidayTradingMultiplier = pt;
+    const tlRaw = pubBlock.tech_load_multiplier ?? pubBlock.techLoadMultiplier;
+    if (tlRaw != null && tlRaw !== '') {
+      const tl = Number(tlRaw);
+      if (Number.isFinite(tl) && tl > 0) {
+        publicHolidayTechLoadMultiplier = Math.min(1, Math.max(0.02, tl));
+      }
+    }
     publicHolidayExtraDates = normalizeDateList(pubBlock.dates);
   }
 
@@ -847,6 +871,7 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     holidayLabCapacityScale,
     publicHolidayStaffingMultiplier,
     publicHolidayTradingMultiplier,
+    publicHolidayTechLoadMultiplier,
     publicHolidayExtraDates,
     schoolHolidayStaffingMultiplier,
     schoolHolidayExtraDates,
@@ -861,6 +886,8 @@ export function yamlToPipelineConfig(parsed: ParsedYaml): MarketConfig {
     seasonalTrading: mapSeasonalTrading(parsed.trading),
     holidays: parsed.holidays,
     holidayCapacityTaperDays,
+    prePublicHolidayLoadTaperDays,
+    prePublicHolidayLoadMultiplier,
     stressCorrelations,
     operatingWindows: mapOperatingWindows(parsed.operating_windows),
     techRhythm: mapTechRhythm(techEffective),

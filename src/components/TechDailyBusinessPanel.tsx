@@ -10,9 +10,15 @@ import { useAtcStore } from '@/store/useAtcStore';
 import type { TechWeeklyPatternPatch } from '@/lib/dslTechRhythmPatch';
 import { WeightingLineMiniChart } from '@/components/WeightingLineMiniChart';
 import { PatternUnitField } from '@/components/PatternUnitField';
+import { cn } from '@/lib/utils';
+
+type TechDailyBusinessPanelProps = {
+  /** When true, omit the in-panel H3 (parent {@link RightPanelSection} supplies the title). */
+  embeddedInCollapsible?: boolean;
+};
 
 /** Support week shape UI: Market IT `weekday_intensity` Mon–Sun (YAML; internal `techRhythm.weekly_pattern`). */
-export function TechDailyBusinessPanel() {
+export function TechDailyBusinessPanel({ embeddedInCollapsible = false }: TechDailyBusinessPanelProps = {}) {
   const country = useAtcStore((s) => s.country);
   const configs = useAtcStore((s) => s.configs);
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
@@ -41,8 +47,15 @@ export function TechDailyBusinessPanel() {
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <div>
-        <h3 className="text-xs font-semibold text-foreground">Support Week Shape</h3>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        {!embeddedInCollapsible ? (
+          <h3 className="text-xs font-semibold text-foreground">Support Week Shape</h3>
+        ) : null}
+        <p
+          className={cn(
+            'text-xs leading-relaxed text-muted-foreground',
+            embeddedInCollapsible ? 'mt-0' : 'mt-1'
+          )}
+        >
           How hard BAU engineering runs Mon–Sun (0 = off, 1 = full). Store trading has its own curve under Restaurant
           Activity.
         </p>

@@ -2,9 +2,16 @@ import { APP_VERSION, BUILD_TIME_ISO, GIT_COMMIT_MESSAGE, GIT_COMMIT_SHORT } fro
 import { HeaderClerkOrgSwitcher } from '@/components/HeaderClerkOrgSwitcher';
 import { HeaderClerkUser } from '@/components/HeaderClerkUser';
 import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom';
+import {
+  FALLBACK_RUNWAY_MARKET_IDS,
+  gammaFocusMarket,
+  isRunwayMultiMarketStrip,
+} from '@/lib/markets';
+import { useAtcStore } from '@/store/useAtcStore';
+import { Link, useNavigate } from 'react-router-dom';
 import { SegmentWorkbenchMark } from '@/components/SegmentWorkbenchMark';
 import { GitBranch } from 'lucide-react';
+import { useCallback, type MouseEvent } from 'react';
 
 /** First 75 chars of the commit subject; ellipsised when longer. Empty/placeholder messages collapse to ''. */
 const COMMIT_SUBJECT_75 = (() => {
@@ -20,6 +27,20 @@ const BUILD_STAMP_TITLE = (() => {
 })();
 
 export function Header() {
+  const navigate = useNavigate();
+  const onTitleClick = useCallback(
+    (e: MouseEvent<HTMLAnchorElement>) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const st = useAtcStore.getState();
+      if (!isRunwayMultiMarketStrip(st.country)) return;
+      e.preventDefault();
+      const order = st.runwayMarketOrder.length ? st.runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
+      st.setCountry(gammaFocusMarket(st.country, st.configs, order), {});
+      navigate({ pathname: '/', search: '' });
+    },
+    [navigate]
+  );
+
   const titleLinkClass = cn(
     'text-inherit no-underline decoration-transparent transition-colors',
     'hover:underline hover:decoration-foreground/50',
@@ -33,7 +54,8 @@ export function Header() {
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
             <h1 className="text-sm font-bold leading-tight tracking-tight text-foreground sm:text-[0.9375rem]">
               <Link
-                to="/"
+                to={{ pathname: '/', search: '' }}
+                onClick={onTitleClick}
                 className={cn(titleLinkClass, 'inline-flex items-center gap-2')}
                 title="Landing page"
                 aria-label="Go to landing page"

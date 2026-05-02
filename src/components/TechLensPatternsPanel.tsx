@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { RightPanelSection } from '@/components/RightPanelSection';
 import { TechCapacityPlanningPanel } from '@/components/TechCapacityPlanningPanel';
 import { TechDailyBusinessPanel } from '@/components/TechDailyBusinessPanel';
 
@@ -6,6 +8,8 @@ import { TechDailyBusinessPanel } from '@/components/TechDailyBusinessPanel';
  * Heatmap Δ + transfer lives in {@link TechLensHeatmapPatternsPanel} below this block in the controls column.
  */
 export function TechLensPatternsPanel() {
+  const [supportWeekExpanded, setSupportWeekExpanded] = useState(false);
+
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <p className="text-[10px] leading-relaxed text-muted-foreground">
@@ -15,7 +19,24 @@ export function TechLensPatternsPanel() {
         <span className="font-medium text-foreground/85">Technology Teams heatmap</span> section (under Business Patterns)
         for Δ, curve, γ, and tail; other lenses use Settings.
       </p>
-      <TechDailyBusinessPanel />
+      <div className="overflow-hidden rounded-lg border border-border/55 bg-muted/[0.07] dark:border-border/45 dark:bg-muted/10">
+        <RightPanelSection
+          className="min-h-0 shrink-0 border-b-0"
+          expanded={supportWeekExpanded}
+          onExpandedChange={setSupportWeekExpanded}
+          title="Support week shape"
+          fillHeight={false}
+          collapsedSummary={
+            <span className="text-[11px] text-muted-foreground">
+              Mon–Sun Market IT intensity (YAML) — expand to edit
+            </span>
+          }
+        >
+          <div className="border-t border-border/40 px-2.5 pb-2.5 pt-2">
+            <TechDailyBusinessPanel embeddedInCollapsible />
+          </div>
+        </RightPanelSection>
+      </div>
       <div className="border-t border-border/60 pt-1">
         <TechCapacityPlanningPanel />
       </div>

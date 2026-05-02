@@ -169,6 +169,18 @@ export type MarketConfig = {
   schoolHolidayStaffingMultiplier?: number;
   /** Multiplies base store-trading level on public holidays (≥1 typical). Default 1. */
   publicHolidayTradingMultiplier?: number;
+  /**
+   * Multiplier on **lab+team** demand surfaces on public holidays (YAML `public_holidays.tech_load_multiplier`).
+   * When omitted, the engine derives a conservative skeleton load from {@link publicHolidayStaffingMultiplier}.
+   */
+  publicHolidayTechLoadMultiplier?: number;
+  /**
+   * Calendar days **before** each upcoming public holiday to blend {@link prePublicHolidayLoadMultiplier}
+   * into lab+team loads (`holidays.pre_public_holiday_load_taper_days`). Omit or 0 = off.
+   */
+  prePublicHolidayLoadTaperDays?: number;
+  /** Target multiplicative lift at the day immediately before a public holiday (clamped ≈1–1.25). */
+  prePublicHolidayLoadMultiplier?: number;
   tradingPressure?: TradingPressureKnobs;
   bau?: BauEntry | BauEntry[];
   campaigns: CampaignConfig[];

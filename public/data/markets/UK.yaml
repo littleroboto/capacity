@@ -231,6 +231,8 @@ public_holidays:
     - '2026-12-25'
     - '2026-12-28'
   staffing_multiplier: 0.25
+  # HQ / change demand on the bank-holiday day (skeleton); caps still follow staffing_multiplier.
+  tech_load_multiplier: 0.08
   trading_multiplier: 1.0
 
 # School breaks — explicit dates (local authority / regional calendar).
@@ -406,6 +408,9 @@ school_holidays:
 
 holidays:
   capacity_taper_days: 0
+  # Mild lab+Market-IT load lift in the few calendar days before each public holiday (trading prep / long-weekend crunch).
+  pre_public_holiday_load_taper_days: 5
+  pre_public_holiday_load_mult: 1.05
   lab_capacity_scale: 1.0
 
 # Store / restaurant trading — demand shape (separate from tech supply).

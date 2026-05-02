@@ -164,6 +164,28 @@ export function holidayProximityStrength(
   return clamp01(best);
 }
 
+/**
+ * 0–1 weight for days **strictly before** the next public holiday: strongest the calendar day
+ * immediately prior, fading to 0 at `taperDays` before that holiday. Public holiday dates return 0.
+ */
+export function upcomingPublicHolidayPrepStrength(
+  dateStr: string,
+  publicHolidayDates: Set<string>,
+  taperDays: number
+): number {
+  if (taperDays <= 0 || publicHolidayDates.has(dateStr)) return 0;
+  let best = 0;
+  for (const h of publicHolidayDates) {
+    if (h <= dateStr) continue;
+    const dist = calendarDaysBetween(dateStr, h);
+    if (dist < 1 || dist > taperDays) continue;
+    const t = clamp01(1 - (dist - 1) / taperDays);
+    const w = smoothstep01(t);
+    if (w > best) best = w;
+  }
+  return clamp01(best);
+}
+
 /** Blend multiplicative factor: `1 + (mult - 1) * weight`. When weight=0 → 1; weight=1 → mult. */
 export function blendTowardMultiplier(mult: number, weight: number): number {
   if (!Number.isFinite(mult)) return 1;
