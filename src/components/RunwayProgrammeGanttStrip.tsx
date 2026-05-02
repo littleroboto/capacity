@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { motion, useReducedMotion } from 'motion/react';
 import { Hammer, FlaskConical } from 'lucide-react';
 import { parseDate } from '@/engine/calendar';
 import type { DeploymentRiskBlackout } from '@/engine/types';
@@ -26,6 +27,8 @@ const CHRONICLE_ICON_PX = 13;
 const CHRONICLE_ICON_HALF = CHRONICLE_ICON_PX / 2;
 /** Campaign hammer/flask: sit just above the dashed baseline (foreignObject top-left). */
 const CHRONICLE_ICON_ABOVE_LINE_PAD_PX = 3;
+/** Give tech programme rows a little more vertical breathing room for milestone labels. */
+const TECH_PROGRAMME_EXTRA_ROW_GAP_PX = 5;
 
 function programmeBarTrailingLabel(
   name: string,
@@ -134,6 +137,8 @@ export type RunwayProgrammeGanttStripProps = {
   lanes: readonly ProgrammeGanttChronicleLane[];
   blackouts: readonly DeploymentRiskBlackout[] | null | undefined;
   prefs: ProgrammeGanttDisplayPrefs;
+  /** Remount key for subtle in-place pop animation of timeline content. */
+  animateInKey?: string | number;
 };
 
 export function runwayProgrammeGanttStripHeightPx(prefs: ProgrammeGanttDisplayPrefs, laneCount: number): number {
@@ -219,10 +224,13 @@ export function RunwayProgrammeGanttStrip({
   lanes,
   blackouts,
   prefs,
+  animateInKey,
 }: RunwayProgrammeGanttStripProps) {
+  const reduceMotion = useReducedMotion();
   const uid = useId().replace(/:/g, '');
   const schoolHatchId = `gantt-school-hatch-45-${uid}`;
   const barHatchId = `gantt-bar-hatch-45-${uid}`;
+  const panelClipId = `gantt-panel-clip-${uid}`;
   const barTile = Math.max(2, Math.min(14, prefs.barHatchSpacingPx));
   const barMid = barTile / 2;
 
@@ -235,7 +243,6 @@ export function RunwayProgrammeGanttStrip({
 
   const { laneRows, svgHeight, schoolOverlaySpans, blackoutSpans, blackoutBandPx } = useMemo(() => {
     const { stripTopPadPx, barHeightPx, laneGapPx, stripBottomPadPx, barOpacity } = prefs;
-    const stride = barHeightPx + laneGapPx;
 
     const blackoutYmdSet = new Set<string>();
     const schoolYmdSet = new Set<string>();
@@ -254,35 +261,15 @@ export function RunwayProgrammeGanttStrip({
       prefs.showBlackouts && blackoutSpans.length > 0 ? PROGRAMME_GANTT_BLACKOUT_CHROME_H_PX : 0;
 
     const laneRows: LaneRow[] = [];
-    let i = 0;
-    for (const lane of lanes) {
-      const yRow = stripTopPadPx + blackoutBandPx + i * stride;
+    let yCursor = stripTopPadPx + blackoutBandPx;
+    for (let laneIdx = 0; laneIdx < lanes.length; laneIdx += 1) {
+      const lane = lanes[laneIdx]!;
+      const yRow = yCursor;
       const midY = yRow + barHeightPx / 2;
       const y0t = yRow + 3;
       const y1t = yRow + barHeightPx - 3;
       const marks: PlacedMark[] = [];
       let maxRightX = -Infinity;
-      const isPosLane = lane.kind === 'tech_programme' && (/\bpos\b/i.test(lane.parentName) || /point\s*of\s*sale/i.test(lane.parentName));
-      let posRunEdgeX0: number | null = null;
-      let posRunEdgeX1: number | null = null;
-      let posRunStartYmd: string | null = null;
-      if (isPosLane) {
-        const runMark = lane.marks.find((m): m is Extract<typeof m, { kind: 'run_bar' }> => m.kind === 'run_bar');
-        if (runMark) {
-          posRunStartYmd = runMark.startYmd;
-          const runSpan = xSpanForInclusiveYmdRangeClipped(
-            runMark.startYmd,
-            runMark.endYmdInclusive,
-            layout,
-            clipStart,
-            clipEnd,
-          );
-          if (runSpan) {
-            posRunEdgeX0 = runSpan.x0;
-            posRunEdgeX1 = runSpan.x1;
-          }
-        }
-      }
 
       for (const m of lane.marks) {
         if (m.kind === 'dotted_span') {
@@ -299,16 +286,7 @@ export function RunwayProgrammeGanttStrip({
           const cStart = layout.get(visibleStartYmd);
           const cEnd = layout.get(visibleEndYmd);
           const x0 = cStart ? cStart.x + cStart.cellPx / 2 : span.x0;
-          let x1 = cEnd ? cEnd.x + cEnd.cellPx / 2 : span.x1;
-          const isLastPosPilot =
-            isPosLane &&
-            m.icon === 'none' &&
-            m.railStyle === 'dashed' &&
-            (m.title?.startsWith('Pilot phase') ?? false) &&
-            posRunStartYmd != null &&
-            nextYmd(m.endYmdInclusive) === posRunStartYmd &&
-            posRunEdgeX0 != null;
-          if (isLastPosPilot && posRunEdgeX0 != null) x1 = posRunEdgeX0;
+          const x1 = cEnd ? cEnd.x + cEnd.cellPx / 2 : span.x1;
           if (x1 < x0) continue;
           maxRightX = Math.max(maxRightX, x1);
           marks.push({
@@ -367,9 +345,7 @@ export function RunwayProgrammeGanttStrip({
             yBot: yRow + barHeightPx - 2.5,
           });
         } else if (m.kind === 'tick') {
-          let cx = cellCenterX(m.ymd, layout);
-          if (isPosLane && m.label === 'NDR' && posRunEdgeX0 != null) cx = posRunEdgeX0;
-          if (isPosLane && m.label === 'NDC' && posRunEdgeX1 != null) cx = posRunEdgeX1;
+          const cx = cellCenterX(m.ymd, layout);
           if (cx == null) continue;
           maxRightX = Math.max(maxRightX, cx + 2);
           marks.push({
@@ -399,11 +375,18 @@ export function RunwayProgrammeGanttStrip({
       const labelX = Math.max(maxRightX, spanFoot?.x1 ?? maxRightX) + LABEL_GAP_PX;
 
       laneRows.push({ lane, yRow, midY, marks, labelX, maxRightX });
-      i += 1;
+      const isLastLane = laneIdx === lanes.length - 1;
+      if (!isLastLane) {
+        yCursor +=
+          barHeightPx +
+          laneGapPx +
+          (lane.kind === 'tech_programme' ? TECH_PROGRAMME_EXTRA_ROW_GAP_PX : 0);
+      } else {
+        yCursor += barHeightPx;
+      }
     }
 
-    const n = laneRows.length;
-    const bodyPx = n === 0 ? 0 : n * barHeightPx + (n - 1) * laneGapPx;
+    const bodyPx = laneRows.length === 0 ? 0 : yCursor - (stripTopPadPx + blackoutBandPx);
     const svgHeight = stripTopPadPx + blackoutBandPx + bodyPx + stripBottomPadPx;
 
     return { laneRows, svgHeight, schoolOverlaySpans, blackoutSpans, blackoutBandPx };
@@ -425,6 +408,9 @@ export function RunwayProgrammeGanttStrip({
       aria-label={`Programme timeline for ${marketKey}`}
     >
       <defs>
+        <clipPath id={panelClipId} clipPathUnits="userSpaceOnUse">
+          <rect x={gutter} y={0.5} width={Math.max(0, gridWidth - gutter)} height={Math.max(0, svgHeight - 1)} rx={2} />
+        </clipPath>
         <pattern
           id={schoolHatchId}
           width="3"
@@ -470,6 +456,14 @@ export function RunwayProgrammeGanttStrip({
         className="fill-zinc-50 stroke-zinc-300/90 dark:fill-zinc-950 dark:stroke-zinc-800"
         strokeWidth={1}
       />
+      <motion.g
+        key={`gantt-pop-${String(animateInKey ?? 'static')}`}
+        initial={reduceMotion ? false : { opacity: 0, scale: 0.985 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        style={{ transformOrigin: `${gutter + 8}px ${Math.max(8, barAreaTop + 6)}px` }}
+        clipPath={`url(#${panelClipId})`}
+      >
       <g>
         {laneRows.flatMap((row) =>
           row.marks
@@ -554,6 +548,35 @@ export function RunwayProgrammeGanttStrip({
         })}
       </g>
 
+      <g className="pointer-events-none">
+        {laneRows.flatMap((row) =>
+          row.marks
+            .filter((m): m is Extract<PlacedMark, { kind: 'tick' }> => m.kind === 'tick')
+            .map((m) =>
+              m.tickStyle === 'dot' ? (
+                <circle
+                  key={`${m.key}-glyph`}
+                  cx={m.cx}
+                  cy={(m.y0 + m.y1) / 2}
+                  r={2.1}
+                  className="fill-zinc-700 dark:fill-zinc-300"
+                />
+              ) : (
+                <line
+                  key={`${m.key}-glyph`}
+                  x1={m.cx}
+                  x2={m.cx}
+                  y1={m.y0}
+                  y2={m.y1}
+                  className="stroke-zinc-600 dark:stroke-zinc-400"
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ),
+            ),
+        )}
+      </g>
+
       <g>
         {laneRows.flatMap((row) =>
           row.marks
@@ -627,24 +650,6 @@ export function RunwayProgrammeGanttStrip({
             .filter((m): m is Extract<PlacedMark, { kind: 'tick' }> => m.kind === 'tick')
             .map((m) => (
               <g key={m.key}>
-                {m.tickStyle === 'dot' ? (
-                  <circle
-                    cx={m.cx}
-                    cy={(m.y0 + m.y1) / 2}
-                    r={2.1}
-                    className="fill-zinc-700 dark:fill-zinc-300"
-                  />
-                ) : (
-                  <line
-                    x1={m.cx}
-                    x2={m.cx}
-                    y1={m.y0}
-                    y2={m.y1}
-                    className="stroke-zinc-600 dark:stroke-zinc-400"
-                    strokeWidth={1}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                )}
                 {m.tickLabel?.trim() ? (
                   <text
                     x={m.cx}
@@ -708,7 +713,9 @@ export function RunwayProgrammeGanttStrip({
               const cx = (m.x0 + m.x1) / 2;
               const isPosLane =
                 row.lane.kind === 'tech_programme' &&
-                (/\bpos\b/i.test(row.lane.parentName) || /point\s*of\s*sale/i.test(row.lane.parentName));
+                (/\bpos\b/i.test(row.lane.parentName) ||
+                  /point\s*of\s*sale/i.test(row.lane.parentName) ||
+                  /\bhoc\b/i.test(row.lane.parentName));
               const iconY =
                 row.lane.kind === 'campaign' || isPosLane
                   ? m.midY - CHRONICLE_ICON_PX - CHRONICLE_ICON_ABOVE_LINE_PAD_PX
@@ -881,6 +888,7 @@ export function RunwayProgrammeGanttStrip({
           })}
         </g>
       ) : null}
+      </motion.g>
     </svg>
   );
 }

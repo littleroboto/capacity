@@ -3828,6 +3828,7 @@ function RunwayGridBody({
                                     blackouts={marketConfig?.deployment_risk_blackouts ?? null}
                                     activityLedger={activityLedger}
                                     ledgerExcludedEntryIds={ledgerExcludedForHeatmap}
+                                    animateInKey={isoGrowResetKey}
                                     railSpacerWidthPx={SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX}
                                     ephemeral={Boolean(landingMinimalChrome && landingProgrammePlan)}
                                     revealPlanWhen={Boolean(

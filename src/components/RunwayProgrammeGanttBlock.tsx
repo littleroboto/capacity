@@ -58,6 +58,7 @@ type Props = {
   blackouts: readonly DeploymentRiskBlackout[] | null | undefined;
   activityLedger?: MarketActivityLedger | null;
   ledgerExcludedEntryIds?: readonly string[];
+  animateInKey?: string | number;
   railSpacerWidthPx: number;
   className?: string;
   /**
@@ -85,6 +86,7 @@ export function RunwayProgrammeGanttBlock({
   blackouts,
   activityLedger,
   ledgerExcludedEntryIds = [],
+  animateInKey,
   railSpacerWidthPx,
   className,
   ephemeral = false,
@@ -351,22 +353,25 @@ export function RunwayProgrammeGanttBlock({
           >
             <div className="flex min-w-0 flex-row items-start gap-1.5">
               <div className="shrink-0" style={{ width: railSpacerWidthPx }} aria-hidden />
-              <div
-                className="min-w-0 shrink-0 overflow-x-visible overflow-y-visible"
-                style={{ width: stripWidth, minWidth: stripWidth }}
-              >
-                <RunwayProgrammeGanttStrip
-                  marketKey={`${country}-programme`}
-                  placedCells={placedCells}
-                  contributionMeta={contributionMeta}
-                  cellPx={cellPx}
-                  gap={gap}
-                  width={stripWidth}
-                  riskByDate={riskByDate}
-                  lanes={lanes}
-                  blackouts={blackouts}
-                  prefs={prefs}
-                />
+              <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable]">
+                <div
+                  className="min-w-0 shrink-0 overflow-hidden rounded-[3px]"
+                  style={{ width: stripWidth, minWidth: stripWidth }}
+                >
+                  <RunwayProgrammeGanttStrip
+                    marketKey={`${country}-programme`}
+                    placedCells={placedCells}
+                    contributionMeta={contributionMeta}
+                    cellPx={cellPx}
+                    gap={gap}
+                    width={stripWidth}
+                    riskByDate={riskByDate}
+                    lanes={lanes}
+                    blackouts={blackouts}
+                    prefs={prefs}
+                    animateInKey={animateInKey}
+                  />
+                </div>
               </div>
             </div>
             <div className="flex min-w-0 flex-row items-center gap-1.5">
