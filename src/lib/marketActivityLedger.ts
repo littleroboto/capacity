@@ -103,6 +103,49 @@ export type MarketActivityLedger = {
   entries: MarketActivityLedgerEntry[];
 };
 
+/**
+ * UI classification: **restrictors** move effective capacity / delivery windows; **consumers** are
+ * scheduled work or demand-shaping that consumes (or reallocates) that capacity.
+ */
+export type MarketActivityCapacityRole = 'restrictor' | 'consumer';
+
+/** Short table label (full semantics stay in column tooltip / docs). */
+export function ledgerCapacityRoleLabel(role: MarketActivityCapacityRole): string {
+  return role === 'restrictor' ? 'Restrictor' : 'Consumer';
+}
+
+/**
+ * Classify a ledger row for observability (derived from {@link MarketActivityEntityKind} and window metadata).
+ *
+ * **Domain note:** BAU and trading/store-pressure rhythms are also **consumers** (they load teams / stores),
+ * but v1 does not materialise them as rows here — they are applied in the pipeline (`phaseEngine` YAML `bau`,
+ * trading month shapes, etc.). When/if those appear as ledger rows, they must use entity kinds handled here
+ * as `consumer` (do not fold them into restrictors unless they truly scale *available* capacity caps).
+ *
+ * Operating windows with a non-unity `lab_team_capacity_mult` are restrictors; other windows default to consumers.
+ */
+export function ledgerEntryCapacityRole(entry: MarketActivityLedgerEntry): MarketActivityCapacityRole {
+  switch (entry.entityKind) {
+    case 'campaign':
+    case 'tech_programme':
+      return 'consumer';
+    case 'national_leave_band':
+    case 'public_holiday_date':
+    case 'school_holiday_date':
+    case 'deployment_risk_event':
+    case 'deployment_risk_blackout':
+      return 'restrictor';
+    case 'operating_window': {
+      const raw = entry.metadata?.lab_team_capacity_mult;
+      const n = typeof raw === 'number' ? raw : Number(raw);
+      if (Number.isFinite(n) && Math.abs(n - 1) > 1e-6) return 'restrictor';
+      return 'consumer';
+    }
+    default:
+      return 'consumer';
+  }
+}
+
 /** Bump when highlight payload shape or defaults change (URL / persisted UI). */
 export const MARKET_ACTIVITY_HIGHLIGHT_SCHEMA_VERSION = 1 as const;
 
@@ -272,8 +315,12 @@ function programmeFootprintIso(p: TechProgrammeConfig): { dateStart: string; dat
 
 /**
  * Build a v1 ledger from a parsed {@link MarketConfig} (browser YAML path or reconstructed config).
- * Intentionally conservative: omits always-on rhythms (BAU, trading monthly shape) until we model them
- * as dated spans or receipt terms.
+ *
+ * Intentionally conservative: omits always-on rhythms (**BAU**, **trading / store-pressure** monthly shape)
+ * until we model them as explicit dated ledger rows or receipt terms. That is **UX / completeness** only:
+ * the engine still applies BAU via {@link MarketConfig.bau} in phase expansion and trading via risk/trading
+ * knobs — both are **capacity consumers** in the domain sense; they are not “managed wrong” by living
+ * outside this table.
  */
 export function buildMarketActivityLedgerFromConfig(config: MarketConfig): MarketActivityLedger {
   const market = config.market;

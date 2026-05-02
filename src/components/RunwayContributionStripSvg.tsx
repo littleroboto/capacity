@@ -17,6 +17,10 @@ import {
 import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import type { CompareSvgLayoutCell } from '@/lib/runwayCompareSvgLayout';
 import { layoutContributionStripRunwaySvg } from '@/lib/runwayCompareSvgLayout';
+import {
+  layeredHeatmapCellMetric,
+  organicHeatmapCellLayerIndex,
+} from '@/lib/runwayHeatmapOrganicLayers';
 import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
 import {
   effectiveLedgerFootprintOverlap,
@@ -63,10 +67,12 @@ export type RunwayContributionStripSvgProps = {
   cellRadiusPx?: number;
   deploymentRiskBlackouts?: readonly DeploymentRiskBlackout[] | null;
   /**
-   * Landing / marketing: disable vertical clip emergence and use per-cell staggered opacity pulse
-   * plus smooth `fill` transitions when stress updates (no strip-wide flicker).
+   * Disable vertical clip emergence and build cell colour in organic layers (hash-staggered timing,
+   * smooth fill transitions).
    */
   landingStaggerCellPulse?: boolean;
+  /** Required when `landingStaggerCellPulse` is true. */
+  organicLayerTick?: number;
   /** When true, omit the dashed day column line (e.g. triple-lens uses a parent overlay line). */
   suppressSelectionColumnLine?: boolean;
 };
@@ -134,6 +140,7 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
   cellRadiusPx = 3,
   deploymentRiskBlackouts = null,
   landingStaggerCellPulse = false,
+  organicLayerTick,
   suppressSelectionColumnLine = false,
 }: RunwayContributionStripSvgProps) {
   const theme = useAtcStore((s) => s.theme);
@@ -181,6 +188,7 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
 
   const emergeKey = emergeResetKey ?? marketKey;
   const pulseOn = landingStaggerCellPulse && !reduceMotion;
+  const organicOn = pulseOn && organicLayerTick != null;
   const insetTopPct = useRunwayHeatmapEmergence(emergeKey, {
     staggerMs: emergeStaggerMs,
     disabled: pulseOn,
@@ -229,13 +237,23 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
   const ariaStrip = `Runway heatmap ${marketKey}; month, calendar quarter, and year labels under the grid with one row of ticks at period boundaries`;
 
   function renderHeatmapCells(asDom: boolean) {
-    let stripCellAnimIdx = 0;
     return cells.map((c, i) => {
       if (c.cell === false) return null;
-      const animIdx = stripCellAnimIdx++;
       const dateStr = c.cell;
       const row = dateStr ? riskByDate.get(dateStr) : undefined;
-      const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
+      const layerIdx =
+        organicOn && dateStr
+          ? organicHeatmapCellLayerIndex({
+              tick: organicLayerTick!,
+              marketKey,
+              dateYmd: dateStr,
+            })
+          : 4;
+      const metric = row
+        ? organicOn
+          ? layeredHeatmapCellMetric(row, viewMode, riskTuning, layerIdx)
+          : heatmapCellMetric(row, viewMode, riskTuning)
+        : undefined;
       const { fill: baseFill, dimOpacity: dimOp } = !dateStr
         ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
         : runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
@@ -275,7 +293,6 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
         viewMode === 'market_risk' && ymdInAnyDeploymentRiskBlackout(ymd, deploymentRiskBlackouts ?? undefined);
       const freezeStroke = Math.max(0.85, Math.min(2.6, cellPx * 0.11));
 
-      const cellDelayMs = (asDom || pulseOn) ? Math.min(animIdx, 440) * 8 : undefined;
       const dayAria = `Day details for ${dateStr ?? ymd}${deployFreezeMark ? '; change-freeze window' : ''}`;
 
       if (asDom) {
@@ -292,10 +309,9 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
             style={{ left: c.x, top: c.y, width: c.w, height: c.h }}
           >
             <div
-              className="landing-heatmap-cell-in absolute inset-0 overflow-hidden"
+              className="absolute inset-0 overflow-hidden"
               style={{
                 borderRadius: rr,
-                animationDelay: cellDelayMs != null ? `${cellDelayMs}ms` : undefined,
               }}
             >
               <div
@@ -359,10 +375,7 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
 
       return (
         <g key={`${marketKey}-svg-${i}-${c.x}-${c.y}`}>
-          <g
-            className={pulseOn ? 'landing-heatmap-cell-in' : undefined}
-            style={cellDelayMs != null ? { animationDelay: `${cellDelayMs}ms` } : undefined}
-          >
+          <g>
             <rect
               x={c.x}
               y={c.y}
@@ -377,7 +390,7 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
               aria-pressed={isSelected}
               style={{
                 cursor: 'pointer',
-                ...(pulseOn ? { transition: 'fill 0.55s ease, stroke 0.45s ease' } : {}),
+                ...(organicOn ? { transition: 'fill 0.55s ease, stroke 0.45s ease' } : {}),
               }}
               role="button"
               tabIndex={0}

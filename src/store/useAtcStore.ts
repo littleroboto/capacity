@@ -198,6 +198,11 @@ type AtcState = {
   runwayHeatmapCellGapPx: number;
   runwayHeatmapCellRadiusPx: number;
   /**
+   * Workbench: organic per-cell heatmap colour build (layered metrics + hash-staggered timing). SVG heatmaps
+   * and contribution strip; no-op when reduced motion. Persisted; off by default.
+   */
+  runwayHeatmapCellIntroPulse: boolean;
+  /**
    * When non-null, workbench shows Back → this picker value (set when opening a single market from
    * LIOM column header). Not persisted.
    */
@@ -250,6 +255,7 @@ type AtcState = {
   setRunwayHeatmapCellPx: (v: number | ((prev: number) => number)) => void;
   setRunwayHeatmapCellGapPx: (v: number | ((prev: number) => number)) => void;
   setRunwayHeatmapCellRadiusPx: (v: number | ((prev: number) => number)) => void;
+  setRunwayHeatmapCellIntroPulse: (v: boolean) => void;
   setDslText: (t: string) => void;
   setRunwayMarketOrder: (ids: string[]) => void;
   setDslByMarket: (m: Record<string, string>) => void;
@@ -413,6 +419,7 @@ export const useAtcStore = create<AtcState>()(
       runwayHeatmapCellPx: RUNWAY_HEATMAP_LAYOUT_DEFAULTS.cellPx,
       runwayHeatmapCellGapPx: RUNWAY_HEATMAP_LAYOUT_DEFAULTS.gapPx,
       runwayHeatmapCellRadiusPx: RUNWAY_HEATMAP_LAYOUT_DEFAULTS.radiusPx,
+      runwayHeatmapCellIntroPulse: false,
       riskSurface: [],
       riskSurfaceLedgerView: null,
       configs: [],
@@ -664,6 +671,8 @@ export const useAtcStore = create<AtcState>()(
             typeof v === 'function' ? v(s.runwayHeatmapCellRadiusPx) : v
           ),
         })),
+
+      setRunwayHeatmapCellIntroPulse: (v) => set({ runwayHeatmapCellIntroPulse: Boolean(v) }),
 
       exportViewSettingsFile: (scope, label) =>
         buildViewSettingsFile(

@@ -13,6 +13,7 @@ import {
   Palmtree,
   RotateCcw,
   Search,
+  Shrink,
 } from 'lucide-react';
 import {
   createColumnHelper,
@@ -27,11 +28,13 @@ import {
 } from '@tanstack/react-table';
 import type { RiskRow } from '@/engine/riskModel';
 import type { RiskModelTuning } from '@/engine/riskModelTuning';
-import type {
-  MarketActivityEntityKind,
-  MarketActivityLedger,
-  MarketActivityLedgerEntry,
-  MarketActivityLensHint,
+import {
+  ledgerCapacityRoleLabel,
+  ledgerEntryCapacityRole,
+  type MarketActivityCapacityRole,
+  type MarketActivityEntityKind,
+  type MarketActivityLedger,
+  type MarketActivityLedgerEntry,
 } from '@/lib/marketActivityLedger';
 import {
   buildDayLensContributionContext,
@@ -48,13 +51,6 @@ export type RunwayLedgerDayContributionPin = {
   riskRow: RiskRow;
   tuning: RiskModelTuning;
 };
-
-function lensHintLabels(hints: readonly MarketActivityLensHint[]): string {
-  const parts = hints.map((h) =>
-    h === 'combined' ? 'Tech' : h === 'in_store' ? 'Trading' : 'Risk',
-  );
-  return parts.length ? parts.join(', ') : '—';
-}
 
 type LedgerActivityTabId = 'all' | 'campaigns' | 'tech' | 'corp_calendar' | 'holidays';
 
@@ -107,6 +103,31 @@ function ledgerActivityTabForKind(kind: MarketActivityEntityKind): LedgerActivit
     return 'holidays';
   }
   return 'tech';
+}
+
+function capacityRoleBadgeClass(role: MarketActivityCapacityRole): string {
+  return role === 'restrictor'
+    ? 'border-amber-500/35 bg-amber-500/[0.09] text-amber-950 dark:border-amber-400/25 dark:bg-amber-400/[0.12] dark:text-amber-50'
+    : 'border-sky-500/35 bg-sky-500/[0.09] text-sky-950 dark:border-sky-400/25 dark:bg-sky-400/[0.12] dark:text-sky-50';
+}
+
+/** Wedge-with-mouth (Pac-Man–style) — generic geometry, not a character mark. */
+function CapacityConsumerGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('shrink-0', className)}
+      viewBox="0 0 24 24"
+      width={14}
+      height={14}
+      aria-hidden
+      focusable="false"
+    >
+      <path
+        fill="currentColor"
+        d="M12 12 L18.364 5.636 A9 9 0 1 0 18.364 18.364 Z"
+      />
+    </svg>
+  );
 }
 
 function formatEntityKindLabel(kind: string): string {
@@ -322,6 +343,42 @@ function buildColumns(
       ),
       filterFn: 'includesString',
     }),
+    colHelp.accessor((row) => ledgerEntryCapacityRole(row), {
+      id: 'capacityRole',
+      header: () => (
+        <abbr
+          title="Restrictors: change effective capacity or delivery windows (leave, holidays, freezes, capacity-shaping windows). Consumers: scheduled demand (campaigns, programmes, load/trading windows)."
+          className="cursor-help no-underline"
+        >
+          Capacity class
+        </abbr>
+      ),
+      cell: ({ row }) => {
+        const role = ledgerEntryCapacityRole(row.original);
+        return (
+          <span
+            className={cn(
+              'inline-flex max-w-[10.5rem] items-center gap-1 whitespace-normal rounded-md border px-1.5 py-0.5 text-[10px] font-semibold leading-snug sm:max-w-none sm:text-[11px]',
+              capacityRoleBadgeClass(role),
+            )}
+          >
+            {role === 'consumer' ? (
+              <CapacityConsumerGlyph className="opacity-95" />
+            ) : (
+              <Shrink className="h-3.5 w-3.5 shrink-0 opacity-95" strokeWidth={2.25} aria-hidden />
+            )}
+            {ledgerCapacityRoleLabel(role)}
+          </span>
+        );
+      },
+      sortingFn: (a, b) =>
+        ledgerEntryCapacityRole(a.original).localeCompare(ledgerEntryCapacityRole(b.original)),
+      filterFn: (row, _columnId, filterValue) => {
+        const q = String(filterValue).trim().toLowerCase();
+        if (!q) return true;
+        return ledgerCapacityRoleLabel(ledgerEntryCapacityRole(row.original)).toLowerCase().includes(q);
+      },
+    }),
     colHelp.accessor('title', {
       header: 'Title',
       cell: ({ getValue, row }) => (
@@ -343,13 +400,6 @@ function buildColumns(
           </span>
         );
       },
-    }),
-    colHelp.display({
-      id: 'lenses',
-      header: 'Lenses',
-      cell: ({ row }) => (
-        <span className="text-[11px] text-muted-foreground">{lensHintLabels(row.original.lensHints)}</span>
-      ),
     }),
     colHelp.accessor('subtitle', {
       header: 'Note',
@@ -534,9 +584,10 @@ export function RunwayActivityLedgerTable({
         e.entryId.toLowerCase().includes(q) ||
         e.entityKind.toLowerCase().includes(q) ||
         e.family.toLowerCase().includes(q) ||
-        lensHintLabels(e.lensHints).toLowerCase().includes(q) ||
         e.dateStart.toLowerCase().includes(q) ||
-        e.dateEnd.toLowerCase().includes(q)
+        e.dateEnd.toLowerCase().includes(q) ||
+        ledgerCapacityRoleLabel(ledgerEntryCapacityRole(e)).toLowerCase().includes(q) ||
+        ledgerEntryCapacityRole(e).toLowerCase().includes(q)
       );
     },
   });

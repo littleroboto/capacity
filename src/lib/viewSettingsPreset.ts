@@ -49,6 +49,11 @@ export type ViewSettingsPayloadV1 = {
   runwayHeatmapCellPx?: number;
   runwayHeatmapCellGapPx?: number;
   runwayHeatmapCellRadiusPx?: number;
+  /**
+   * Workbench: staggered cell fade-in on load (same CSS as marketing preview). SVG heatmaps + contribution strip.
+   * Off by default.
+   */
+  runwayHeatmapCellIntroPulse?: boolean;
 };
 
 export type ViewSettingsFileV1 = {
@@ -83,6 +88,7 @@ export const VIEW_SETTINGS_PAYLOAD_KEYS = [
   'runwayHeatmapCellPx',
   'runwayHeatmapCellGapPx',
   'runwayHeatmapCellRadiusPx',
+  'runwayHeatmapCellIntroPulse',
 ] as const satisfies readonly (keyof ViewSettingsPayloadV1)[];
 
 export type ViewSettingsPayloadKey = (typeof VIEW_SETTINGS_PAYLOAD_KEYS)[number];
@@ -369,6 +375,13 @@ export function sanitizeSettingsPayload(raw: Record<string, unknown>): Partial<V
     if (typeof raw.runwayHeatmapCellRadiusPx === 'number' && Number.isFinite(raw.runwayHeatmapCellRadiusPx)) {
       out.runwayHeatmapCellRadiusPx = clampRunwayHeatmapRadiusPx(raw.runwayHeatmapCellRadiusPx);
     }
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(raw, 'runwayHeatmapCellIntroPulse') &&
+    typeof raw.runwayHeatmapCellIntroPulse === 'boolean'
+  ) {
+    out.runwayHeatmapCellIntroPulse = raw.runwayHeatmapCellIntroPulse;
   }
 
   if (!out.riskHeatmapTuningByLens && rawHasLegacyHeatmapKeys(raw)) {

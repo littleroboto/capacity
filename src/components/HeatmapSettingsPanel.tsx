@@ -46,6 +46,8 @@ export function HeatmapSettingsPanel({ showCampaignBoost, showHeatmapTransferTun
   const setHeatmapRenderStyle = useAtcStore((s) => s.setHeatmapRenderStyle);
   const setHeatmapMonoColor = useAtcStore((s) => s.setHeatmapMonoColor);
   const setHeatmapSpectrumContinuous = useAtcStore((s) => s.setHeatmapSpectrumContinuous);
+  const runwayHeatmapCellIntroPulse = useAtcStore((s) => s.runwayHeatmapCellIntroPulse);
+  const setRunwayHeatmapCellIntroPulse = useAtcStore((s) => s.setRunwayHeatmapCellIntroPulse);
   const country = useAtcStore((s) => s.country);
   const configs = useAtcStore((s) => s.configs);
   const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
@@ -73,6 +75,22 @@ export function HeatmapSettingsPanel({ showCampaignBoost, showHeatmapTransferTun
 
   return (
     <div className="space-y-6">
+      <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring"
+          checked={runwayHeatmapCellIntroPulse}
+          onChange={(e) => setRunwayHeatmapCellIntroPulse(e.target.checked)}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-foreground">Animate heatmap cells on load</span>
+          <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+            SVG runway and triple-lens strips build colour by lens layers (e.g. tech: BAU → calendar load → change →
+            campaigns → carryover) with per-day timing so cells do not sweep left-to-right. Respects reduced motion.
+            Turn off if it feels busy.
+          </span>
+        </span>
+      </label>
       <div className="space-y-4">
         {showHeatmapTransferTuning ? (
           <div className="space-y-6">

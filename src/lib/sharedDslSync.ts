@@ -244,6 +244,14 @@ export function requestOpenWorkspaceDialog(): void {
   window.dispatchEvent(new CustomEvent(OPEN_WORKSPACE_EVENT));
 }
 
+/** Open the Settings dialog (heatmap / display — handled in {@link DSLPanel}). */
+export const OPEN_WORKBENCH_SETTINGS_EVENT = 'capacity:open-workbench-settings';
+
+export function requestOpenWorkbenchSettingsDialog(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(OPEN_WORKBENCH_SETTINGS_EVENT));
+}
+
 export type FetchSharedDslResult = { yaml: string; etag: string };
 
 export type FetchSharedDslFailReason =

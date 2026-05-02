@@ -39,7 +39,7 @@ applyPersistedWorkbenchThemeClass();
 function WorkbenchLoading() {
   return (
     <div
-      className="flex min-h-screen flex-col items-center justify-center gap-2 bg-background px-4 text-sm text-muted-foreground"
+      className="workbench-studio flex min-h-screen flex-col items-center justify-center gap-2 bg-background px-4 text-sm text-muted-foreground"
       role="status"
       aria-live="polite"
     >

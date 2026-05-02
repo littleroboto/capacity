@@ -9,7 +9,7 @@ title: Switzerland
 
 resources:
   labs:
-    capacity: 7
+    capacity: 4
   staff:
     capacity: 5
     monthly_pattern_basis: absolute
@@ -17,16 +17,16 @@ resources:
       Jan: 5
       Feb: 5
       Mar: 5
-      Apr: 4
-      May: 4
-      Jun: 3
-      Jul: 3
-      Aug: 3
-      Sep: 4
+      Apr: 5
+      May: 5
+      Jun: 5
+      Jul: 5
+      Aug: 5
+      Sep: 5
       Oct: 5
-      Nov: 4
-      Dec: 3
-  testing_capacity: 5
+      Nov: 5
+      Dec: 5
+  testing_capacity: 4
 
 # Collective leave density — cantonal variation smooths the summer dip; Christmas/NY strong.
 national_leave_bands:

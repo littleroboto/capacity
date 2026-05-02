@@ -8,6 +8,10 @@ import type { RiskModelTuning } from '@/engine/riskModelTuning';
 import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
 import { layoutCompareMarketColumnSvg } from '@/lib/runwayCompareSvgLayout';
 import type { VerticalYearSection } from '@/lib/calendarQuarterLayout';
+import {
+  layeredHeatmapCellMetric,
+  organicHeatmapCellLayerIndex,
+} from '@/lib/runwayHeatmapOrganicLayers';
 import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
 import {
   effectiveLedgerFootprintOverlap,
@@ -50,6 +54,10 @@ export type RunwayCompareSvgColumnProps = {
   ledgerImplicitBaselineFootprint?: boolean;
   cellRadiusPx?: number;
   deploymentRiskBlackouts?: readonly DeploymentRiskBlackout[] | null;
+  /** Organic layered cell colouring on load; disables clip emergence while active. */
+  staggerCellPulse?: boolean;
+  /** Required when `staggerCellPulse` is true (driven from {@link RunwayGridBody}). */
+  organicLayerTick?: number;
 };
 
 function svgClientPoint(e: React.MouseEvent | React.KeyboardEvent, fallbackW: number, fallbackH: number) {
@@ -81,6 +89,8 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
   ledgerImplicitBaselineFootprint = true,
   cellRadiusPx = 3,
   deploymentRiskBlackouts = null,
+  staggerCellPulse = false,
+  organicLayerTick,
 }: RunwayCompareSvgColumnProps) {
   const { width, height, cells, monthLabels, weekdayLabels } = useMemo(
     () => layoutCompareMarketColumnSvg(sections, cellPx, gap, monthStripW, firstCalendarMonthKey),
@@ -98,7 +108,9 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
   );
 
   const emergeKey = emergeResetKey ?? marketKey;
-  const insetTopPct = useRunwayHeatmapEmergence(emergeKey, { staggerMs: emergeStaggerMs });
+  const pulseOn = staggerCellPulse && !preferReducedMotion;
+  const organicOn = pulseOn && organicLayerTick != null;
+  const insetTopPct = useRunwayHeatmapEmergence(emergeKey, { staggerMs: emergeStaggerMs, disabled: pulseOn });
   const cellClipId = useId().replace(/:/g, '');
   const clipR = runwayHeatmapEmergenceClipRect(width, height, insetTopPct);
 
@@ -151,11 +163,24 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
         ))}
       </g>
       <g clipPath={`url(#${cellClipId})`}>
-      {cells.map((c, i) => {
+      {(() => {
+        return cells.map((c, i) => {
         if (c.cell === false) return null;
         const dateStr = c.cell;
         const row = dateStr ? riskByDate.get(dateStr) : undefined;
-        const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
+        const layerIdx =
+          organicOn && dateStr
+            ? organicHeatmapCellLayerIndex({
+                tick: organicLayerTick!,
+                marketKey,
+                dateYmd: dateStr,
+              })
+            : 4;
+        const metric = row
+          ? organicOn
+            ? layeredHeatmapCellMetric(row, viewMode, riskTuning, layerIdx)
+            : heatmapCellMetric(row, viewMode, riskTuning)
+          : undefined;
         const { fill: baseFill, dimOpacity: dimOp } = !dateStr
           ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
           : runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
@@ -190,54 +215,58 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
           typeof dateStr === 'string' &&
           ymdInAnyDeploymentRiskBlackout(dateStr, deploymentRiskBlackouts ?? undefined);
         const freezeStroke = Math.max(0.85, Math.min(2.6, cellPx * 0.11));
-
         return (
           <g key={`${marketKey}-svg-${i}-${c.x}-${c.y}`}>
-            <rect
-              x={c.x}
-              y={c.y}
-              width={c.w}
-              height={c.h}
-              rx={rr}
-              ry={rr}
-              fill={fill}
-              opacity={opacity}
-              className="stroke-border/35"
-              strokeWidth={thickOverlapStroke ? 1.25 : 0.5}
-              style={interactionDisabled ? undefined : { cursor: 'pointer' }}
-              role={interactionDisabled ? 'presentation' : 'button'}
-              tabIndex={interactionDisabled ? undefined : 0}
-              aria-hidden={interactionDisabled ? true : undefined}
-              aria-label={
-                interactionDisabled
-                  ? undefined
-                  : dateStr
-                    ? `Day details for ${dateStr}${deployFreezeMark ? '; change-freeze window' : ''}`
-                    : 'Day cell'
-              }
-              onClick={
-                interactionDisabled
-                  ? undefined
-                  : (e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)
-              }
-              onKeyDown={
-                interactionDisabled
-                  ? undefined
-                  : (e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)
-              }
-            >
-              {inPulseRange && !preferReducedMotion ? (
-                <animate
-                  attributeName="opacity"
-                  values={`${opacity};${pulseLow};${opacity}`}
-                  keyTimes="0;0.5;1"
-                  dur="1.05s"
-                  repeatCount="indefinite"
-                  calcMode="spline"
-                  keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
-                />
-              ) : null}
-            </rect>
+            <g>
+              <rect
+                x={c.x}
+                y={c.y}
+                width={c.w}
+                height={c.h}
+                rx={rr}
+                ry={rr}
+                fill={fill}
+                opacity={opacity}
+                className="stroke-border/35"
+                strokeWidth={thickOverlapStroke ? 1.25 : 0.5}
+                style={{
+                  ...(interactionDisabled ? {} : { cursor: 'pointer' }),
+                  ...(organicOn ? { transition: 'fill 0.55s ease, stroke 0.45s ease' } : {}),
+                }}
+                role={interactionDisabled ? 'presentation' : 'button'}
+                tabIndex={interactionDisabled ? undefined : 0}
+                aria-hidden={interactionDisabled ? true : undefined}
+                aria-label={
+                  interactionDisabled
+                    ? undefined
+                    : dateStr
+                      ? `Day details for ${dateStr}${deployFreezeMark ? '; change-freeze window' : ''}`
+                      : 'Day cell'
+                }
+                onClick={
+                  interactionDisabled
+                    ? undefined
+                    : (e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)
+                }
+                onKeyDown={
+                  interactionDisabled
+                    ? undefined
+                    : (e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)
+                }
+              >
+                {inPulseRange && !preferReducedMotion ? (
+                  <animate
+                    attributeName="opacity"
+                    values={`${opacity};${pulseLow};${opacity}`}
+                    keyTimes="0;0.5;1"
+                    dur="1.05s"
+                    repeatCount="indefinite"
+                    calcMode="spline"
+                    keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+                  />
+                ) : null}
+              </rect>
+            </g>
             {deployFreezeMark ? (
               <line
                 x1={c.x}
@@ -264,7 +293,8 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
             ) : null}
           </g>
         );
-      })}
+      });
+      })()}
       </g>
     </svg>
   );

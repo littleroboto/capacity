@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Header } from '@/components/Header';
+import { WorkbenchSidebar } from '@/components/WorkbenchSidebar';
 import { ProductionAuthHintBanner } from '@/components/ProductionAuthHintBanner';
 import { SharedCloudLoadWarningBanner } from '@/components/SharedCloudLoadWarningBanner';
 import { SharedDslConflictBanner } from '@/components/SharedDslConflictBanner';
@@ -317,7 +318,7 @@ export default function App() {
   }, [accessBootstrapKey, persistReady]);
 
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-background">
+    <div className="workbench-studio flex h-screen min-h-0 flex-col bg-background text-foreground">
       {showMobileCodeFs ? (
         <div
           className="fixed inset-0 z-[100] flex min-h-[100dvh] w-full flex-col bg-background"
@@ -356,37 +357,41 @@ export default function App() {
             <SharedCloudLoadWarningBanner message={cloudLoadWarning} onDismiss={() => setCloudLoadWarning(null)} />
           ) : null}
           <SharedDslConflictBanner />
-          <Header />
-          <main
-            className={cn(
-              'flex min-h-0 flex-1 flex-col bg-transparent text-foreground',
-              lgUp ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]'
-            )}
-          >
-            <div
-              ref={mainGridRef}
-              className={cn(
-                'grid grid-cols-1 gap-0',
-                dslPanelLayoutCollapsed && 'lg:grid-cols-[minmax(0,1fr)_2.75rem]',
-                lgUp && 'min-h-0 flex-1 grid-rows-1',
-                !lgUp && 'w-full shrink-0'
-              )}
-              style={
-                lgUp && !dslPanelLayoutCollapsed
-                  ? {
-                      gridTemplateColumns: `minmax(0, 1fr) ${WORKBENCH_SPLIT_HANDLE_PX}px minmax(${MIN_DSL_PANEL_PX}px, ${dslRightWidthPx}px)`,
-                    }
-                  : undefined
-              }
-            >
-              <div
+          <div className="flex min-h-0 flex-1 flex-row">
+            <WorkbenchSidebar parseError={parseError} />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <Header layout="studio" />
+              <main
                 className={cn(
-                  'flex min-h-0 min-w-0 flex-col gap-2 p-4',
-                  viewMode === 'code'
-                    ? 'flex-1 overflow-hidden'
-                    : 'overflow-y-auto overflow-x-auto [scrollbar-gutter:stable]'
+                  'flex min-h-0 flex-1 flex-col bg-transparent',
+                  lgUp ? 'overflow-hidden' : 'overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]'
                 )}
               >
+                <div
+                  ref={mainGridRef}
+                  className={cn(
+                    'grid grid-cols-1 gap-0',
+                    dslPanelLayoutCollapsed && 'lg:grid-cols-[minmax(0,1fr)_2.75rem]',
+                    lgUp && 'min-h-0 flex-1 grid-rows-1',
+                    !lgUp && 'w-full shrink-0'
+                  )}
+                  style={
+                    lgUp && !dslPanelLayoutCollapsed
+                      ? {
+                          gridTemplateColumns: `minmax(0, 1fr) ${WORKBENCH_SPLIT_HANDLE_PX}px minmax(${MIN_DSL_PANEL_PX}px, ${dslRightWidthPx}px)`,
+                        }
+                      : undefined
+                  }
+                >
+                  <div
+                    className={cn(
+                      'flex min-h-0 min-w-0 flex-col gap-2 p-4',
+                      lgUp && 'bg-muted/20',
+                      viewMode === 'code'
+                        ? 'flex-1 overflow-hidden'
+                        : 'overflow-y-auto overflow-x-auto [scrollbar-gutter:stable]'
+                    )}
+                  >
                 {viewMode === 'code' ? (
                   <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
                     <MainDslWorkspace
@@ -398,7 +403,7 @@ export default function App() {
                 ) : (
                   <>
                     {parseError ? (
-                      <p className="shrink-0 text-sm text-red-600 dark:text-red-400">{parseError}</p>
+                      <p className="shrink-0 text-sm text-destructive">{parseError}</p>
                     ) : null}
                     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
                       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
@@ -419,17 +424,23 @@ export default function App() {
                   </>
                 )}
               </div>
-              {lgUp && !dslPanelLayoutCollapsed ? (
-                <WorkbenchSplitHandle
-                  rightWidthPx={dslRightWidthPx}
-                  onWidthChange={setDslRightWidthPx}
-                  containerRef={mainGridRef}
-                  minRightPx={MIN_DSL_PANEL_PX}
-                />
-              ) : null}
-              <DSLPanel collapsed={dslPanelLayoutCollapsed} onCollapsedChange={setDslPanelCollapsed} />
+                  {lgUp && !dslPanelLayoutCollapsed ? (
+                    <WorkbenchSplitHandle
+                      rightWidthPx={dslRightWidthPx}
+                      onWidthChange={setDslRightWidthPx}
+                      containerRef={mainGridRef}
+                      minRightPx={MIN_DSL_PANEL_PX}
+                    />
+                  ) : null}
+                  <DSLPanel
+                    collapsed={dslPanelLayoutCollapsed}
+                    onCollapsedChange={setDslPanelCollapsed}
+                    primaryNavInSidebar={lgUp}
+                  />
+                </div>
+              </main>
             </div>
-          </main>
+          </div>
         </>
       )}
     </div>

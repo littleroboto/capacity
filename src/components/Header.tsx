@@ -1,4 +1,9 @@
-import { APP_VERSION, BUILD_TIME_ISO, GIT_COMMIT_MESSAGE, GIT_COMMIT_SHORT } from '@/lib/buildMeta';
+import {
+  APP_VERSION,
+  BUILD_TIME_ISO,
+  GIT_COMMIT_MESSAGE,
+  GIT_COMMIT_SHORT,
+} from '@/lib/buildMeta';
 import { HeaderClerkOrgSwitcher } from '@/components/HeaderClerkOrgSwitcher';
 import { HeaderClerkUser } from '@/components/HeaderClerkUser';
 import { cn } from '@/lib/utils';
@@ -26,8 +31,15 @@ const BUILD_STAMP_TITLE = (() => {
   return `v${APP_VERSION} · ${GIT_COMMIT_SHORT}${subject}${built}`;
 })();
 
-export function Header() {
+type HeaderProps = {
+  /** Dashboard chrome: compact top bar, context in the left rail instead of a marketing title. */
+  layout?: 'default' | 'studio';
+};
+
+export function Header({ layout = 'default' }: HeaderProps) {
   const navigate = useNavigate();
+  const country = useAtcStore((s) => s.country);
+  const viewMode = useAtcStore((s) => s.viewMode);
   const onTitleClick = useCallback(
     (e: MouseEvent<HTMLAnchorElement>) => {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -46,6 +58,42 @@ export function Header() {
     'hover:underline hover:decoration-foreground/50',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm'
   );
+
+  if (layout === 'studio') {
+    const contextLabel = viewMode === 'code' ? 'Configuration' : 'Runway';
+    return (
+      <header className="border-b border-border/80 bg-background/80 backdrop-blur-md">
+        <div className="flex min-h-10 items-center justify-between gap-3 px-3 py-1.5 md:px-4">
+          <div className="flex min-w-0 items-baseline gap-2 lg:hidden">
+            <h1 className="truncate text-sm font-semibold tracking-tight text-foreground">
+              <Link
+                to={{ pathname: '/', search: '' }}
+                onClick={onTitleClick}
+                className={cn(titleLinkClass, 'inline-flex items-center gap-1.5')}
+                title="Home"
+                aria-label="Go to landing page"
+              >
+                <SegmentWorkbenchMark className="h-4 w-4 shrink-0 text-primary" />
+                Capacity
+              </Link>
+            </h1>
+            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{country}</span>
+          </div>
+          <div className="hidden min-w-0 flex-1 items-center gap-2 lg:flex">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              {contextLabel}
+            </span>
+            <span className="text-muted-foreground/40">/</span>
+            <span className="font-mono text-xs tabular-nums text-foreground/90">{country}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <HeaderClerkOrgSwitcher compact />
+            <HeaderClerkUser compact />
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="border-b border-border bg-background">

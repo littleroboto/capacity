@@ -151,7 +151,22 @@ import {
 } from '@/lib/runwayTechContributionOverloadHistogram';
 import { RunwayHeatmapCellStylePopover } from '@/components/RunwayHeatmapCellStylePopover';
 import { RunwayQuarterGridSvg } from '@/components/RunwayQuarterGridSvg';
-import { Box, CalendarDays, Download, Grid2x2, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  ORGANIC_HEATMAP_MAX_TICK,
+  ORGANIC_HEATMAP_TICK_MS,
+} from '@/lib/runwayHeatmapOrganicLayers';
+import {
+  AlertTriangle,
+  Box,
+  CalendarDays,
+  Download,
+  Gauge,
+  Grid2x2,
+  LineChart,
+  Loader2,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 
 /** @deprecated Use {@link RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX} / layout prefs; kept for external imports. */
@@ -196,57 +211,40 @@ const SINGLE_MARKET_MULTI_LENS_HEADLINE = 'Tech Capacity, Trading Pressure, Depl
 const SINGLE_MARKET_STACK_SHARED_LEGEND_LENS: ViewModeId =
   SINGLE_MARKET_STACK_LENS_IDS[0] ?? 'combined';
 
-/** Two-line heading in the slim triple-lens rail (no icons); JSX applies −90° (90° CCW) so it reads along the strip. */
-function lensStackRailLines(mode: ViewModeId): readonly [string, string] {
-  switch (mode) {
-    case 'combined':
-      return ['TECH', 'CAPACITY'];
-    case 'in_store':
-      return ['RESTAURANT', 'TRADING'];
-    case 'market_risk':
-      return ['DEPLOYMENT', 'RISK'];
-    default:
-      return [String(mode), ''];
-  }
-}
-
 /** Neutral rail surface (no lens tint — strip carries colour). */
 const LENS_STACK_RAIL_SURFACE = cn(
   'border border-border/60 bg-muted/35 shadow-sm dark:border-border/55 dark:bg-muted/20',
 );
 
-/**
- * Slim triple-lens rail: two uppercase lines in a fixed “sheet” (`sheetW` × `sheetH`), centred in the
- * rail, then rotated −90° about the sheet centre. `sheetW` matches the rail’s long edge (minus pad) so
- * the run of text lines up with the strip axis; `sheetH` is the rail width so the pre-rotate stack fits
- * the narrow column — same layout contract as the original stacked-strip rail (see comment on
- * {@link lensStackRailLines}).
- */
+const LENS_STACK_RAIL_ICON_CLASS =
+  'h-4 w-4 shrink-0 text-foreground/85 sm:h-[18px] sm:w-[18px]';
+
+function lensStackRailIconEl(mode: ViewModeId) {
+  switch (mode) {
+    case 'combined':
+      return <Gauge className={LENS_STACK_RAIL_ICON_CLASS} aria-hidden strokeWidth={2} />;
+    case 'in_store':
+      return <LineChart className={LENS_STACK_RAIL_ICON_CLASS} aria-hidden strokeWidth={2} />;
+    case 'market_risk':
+      return <AlertTriangle className={LENS_STACK_RAIL_ICON_CLASS} aria-hidden strokeWidth={2} />;
+    default:
+      return <Box className={LENS_STACK_RAIL_ICON_CLASS} aria-hidden strokeWidth={2} />;
+  }
+}
+
+/** Slim triple-lens rail: one icon per lens; native tooltip + aria label use product copy. */
 function TripleLensStackRailCaption({ lensMode, railH }: { lensMode: ViewModeId; railH: number }) {
-  const lines = lensStackRailLines(lensMode);
   const railW = SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX;
-  const sheetW = Math.max(32, railH - 8);
-  const sheetH = railW;
+  const tip = `${runwayLensProductLabel(lensMode)} — ${runwayHeatmapTitleForViewMode(lensMode)}`;
 
   return (
     <div
       className={cn('relative flex shrink-0 overflow-visible rounded-sm', LENS_STACK_RAIL_SURFACE)}
       style={{ width: railW, height: railH, minHeight: railH, maxHeight: railH }}
-      title={runwayLensProductLabel(lensMode)}
-      aria-label={lines.filter(Boolean).join(' ')}
+      title={tip}
+      aria-label={tip}
     >
-      <div className="flex h-full min-h-0 w-full items-center justify-center">
-        <div
-          className="flex origin-center -rotate-90 flex-col items-center justify-center gap-0.5 whitespace-nowrap text-center text-[8px] font-semibold uppercase leading-none tracking-tight text-foreground/90 antialiased sm:text-[9px]"
-          style={{ width: sheetW, height: sheetH }}
-        >
-          {lines.map((line, li) =>
-            line ? (
-              <span key={`${lensMode}-${li}`}>{line}</span>
-            ) : null,
-          )}
-        </div>
-      </div>
+      <div className="flex h-full min-h-0 w-full items-center justify-center">{lensStackRailIconEl(lensMode)}</div>
     </div>
   );
 }
@@ -1735,6 +1733,7 @@ export function RunwayGrid({
     compareAllMarkets && storeIso3dOn && !landingMinimalChrome;
   const runwaySvgHeatmapPref = useAtcStore((s) => s.runwaySvgHeatmap);
   const setRunwaySvgHeatmap = useAtcStore((s) => s.setRunwaySvgHeatmap);
+  const runwayHeatmapCellIntroPulse = useAtcStore((s) => s.runwayHeatmapCellIntroPulse);
   /** SVG columns when pref is on (compare strip, single-market quarter grid, and triple-lens stack). */
   const useSvgHeatmap =
     runwaySvgHeatmapPref && (compareAllMarkets || !showIso3dSingleMarket);
@@ -2884,7 +2883,9 @@ export function RunwayGrid({
                   onLandingContributionHeatmapSettled={onLandingContributionHeatmapSettled}
                   landingTechSparklineSweep={landingTechSparklineSweep}
                   landingTechSparklineTightFill={landingTechSparklineTightFill}
-                  landingStaggerCellPulse={landingMinimalChrome && !reduceMotion}
+                  landingStaggerCellPulse={
+                    (landingMinimalChrome || runwayHeatmapCellIntroPulse) && !reduceMotion
+                  }
                 />
               </motion.div>
             ) : null}
@@ -3214,6 +3215,21 @@ function RunwayGridBody({
 }: RunwayGridBodyProps) {
   const enableColorSweep = !reduceMotion;
   const [postSweep, setPostSweep] = useState(reduceMotion);
+  const [organicLayerTick, setOrganicLayerTick] = useState(0);
+
+  useEffect(() => {
+    if (!landingStaggerCellPulse) {
+      setOrganicLayerTick(ORGANIC_HEATMAP_MAX_TICK);
+      return;
+    }
+    setOrganicLayerTick(0);
+    const id = window.setInterval(() => {
+      setOrganicLayerTick((t) =>
+        t >= ORGANIC_HEATMAP_MAX_TICK ? ORGANIC_HEATMAP_MAX_TICK : t + 1
+      );
+    }, ORGANIC_HEATMAP_TICK_MS);
+    return () => window.clearInterval(id);
+  }, [landingStaggerCellPulse, isoGrowResetKey, viewMode]);
 
   useEffect(() => {
     if (reduceMotion) {
@@ -3225,8 +3241,7 @@ function RunwayGridBody({
     return () => clearTimeout(t);
   }, [reduceMotion, viewMode]);
 
-  /** Match `landing-heatmap-cell-in` 0.58s in index.css and stagger in RunwayContributionStripSvg. */
-  const LANDING_HEATMAP_CELL_IN_MS = 580;
+  const ORGANIC_HEATMAP_SETTLE_PAD_MS = 680;
 
   useEffect(() => {
     const cb = onLandingContributionHeatmapSettled;
@@ -3240,8 +3255,7 @@ function RunwayGridBody({
 
     let ms: number;
     if (landingStaggerCellPulse) {
-      const lastIdx = Math.min(Math.max(0, placedCells.length - 1), 440);
-      ms = lastIdx * 8 + LANDING_HEATMAP_CELL_IN_MS + 120;
+      ms = ORGANIC_HEATMAP_MAX_TICK * ORGANIC_HEATMAP_TICK_MS + ORGANIC_HEATMAP_SETTLE_PAD_MS;
     } else {
       const rowCount = SINGLE_MARKET_STACK_LENS_IDS.length;
       const lastRowStagger = (rowCount - 1) * LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS;
@@ -3372,18 +3386,35 @@ function RunwayGridBody({
     return () => window.removeEventListener('keydown', onKey);
   }, [singleMarketMultiLens, tip, onClearDaySummary]);
 
-  /** Session-only: workbench defaults to Tech capacity strip only; programme + per-lens strips off until toggled. */
+  /** Session-only: programme Gantt off until toggled; per-lens contribution strips independent (see below). */
   const [showRunwayProgrammePlanWorkbench, setShowRunwayProgrammePlanWorkbench] = useState(false);
-  const [showTripleLensContributionHeatmapStrips, setShowTripleLensContributionHeatmapStrips] =
-    useState(false);
+  /** Workbench: XY sparkline always on; tech capacity (`combined`) strip on by default; trading / deployment off. */
+  const [showTripleLensTechCapacityStrip, setShowTripleLensTechCapacityStrip] = useState(true);
+  const [showTripleLensTradingStrip, setShowTripleLensTradingStrip] = useState(false);
+  const [showTripleLensDeploymentStrip, setShowTripleLensDeploymentStrip] = useState(false);
 
   const showProgrammeGanttBlock =
     (landingMinimalChrome && landingProgrammePlan) ||
     (!landingMinimalChrome && showRunwayProgrammePlanWorkbench);
 
-  /** Landing / embed previews keep the full triple-lens stack; workbench defaults strips off until toggled. */
-  const showTripleLensContributionStripsEffective =
-    landingMinimalChrome || showTripleLensContributionHeatmapStrips;
+  const tripleLensVisibleStripModes = useMemo((): ViewModeId[] => {
+    if (landingMinimalChrome) return [...SINGLE_MARKET_STACK_LENS_IDS];
+    const out: ViewModeId[] = [];
+    for (const m of SINGLE_MARKET_STACK_LENS_IDS) {
+      if (m === 'combined' && showTripleLensTechCapacityStrip) out.push(m);
+      else if (m === 'in_store' && showTripleLensTradingStrip) out.push(m);
+      else if (m === 'market_risk' && showTripleLensDeploymentStrip) out.push(m);
+    }
+    return out;
+  }, [
+    landingMinimalChrome,
+    showTripleLensDeploymentStrip,
+    showTripleLensTechCapacityStrip,
+    showTripleLensTradingStrip,
+  ]);
+
+  /** Workbench runway toggles: short ease-out in, slightly quicker ease-in out. */
+  const workbenchSectionEase = [0.22, 1, 0.36, 1] as const;
 
   const dayContributionPin: RunwayLedgerDayContributionPin | null =
     !compareAllMarkets &&
@@ -3572,6 +3603,10 @@ function RunwayGridBody({
                           deploymentRiskBlackouts={
                             viewMode === 'market_risk' ? cfg?.deployment_risk_blackouts ?? null : null
                           }
+                          staggerCellPulse={landingStaggerCellPulse}
+                          organicLayerTick={
+                            landingStaggerCellPulse ? organicLayerTick : undefined
+                          }
                         />
                       ) : (
                         <RunwayVerticalHeatmapBody
@@ -3668,13 +3703,13 @@ function RunwayGridBody({
                         {!landingMinimalChrome ? (
                           <div
                             role="toolbar"
-                            aria-label="Runway strips below heatmap"
+                            aria-label="Runway contribution strips"
                             className="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2"
                           >
                             <button
                               type="button"
                               className={cn(
-                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.97]',
                                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                                 showRunwayProgrammePlanWorkbench
                                   ? 'border-primary/55 bg-primary/10 text-foreground'
@@ -3688,19 +3723,47 @@ function RunwayGridBody({
                             <button
                               type="button"
                               className={cn(
-                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.97]',
                                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-                                showTripleLensContributionHeatmapStrips
+                                showTripleLensTechCapacityStrip
                                   ? 'border-primary/55 bg-primary/10 text-foreground'
                                   : 'border-border/55 bg-muted/15 text-muted-foreground hover:bg-muted/30 hover:text-foreground'
                               )}
-                              aria-pressed={showTripleLensContributionHeatmapStrips}
-                              onClick={() => setShowTripleLensContributionHeatmapStrips((v) => !v)}
+                              aria-pressed={showTripleLensTechCapacityStrip}
+                              onClick={() => setShowTripleLensTechCapacityStrip((v) => !v)}
                             >
-                              Lens heatmap strips
+                              Tech capacity strip
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(
+                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.97]',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                                showTripleLensTradingStrip
+                                  ? 'border-primary/55 bg-primary/10 text-foreground'
+                                  : 'border-border/55 bg-muted/15 text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                              )}
+                              aria-pressed={showTripleLensTradingStrip}
+                              onClick={() => setShowTripleLensTradingStrip((v) => !v)}
+                            >
+                              Trading strip
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(
+                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.97]',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                                showTripleLensDeploymentStrip
+                                  ? 'border-primary/55 bg-primary/10 text-foreground'
+                                  : 'border-border/55 bg-muted/15 text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                              )}
+                              aria-pressed={showTripleLensDeploymentStrip}
+                              onClick={() => setShowTripleLensDeploymentStrip((v) => !v)}
+                            >
+                              Deployment strip
                             </button>
                             <span className="text-[11px] leading-snug text-muted-foreground">
-                              Tech capacity strip stays visible; expand the rest when you need it.
+                              XY balance trace stays on; tech capacity strip defaults on; other strips optional.
                             </span>
                           </div>
                         ) : null}
@@ -3736,30 +3799,53 @@ function RunwayGridBody({
                                 />
                               </svg>
                             ) : null}
-                            {showProgrammeGanttBlock ? (
-                              <RunwayProgrammeGanttBlock
-                                country={country}
-                                marketConfig={marketConfig}
-                                placedCells={placedCells}
-                                contributionMeta={contributionMeta}
-                                cellPx={cellPx}
-                                gap={gap}
-                                stripWidth={contributionColumnContentWidth ?? contentWidth}
-                                riskByDate={singleRiskByDate!}
-                                blackouts={marketConfig?.deployment_risk_blackouts ?? null}
-                                railSpacerWidthPx={SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX}
-                                ephemeral={Boolean(landingMinimalChrome && landingProgrammePlan)}
-                                revealPlanWhen={Boolean(
-                                  landingMinimalChrome &&
-                                    landingProgrammePlan &&
-                                    landingProgrammePlanRevealReady
-                                )}
-                                revealPlanDelayMs={
-                                  landingMinimalChrome && landingProgrammePlan ? 0 : 900
-                                }
-                                ephemeralInitialPrefs={landingProgrammePlanPrefs}
-                              />
-                            ) : null}
+                            <AnimatePresence initial={false} mode="sync">
+                              {showProgrammeGanttBlock ? (
+                                <motion.div
+                                  key="workbench-programme-gantt"
+                                  className="min-h-0 shrink-0 origin-top"
+                                  initial={reduceMotion ? false : { opacity: 0, y: -10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={
+                                    reduceMotion
+                                      ? { opacity: 0, transition: { duration: 0.08 } }
+                                      : {
+                                          opacity: 0,
+                                          y: -8,
+                                          transition: { duration: 0.16, ease: workbenchSectionEase },
+                                        }
+                                  }
+                                  transition={
+                                    reduceMotion
+                                      ? { duration: 0.1 }
+                                      : { duration: 0.24, ease: workbenchSectionEase }
+                                  }
+                                >
+                                  <RunwayProgrammeGanttBlock
+                                    country={country}
+                                    marketConfig={marketConfig}
+                                    placedCells={placedCells}
+                                    contributionMeta={contributionMeta}
+                                    cellPx={cellPx}
+                                    gap={gap}
+                                    stripWidth={contributionColumnContentWidth ?? contentWidth}
+                                    riskByDate={singleRiskByDate!}
+                                    blackouts={marketConfig?.deployment_risk_blackouts ?? null}
+                                    railSpacerWidthPx={SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX}
+                                    ephemeral={Boolean(landingMinimalChrome && landingProgrammePlan)}
+                                    revealPlanWhen={Boolean(
+                                      landingMinimalChrome &&
+                                        landingProgrammePlan &&
+                                        landingProgrammePlanRevealReady
+                                    )}
+                                    revealPlanDelayMs={
+                                      landingMinimalChrome && landingProgrammePlan ? 0 : 900
+                                    }
+                                    ephemeralInitialPrefs={landingProgrammePlanPrefs}
+                                  />
+                                </motion.div>
+                              ) : null}
+                            </AnimatePresence>
                             <div className="flex min-h-0 shrink-0 flex-col gap-1">
                               <div className="flex min-h-0 flex-row items-end gap-1.5">
                                 <div
@@ -3783,78 +3869,114 @@ function RunwayGridBody({
                                     landingMinimalChrome && landingTechSparklineTightFill
                                   }
                                   suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
+                                  organicLayerTick={
+                                    landingStaggerCellPulse ? organicLayerTick : undefined
+                                  }
+                                  organicLayerMarketKey={
+                                    landingStaggerCellPulse ? `${country}-combined` : undefined
+                                  }
+                                  riskTuning={riskTuning}
                                 />
                               </div>
                             </div>
-                            {showTripleLensContributionStripsEffective
-                              ? SINGLE_MARKET_STACK_LENS_IDS.map((lensMode, rowIdx) => {
-                                  const stripW = contributionColumnContentWidth ?? contentWidth;
-                                  const isBottomRow = rowIdx === SINGLE_MARKET_STACK_LENS_IDS.length - 1;
-                                  const stripH = isBottomRow
-                                    ? contributionStripLayerHeight ?? contentHeight
-                                    : contributionStripCompactHeight ?? contentHeight;
-                                  const railH = Math.min(tripleLensRailIdealPx, stripH);
-                                  return (
+                            <AnimatePresence initial={false} mode="popLayout">
+                              {tripleLensVisibleStripModes.map((lensMode, rowIdx) => {
+                                const stripW = contributionColumnContentWidth ?? contentWidth;
+                                const isBottomRow = rowIdx === tripleLensVisibleStripModes.length - 1;
+                                const stripH = isBottomRow
+                                  ? contributionStripLayerHeight ?? contentHeight
+                                  : contributionStripCompactHeight ?? contentHeight;
+                                const railH = Math.min(tripleLensRailIdealPx, stripH);
+                                return (
+                                  <motion.div
+                                    key={lensMode}
+                                    layout
+                                    className="flex min-h-0 shrink-0 flex-row items-start gap-1.5"
+                                    style={{ height: stripH }}
+                                    initial={reduceMotion ? false : { opacity: 0, y: -8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={
+                                      reduceMotion
+                                        ? { opacity: 0, transition: { duration: 0.08 } }
+                                        : {
+                                            opacity: 0,
+                                            y: -6,
+                                            transition: { duration: 0.15, ease: workbenchSectionEase },
+                                          }
+                                    }
+                                    transition={
+                                      reduceMotion
+                                        ? { duration: 0.1 }
+                                        : {
+                                            layout: { duration: 0.22, ease: workbenchSectionEase },
+                                            opacity: { duration: 0.2, ease: workbenchSectionEase },
+                                            y: {
+                                              type: 'spring',
+                                              stiffness: 520,
+                                              damping: 38,
+                                              mass: 0.78,
+                                            },
+                                          }
+                                    }
+                                  >
+                                    <TripleLensStackRailCaption lensMode={lensMode} railH={railH} />
                                     <div
-                                      key={lensMode}
-                                      className="flex min-h-0 shrink-0 flex-row items-start gap-1.5"
-                                      style={{ height: stripH }}
+                                      className="relative z-0 min-w-0 shrink-0 self-stretch overflow-visible bg-transparent"
+                                      style={{
+                                        width: stripW,
+                                        height: stripH,
+                                        minHeight: stripH,
+                                        maxHeight: stripH,
+                                      }}
                                     >
-                                      <TripleLensStackRailCaption lensMode={lensMode} railH={railH} />
-                                      <div
-                                        className="relative z-0 min-w-0 shrink-0 self-stretch overflow-visible bg-transparent"
-                                        style={{
-                                          width: stripW,
-                                          height: stripH,
-                                          minHeight: stripH,
-                                          maxHeight: stripH,
-                                        }}
-                                      >
-                                        <RunwayContributionStripSvg
-                                          marketKey={`${country}-${lensMode}`}
-                                          placedCells={placedCells}
-                                          contributionMeta={contributionMeta}
-                                          cellPx={cellPx}
-                                          gap={gap}
-                                          cellRadiusPx={heatmapCellRadiusPx}
-                                          width={stripW}
-                                          height={stripH}
-                                          riskByDate={singleRiskByDate!}
-                                          heatmapOpts={heatmapOptsForMarketLens(country, lensMode)}
-                                          riskTuning={riskTuning}
-                                          viewMode={lensMode}
-                                          todayYmd={todayYmd}
-                                          dimPastDays={dimPastDays}
-                                          selectedDayYmd={singleMarketSelectedDayYmd}
-                                          openDayDetailsFromCell={(anchor, ds, wc) =>
-                                            makeShowTip(country, singleRiskByDate!, marketConfig)(anchor, ds, wc, {
-                                              detailViewMode: lensMode,
-                                            })
-                                          }
-                                          emergeResetKey={`${isoGrowResetKey}-${lensMode}`}
-                                          emergeStaggerMs={
-                                            landingMinimalChrome
-                                              ? rowIdx * LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS
-                                              : 0
-                                          }
-                                          showAxisLabels={isBottomRow}
-                                          ledgerAttribution={ledgerAttrForLens(lensMode)}
-                                          ledgerImplicitBaselineFootprint={
-                                            ledgerImplicitBaselineFootprintForHeatmap
-                                          }
-                                          deploymentRiskBlackouts={
-                                            lensMode === 'market_risk'
-                                              ? marketConfig?.deployment_risk_blackouts ?? null
-                                              : null
-                                          }
-                                          landingStaggerCellPulse={landingStaggerCellPulse}
-                                          suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
-                                        />
-                                      </div>
+                                      <RunwayContributionStripSvg
+                                        marketKey={`${country}-${lensMode}`}
+                                        placedCells={placedCells}
+                                        contributionMeta={contributionMeta}
+                                        cellPx={cellPx}
+                                        gap={gap}
+                                        cellRadiusPx={heatmapCellRadiusPx}
+                                        width={stripW}
+                                        height={stripH}
+                                        riskByDate={singleRiskByDate!}
+                                        heatmapOpts={heatmapOptsForMarketLens(country, lensMode)}
+                                        riskTuning={riskTuning}
+                                        viewMode={lensMode}
+                                        todayYmd={todayYmd}
+                                        dimPastDays={dimPastDays}
+                                        selectedDayYmd={singleMarketSelectedDayYmd}
+                                        openDayDetailsFromCell={(anchor, ds, wc) =>
+                                          makeShowTip(country, singleRiskByDate!, marketConfig)(anchor, ds, wc, {
+                                            detailViewMode: lensMode,
+                                          })
+                                        }
+                                        emergeResetKey={`${isoGrowResetKey}-${lensMode}`}
+                                        emergeStaggerMs={
+                                          landingMinimalChrome
+                                            ? rowIdx * LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS
+                                            : 0
+                                        }
+                                        showAxisLabels={isBottomRow}
+                                        ledgerAttribution={ledgerAttrForLens(lensMode)}
+                                        ledgerImplicitBaselineFootprint={
+                                          ledgerImplicitBaselineFootprintForHeatmap
+                                        }
+                                        deploymentRiskBlackouts={
+                                          lensMode === 'market_risk'
+                                            ? marketConfig?.deployment_risk_blackouts ?? null
+                                            : null
+                                        }
+                                        landingStaggerCellPulse={landingStaggerCellPulse}
+                                        organicLayerTick={
+                                          landingStaggerCellPulse ? organicLayerTick : undefined
+                                        }
+                                        suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
+                                      />
                                     </div>
-                                  );
-                                })
-                              : null}
+                                  </motion.div>
+                                );
+                              })}
+                            </AnimatePresence>
                           </div>
                           <div className="relative z-[4] ml-[25px] flex shrink-0 self-end">
                             {heatmapLegendEl}
@@ -3892,6 +4014,9 @@ function RunwayGridBody({
                               : null
                           }
                           landingStaggerCellPulse={landingStaggerCellPulse}
+                          organicLayerTick={
+                            landingStaggerCellPulse ? organicLayerTick : undefined
+                          }
                         />
                         <div className="relative z-[4] ml-[25px] flex shrink-0 self-end">
                           {heatmapLegendEl}
@@ -3920,6 +4045,10 @@ function RunwayGridBody({
                           viewMode === 'market_risk'
                             ? marketConfig?.deployment_risk_blackouts ?? null
                             : null
+                        }
+                        staggerCellPulse={landingStaggerCellPulse}
+                        organicLayerTick={
+                          landingStaggerCellPulse ? organicLayerTick : undefined
                         }
                       />
                     ) : (

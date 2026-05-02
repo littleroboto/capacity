@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useReducedMotion } from 'motion/react';
 import type { RiskRow } from '@/engine/riskModel';
+import { DEFAULT_RISK_TUNING, type RiskModelTuning } from '@/engine/riskModelTuning';
 import {
   CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX,
   CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W,
@@ -14,11 +15,16 @@ import {
   layoutContributionStripRunwayTimeAxisAbove,
 } from '@/lib/runwayCompareSvgLayout';
 import {
+  layeredHeatmapCellMetric,
+  organicHeatmapCellLayerIndex,
+} from '@/lib/runwayHeatmapOrganicLayers';
+import {
   computeContributionStripDailyCapacityBalance,
   contributionDayIndexForYmd,
   contributionStripDayColumnCenterX,
   contributionStripDaySparklineX,
 } from '@/lib/runwayTechContributionOverloadHistogram';
+import { heatmapCellMetric } from '@/lib/runwayViewMetrics';
 import { cn } from '@/lib/utils';
 
 const RS = {
@@ -188,6 +194,14 @@ export type RunwayTechCapacityDemandSparklineProps = {
   landingMarketingTightCapacityFill?: boolean;
   /** When true, omit dashed selection lines (parent draws one overlay through the stack). */
   suppressSelectionColumnLine?: boolean;
+  /**
+   * Workbench: same tick + per-day hash as tech heatmap cells — trace amplitude scales with layered
+   * combined metric until the intro finishes (axis stays from full utilization).
+   */
+  organicLayerTick?: number;
+  /** Hash salt for {@link organicHeatmapCellLayerIndex}; use the same key as the combined tech strip. */
+  organicLayerMarketKey?: string;
+  riskTuning?: RiskModelTuning;
 };
 
 function yForUtilizationStroke(
@@ -223,8 +237,16 @@ export function RunwayTechCapacityDemandSparkline({
   landingMarketingSweepReveal = false,
   landingMarketingTightCapacityFill = false,
   suppressSelectionColumnLine = false,
+  organicLayerTick,
+  organicLayerMarketKey,
+  riskTuning = DEFAULT_RISK_TUNING,
 }: RunwayTechCapacityDemandSparklineProps) {
   const prefersReducedMotion = useReducedMotion();
+  const organicTraceOn =
+    organicLayerTick != null &&
+    organicLayerMarketKey != null &&
+    organicLayerMarketKey.length > 0 &&
+    !prefersReducedMotion;
   const gutter = CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W;
 
   const chronologyAbove = useMemo(
@@ -254,6 +276,38 @@ export function RunwayTechCapacityDemandSparkline({
     [days, modelTraceSuppressed],
   );
 
+  /** Display utilization (may scale down during organic intro); axis span still from full ratios. */
+  const daysForTrace = useMemo(() => {
+    if (!organicTraceOn) {
+      return days.map((d) => ({ ...d, uTrace: d.capacityUtilizationRatio }));
+    }
+    return days.map((d) => {
+      if (modelTraceSuppressed || !d.hasData) {
+        return { ...d, uTrace: d.capacityUtilizationRatio };
+      }
+      const row = riskByDate.get(d.ymd);
+      if (!row) return { ...d, uTrace: d.capacityUtilizationRatio };
+      const layerIdx = organicHeatmapCellLayerIndex({
+        tick: organicLayerTick!,
+        marketKey: organicLayerMarketKey!,
+        dateYmd: d.ymd,
+      });
+      const mFull = heatmapCellMetric(row, 'combined', riskTuning);
+      const mLayer = layeredHeatmapCellMetric(row, 'combined', riskTuning, layerIdx);
+      const uFull = d.capacityUtilizationRatio;
+      const scale = mFull > 1e-9 ? Math.min(1, Math.max(0, mLayer / mFull)) : 0;
+      return { ...d, uTrace: uFull * scale };
+    });
+  }, [
+    days,
+    modelTraceSuppressed,
+    organicTraceOn,
+    organicLayerTick,
+    organicLayerMarketKey,
+    riskByDate,
+    riskTuning,
+  ]);
+
   const uScale = useMemo(() => {
     if (!modeledDays.length) {
       return { uMin: 0, uMax: 1, span: 1 };
@@ -273,16 +327,16 @@ export function RunwayTechCapacityDemandSparkline({
 
   const sparkPtsRawSvg = useMemo((): SparkPt[] => {
     const { uMin, span } = uScale;
-    return days.map((d) => {
+    return daysForTrace.map((d) => {
       const x = contributionStripDaySparklineX(cellPx, gap, d.dayIndex);
       const xo = x + LEFT_AXIS_OVERFLOW_PX;
       if (modelTraceSuppressed || !d.hasData) {
         return { x: xo, y: yBandBot };
       }
-      const y = yForUtilizationStroke(d.capacityUtilizationRatio, uMin, span, yBandTop, yBandBot);
+      const y = yForUtilizationStroke(d.uTrace, uMin, span, yBandTop, yBandBot);
       return { x: xo, y };
     });
-  }, [days, cellPx, gap, uScale, yBandTop, yBandBot, modelTraceSuppressed]);
+  }, [daysForTrace, cellPx, gap, uScale, yBandTop, yBandBot, modelTraceSuppressed]);
 
   const deficitRibbonDsSvg = useMemo(
     () => ribbonPathsBetweenBaseline(sparkPtsRawSvg, yCapPx, (y) => y < yCapPx),
@@ -291,12 +345,12 @@ export function RunwayTechCapacityDemandSparkline({
 
   const tightHeadroomMask = useMemo(() => {
     if (!landingMarketingTightCapacityFill) return null;
-    return days.map((d) => {
+    return daysForTrace.map((d) => {
       if (modelTraceSuppressed || !d.hasData) return false;
-      const u = d.capacityUtilizationRatio;
+      const u = d.uTrace;
       return u >= TIGHT_HEADROOM_UTIL_LOW && u <= 1 + 1e-9;
     });
-  }, [days, modelTraceSuppressed, landingMarketingTightCapacityFill]);
+  }, [daysForTrace, modelTraceSuppressed, landingMarketingTightCapacityFill]);
 
   const tightRibbonDsSvg = useMemo(() => {
     if (!tightHeadroomMask) return [];

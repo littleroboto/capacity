@@ -1,4 +1,5 @@
 import { memo, useCallback, useId, useMemo, type KeyboardEvent, type MouseEvent } from 'react';
+import { useReducedMotion } from 'motion/react';
 import { useRunwayHeatmapEmergence, runwayHeatmapEmergenceClipRect } from '@/hooks/useRunwayHeatmapEmergence';
 import type { ViewModeId } from '@/lib/constants';
 import type { RiskRow } from '@/engine/riskModel';
@@ -12,6 +13,10 @@ import {
   CALENDAR_WEEKDAY_HEADER_H,
   type VerticalYearSection,
 } from '@/lib/calendarQuarterLayout';
+import {
+  layeredHeatmapCellMetric,
+  organicHeatmapCellLayerIndex,
+} from '@/lib/runwayHeatmapOrganicLayers';
 import { heatmapCellMetric, runwayHeatmapCellFillAndDim } from '@/lib/runwayViewMetrics';
 import {
   effectiveLedgerFootprintOverlap,
@@ -46,6 +51,10 @@ export type RunwayQuarterGridSvgProps = {
   cellRadiusPx?: number;
   /** Deployment Risk lens: change-freeze windows → diagonal on cells. */
   deploymentRiskBlackouts?: readonly DeploymentRiskBlackout[] | null;
+  /** Organic layered cell colouring on load; disables clip emergence while active. */
+  staggerCellPulse?: boolean;
+  /** Required when `staggerCellPulse` is true — per-cell hash timing (no left-to-right sweep). */
+  organicLayerTick?: number;
 };
 
 function svgClientPoint(e: MouseEvent | KeyboardEvent, fallbackW: number, fallbackH: number) {
@@ -73,7 +82,12 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
   ledgerImplicitBaselineFootprint = true,
   cellRadiusPx = 3,
   deploymentRiskBlackouts = null,
+  staggerCellPulse = false,
+  organicLayerTick,
 }: RunwayQuarterGridSvgProps) {
+  const reduceMotion = useReducedMotion();
+  const pulseOn = staggerCellPulse && !reduceMotion;
+  const organicOn = pulseOn && organicLayerTick != null;
   const { width, height, cells, monthLabels, weekdayLabels, yearLabels, quarterLabels } = useMemo(
     () => layoutQuarterGridRunwaySvg(sections, cellPx, gap, monthStripW),
     [sections, cellPx, gap, monthStripW]
@@ -90,7 +104,7 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
   );
 
   const emergeKey = emergeResetKey ?? marketKey;
-  const insetTopPct = useRunwayHeatmapEmergence(emergeKey);
+  const insetTopPct = useRunwayHeatmapEmergence(emergeKey, { disabled: pulseOn });
   const cellClipId = useId().replace(/:/g, '');
   const clipR = runwayHeatmapEmergenceClipRect(width, height, insetTopPct);
 
@@ -199,11 +213,24 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
         ))}
       </g>
       <g clipPath={`url(#${cellClipId})`}>
-      {cells.map((c, i) => {
+      {(() => {
+        return cells.map((c, i) => {
         if (c.cell === false) return null;
         const dateStr = c.cell;
         const row = dateStr ? riskByDate.get(dateStr) : undefined;
-        const metric = row ? heatmapCellMetric(row, viewMode, riskTuning) : undefined;
+        const layerIdx =
+          organicOn && dateStr
+            ? organicHeatmapCellLayerIndex({
+                tick: organicLayerTick!,
+                marketKey,
+                dateYmd: dateStr,
+              })
+            : 4;
+        const metric = row
+          ? organicOn
+            ? layeredHeatmapCellMetric(row, viewMode, riskTuning, layerIdx)
+            : heatmapCellMetric(row, viewMode, riskTuning)
+          : undefined;
         const { fill: baseFill, dimOpacity: dimOp } = !dateStr
           ? { fill: HEATMAP_RUNWAY_PAD_FILL, dimOpacity: 1 }
           : runwayHeatmapCellFillAndDim(viewMode, metric, heatmapOpts, row);
@@ -230,34 +257,38 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
           typeof dateStr === 'string' &&
           ymdInAnyDeploymentRiskBlackout(dateStr, deploymentRiskBlackouts ?? undefined);
         const freezeStroke = Math.max(0.85, Math.min(2.6, cellPx * 0.11));
-
         return (
           <g key={`${marketKey}-svg-${i}-${c.x}-${c.y}`}>
-            <rect
-              x={c.x}
-              y={c.y}
-              width={c.w}
-              height={c.h}
-              rx={rr}
-              ry={rr}
-              fill={fill}
-              opacity={opacity}
-              className={isSelected ? 'stroke-primary' : 'stroke-border/35'}
-              strokeWidth={
-                isSelected ? 1.75 : ledgerAttribution && overlap > 1 ? 1.25 : 0.5
-              }
-              aria-pressed={isSelected}
-              style={{ cursor: 'pointer' }}
-              role="button"
-              tabIndex={0}
-              aria-label={
-                dateStr
-                  ? `Day details for ${dateStr}${deployFreezeMark ? '; change-freeze window' : ''}`
-                  : 'Day cell'
-              }
-              onClick={(e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)}
-              onKeyDown={(e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)}
-            />
+            <g>
+              <rect
+                x={c.x}
+                y={c.y}
+                width={c.w}
+                height={c.h}
+                rx={rr}
+                ry={rr}
+                fill={fill}
+                opacity={opacity}
+                className={isSelected ? 'stroke-primary' : 'stroke-border/35'}
+                strokeWidth={
+                  isSelected ? 1.75 : ledgerAttribution && overlap > 1 ? 1.25 : 0.5
+                }
+                aria-pressed={isSelected}
+                style={{
+                  cursor: 'pointer',
+                  ...(organicOn ? { transition: 'fill 0.55s ease, stroke 0.45s ease' } : {}),
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={
+                  dateStr
+                    ? `Day details for ${dateStr}${deployFreezeMark ? '; change-freeze window' : ''}`
+                    : 'Day cell'
+                }
+                onClick={(e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)}
+                onKeyDown={(e) => onCellActivate(e, dateStr, c.weekdayCol, c.w, c.h)}
+              />
+            </g>
             {deployFreezeMark ? (
               <line
                 x1={c.x}
@@ -284,7 +315,8 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
             ) : null}
           </g>
         );
-      })}
+      });
+      })()}
       </g>
       {selectedDayGuide ? (
         <line

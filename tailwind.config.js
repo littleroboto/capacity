@@ -40,6 +40,15 @@ export default {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
         },
+        ring: 'hsl(var(--ring))',
+        input: 'hsl(var(--input))',
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+      },
+      ringOffsetColor: {
+        background: 'hsl(var(--background))',
       },
       borderRadius: {
         lg: 'var(--radius)',
