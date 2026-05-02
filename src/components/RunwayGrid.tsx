@@ -211,11 +211,6 @@ const SINGLE_MARKET_MULTI_LENS_HEADLINE = 'Tech Capacity, Trading Pressure, Depl
 const SINGLE_MARKET_STACK_SHARED_LEGEND_LENS: ViewModeId =
   SINGLE_MARKET_STACK_LENS_IDS[0] ?? 'combined';
 
-/** Neutral rail surface (no lens tint — strip carries colour). */
-const LENS_STACK_RAIL_SURFACE = cn(
-  'border border-border/60 bg-muted/35 shadow-sm dark:border-border/55 dark:bg-muted/20',
-);
-
 const LENS_STACK_RAIL_ICON_CLASS =
   'h-4 w-4 shrink-0 text-foreground/85 sm:h-[18px] sm:w-[18px]';
 
@@ -239,7 +234,7 @@ function TripleLensStackRailCaption({ lensMode, railH }: { lensMode: ViewModeId;
 
   return (
     <div
-      className={cn('relative flex shrink-0 overflow-visible rounded-sm', LENS_STACK_RAIL_SURFACE)}
+      className="relative flex shrink-0 overflow-visible"
       style={{ width: railW, height: railH, minHeight: railH, maxHeight: railH }}
       title={tip}
       aria-label={tip}
@@ -3831,6 +3826,8 @@ function RunwayGridBody({
                                     stripWidth={contributionColumnContentWidth ?? contentWidth}
                                     riskByDate={singleRiskByDate!}
                                     blackouts={marketConfig?.deployment_risk_blackouts ?? null}
+                                    activityLedger={activityLedger}
+                                    ledgerExcludedEntryIds={ledgerExcludedForHeatmap}
                                     railSpacerWidthPx={SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX}
                                     ephemeral={Boolean(landingMinimalChrome && landingProgrammePlan)}
                                     revealPlanWhen={Boolean(

@@ -173,9 +173,10 @@ export function LocalDataPanelContent() {
       <section className="space-y-2" aria-labelledby="view-device-heading">
         <SectionHeading id="view-device-heading">View in this session</SectionHeading>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          <span className="font-medium text-foreground/85">Team YAML</span> (Vercel Blob or bundled files) is the shared
-          scenario. Lens, heatmap transfer, γ, palette, runway filters, and pressure-mix sliders live in memory for this
-          tab only — export/import JSON to copy a look across machines; that does not replace Save to cloud for YAML.
+          <span className="font-medium text-foreground/85">Team YAML</span> (Postgres-assembled workspace from the server,
+          or bundled files when nothing is deployed yet) is the shared scenario. Lens, heatmap transfer, γ, palette, runway
+          filters, and pressure-mix sliders live in memory for this tab only — export/import JSON to copy a look across
+          machines; that does not replace server-side workspace updates (fragments/import when PUT is unavailable).
         </p>
         <input
           ref={importFileRef}

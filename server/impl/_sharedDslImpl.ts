@@ -13,6 +13,14 @@ import { verifyToken } from '@clerk/backend';
 import { clerkAuthEnvFromProcess } from '../lib/env';
 import { isClerkJwtEmailAllowed, parseAllowedEmailSet } from './_allowedUserEmails';
 import { SEGMENT_TO_MARKETS, WORKSPACE_MANIFEST_MARKET_ORDER } from './_capacityWorkspaceAcl.data';
+import {
+  extractClerkOrganizationIdFromJwtPayload,
+  fetchMarketDocumentsYamlByMarket,
+  isWorkspaceDocumentsReadEnabled,
+  lookupWorkspaceIdByClerkOrg,
+  mergePerMarketYamlWithArtifactFallback,
+  orderMarketIdsForWorkspaceBundle,
+} from '../services/workspaceDocumentsBundle';
 
 type CapacityWorkspaceAccess = {
   legacyFullAccess: boolean;
@@ -187,10 +195,19 @@ function orgAdminRoles(): string[] {
   return parseOrgAdminRolesFromEnv(process.env.CAPACITY_ORG_ADMIN_ROLES);
 }
 
-type ReadAuthResult = { ok: false } | { ok: true; workspaceAccess: CapacityWorkspaceAccess | null };
+type ReadAuthResult =
+  | { ok: false }
+  | {
+      ok: true;
+      workspaceAccess: CapacityWorkspaceAccess | null;
+      /** From verified Clerk JWT when org context is present; see extractClerkOrganizationIdFromJwtPayload */
+      clerkOrganizationId: string | null;
+    };
 
 async function authorizeRead(req: VercelRequest, res: VercelResponse): Promise<ReadAuthResult> {
-  if (!clerkSecretKeyConfigured()) return { ok: true, workspaceAccess: null };
+  if (!clerkSecretKeyConfigured()) {
+    return { ok: true, workspaceAccess: null, clerkOrganizationId: null };
+  }
   const bearer = bearerFromAuthorizationHeader(req.headers.authorization);
   const p = await authenticateBearer(bearer);
   if (p.kind === 'email_not_allowed') {
@@ -203,7 +220,11 @@ async function authorizeRead(req: VercelRequest, res: VercelResponse): Promise<R
   }
   if (p.kind === 'clerk') {
     const workspaceAccess = parseCapacityWorkspaceAccess(p.jwtPayload, p.orgRoleNorm, orgAdminRoles());
-    return { ok: true, workspaceAccess };
+    return {
+      ok: true,
+      workspaceAccess,
+      clerkOrganizationId: extractClerkOrganizationIdFromJwtPayload(p.jwtPayload),
+    };
   }
   if (p.kind === 'auth_failed') {
     const body =
@@ -231,9 +252,10 @@ async function authorizeRead(req: VercelRequest, res: VercelResponse): Promise<R
 async function handlePostgresGet(
   _req: VercelRequest,
   res: VercelResponse,
-  ws: CapacityWorkspaceAccess | null
+  ws: CapacityWorkspaceAccess | null,
+  clerkOrganizationId: string | null
 ): Promise<void> {
-  const { getMultiMarketBundle } = await import('../services/cacheService');
+  const { getMultiMarketBundle, getActiveArtifact } = await import('../services/cacheService');
   const { supabaseServiceClient } = await import('../lib/supabaseClient');
 
   const client = supabaseServiceClient();
@@ -251,6 +273,27 @@ async function handlePostgresGet(
   let marketIds = allMarkets.map((m: { id: string }) => m.id);
   if (ws && !ws.legacyFullAccess && !ws.admin && ws.allowedMarketIds.size > 0) {
     marketIds = marketIds.filter((id: string) => ws.allowedMarketIds.has(id));
+  }
+
+  if (
+    isWorkspaceDocumentsReadEnabled() &&
+    clerkOrganizationId &&
+    marketIds.length > 0
+  ) {
+    const workspaceId = await lookupWorkspaceIdByClerkOrg(client, clerkOrganizationId);
+    if (workspaceId) {
+      const ordered = orderMarketIdsForWorkspaceBundle(marketIds, WORKSPACE_MANIFEST_MARKET_ORDER);
+      const docs = await fetchMarketDocumentsYamlByMarket(client, workspaceId, ordered);
+      const yaml = await mergePerMarketYamlWithArtifactFallback(ordered, docs, getActiveArtifact);
+      if (!yaml.trim()) {
+        res.status(404).json({ ok: false, reason: 'no_published_artifacts' });
+        return;
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
+      res.status(200).send(yaml);
+      return;
+    }
   }
 
   const yaml = await getMultiMarketBundle(marketIds);
@@ -279,7 +322,7 @@ async function handleSharedDsl(req: VercelRequest, res: VercelResponse): Promise
     const ra = await authorizeRead(req, res);
     if (!ra.ok) return;
     try {
-      await handlePostgresGet(req, res, ra.workspaceAccess);
+      await handlePostgresGet(req, res, ra.workspaceAccess, ra.clerkOrganizationId);
     } catch (e) {
       console.error('[shared-dsl GET]', e);
       res.status(500).json({

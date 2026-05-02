@@ -67,157 +67,158 @@ bau:
       Sun: 0.260
 
 # Marketing campaigns — timing, impact, prep/live support.
-# Synthetic test fixtures: 28-day prep, ~30-day live, 1 lab + 1 Market IT (tech_staff) each.
+# Representative fixtures: prep ~3–5 months, run ~4–6 weeks, moderated campaign/live support load.
 # 2027 rows repeat the same seasonal pattern (+1 calendar year on month/day).
 
 campaigns:
   - name: Spring savings event
-    start_date: '2026-03-30'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2026-04-03'
+    duration: 42
+    testing_prep_duration: 128
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.61
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Spring savings event
-    start_date: '2027-03-30'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2027-03-29'
+    duration: 28
+    testing_prep_duration: 132
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.45
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Summer terrace promo
-    start_date: '2026-07-22'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2026-07-15'
+    duration: 40
+    testing_prep_duration: 120
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.62
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Summer terrace promo
-    start_date: '2027-07-22'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2027-07-31'
+    duration: 41
+    testing_prep_duration: 124
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.46
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Summer app rewards push
-    start_date: '2026-07-18'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2026-07-23'
+    duration: 31
+    testing_prep_duration: 144
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.59
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Summer app rewards push
     start_date: '2027-07-18'
+    duration: 32
+    testing_prep_duration: 148
+    impact: medium
+    promo_weight: 1.0
+    live_tech_load_scale: 0.74
+    campaign_support:
+      labs_required: 0.8
+      tech_staff: 0.7
+    live_campaign_support:
+      labs_required: 0.8
+      tech_staff: 0.7
+  - name: Sinterklaas family deal
+    start_date: '2026-12-02'
+    duration: 29
+    testing_prep_duration: 136
+    impact: medium
+    promo_weight: 1.0
+    live_tech_load_scale: 0.6
+    campaign_support:
+      labs_required: 0.8
+      tech_staff: 0.7
+    live_campaign_support:
+      labs_required: 0.8
+      tech_staff: 0.7
+  - name: Sinterklaas family deal
+    start_date: '2027-12-18'
     duration: 30
-    testing_prep_duration: 28
+    testing_prep_duration: 140
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.75
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
-  - name: Sinterklaas family deal
-    start_date: '2026-12-08'
-    duration: 28
-    testing_prep_duration: 25
-    impact: medium
-    promo_weight: 1.0
-    live_tech_load_scale: 1
-    campaign_support:
-      labs_required: 1
-      tech_staff: 1
-    live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
-  - name: Sinterklaas family deal
-    start_date: '2027-12-08'
-    duration: 28
-    testing_prep_duration: 25
-    impact: medium
-    promo_weight: 1.0
-    live_tech_load_scale: 1
-    campaign_support:
-      labs_required: 1
-      tech_staff: 1
-    live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
 
-# Tech programmes — non-campaign engineering. Two ~60d POS rollouts / year (1 lab + 1 Market IT); 2027 rows repeat the same pattern (+1 calendar year).
+# Tech programmes — POS HoC rollouts. Two per year (May/Oct) with prep + national deployment windows; following year repeats.
 
 tech_programmes:
-  - name: Payment terminal refresh
-    start_date: '2026-01-27'
-    duration: 60
+  - name: Sesame May HoC
+    start_date: '2026-05-06'
+    duration: 42
+    testing_prep_duration: 42
     programme_support:
       labs_required: 1
       tech_staff: 1
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: Drive-thru sensor upgrade
-    start_date: '2026-08-26'
-    duration: 60
+  - name: Sesame Oct HoC
+    start_date: '2026-10-07'
+    duration: 35
+    testing_prep_duration: 35
     programme_support:
       labs_required: 1
       tech_staff: 1
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: Payment terminal refresh
-    start_date: '2027-01-27'
-    duration: 60
+  - name: Sesame May HoC
+    start_date: '2027-05-06'
+    duration: 42
+    testing_prep_duration: 42
     programme_support:
       labs_required: 1
       tech_staff: 1
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: Drive-thru sensor upgrade
-    start_date: '2027-08-26'
-    duration: 60
+  - name: Sesame Oct HoC
+    start_date: '2027-10-07'
+    duration: 35
+    testing_prep_duration: 35
     programme_support:
       labs_required: 1
       tech_staff: 1
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-
-# Public holidays — bank / national closures (Nationwide recognised public days; school = regio Midden (Rijksoverheid 2026/27).)
-
 public_holidays:
   auto: false
   dates:

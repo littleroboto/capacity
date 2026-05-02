@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion/react';
 import { CalendarRange, Settings2 } from 'lucide-react';
 import type { DeploymentRiskBlackout, MarketConfig } from '@/engine/types';
 import type { RiskRow } from '@/engine/riskModel';
 import type { ContributionStripLayoutMeta, PlacedRunwayCell } from '@/lib/calendarQuarterLayout';
 import { cn } from '@/lib/utils';
-import { collectProgrammeGanttBars } from '@/lib/runwayProgrammeGanttModel';
+import { collectProgrammeGanttChronicleLanes } from '@/lib/runwayProgrammeGanttModel';
+import { applyLedgerExclusionsToMarketConfig } from '@/lib/marketConfigLedgerExclusions';
+import type { MarketActivityLedger } from '@/lib/marketActivityLedger';
 import {
   loadProgrammeGanttOpen,
   loadProgrammeGanttPrefs,
@@ -54,6 +56,8 @@ type Props = {
   stripWidth: number;
   riskByDate: ReadonlyMap<string, RiskRow>;
   blackouts: readonly DeploymentRiskBlackout[] | null | undefined;
+  activityLedger?: MarketActivityLedger | null;
+  ledgerExcludedEntryIds?: readonly string[];
   railSpacerWidthPx: number;
   className?: string;
   /**
@@ -79,6 +83,8 @@ export function RunwayProgrammeGanttBlock({
   stripWidth,
   riskByDate,
   blackouts,
+  activityLedger,
+  ledgerExcludedEntryIds = [],
   railSpacerWidthPx,
   className,
   ephemeral = false,
@@ -137,7 +143,13 @@ export function RunwayProgrammeGanttBlock({
     setPrefs({ ...RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS });
   }, []);
 
-  const bars = collectProgrammeGanttBars(marketConfig);
+  const ganttSourceConfig = useMemo(() => {
+    if (!marketConfig) return undefined;
+    if (!activityLedger || ledgerExcludedEntryIds.length === 0) return marketConfig;
+    return applyLedgerExclusionsToMarketConfig(marketConfig, activityLedger, new Set(ledgerExcludedEntryIds));
+  }, [marketConfig, activityLedger, ledgerExcludedEntryIds]);
+
+  const lanes = collectProgrammeGanttChronicleLanes(ganttSourceConfig);
 
   return (
     <div className={cn('flex w-full min-w-0 flex-col gap-1.5', className)}>
@@ -351,7 +363,7 @@ export function RunwayProgrammeGanttBlock({
                   gap={gap}
                   width={stripWidth}
                   riskByDate={riskByDate}
-                  bars={bars}
+                  lanes={lanes}
                   blackouts={blackouts}
                   prefs={prefs}
                 />

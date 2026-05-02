@@ -72,157 +72,158 @@ bau:
       Sun: 0.241
 
 # Marketing campaigns — timing, impact, prep/live support.
-# Synthetic test fixtures: 28-day prep, ~30-day live, 1 lab + 1 Market IT (tech_staff) each.
+# Representative fixtures: prep ~3–5 months, run ~4–6 weeks, moderated campaign/live support load.
 # 2027 rows repeat the same seasonal pattern (+1 calendar year on month/day).
 
 campaigns:
   - name: Spring combo launch
     start_date: '2026-04-11'
-    duration: 30
-    testing_prep_duration: 28
+    duration: 29
+    testing_prep_duration: 129
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.48
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Spring combo launch
-    start_date: '2027-04-11'
+    start_date: '2027-04-06'
     duration: 30
-    testing_prep_duration: 28
+    testing_prep_duration: 133
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.63
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Summer family bundle
-    start_date: '2026-07-09'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2026-06-29'
+    duration: 31
+    testing_prep_duration: 137
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.47
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Summer family bundle
-    start_date: '2027-07-09'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2027-07-15'
+    duration: 32
+    testing_prep_duration: 141
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.62
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Kids meal collectibles
-    start_date: '2026-07-27'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2026-07-28'
+    duration: 33
+    testing_prep_duration: 145
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.46
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Kids meal collectibles
-    start_date: '2027-07-27'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2027-07-23'
+    duration: 34
+    testing_prep_duration: 149
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.61
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Festive menu event
-    start_date: '2026-11-30'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2026-11-21'
+    duration: 35
+    testing_prep_duration: 153
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.45
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
   - name: Festive menu event
-    start_date: '2027-11-30'
-    duration: 30
-    testing_prep_duration: 28
+    start_date: '2027-12-07'
+    duration: 36
+    testing_prep_duration: 96
     impact: medium
     promo_weight: 1.0
-    live_tech_load_scale: 1
+    live_tech_load_scale: 0.6
     campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
     live_campaign_support:
-      labs_required: 1
-      tech_staff: 1
+      labs_required: 0.8
+      tech_staff: 0.7
 
-# Tech programmes — non-campaign engineering. Two ~60d POS rollouts / year (1 lab + 1 Market IT); 2027 rows repeat the same pattern (+1 calendar year).
+# Tech programmes — POS HoC rollouts. Two per year (May/Oct) with prep + national deployment windows; following year repeats.
 
 tech_programmes:
-  - name: Ordering app replatform
-    start_date: '2026-01-07'
-    duration: 60
+  - name: Sesame May HoC
+    start_date: '2026-05-06'
+    duration: 42
+    testing_prep_duration: 42
     programme_support:
       labs_required: 1
       tech_staff: 1
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: Kitchen printer rollout
-    start_date: '2026-09-10'
-    duration: 60
+  - name: Sesame Oct HoC
+    start_date: '2026-10-07'
+    duration: 35
+    testing_prep_duration: 35
     programme_support:
       labs_required: 1
       tech_staff: 1
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: Ordering app replatform
-    start_date: '2027-01-07'
-    duration: 60
+  - name: Sesame May HoC
+    start_date: '2027-05-06'
+    duration: 42
+    testing_prep_duration: 42
     programme_support:
       labs_required: 1
       tech_staff: 1
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-  - name: Kitchen printer rollout
-    start_date: '2027-09-10'
-    duration: 60
+  - name: Sesame Oct HoC
+    start_date: '2027-10-07'
+    duration: 35
+    testing_prep_duration: 35
     programme_support:
       labs_required: 1
       tech_staff: 1
     live_programme_support:
       labs_required: 1
       tech_staff: 1
-
-# Public holidays — bank / national closures (explicit dates).
-
 public_holidays:
   auto: false
   dates:
