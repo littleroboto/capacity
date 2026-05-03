@@ -1,11 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
-import { Database, FileCode2, LayoutGrid, Settings2 } from 'lucide-react';
+import { Database, FileCode2, LayoutDashboard, LayoutGrid, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DslPanelClerkSignOut } from '@/components/DslPanelClerkSignOut';
 import { SegmentWorkbenchMark } from '@/components/SegmentWorkbenchMark';
 import { APP_VERSION, GIT_COMMIT_SHORT } from '@/lib/buildMeta';
+import { useCapacityAccess } from '@/lib/capacityAccessContext';
 import {
   FALLBACK_RUNWAY_MARKET_IDS,
   gammaFocusMarket,
@@ -35,11 +35,18 @@ const railBtnActive = 'bg-primary/12 text-primary hover:bg-primary/16 hover:text
  */
 export function WorkbenchSidebar({ parseError }: WorkbenchSidebarProps) {
   const navigate = useNavigate();
+  const access = useCapacityAccess();
   const country = useAtcStore((s) => s.country);
+  const configs = useAtcStore((s) => s.configs);
+  const runwayMarketOrder = useAtcStore((s) => s.runwayMarketOrder);
   const viewMode = useAtcStore((s) => s.viewMode);
   const setViewMode = useAtcStore((s) => s.setViewMode);
   const runwayLensBeforeCode = useAtcStore((s) => s.runwayLensBeforeCode);
   const compareAllMarkets = isRunwayMultiMarketStrip(country);
+  const canAdmin = access.admin || access.legacyFullAccess;
+  const order = runwayMarketOrder.length ? runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
+  const adminFocusMarketId = gammaFocusMarket(country, configs, order);
+  const adminMarketPath = `/admin/market/${encodeURIComponent(adminFocusMarketId)}`;
 
   const onLogoClick = useCallback(
     (e: MouseEvent<HTMLAnchorElement>) => {
@@ -101,12 +108,26 @@ export function WorkbenchSidebar({ parseError }: WorkbenchSidebarProps) {
             size="sm"
             className={cn(railBtn, viewMode === 'code' ? railBtnActive : 'opacity-55')}
             onClick={() => setViewMode('code')}
-            title="Market configuration (YAML)"
-            aria-label="Market configuration YAML"
+            title="YAML editor"
+            aria-label="Open YAML editor"
             aria-current={viewMode === 'code' ? 'page' : undefined}
           >
             <FileCode2 className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
           </Button>
+          {canAdmin && viewMode !== 'code' ? (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className={railBtn}
+              title={`Fragments admin — ${adminFocusMarketId} (all markets: /admin)`}
+              aria-label={`Open ${adminFocusMarketId} in admin`}
+            >
+              <Link to={adminMarketPath}>
+                <LayoutDashboard className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+              </Link>
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -135,12 +156,11 @@ export function WorkbenchSidebar({ parseError }: WorkbenchSidebarProps) {
         >
           <Settings2 className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
         </Button>
-        <DslPanelClerkSignOut collapsed />
         {parseError ? (
           <span
             className="mt-0.5 h-2 w-2 rounded-full bg-destructive"
             title={parseError}
-            aria-label="YAML parse error"
+            aria-label="YAML parse error — open YAML editor for details"
           />
         ) : null}
       </div>

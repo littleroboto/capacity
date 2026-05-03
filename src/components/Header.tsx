@@ -48,7 +48,7 @@ export function Header({ layout = 'default' }: HeaderProps) {
       e.preventDefault();
       const order = st.runwayMarketOrder.length ? st.runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
       st.setCountry(gammaFocusMarket(st.country, st.configs, order), {});
-      navigate({ pathname: '/', search: '' });
+      navigate('/');
     },
     [navigate]
   );
@@ -60,14 +60,14 @@ export function Header({ layout = 'default' }: HeaderProps) {
   );
 
   if (layout === 'studio') {
-    const contextLabel = viewMode === 'code' ? 'Configuration' : 'Runway';
+    const contextLabel = viewMode === 'code' ? 'YAML' : 'Runway';
     return (
       <header className="border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="flex min-h-10 items-center justify-between gap-3 px-3 py-1.5 md:px-4">
           <div className="flex min-w-0 items-baseline gap-2 lg:hidden">
             <h1 className="truncate text-sm font-semibold tracking-tight text-foreground">
               <Link
-                to={{ pathname: '/', search: '' }}
+                to="/"
                 onClick={onTitleClick}
                 className={cn(titleLinkClass, 'inline-flex items-center gap-1.5')}
                 title="Home"
@@ -102,7 +102,7 @@ export function Header({ layout = 'default' }: HeaderProps) {
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
             <h1 className="text-sm font-bold leading-tight tracking-tight text-foreground sm:text-[0.9375rem]">
               <Link
-                to={{ pathname: '/', search: '' }}
+                to="/"
                 onClick={onTitleClick}
                 className={cn(titleLinkClass, 'inline-flex items-center gap-2')}
                 title="Landing page"

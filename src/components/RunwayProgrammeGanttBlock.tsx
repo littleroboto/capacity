@@ -353,7 +353,7 @@ export function RunwayProgrammeGanttBlock({
           >
             <div className="flex min-w-0 flex-row items-start gap-1.5">
               <div className="shrink-0" style={{ width: railSpacerWidthPx }} aria-hidden />
-              <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable]">
+              <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-1 py-0.5 [scrollbar-gutter:stable]">
                 <div
                   className="min-w-0 shrink-0 overflow-hidden rounded-[3px]"
                   style={{ width: stripWidth, minWidth: stripWidth }}

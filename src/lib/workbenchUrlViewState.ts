@@ -1,6 +1,10 @@
 import type { ViewModeId } from '@/lib/constants';
 import { normalizeViewModeId } from '@/lib/constants';
-import { RUNWAY_ALL_MARKETS_LABEL, RUNWAY_ALL_MARKETS_VALUE } from '@/lib/markets';
+import {
+  FALLBACK_RUNWAY_MARKET_IDS,
+  RUNWAY_ALL_MARKETS_VALUE,
+  RUNWAY_IOM_MARKETS_VALUE,
+} from '@/lib/markets';
 import type { RunwayQuarter } from '@/lib/runwayDateFilter';
 import { useAtcStore } from '@/store/useAtcStore';
 
@@ -35,7 +39,9 @@ function parseCountry(sp: URLSearchParams): string | null {
   const t = raw.trim();
   if (!t) return null;
   const u = t.toUpperCase();
-  if (u === 'LIOM' || u === '__ALL__') return RUNWAY_ALL_MARKETS_VALUE;
+  if (u === 'LIOM' || u === '__ALL__' || u === 'IOM' || u === '__IOM__') {
+    return FALLBACK_RUNWAY_MARKET_IDS[0] ?? null;
+  }
   return t;
 }
 
@@ -246,9 +252,7 @@ export function mergeWorkbenchUrlSearchParams(base: URLSearchParams, state: AtcS
   } = state;
   const { runwaySelectedDayYmd, dslLlmAssistantEnabled } = state;
 
-  if (country === RUNWAY_ALL_MARKETS_VALUE) {
-    out.set(WORKBENCH_URL_KEYS.country, RUNWAY_ALL_MARKETS_LABEL);
-  } else if (country) {
+  if (country && country !== RUNWAY_ALL_MARKETS_VALUE && country !== RUNWAY_IOM_MARKETS_VALUE) {
     out.set(WORKBENCH_URL_KEYS.country, country);
   } else {
     out.delete(WORKBENCH_URL_KEYS.country);

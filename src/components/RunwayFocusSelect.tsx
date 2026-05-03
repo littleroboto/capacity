@@ -57,18 +57,24 @@ export function RunwayFocusSelect({ className }: { className?: string }) {
     (access.legacyFullAccess || access.admin || access.segments.includes('LIOM')) && liomMarkets.length > 0;
   const showIomGroup =
     (access.legacyFullAccess || access.admin || access.segments.includes('IOM')) && iomMarkets.length > 0;
+  const selectableMarkets = [...new Set([...liomMarkets, ...iomMarkets, ...otherMarkets])];
 
   useEffect(() => {
-    if (access.legacyFullAccess || access.admin) return;
-    if (runwayFocusAllowed(access, country, RUNWAY_ALL_MARKETS_VALUE, RUNWAY_IOM_MARKETS_VALUE)) return;
-    const idList = runwayMarketOrder.length ? runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
-    const next = idList.find((id) => access.allowedMarketIds.includes(id));
+    const hasLegacySegmentCountry = country === RUNWAY_ALL_MARKETS_VALUE || country === RUNWAY_IOM_MARKETS_VALUE;
+    if (!hasLegacySegmentCountry && selectableMarkets.includes(country)) return;
+    const idList = selectableMarkets.length
+      ? selectableMarkets
+      : runwayMarketOrder.length
+        ? runwayMarketOrder
+        : [...FALLBACK_RUNWAY_MARKET_IDS];
+    const next =
+      idList.find((id) => runwayFocusAllowed(access, id, RUNWAY_ALL_MARKETS_VALUE, RUNWAY_IOM_MARKETS_VALUE)) ??
+      idList[0];
     if (next && next !== country) setCountry(next);
   }, [
-    access.legacyFullAccess,
-    access.admin,
-    access.allowedMarketIds,
+    access,
     country,
+    selectableMarkets,
     runwayMarketOrder,
     setCountry,
   ]);
@@ -91,7 +97,7 @@ export function RunwayFocusSelect({ className }: { className?: string }) {
           htmlFor="runway-focus-select"
           className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
         >
-          Focus
+          Market
         </Label>
         <Select value={country} onValueChange={(v) => setCountry(v)}>
           <SelectTrigger
@@ -103,9 +109,7 @@ export function RunwayFocusSelect({ className }: { className?: string }) {
           <SelectContent className="max-h-[min(24rem,var(--radix-select-content-available-height))]">
             {showLiomGroup ? (
               <SelectGroup>
-                <SelectItem value={RUNWAY_ALL_MARKETS_VALUE}>
-                  {RUNWAY_ALL_MARKETS_LABEL} (Segment)
-                </SelectItem>
+                <SelectLabel>{RUNWAY_ALL_MARKETS_LABEL}</SelectLabel>
                 {liomMarkets.map((id) => (
                   <SelectItem key={id} value={id} className={marketItemClass}>
                     {labelForMarket(id)}
@@ -116,9 +120,7 @@ export function RunwayFocusSelect({ className }: { className?: string }) {
             {showLiomGroup && showIomGroup ? <SelectSeparator /> : null}
             {showIomGroup ? (
               <SelectGroup>
-                <SelectItem value={RUNWAY_IOM_MARKETS_VALUE}>
-                  {RUNWAY_IOM_MARKETS_LABEL} (Segment)
-                </SelectItem>
+                <SelectLabel>{RUNWAY_IOM_MARKETS_LABEL}</SelectLabel>
                 {iomMarkets.map((id) => (
                   <SelectItem key={id} value={id} className={marketItemClass}>
                     {labelForMarket(id)}

@@ -38,8 +38,8 @@ export const VIEW_MODES = [
   },
   {
     id: 'code',
-    label: 'Code',
-    runwayHeatmapTitle: 'Market configuration',
+    label: 'YAML',
+    runwayHeatmapTitle: 'YAML editor',
     title:
       'Full multi-market YAML in the main area. Edits stay local until you switch back to Technology Teams, Restaurant Activity, or Deployment Risk — then the model re-runs and the runway updates.',
   },

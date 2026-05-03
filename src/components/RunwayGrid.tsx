@@ -3381,8 +3381,8 @@ function RunwayGridBody({
     return () => window.removeEventListener('keydown', onKey);
   }, [singleMarketMultiLens, tip, onClearDaySummary]);
 
-  /** Session-only: programme Gantt off until toggled; per-lens contribution strips independent (see below). */
-  const [showRunwayProgrammePlanWorkbench, setShowRunwayProgrammePlanWorkbench] = useState(false);
+  /** Session-only: programme Gantt on by default; per-lens contribution strips independent (see below). */
+  const [showRunwayProgrammePlanWorkbench, setShowRunwayProgrammePlanWorkbench] = useState(true);
   /** Workbench: XY sparkline always on; tech capacity (`combined`) strip on by default; trading / deployment off. */
   const [showTripleLensTechCapacityStrip, setShowTripleLensTechCapacityStrip] = useState(true);
   const [showTripleLensTradingStrip, setShowTripleLensTradingStrip] = useState(false);
@@ -3410,6 +3410,10 @@ function RunwayGridBody({
 
   /** Workbench runway toggles: short ease-out in, slightly quicker ease-in out. */
   const workbenchSectionEase = [0.22, 1, 0.36, 1] as const;
+  const stripToggleBaseClass =
+    'inline-flex h-7 w-7 items-center justify-center rounded-md border p-0 text-[11px] font-medium leading-none transition-[color,transform] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
+  const stripToggleOnClass = 'border-primary/55 bg-primary/10 text-foreground';
+  const stripToggleOffClass = 'border-border/55 bg-muted/15 text-muted-foreground hover:bg-muted/30 hover:text-foreground';
 
   const dayContributionPin: RunwayLedgerDayContributionPin | null =
     !compareAllMarkets &&
@@ -3704,62 +3708,63 @@ function RunwayGridBody({
                             <button
                               type="button"
                               className={cn(
-                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.97]',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                                stripToggleBaseClass,
                                 showRunwayProgrammePlanWorkbench
-                                  ? 'border-primary/55 bg-primary/10 text-foreground'
-                                  : 'border-border/55 bg-muted/15 text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                                  ? stripToggleOnClass
+                                  : stripToggleOffClass,
                               )}
+                              title="Programme plan"
+                              aria-label="Programme plan"
                               aria-pressed={showRunwayProgrammePlanWorkbench}
                               onClick={() => setShowRunwayProgrammePlanWorkbench((v) => !v)}
                             >
-                              Programme plan
+                              <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
                             </button>
                             <button
                               type="button"
                               className={cn(
-                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.97]',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                                stripToggleBaseClass,
                                 showTripleLensTechCapacityStrip
-                                  ? 'border-primary/55 bg-primary/10 text-foreground'
-                                  : 'border-border/55 bg-muted/15 text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                                  ? stripToggleOnClass
+                                  : stripToggleOffClass,
                               )}
+                              title="Tech capacity strip"
+                              aria-label="Tech capacity strip"
                               aria-pressed={showTripleLensTechCapacityStrip}
                               onClick={() => setShowTripleLensTechCapacityStrip((v) => !v)}
                             >
-                              Tech capacity strip
+                              <Gauge className="h-3.5 w-3.5 shrink-0" aria-hidden />
                             </button>
                             <button
                               type="button"
                               className={cn(
-                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.97]',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                                stripToggleBaseClass,
                                 showTripleLensTradingStrip
-                                  ? 'border-primary/55 bg-primary/10 text-foreground'
-                                  : 'border-border/55 bg-muted/15 text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                                  ? stripToggleOnClass
+                                  : stripToggleOffClass,
                               )}
+                              title="Trading strip"
+                              aria-label="Trading strip"
                               aria-pressed={showTripleLensTradingStrip}
                               onClick={() => setShowTripleLensTradingStrip((v) => !v)}
                             >
-                              Trading strip
+                              <LineChart className="h-3.5 w-3.5 shrink-0" aria-hidden />
                             </button>
                             <button
                               type="button"
                               className={cn(
-                                'rounded-md border px-2.5 py-1 text-xs font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.97]',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                                stripToggleBaseClass,
                                 showTripleLensDeploymentStrip
-                                  ? 'border-primary/55 bg-primary/10 text-foreground'
-                                  : 'border-border/55 bg-muted/15 text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                                  ? stripToggleOnClass
+                                  : stripToggleOffClass,
                               )}
+                              title="Deployment strip"
+                              aria-label="Deployment strip"
                               aria-pressed={showTripleLensDeploymentStrip}
                               onClick={() => setShowTripleLensDeploymentStrip((v) => !v)}
                             >
-                              Deployment strip
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
                             </button>
-                            <span className="text-[11px] leading-snug text-muted-foreground">
-                              XY balance trace stays on; tech capacity strip defaults on; other strips optional.
-                            </span>
                           </div>
                         ) : null}
                         <div

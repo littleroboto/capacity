@@ -3,7 +3,6 @@ import { DslPanelClerkSignOut } from '@/components/DslPanelClerkSignOut';
 import { HeatmapSettingsPanel } from '@/components/HeatmapSettingsPanel';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
 import { WorkbenchMarketAdminPanel } from '@/components/WorkbenchMarketAdminPanel';
-import { TechLensHeatmapPatternsPanel } from '@/components/TechLensHeatmapPatternsPanel';
 import { RunwayFocusSelect } from '@/components/RunwayFocusSelect';
 import { RunwayRangeSelect } from '@/components/RunwayRangeSelect';
 import { WorkbenchRunwayControls } from '@/components/WorkbenchRunwayControls';
@@ -61,11 +60,11 @@ export function DSLPanel({ collapsed, onCollapsedChange, primaryNavInSidebar = f
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription className="text-pretty">
-            Runway palette and campaign overlay.             Heatmap pressure offset, curve, γ, and tail are{' '}
+            Runway palette and campaign overlay. Heatmap pressure offset, curve, γ, and tail are{' '}
             <strong className="font-medium text-foreground">per lens</strong> (Technology Teams, Restaurant Activity,
             Deployment Risk) and <strong className="font-medium text-foreground">the same for every country column</strong>.
-            Trading and deploy-risk fragments are edited in <strong className="font-medium text-foreground">admin</strong>{' '}
-            (Market configuration in the controls column when you have access).
+            Trading and deploy-risk fragments are edited in <strong className="font-medium text-foreground">market admin</strong>.
+            All heatmap tuning controls live here.
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">
@@ -167,8 +166,8 @@ export function DSLPanel({ collapsed, onCollapsedChange, primaryNavInSidebar = f
                 )}
                 disabled={viewMode === 'code'}
                 onClick={() => setViewMode('code')}
-                title="Config (YAML) in the main column"
-                aria-label="Open config — YAML editor"
+                title="YAML editor in the main column"
+                aria-label="Open YAML editor"
               >
                 <FileCode2 className="h-4 w-4" aria-hidden />
               </Button>
@@ -207,8 +206,8 @@ export function DSLPanel({ collapsed, onCollapsedChange, primaryNavInSidebar = f
               title={parseError}
               aria-label={
                 compareAllMarkets
-                  ? 'DSL parse error — choose a single market in Focus to open Code view and fix YAML'
-                  : 'DSL parse error — switch to Code view to review'
+                  ? 'YAML parse error — choose a single market in Focus to open YAML and fix'
+                  : 'YAML parse error — switch to YAML editor to review'
               }
             />
           ) : null}
@@ -281,24 +280,12 @@ export function DSLPanel({ collapsed, onCollapsedChange, primaryNavInSidebar = f
           <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-border/50 bg-muted/[0.07] px-2.5 py-2 dark:border-border/40 dark:bg-muted/10">
             <RunwayFocusSelect className="min-w-0 w-full" />
             <RunwayRangeSelect className="min-w-0 w-full" />
-            <WorkbenchRunwayControls compareAllMarkets={compareAllMarkets} />
+            <WorkbenchRunwayControls
+              compareAllMarkets={compareAllMarkets}
+              hideMainAreaToggle={primaryNavInSidebar}
+            />
           </div>
-          {!compareAllMarkets && parseError ? (
-            <div
-              className="flex w-full shrink-0 items-center gap-2 rounded-md border border-destructive/35 bg-destructive/10 px-2.5 py-2 text-xs text-destructive"
-              role="status"
-              title={parseError}
-            >
-              <span className="h-2 w-2 shrink-0 rounded-full bg-destructive" aria-hidden />
-              <span className="min-w-0 leading-snug">
-                {viewMode === 'code'
-                  ? 'YAML parse error — check the editor.'
-                  : 'YAML parse error — choose Code in View mode to fix.'}
-              </span>
-            </div>
-          ) : null}
-          <WorkbenchMarketAdminPanel />
-          <TechLensHeatmapPatternsPanel />
+          {!primaryNavInSidebar || compareAllMarkets ? <WorkbenchMarketAdminPanel /> : null}
         </div>
       </aside>
       {localDataDialog}

@@ -11,16 +11,28 @@ const RUNWAY_LENS_MODE_IDS: readonly ViewModeId[] = ['combined', 'in_store', 'ma
 type WorkbenchRunwayControlsProps = {
   /** When true, hide the Code option; lens toggles still apply to every compare column. */
   compareAllMarkets?: boolean;
+  /**
+   * When true (large workbench with {@link WorkbenchSidebar}), omit Heatmap/YAML — same actions live on the
+   * left rail so the inspector stays Focus + range + lens only.
+   */
+  hideMainAreaToggle?: boolean;
 };
 
-/** Runway lens (compare) or Heatmap / Config toggle (single market) — below Focus and Year in the controls column. */
-export function WorkbenchRunwayControls({ compareAllMarkets = false }: WorkbenchRunwayControlsProps) {
+/** Runway lens (compare) or Heatmap / YAML toggle (single market) — below Focus and Year in the controls column. */
+export function WorkbenchRunwayControls({
+  compareAllMarkets = false,
+  hideMainAreaToggle = false,
+}: WorkbenchRunwayControlsProps) {
   const viewMode = useAtcStore((s) => s.viewMode);
   const setViewMode = useAtcStore((s) => s.setViewMode);
   const runwayLensBeforeCode = useAtcStore((s) => s.runwayLensBeforeCode);
   const reduceMotion = useReducedMotion();
 
   const isCode = viewMode === 'code';
+
+  if (!compareAllMarkets && hideMainAreaToggle) {
+    return null;
+  }
 
   return (
     <div className="flex shrink-0 flex-col gap-2 px-0 py-0">
@@ -80,8 +92,8 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
             <button
               type="button"
               aria-pressed={isCode}
-              title="Open YAML configuration in the main column"
-              aria-label="Config — YAML editor in the main column"
+              title="Open YAML editor in the main column"
+              aria-label="YAML editor in the main column"
               className={cn(
                 'inline-flex h-8 items-center justify-center rounded-md text-xs font-medium transition-colors',
                 isCode
@@ -90,7 +102,7 @@ export function WorkbenchRunwayControls({ compareAllMarkets = false }: Workbench
               )}
               onClick={() => setViewMode('code')}
             >
-              Config
+              YAML
             </button>
           </div>
         </div>

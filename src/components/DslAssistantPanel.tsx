@@ -81,7 +81,6 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
   const threadId = useId();
   const docked = layout === 'dock';
   const dslText = useAtcStore((s) => s.dslText);
-  const parseError = useAtcStore((s) => s.parseError);
   const setDslText = useAtcStore((s) => s.setDslText);
   const setDslAssistantEditorLock = useAtcStore((s) => s.setDslAssistantEditorLock);
 
@@ -442,8 +441,7 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
       </span>
     );
 
-  const showDockStatusStrip =
-    docked && (busy || status !== 'Idle' || statusDetail != null || parseError != null);
+  const showDockStatusStrip = docked && (busy || status !== 'Idle' || statusDetail != null);
 
   return (
     <div
@@ -612,12 +610,9 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
             </div>
           </div>
 
-          {showDockStatusStrip && (statusDetail || parseError) ? (
+          {showDockStatusStrip && statusDetail ? (
             <div className="shrink-0 border-t border-border/40 pt-2.5 text-[10px] leading-snug text-muted-foreground">
               {statusDetail ? <p className="m-0 text-destructive">{statusDetail}</p> : null}
-              {parseError ? (
-                <p className="m-0 text-amber-700 dark:text-amber-400">Editor parse: {parseError}</p>
-              ) : null}
             </div>
           ) : null}
         </>
@@ -796,9 +791,6 @@ export function DslAssistantPanel({ layout = 'panel' }: DslAssistantPanelProps) 
           <div className="shrink-0 border-t border-border/40 pt-1.5 text-[11px] text-muted-foreground">
             <span className="font-medium text-foreground/80">{status}</span>
             {statusDetail ? <span className="mt-0.5 block text-destructive">{statusDetail}</span> : null}
-            {parseError ? (
-              <span className="mt-0.5 block text-amber-700 dark:text-amber-400">Editor parse: {parseError}</span>
-            ) : null}
           </div>
         </>
       )}

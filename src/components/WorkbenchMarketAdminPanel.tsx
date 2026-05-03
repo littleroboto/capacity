@@ -39,7 +39,7 @@ export function WorkbenchMarketAdminPanel() {
         className="min-h-0 shrink-0 border-b-0"
         expanded={expanded}
         onExpandedChange={setExpanded}
-        title="Market configuration"
+        title="Market admin"
         fillHeight={false}
         collapsedSummary={
           <>
