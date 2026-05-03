@@ -48,7 +48,7 @@ export function ContributionStripAxisChrome({
                 x={wd.x}
                 y={wd.y}
                 textAnchor="middle"
-                style={{ fontSize: 9, fontWeight: 600, letterSpacing: '-0.02em' }}
+                style={{ fontSize: 7, fontWeight: 600, letterSpacing: '-0.01em' }}
               >
                 <title>{wd.title}</title>
                 {wd.abbr}

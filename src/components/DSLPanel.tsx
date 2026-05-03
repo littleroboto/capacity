@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DslPanelClerkSignOut } from '@/components/DslPanelClerkSignOut';
-import { HeatmapSettingsPanel } from '@/components/HeatmapSettingsPanel';
+import { WorkbenchSettingsContent } from '@/components/WorkbenchSettingsContent';
 import { LocalDataPanelContent } from '@/components/LocalDataSection';
 import { WorkbenchMarketAdminPanel } from '@/components/WorkbenchMarketAdminPanel';
 import { RunwayFocusSelect } from '@/components/RunwayFocusSelect';
@@ -56,22 +56,16 @@ export function DSLPanel({ collapsed, onCollapsedChange, primaryNavInSidebar = f
 
   const settingsDialog = (
     <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-      <DialogContent className="max-h-[min(88dvh,720px)] gap-0 overflow-hidden sm:max-w-xl">
+      <DialogContent className="max-h-[min(92dvh,860px)] gap-0 overflow-hidden sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Settings</DialogTitle>
+          <DialogTitle>Workbench settings</DialogTitle>
           <DialogDescription className="text-pretty">
-            Runway palette and campaign overlay. Heatmap pressure offset, curve, γ, and tail are{' '}
-            <strong className="font-medium text-foreground">per lens</strong> (Technology Teams, Restaurant Activity,
-            Deployment Risk) and <strong className="font-medium text-foreground">the same for every country column</strong>.
-            Trading and deploy-risk fragments are edited in <strong className="font-medium text-foreground">market admin</strong>.
-            All heatmap tuning controls live here.
+            Runway cell size, tech sparkline smoothing, programme plan strip appearance, then heatmap palette and per-lens
+            pressure / transfer tuning. YAML remains in the editor; this dialog is display and model-tuning only (POC).
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-y-auto px-5 pb-2 pt-1">
-          <HeatmapSettingsPanel
-            showCampaignBoost={viewMode !== 'combined'}
-            showHeatmapTransferTuning={viewMode !== 'code'}
-          />
+          <WorkbenchSettingsContent viewMode={viewMode} settingsDialogOpen={settingsOpen} />
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button
@@ -193,8 +187,8 @@ export function DSLPanel({ collapsed, onCollapsedChange, primaryNavInSidebar = f
                 size="sm"
                 className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
                 onClick={() => setSettingsOpen(true)}
-                title="Settings — heatmap curve, γ, campaign, palette"
-                aria-label="Open settings"
+                title="Workbench settings — runway, programme plan, heatmap"
+                aria-label="Open workbench settings"
               >
                 <SlidersHorizontal className="h-4 w-4" aria-hidden />
               </Button>
@@ -253,8 +247,8 @@ export function DSLPanel({ collapsed, onCollapsedChange, primaryNavInSidebar = f
                   size="sm"
                   className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
                   onClick={() => setSettingsOpen(true)}
-                  title="Settings — heatmap curve, γ, campaign, palette"
-                  aria-label="Open settings — heatmap and display"
+                  title="Workbench settings — runway, programme plan, heatmap"
+                  aria-label="Open workbench settings"
                 >
                   <SlidersHorizontal className="h-4 w-4 opacity-85" aria-hidden />
                 </Button>

@@ -39,3 +39,34 @@ export function clampRunwayHeatmapRadiusPx(n: number): number {
 export const RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX = snapRunwayHeatmapCellPx(
   RUNWAY_HEATMAP_LAYOUT_DEFAULTS.cellPx
 );
+
+/** Tech capacity sparkline: odd moving-average window (days with data); 0 = raw trace. */
+export const RUNWAY_TECH_SPARKLINE_UTIL_SMOOTH_DEFAULT = 0;
+
+const RUNWAY_TECH_SPARKLINE_UTIL_SMOOTH_ALLOWED = new Set([0, 3, 5, 7, 9]);
+
+/**
+ * Coerce persisted / imported values to a supported tech-sparkline smooth window.
+ * Unknown positive numbers snap to the nearest allowed odd window in {3,5,7,9}.
+ */
+export function clampRunwayTechSparklineUtilSmoothWindow(n: unknown): number {
+  if (n === null || n === undefined) return RUNWAY_TECH_SPARKLINE_UTIL_SMOOTH_DEFAULT;
+  const x = typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : RUNWAY_TECH_SPARKLINE_UTIL_SMOOTH_DEFAULT;
+  if (RUNWAY_TECH_SPARKLINE_UTIL_SMOOTH_ALLOWED.has(x)) return x;
+  if (x <= 0) return 0;
+  const odds = [3, 5, 7, 9] as const;
+  return odds.reduce((best, cur) => (Math.abs(cur - x) <= Math.abs(best - x) ? cur : best), 5);
+}
+
+/**
+ * Value passed to {@link RunwayTechCapacityDemandSparkline}: `undefined` disables smoothing.
+ * When the user preference is off but {@link opts.landingMinimalChrome} is true, keep a light default (5) for the hero preview.
+ */
+export function resolvedSparklineUtilSmoothWindow(
+  pref: number,
+  opts?: { landingMinimalChrome?: boolean },
+): number | undefined {
+  const w = clampRunwayTechSparklineUtilSmoothWindow(pref);
+  if (w > 0) return w;
+  return opts?.landingMinimalChrome ? 5 : undefined;
+}

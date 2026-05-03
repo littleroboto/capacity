@@ -20,7 +20,6 @@ import {
   ledgerAttributionNeutralFillHex,
   maxRawLedgerOverlapInMap,
 } from '@/lib/runwayLedgerAttribution';
-
 type RunwayTipAnchor = { clientX: number; clientY: number };
 
 export type RunwayCompareSvgColumnProps = {
@@ -141,7 +140,7 @@ export const RunwayCompareSvgColumn = memo(function RunwayCompareSvgColumn({
             x={wd.x}
             y={wd.y}
             textAnchor="middle"
-            style={{ fontSize: 9, fontWeight: 600, letterSpacing: '-0.02em' }}
+            style={{ fontSize: 8, fontWeight: 600, letterSpacing: '-0.015em' }}
           >
             <title>{wd.title}</title>
             {wd.abbr}

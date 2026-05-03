@@ -612,8 +612,8 @@ export function compareAllRunwayTotalContentWidthPx(
  * Triple-lens **stacked** contribution strips: one full-width strip column + gutter (same horizontal
  * accounting as a single compare column, `RunwayGridBody` `px-0.5`).
  */
-/** Lens label rail to the left of each stacked strip (compact stacked heading + icon). */
-export const SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX = 28;
+/** Lens label rail to the left of each stacked strip (vertical TECH / REST-OPS / RISK labels). */
+export const SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX = 32;
 
 /** Left padding on single-market contribution strip flex rows in `RunwayGrid` (`px-0.5` → 2px). */
 export const RUNWAY_CONTRIBUTION_STRIP_FLEX_ROW_PAD_LEFT_PX = 2;
@@ -641,6 +641,13 @@ export const SINGLE_MARKET_TRIPLE_LENS_VERTICAL_GAP_PX = 8;
  */
 export const RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CHART_PX = 96;
 /**
+ * Programme Gantt under-strip sparkline: chart band is half the workbench strip height so the Y axis reads tighter
+ * in the plan panel (chronology stack height unchanged).
+ */
+export const RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_PX = Math.round(RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CHART_PX * 0.5);
+/** Extra space between the chronology axis and the programme sparkline chart SVG. */
+export const RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_TOP_OFFSET_PX = 30;
+/**
  * Legacy reserved height for a controls row above the sparkline SVG (removed). Kept at 0 so
  * `RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TOTAL_BLOCK_PX` still documents chart-only stack height.
  */
@@ -648,16 +655,41 @@ export const RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CONTROLS_PX = 0;
 /** Chart SVG height (must match `RunwayTechCapacityDemandSparkline` chart SVG only). */
 export const RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TOTAL_BLOCK_PX =
   RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CONTROLS_PX + RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CHART_PX;
+/**
+ * Gap under the chart SVG plus one legend row (`RunwayTechCapacityDemandSparkline`).
+ * Keep in sync with margin + line height in that component.
+ */
+/** Legend + optional wrapped row for triple-series checkboxes (`RunwayTechCapacityDemandSparkline`). */
+export const RUNWAY_TECH_SPARKLINE_LEGEND_BELOW_CHART_PX = 34;
 /** `gap-1` between histogram block and Tech strip in `RunwayGrid`. */
 export const RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TO_STRIP_GAP_PX = 4;
 
 /**
- * Tech sparkline column: mirrored time axis + gap + chart (matches `RunwayTechCapacityDemandSparkline` wrapper).
+ * Tech sparkline column: mirrored time axis + gap + chart + legend (matches `RunwayTechCapacityDemandSparkline` wrapper).
  */
 export const RUNWAY_TECH_SPARKLINE_STACK_PX =
   CONTRIBUTION_STRIP_TIME_AXIS_STACK_H +
   CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX +
-  RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TOTAL_BLOCK_PX;
+  RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_TOTAL_BLOCK_PX +
+  RUNWAY_TECH_SPARKLINE_LEGEND_BELOW_CHART_PX;
+
+/**
+ * Vertical stack for mirrored time axis + gap + chart SVG + legend row at a given chart height (matches
+ * {@link RunwayTechCapacityDemandSparkline} when passed the same `chartSvgHeightPx` and `chartTopMarginPx`).
+ */
+export function runwayTechSparklineStackHeightForChartSvgPx(
+  chartSvgPx: number,
+  chartTopMarginPx = 0,
+): number {
+  return (
+    CONTRIBUTION_STRIP_TIME_AXIS_STACK_H +
+    CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX +
+    chartTopMarginPx +
+    RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CONTROLS_PX +
+    chartSvgPx +
+    RUNWAY_TECH_SPARKLINE_LEGEND_BELOW_CHART_PX
+  );
+}
 
 /** Total vertical stack for sparkline column + gap before the Tech contribution strip. */
 export const SINGLE_MARKET_TRIPLE_LENS_TECH_SPARK_ABOVE_PX =
@@ -677,7 +709,7 @@ export function tripleLensStackedContributionTotalContentWidthPx(contributionStr
 /**
  * Horizontal offset from the start of the triple-lens **inner** column (the flex stack under the quarter
  * gutter) to the left edge of the contribution strip / programme Gantt SVG — rail + `gap-1.5`.
- * Keep in sync with `RunwayGrid` + `RunwayProgrammeGanttBlock` rail + strip rows.
+ * Keep in sync with `RunwayGrid` + `RunwayProgrammeGanttBlock` rail + strip rows (tech sparkline lives in the programme block when enabled).
  */
 export const RUNWAY_TRIPLE_LENS_INNER_COL_TO_STRIP_LEFT_PX =
   SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX + RUNWAY_TRIPLE_LENS_RAIL_TO_STRIP_GAP_PX;
@@ -788,9 +820,11 @@ export function tripleLensStackRailHeightPx(
 }
 
 /**
- * Triple-lens stacked contribution strips: tech weekly sparkline, two compact grid-only strips, one full strip
- * (with month axis), and small vertical gaps. Lens titles sit in a short left rail (see
- * {@link tripleLensStackRailHeightPx}), not full strip height.
+ * Triple-lens stacked contribution strips: tech XY sparkline above, two compact grid-only strips, one full strip
+ * (with month axis), optional trading + deployment lens sparklines under those heatmaps (same stack height as tech XY;
+ * vertical fit grows via layout — not folded into this helper so strip visibility toggles do not over-reserve space),
+ * and small vertical gaps. Lens titles sit in a short left rail (see {@link tripleLensStackRailHeightPx}), not full
+ * strip height.
  */
 export function tripleLensStackedContributionTotalContentHeightPx(
   fullStripContentHeight: number,

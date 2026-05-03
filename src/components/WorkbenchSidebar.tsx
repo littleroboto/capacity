@@ -151,8 +151,8 @@ export function WorkbenchSidebar({ parseError }: WorkbenchSidebarProps) {
           size="sm"
           className={railBtn}
           onClick={() => requestOpenWorkbenchSettingsDialog()}
-          title="Display and heatmap settings"
-          aria-label="Open settings"
+          title="Workbench settings — runway, programme plan, heatmap"
+          aria-label="Open workbench settings"
         >
           <Settings2 className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
         </Button>

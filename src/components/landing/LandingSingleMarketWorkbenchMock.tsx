@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import type { RiskRow } from '@/engine/riskModel';
@@ -13,10 +13,10 @@ import type { RunwayQuarter } from '@/lib/runwayDateFilter';
 
 const LANDING_HERO_MARKET = 'UK';
 
-/** Homepage hero: school column off, deployment blackouts on, campaign bars a pale blue (less mint/teal). */
+/** Homepage hero: overlay columns off by default; campaign bars a pale blue (less mint/teal). */
 const LANDING_HERO_PROGRAMME_GANTT_PREFS = {
   showSchoolHolidays: false,
-  showBlackouts: true,
+  showBlackouts: false,
   campaignFill: '#d5e8fa',
 } satisfies Partial<ProgrammeGanttDisplayPrefs>;
 const LANDING_HERO_FROM = '2026-04-23';
@@ -123,13 +123,7 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
   const viewMode = useAtcStore((s) => s.viewMode);
   const parseError = useAtcStore((s) => s.parseError);
   const configs = useAtcStore((s) => s.configs);
-  const [programmePlanRevealReady, setProgrammePlanRevealReady] = useState(false);
-
-  const noopSlot = useCallback((_s: SlotSelection | null) => {}, []);
-
-  const onContributionHeatmapsSettled = useCallback(() => {
-    setProgrammePlanRevealReady(true);
-  }, []);
+  const noopSlot = (_s: SlotSelection | null) => {};
 
   const ready = useMemo(() => {
     if (parseError) return false;
@@ -138,10 +132,6 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
     if (!configs.some((c) => c.market === LANDING_HERO_MARKET)) return false;
     return riskSurface.some((r) => r.market === LANDING_HERO_MARKET);
   }, [parseError, country, viewMode, configs, riskSurface]);
-
-  useEffect(() => {
-    if (!ready) setProgrammePlanRevealReady(false);
-  }, [ready]);
 
   useLayoutEffect(() => {
     savedRef.current = cloneLandingWorkbenchSnap();
@@ -210,9 +200,8 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
                     onSlotSelection={noopSlot}
                     landingMinimalChrome
                     landingProgrammePlan
-                    landingProgrammePlanRevealReady={programmePlanRevealReady}
+                    landingProgrammePlanRevealReady={ready}
                     landingProgrammePlanPrefs={LANDING_HERO_PROGRAMME_GANTT_PREFS}
-                    onLandingContributionHeatmapSettled={onContributionHeatmapsSettled}
                     landingCompareDisableCellDetails
                     landingTechSparklineSweep={!reducedMotion}
                     landingTechSparklineTightFill

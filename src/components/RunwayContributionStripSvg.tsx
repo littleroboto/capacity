@@ -15,6 +15,7 @@ import {
   type PlacedRunwayCell,
 } from '@/lib/calendarQuarterLayout';
 import { HEATMAP_RUNWAY_PAD_FILL, type HeatmapColorOpts } from '@/lib/riskHeatmapColors';
+import type { ProgrammePlanVisibleYmdRange } from '@/lib/runwayProgrammePlanViewportRange';
 import type { CompareSvgLayoutCell } from '@/lib/runwayCompareSvgLayout';
 import { layoutContributionStripRunwaySvg } from '@/lib/runwayCompareSvgLayout';
 import {
@@ -75,7 +76,15 @@ export type RunwayContributionStripSvgProps = {
   organicLayerTick?: number;
   /** When true, omit the dashed day column line (e.g. triple-lens uses a parent overlay line). */
   suppressSelectionColumnLine?: boolean;
+  /**
+   * Programme Gantt viewport: days outside this inclusive ISO span render dimmer so the runway
+   * highlights the same time window as the zoomed plan.
+   */
+  programmePlanFocusVisibleRange?: ProgrammePlanVisibleYmdRange | null;
 };
+
+/** Multiply cell opacity when a calendar day is outside the programme plan’s zoomed window. */
+const OUTSIDE_PROGRAMME_PLAN_FOCUS_OPACITY = 0.34;
 
 function svgClientPoint(e: MouseEvent | KeyboardEvent, fallbackW: number, fallbackH: number) {
   const cur = e.currentTarget as unknown as SVGGraphicsElement;
@@ -142,6 +151,7 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
   landingStaggerCellPulse = false,
   organicLayerTick,
   suppressSelectionColumnLine = false,
+  programmePlanFocusVisibleRange = null,
 }: RunwayContributionStripSvgProps) {
   const theme = useAtcStore((s) => s.theme);
   const reduceMotion = useReducedMotion();
@@ -195,7 +205,6 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
   });
   const cellClipId = useId().replace(/:/g, '');
   const clipR = runwayHeatmapEmergenceClipRect(width, height, insetTopPct);
-
   const selectedDayColumnX = useMemo(() => {
     if (!selectedDayYmd?.trim()) return null;
     const di = contributionDayIndexForYmd(contributionMeta, selectedDayYmd);
@@ -284,8 +293,13 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
 
       const pastDimmed = dimPastDays && typeof dateStr === 'string' && dateStr < todayYmd;
       const ledgerEmptyNonOverlap = Boolean(ledgerAttribution && dateStr && overlap === 0);
+      const outsideProgrammePlanWindow =
+        programmePlanFocusVisibleRange != null &&
+        (ymd < programmePlanFocusVisibleRange.startYmd || ymd > programmePlanFocusVisibleRange.endYmd);
       const opacity =
-        (pastDimmed ? 0.25 * dimOp : dimOp) * (ledgerEmptyNonOverlap ? LEDGER_EMPTY_DAY_OPACITY_FACTOR : 1);
+        (pastDimmed ? 0.25 * dimOp : dimOp) *
+        (ledgerEmptyNonOverlap ? LEDGER_EMPTY_DAY_OPACITY_FACTOR : 1) *
+        (outsideProgrammePlanWindow ? OUTSIDE_PROGRAMME_PLAN_FOCUS_OPACITY : 1);
       const isToday = typeof dateStr === 'string' && dateStr === todayYmd;
       const isSelected = typeof dateStr === 'string' && dateStr === selectedDayYmd;
       const rr = Math.min(cellRadiusPx, c.w / 2, c.h / 2);
@@ -385,7 +399,9 @@ export const RunwayContributionStripSvg = memo(function RunwayContributionStripS
               ry={rr}
               fill={displayFill}
               opacity={opacity}
-              className={isSelected ? 'stroke-primary' : 'stroke-border/35'}
+              className={
+                isSelected ? 'stroke-primary' : 'stroke-border/35'
+              }
               strokeWidth={isSelected ? 1.75 : ledgerAttribution && overlap > 1 ? 1.25 : 0.5}
               aria-pressed={isSelected}
               style={{

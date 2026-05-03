@@ -25,12 +25,22 @@ export type ProgrammeGanttDisplayPrefs = {
   showBarTrailingCaption: boolean;
   showBlackouts: boolean;
   showSchoolHolidays: boolean;
+  /**
+   * Horizontal timeline zoom for the programme strip (1 = native cell scale).
+   * Persisted so slide prep can reopen at the same magnification.
+   */
+  timelineZoom: number;
+  /**
+   * Programme tech chart: three 7-day smoothed traces (technology utilization, restaurant / trading, deployment
+   * risk); each line uses its own in-window min/max stretch in the band for readable qualitative shapes.
+   */
+  showGanttUnifiedThreeLineSparkline: boolean;
 };
 
 export const RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS: ProgrammeGanttDisplayPrefs = {
   barHeightPx: 15,
   laneGapPx: 5,
-  stripTopPadPx: 4,
+  stripTopPadPx: 8,
   stripBottomPadPx: 6,
   /** `rgb(199, 244, 240)` — mint campaign bars. */
   campaignFill: '#c7f4f0',
@@ -45,8 +55,11 @@ export const RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS: ProgrammeGanttDisplayPrefs = 
   /** Programme bar diagonal hatch strength — 0–1. */
   barHatchOpacity: 0.5,
   showBarTrailingCaption: false,
-  showBlackouts: true,
-  showSchoolHolidays: true,
+  showBlackouts: false,
+  showSchoolHolidays: false,
+  timelineZoom: 1,
+  /** On by default so workbench strip + programme chart show tech, trading, and risk traces together. */
+  showGanttUnifiedThreeLineSparkline: true,
 };
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -100,6 +113,20 @@ export function loadProgrammeGanttPrefs(): ProgrammeGanttDisplayPrefs {
       typeof p.showBarTrailingCaption === 'boolean' ? p.showBarTrailingCaption : d.showBarTrailingCaption,
     showBlackouts: typeof p.showBlackouts === 'boolean' ? p.showBlackouts : d.showBlackouts,
     showSchoolHolidays: typeof p.showSchoolHolidays === 'boolean' ? p.showSchoolHolidays : d.showSchoolHolidays,
+    timelineZoom: clamp(Number(p.timelineZoom) || d.timelineZoom, 0.35, 3.5),
+    showGanttUnifiedThreeLineSparkline: (() => {
+      if (typeof p.showGanttUnifiedThreeLineSparkline === 'boolean') {
+        return p.showGanttUnifiedThreeLineSparkline;
+      }
+      const hadTrading =
+        Object.prototype.hasOwnProperty.call(legacyAny, 'showGanttTradingSparkline') &&
+        legacyAny.showGanttTradingSparkline === true;
+      const hadRisk =
+        Object.prototype.hasOwnProperty.call(legacyAny, 'showGanttRiskSparkline') &&
+        legacyAny.showGanttRiskSparkline === true;
+      if (hadTrading || hadRisk) return true;
+      return d.showGanttUnifiedThreeLineSparkline;
+    })(),
   };
 }
 
@@ -128,4 +155,12 @@ export function saveProgrammeGanttOpen(open: boolean): void {
   } catch {
     /* ignore */
   }
+}
+
+/** Fired after programme display prefs are written to `localStorage` so open {@link RunwayProgrammeGanttBlock} UIs can resync. */
+export const PROGRAMME_GANTT_PREFS_CHANGED_EVENT = 'capacity:programme-gantt-prefs-changed';
+
+export function notifyProgrammeGanttPrefsChanged(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(PROGRAMME_GANTT_PREFS_CHANGED_EVENT));
 }

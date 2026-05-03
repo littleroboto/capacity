@@ -406,16 +406,6 @@ function ymdEndOfMonthFromDate(d: Date): string {
   return formatDateYmd(new Date(d.getFullYear(), d.getMonth() + 1, 0));
 }
 
-function ymdStartOfQuarterFromDate(d: Date): string {
-  const q = Math.floor(d.getMonth() / 3);
-  return formatDateYmd(new Date(d.getFullYear(), q * 3, 1));
-}
-
-function ymdEndOfQuarterFromDate(d: Date): string {
-  const q = Math.floor(d.getMonth() / 3);
-  return formatDateYmd(new Date(d.getFullYear(), q * 3 + 3, 0));
-}
-
 function ymdStartOfYear(y: number): string {
   return formatDateYmd(new Date(y, 0, 1));
 }
@@ -589,15 +579,13 @@ export function layoutContributionStripRunwaySvg(args: {
     });
   }
 
+  /** One label per in-strip quarter segment, including when `rangeStartYmd` / `rangeEndYmd` cut a calendar quarter. */
   const quarterLabels: SvgQuarterLabel[] = [];
   const nQSeg = quarterBounds.length - 1;
   for (let i = 0; i < nQSeg; i++) {
     const w0 = quarterBounds[i]!;
     const w1 = quarterBounds[i + 1]!;
     const d0 = parseDate(contributionWeekColumnAnchorYmd(grid0, w0, msPerDay));
-    const pStart = ymdStartOfQuarterFromDate(d0);
-    const pEnd = ymdEndOfQuarterFromDate(d0);
-    if ((i === 0 && rs > pStart) || (i === nQSeg - 1 && re < pEnd)) continue;
     const m0 = d0.getMonth();
     const letters: QuarterLetters = QUARTER_LETTERS[Math.floor(m0 / 3)]!;
     const { railLeft, railRight } = segmentQuarterRailBounds(w0, w1);
@@ -790,15 +778,13 @@ export function layoutContributionStripRunwayTimeAxisAbove(args: {
     });
   }
 
+  /** Same quarter rules as {@link layoutContributionStripRunwaySvg} (labels for partial leading/trailing quarters). */
   const quarterLabels: SvgQuarterLabel[] = [];
   const nQSeg = quarterBounds.length - 1;
   for (let i = 0; i < nQSeg; i++) {
     const w0 = quarterBounds[i]!;
     const w1 = quarterBounds[i + 1]!;
     const d0 = parseDate(contributionWeekColumnAnchorYmd(grid0, w0, msPerDay));
-    const pStart = ymdStartOfQuarterFromDate(d0);
-    const pEnd = ymdEndOfQuarterFromDate(d0);
-    if ((i === 0 && rs > pStart) || (i === nQSeg - 1 && re < pEnd)) continue;
     const m0 = d0.getMonth();
     const letters: QuarterLetters = QUARTER_LETTERS[Math.floor(m0 / 3)]!;
     const { railLeft, railRight } = segmentQuarterRailBounds(w0, w1);

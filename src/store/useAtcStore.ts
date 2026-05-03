@@ -103,7 +103,9 @@ import {
 import {
   clampRunwayHeatmapGapPx,
   clampRunwayHeatmapRadiusPx,
+  clampRunwayTechSparklineUtilSmoothWindow,
   RUNWAY_HEATMAP_LAYOUT_DEFAULTS,
+  RUNWAY_TECH_SPARKLINE_UTIL_SMOOTH_DEFAULT,
   snapRunwayHeatmapCellPx,
 } from '@/lib/runwayHeatmapLayoutPrefs';
 
@@ -203,6 +205,11 @@ type AtcState = {
    */
   runwayHeatmapCellIntroPulse: boolean;
   /**
+   * Tech capacity sparkline (strip + programme block): centered moving-average window over modeled days.
+   * `0` = raw daily trace; odd values 3/5/7/9 supported. Persisted.
+   */
+  runwayTechSparklineUtilSmoothWindow: number;
+  /**
    * When non-null, workbench shows Back → this picker value (set when opening a single market from
    * LIOM column header). Not persisted.
    */
@@ -256,6 +263,7 @@ type AtcState = {
   setRunwayHeatmapCellGapPx: (v: number | ((prev: number) => number)) => void;
   setRunwayHeatmapCellRadiusPx: (v: number | ((prev: number) => number)) => void;
   setRunwayHeatmapCellIntroPulse: (v: boolean) => void;
+  setRunwayTechSparklineUtilSmoothWindow: (v: number) => void;
   setDslText: (t: string) => void;
   setRunwayMarketOrder: (ids: string[]) => void;
   setDslByMarket: (m: Record<string, string>) => void;
@@ -367,6 +375,9 @@ function withClampedRunwayHeatmapLayout(s: AtcState): AtcState {
     runwayHeatmapCellPx: snapRunwayHeatmapCellPx(Number(s.runwayHeatmapCellPx)),
     runwayHeatmapCellGapPx: clampRunwayHeatmapGapPx(Number(s.runwayHeatmapCellGapPx)),
     runwayHeatmapCellRadiusPx: clampRunwayHeatmapRadiusPx(Number(s.runwayHeatmapCellRadiusPx)),
+    runwayTechSparklineUtilSmoothWindow: clampRunwayTechSparklineUtilSmoothWindow(
+      s.runwayTechSparklineUtilSmoothWindow
+    ),
   };
 }
 
@@ -420,6 +431,7 @@ export const useAtcStore = create<AtcState>()(
       runwayHeatmapCellGapPx: RUNWAY_HEATMAP_LAYOUT_DEFAULTS.gapPx,
       runwayHeatmapCellRadiusPx: RUNWAY_HEATMAP_LAYOUT_DEFAULTS.radiusPx,
       runwayHeatmapCellIntroPulse: false,
+      runwayTechSparklineUtilSmoothWindow: RUNWAY_TECH_SPARKLINE_UTIL_SMOOTH_DEFAULT,
       riskSurface: [],
       riskSurfaceLedgerView: null,
       configs: [],
@@ -673,6 +685,9 @@ export const useAtcStore = create<AtcState>()(
         })),
 
       setRunwayHeatmapCellIntroPulse: (v) => set({ runwayHeatmapCellIntroPulse: Boolean(v) }),
+
+      setRunwayTechSparklineUtilSmoothWindow: (v) =>
+        set({ runwayTechSparklineUtilSmoothWindow: clampRunwayTechSparklineUtilSmoothWindow(v) }),
 
       exportViewSettingsFile: (scope, label) =>
         buildViewSettingsFile(

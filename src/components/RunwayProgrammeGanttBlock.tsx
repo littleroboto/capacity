@@ -1,25 +1,48 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion/react';
-import { CalendarRange, Settings2 } from 'lucide-react';
+import { CalendarRange, Minus, Plus, RotateCcw, Settings2, StretchHorizontal } from 'lucide-react';
 import type { DeploymentRiskBlackout, MarketConfig } from '@/engine/types';
 import type { RiskRow } from '@/engine/riskModel';
 import type { ContributionStripLayoutMeta, PlacedRunwayCell } from '@/lib/calendarQuarterLayout';
+import {
+  RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_PX,
+  RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_TOP_OFFSET_PX,
+  runwayTechSparklineStackHeightForChartSvgPx,
+} from '@/lib/calendarQuarterLayout';
 import { cn } from '@/lib/utils';
+import type { GanttLensOverlaySourcePack } from '@/lib/runwayGanttLensOverlaySeries';
 import { collectProgrammeGanttChronicleLanes } from '@/lib/runwayProgrammeGanttModel';
 import { applyLedgerExclusionsToMarketConfig } from '@/lib/marketConfigLedgerExclusions';
 import type { MarketActivityLedger } from '@/lib/marketActivityLedger';
 import {
   loadProgrammeGanttOpen,
   loadProgrammeGanttPrefs,
+  notifyProgrammeGanttPrefsChanged,
+  PROGRAMME_GANTT_PREFS_CHANGED_EVENT,
   RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS,
   saveProgrammeGanttOpen,
   saveProgrammeGanttPrefs,
   type ProgrammeGanttDisplayPrefs,
 } from '@/lib/runwayProgrammeGanttPrefs';
-import { RunwayProgrammeGanttStrip } from '@/components/RunwayProgrammeGanttStrip';
+import { requestOpenWorkbenchSettingsDialog } from '@/lib/sharedDslSync';
+import { ProgrammePlanDisplaySettingsForm } from '@/components/ProgrammePlanDisplaySettingsForm';
+import { Button } from '@/components/ui/button';
+import { useAtcStore } from '@/store/useAtcStore';
+import {
+  RunwayTechCapacityDemandSparkline,
+  type RunwayTechCapacityDemandSparklineProps,
+} from '@/components/RunwayTechCapacityDemandSparkline';
+import { RunwayProgrammeGanttStrip, runwayProgrammeGanttStripHeightPx } from '@/components/RunwayProgrammeGanttStrip';
+import { nextProgrammeGanttDisclosureTier, type ProgrammeGanttDisclosureTier } from '@/lib/runwayProgrammeGanttDisclosure';
+import {
+  programmePlanVisibleYmdRangeFromViewport,
+  type ProgrammePlanVisibleYmdRange,
+} from '@/lib/runwayProgrammePlanViewportRange';
 
 const MOTION_EASE_OUT = [0.22, 1, 0.36, 1] as const;
 const MOTION_EASE_IN = [0.32, 0, 0.67, 1] as const;
+/** Space below the zoom toolbar before the chart (`pt-3`); keep in sync with `minHeight` offset. */
+const PROGRAMME_GANTT_VIEWPORT_CHART_SAFE_TOP_PX = 12;
 
 /** Open: spring on vertical motion + eased opacity; close: smooth ease-in shrink. */
 const programmePlanPanelVariants: Variants = {
@@ -45,6 +68,17 @@ const programmePlanPanelVariantsReduced: Variants = {
   hidden: { opacity: 0, transition: { duration: 0.06 } },
   visible: { opacity: 1, transition: { duration: 0.1 } },
 };
+
+/** Props for {@link RunwayTechCapacityDemandSparkline} except layout inputs owned by the programme block. */
+export type ProgrammeGanttTechDemandSparklineConfig = Omit<
+  RunwayTechCapacityDemandSparklineProps,
+  'contributionMeta' | 'cellPx' | 'gap' | 'riskByDate' | 'width' | 'ganttLensOverlays'
+> & {
+  /** Optional trading/risk heatmap opts for programme-chart overlays (merged with display prefs in this block). */
+  ganttLensOverlaySource?: GanttLensOverlaySourcePack;
+};
+
+export type { GanttLensOverlaySourcePack };
 
 type Props = {
   country: string;
@@ -72,6 +106,20 @@ type Props = {
   revealPlanDelayMs?: number;
   /** Merged into defaults when `ephemeral` (e.g. homepage hero programme styling). */
   ephemeralInitialPrefs?: Partial<ProgrammeGanttDisplayPrefs>;
+  /**
+   * When the plan panel is open, reports the ISO date span visible in the zoomed/panned Gantt
+   * so runway heatmaps can emphasise the same window.
+   */
+  onPlanVisibleYmdRangeChange?: (range: ProgrammePlanVisibleYmdRange | null) => void;
+  /**
+   * Workbench: daily tech load strip aligned under the programme Gantt (same `stripWidth` / cell grid).
+   * When the plan is open it shares pan/zoom; when closed it still renders below the header at 1:1 scale.
+   */
+  techDemandSparkline?: ProgrammeGanttTechDemandSparklineConfig | null;
+  /** Landing: same organic tick as contribution heatmaps so Gantt segments build in sync. */
+  landingHeatmapOrganicSyncTick?: number;
+  /** Hash key for organic reveal; match combined heatmap strips (e.g. `${country}-combined`). */
+  landingOrganicSyncMarketKey?: string;
 };
 
 export function RunwayProgrammeGanttBlock({
@@ -93,6 +141,10 @@ export function RunwayProgrammeGanttBlock({
   revealPlanWhen = false,
   revealPlanDelayMs = 900,
   ephemeralInitialPrefs,
+  onPlanVisibleYmdRangeChange,
+  techDemandSparkline = null,
+  landingHeatmapOrganicSyncTick,
+  landingOrganicSyncMarketKey,
 }: Props) {
   const reduceMotion = useReducedMotion();
   const programmePlanPanelId = useId().replace(/:/g, '');
@@ -104,7 +156,19 @@ export function RunwayProgrammeGanttBlock({
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsWrapRef = useRef<HTMLDivElement | null>(null);
+  const programmePrefsNotifySkipRef = useRef(true);
   const ephemeralRevealStartedRef = useRef(false);
+  const runwayTechSparklineUtilSmoothWindow = useAtcStore((s) => s.runwayTechSparklineUtilSmoothWindow);
+  const setRunwayTechSparklineUtilSmoothWindow = useAtcStore((s) => s.setRunwayTechSparklineUtilSmoothWindow);
+  const ganttViewportRef = useRef<HTMLDivElement | null>(null);
+  const [ganttViewportWidth, setGanttViewportWidth] = useState(0);
+  const [panX, setPanX] = useState(0);
+  const [disclosureTier, setDisclosureTier] = useState<ProgrammeGanttDisclosureTier>(3);
+  const panDragRef = useRef<{ startClientX: number; startPan: number; pointerId: number } | null>(null);
+  const zoomRafRef = useRef<number | null>(null);
+  const pendingZoomRef = useRef<number | null>(null);
+  const timelineZoomRef = useRef(prefs.timelineZoom);
+  timelineZoomRef.current = prefs.timelineZoom;
 
   useEffect(() => {
     if (ephemeral) return;
@@ -114,7 +178,19 @@ export function RunwayProgrammeGanttBlock({
   useEffect(() => {
     if (ephemeral) return;
     saveProgrammeGanttPrefs(prefs);
+    if (programmePrefsNotifySkipRef.current) {
+      programmePrefsNotifySkipRef.current = false;
+      return;
+    }
+    notifyProgrammeGanttPrefsChanged();
   }, [ephemeral, prefs]);
+
+  useEffect(() => {
+    if (ephemeral) return;
+    const onExternal = () => setPrefs(loadProgrammeGanttPrefs());
+    window.addEventListener(PROGRAMME_GANTT_PREFS_CHANGED_EVENT, onExternal);
+    return () => window.removeEventListener(PROGRAMME_GANTT_PREFS_CHANGED_EVENT, onExternal);
+  }, [ephemeral]);
 
   useEffect(() => {
     if (!ephemeral || !revealPlanWhen || ephemeralRevealStartedRef.current) return;
@@ -152,6 +228,209 @@ export function RunwayProgrammeGanttBlock({
   }, [marketConfig, activityLedger, ledgerExcludedEntryIds]);
 
   const lanes = collectProgrammeGanttChronicleLanes(ganttSourceConfig);
+
+  const timelineZoom = prefs.timelineZoom;
+  const effectiveCellPx = cellPx * timelineZoom;
+
+  useLayoutEffect(() => {
+    setDisclosureTier((prev) => nextProgrammeGanttDisclosureTier(prev, effectiveCellPx));
+  }, [effectiveCellPx]);
+
+  useEffect(() => {
+    const el = ganttViewportRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      setGanttViewportWidth(el.clientWidth);
+    });
+    ro.observe(el);
+    setGanttViewportWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, [open]);
+
+  const clampPan = useCallback(
+    (nextPan: number, zoom: number, vw: number) => {
+      const scaledW = stripWidth * zoom;
+      const minPan = Math.min(0, vw - scaledW);
+      return Math.min(0, Math.max(minPan, nextPan));
+    },
+    [stripWidth],
+  );
+
+  useLayoutEffect(() => {
+    if (!open || ganttViewportWidth <= 0) return;
+    setPanX((p) => clampPan(p, timelineZoom, ganttViewportWidth));
+  }, [open, ganttViewportWidth, timelineZoom, stripWidth, clampPan]);
+
+  useLayoutEffect(() => {
+    if (!onPlanVisibleYmdRangeChange) return;
+    if (!open) {
+      onPlanVisibleYmdRangeChange(null);
+      return;
+    }
+    if (ganttViewportWidth <= 0) {
+      onPlanVisibleYmdRangeChange(null);
+      return;
+    }
+    onPlanVisibleYmdRangeChange(
+      programmePlanVisibleYmdRangeFromViewport({
+        viewportWidthPx: ganttViewportWidth,
+        panXPx: panX,
+        timelineZoom,
+        stripWidthPx: stripWidth,
+        placedCells,
+        cellPx,
+      }),
+    );
+  }, [
+    onPlanVisibleYmdRangeChange,
+    open,
+    ganttViewportWidth,
+    panX,
+    timelineZoom,
+    stripWidth,
+    placedCells,
+    cellPx,
+  ]);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = ganttViewportRef.current;
+    if (!el) return;
+
+    const flushZoom = () => {
+      zoomRafRef.current = null;
+      const z = pendingZoomRef.current;
+      pendingZoomRef.current = null;
+      if (z == null) return;
+      setPrefs((p) => ({ ...p, timelineZoom: z }));
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      const zoomGesture = e.ctrlKey || e.metaKey;
+      if (zoomGesture) {
+        e.preventDefault();
+        const factor = Math.exp(-e.deltaY * 0.0018);
+        const cur = pendingZoomRef.current ?? timelineZoomRef.current;
+        const next = Math.min(3.5, Math.max(0.35, cur * factor));
+        pendingZoomRef.current = next;
+        if (zoomRafRef.current == null) {
+          zoomRafRef.current = window.requestAnimationFrame(flushZoom);
+        }
+        return;
+      }
+      if (e.shiftKey) {
+        e.preventDefault();
+        setPanX((p) => clampPan(p - e.deltaY, timelineZoomRef.current, el.clientWidth));
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      if (zoomRafRef.current != null) {
+        window.cancelAnimationFrame(zoomRafRef.current);
+        zoomRafRef.current = null;
+      }
+      pendingZoomRef.current = null;
+    };
+  }, [open, clampPan]);
+
+  const setTimelineZoom = useCallback((z: number) => {
+    const clamped = Math.min(3.5, Math.max(0.35, z));
+    setPrefs((p) => ({ ...p, timelineZoom: clamped }));
+  }, []);
+
+  const zoomBy = useCallback(
+    (mult: number) => {
+      setTimelineZoom(timelineZoom * mult);
+    },
+    [setTimelineZoom, timelineZoom],
+  );
+
+  const resetZoomAndPan = useCallback(() => {
+    setPrefs((p) => ({ ...p, timelineZoom: 1 }));
+    setPanX(0);
+  }, []);
+
+  const fitTimelineToViewport = useCallback(() => {
+    const vw = ganttViewportRef.current?.clientWidth ?? ganttViewportWidth;
+    if (vw <= 0) return;
+    const zRaw = vw / stripWidth;
+    const z = Math.min(3.5, Math.max(0.35, Math.min(1, zRaw)));
+    setPrefs((p) => ({ ...p, timelineZoom: z }));
+    setPanX(0);
+  }, [ganttViewportWidth, stripWidth]);
+
+  const onGanttPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 1) return;
+      e.preventDefault();
+      const el = e.currentTarget;
+      el.setPointerCapture(e.pointerId);
+      panDragRef.current = { startClientX: e.clientX, startPan: panX, pointerId: e.pointerId };
+    },
+    [panX],
+  );
+
+  const onGanttPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const drag = panDragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      const vw = ganttViewportRef.current?.clientWidth ?? ganttViewportWidth;
+      const dx = e.clientX - drag.startClientX;
+      setPanX(clampPan(drag.startPan + dx, timelineZoom, vw));
+    },
+    [clampPan, ganttViewportWidth, timelineZoom],
+  );
+
+  const endPanDrag = useCallback((e: React.PointerEvent) => {
+    const drag = panDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    panDragRef.current = null;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const stripHeightPx = runwayProgrammeGanttStripHeightPx(prefs, lanes.length);
+  const sparklineStackPx = techDemandSparkline
+    ? runwayTechSparklineStackHeightForChartSvgPx(
+        RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_PX,
+        RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_TOP_OFFSET_PX,
+      )
+    : 0;
+  const ganttPlusSparklineHeightPx = stripHeightPx + sparklineStackPx;
+
+  function renderTechDemandSparkline() {
+    if (techDemandSparkline == null) return null;
+    const { ganttLensOverlaySource, ...sparkRest } = techDemandSparkline;
+    const ganttLensOverlays =
+      ganttLensOverlaySource != null
+        ? {
+            unifiedThreeLine: prefs.showGanttUnifiedThreeLineSparkline,
+            heatmapOptsTrading: ganttLensOverlaySource.heatmapOptsTrading,
+            heatmapOptsRisk: ganttLensOverlaySource.heatmapOptsRisk,
+            organicLayerMarketKeyTrading: ganttLensOverlaySource.organicLayerMarketKeyTrading,
+            organicLayerMarketKeyRisk: ganttLensOverlaySource.organicLayerMarketKeyRisk,
+          }
+        : undefined;
+    return (
+      <RunwayTechCapacityDemandSparkline
+        contributionMeta={contributionMeta}
+        cellPx={cellPx}
+        gap={gap}
+        riskByDate={riskByDate as Map<string, RiskRow>}
+        width={stripWidth}
+        chartSvgHeightPx={RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_PX}
+        chartContentMarginTopPx={RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_TOP_OFFSET_PX}
+        {...sparkRest}
+        ganttLensOverlays={ganttLensOverlays}
+        className="min-w-0"
+      />
+    );
+  }
 
   return (
     <div className={cn('flex w-full min-w-0 flex-col gap-1.5', className)}>
@@ -201,136 +480,36 @@ export function RunwayProgrammeGanttBlock({
                       Reset
                     </button>
                   </div>
-                  <div className="max-h-[min(70vh,22rem)] space-y-3 overflow-y-auto pr-0.5 text-[11px]">
-                    <label className="flex flex-col gap-1">
-                      <span className="text-zinc-600 dark:text-zinc-400">Bar height (px)</span>
-                      <input
-                        type="number"
-                        min={6}
-                        max={28}
-                        className="h-8 rounded-md border border-zinc-300 bg-white px-2 font-mono text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                        value={prefs.barHeightPx}
-                        onChange={(e) => setPref('barHeightPx', Number(e.target.value) || prefs.barHeightPx)}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-zinc-600 dark:text-zinc-400">Lane gap (px)</span>
-                      <input
-                        type="number"
-                        min={2}
-                        max={16}
-                        className="h-8 rounded-md border border-zinc-300 bg-white px-2 font-mono text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                        value={prefs.laneGapPx}
-                        onChange={(e) => setPref('laneGapPx', Number(e.target.value) || prefs.laneGapPx)}
-                      />
-                    </label>
-                    <label className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
-                      <input
-                        type="checkbox"
-                        checked={prefs.showBlackouts}
-                        onChange={(e) => setPref('showBlackouts', e.target.checked)}
-                        className="accent-zinc-900 dark:accent-zinc-100"
-                      />
-                      <span>Show deployment blackouts</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
-                      <input
-                        type="checkbox"
-                        checked={prefs.showSchoolHolidays}
-                        onChange={(e) => setPref('showSchoolHolidays', e.target.checked)}
-                        className="accent-zinc-900 dark:accent-zinc-100"
-                      />
-                      <span>Show school holidays</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
-                      <input
-                        type="checkbox"
-                        checked={prefs.showBarTrailingCaption}
-                        onChange={(e) => setPref('showBarTrailingCaption', e.target.checked)}
-                        className="accent-zinc-900 dark:accent-zinc-100"
-                      />
-                      <span>Show date range after bar name (ISO)</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-zinc-600 dark:text-zinc-400">Campaign colour</span>
-                        <input
-                          type="color"
-                          className="h-8 w-full cursor-pointer rounded border border-zinc-300 bg-white p-0.5 dark:border-zinc-600 dark:bg-zinc-900"
-                          value={solidOrHexForPicker(prefs.campaignFill, RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS.campaignFill)}
-                          onChange={(e) => setPref('campaignFill', e.target.value)}
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-zinc-600 dark:text-zinc-400">Tech colour</span>
-                        <input
-                          type="color"
-                          className="h-8 w-full cursor-pointer rounded border border-zinc-300 bg-white p-0.5 dark:border-zinc-600 dark:bg-zinc-900"
-                          value={solidOrHexForPicker(prefs.techFill, RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS.techFill)}
-                          onChange={(e) => setPref('techFill', e.target.value)}
-                        />
+                  <div className="max-h-[min(70vh,26rem)] space-y-3 overflow-y-auto pr-0.5">
+                    <ProgrammePlanDisplaySettingsForm prefs={prefs} setPref={setPref} />
+                    <div className="border-t border-zinc-200/80 pt-3 dark:border-zinc-700/80">
+                      <label className="flex flex-col gap-1 text-[11px] text-zinc-800 dark:text-zinc-200">
+                        <span className="text-zinc-600 dark:text-zinc-400">Tech sparkline smoothing</span>
+                        <select
+                          className="h-8 rounded-md border border-zinc-300 bg-white px-2 text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                          value={runwayTechSparklineUtilSmoothWindow}
+                          onChange={(e) => setRunwayTechSparklineUtilSmoothWindow(Number(e.target.value))}
+                        >
+                          <option value={0}>Off</option>
+                          <option value={3}>3-day</option>
+                          <option value={5}>5-day</option>
+                          <option value={7}>7-day</option>
+                          <option value={9}>9-day</option>
+                        </select>
                       </label>
                     </div>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-zinc-600 dark:text-zinc-400">Bar opacity</span>
-                      <input
-                        type="range"
-                        min={0.25}
-                        max={1}
-                        step={0.05}
-                        value={prefs.barOpacity}
-                        onChange={(e) => setPref('barOpacity', Number(e.target.value))}
-                        className="accent-zinc-900 dark:accent-zinc-100"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-zinc-600 dark:text-zinc-400">Bar hatch spacing (px, 45°)</span>
-                      <input
-                        type="number"
-                        min={2}
-                        max={14}
-                        className="h-8 rounded-md border border-zinc-300 bg-white px-2 font-mono text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                        value={prefs.barHatchSpacingPx}
-                        onChange={(e) =>
-                          setPref('barHatchSpacingPx', Number(e.target.value) || prefs.barHatchSpacingPx)
-                        }
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-zinc-600 dark:text-zinc-400">Bar hatch strength</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={prefs.barHatchOpacity}
-                        onChange={(e) => setPref('barHatchOpacity', Number(e.target.value))}
-                        className="accent-zinc-900 dark:accent-zinc-100"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-zinc-600 dark:text-zinc-400">School holiday column hatch</span>
-                      <input
-                        type="range"
-                        min={0.08}
-                        max={1}
-                        step={0.05}
-                        value={prefs.overlayHatchOpacity}
-                        onChange={(e) => setPref('overlayHatchOpacity', Number(e.target.value))}
-                        className="accent-zinc-900 dark:accent-zinc-100"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-zinc-600 dark:text-zinc-400">Column wash (under hatch)</span>
-                      <input
-                        type="text"
-                        spellCheck={false}
-                        className="h-8 rounded-md border border-zinc-300 bg-white px-2 font-mono text-[10px] text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                        value={prefs.overlayColumnFill}
-                        onChange={(e) => setPref('overlayColumnFill', e.target.value)}
-                        placeholder="e.g. rgba(228,228,231,0.45)"
-                      />
-                    </label>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 w-full text-xs"
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        requestOpenWorkbenchSettingsDialog();
+                      }}
+                    >
+                      All workbench settings…
+                    </Button>
                   </div>
                 </div>
               ) : null}
@@ -353,24 +532,104 @@ export function RunwayProgrammeGanttBlock({
           >
             <div className="flex min-w-0 flex-row items-start gap-1.5">
               <div className="shrink-0" style={{ width: railSpacerWidthPx }} aria-hidden />
-              <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-1 py-0.5 [scrollbar-gutter:stable]">
+              <div className="min-w-0 flex-1">
+                <div className="overflow-hidden rounded-md border border-zinc-200/90 bg-white dark:border-zinc-700 dark:bg-zinc-950">
                 <div
-                  className="min-w-0 shrink-0 overflow-hidden rounded-[3px]"
-                  style={{ width: stripWidth, minWidth: stripWidth }}
+                  className="flex min-w-0 flex-wrap items-center gap-1.5 border-b border-zinc-200/70 bg-white px-3 py-2 text-[10px] text-muted-foreground dark:border-zinc-700/80 dark:bg-zinc-950"
+                  role="toolbar"
+                  aria-label="Programme timeline zoom"
                 >
-                  <RunwayProgrammeGanttStrip
-                    marketKey={`${country}-programme`}
-                    placedCells={placedCells}
-                    contributionMeta={contributionMeta}
-                    cellPx={cellPx}
-                    gap={gap}
-                    width={stripWidth}
-                    riskByDate={riskByDate}
-                    lanes={lanes}
-                    blackouts={blackouts}
-                    prefs={prefs}
-                    animateInKey={animateInKey}
-                  />
+                  <button
+                    type="button"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background text-foreground transition-colors hover:bg-muted/50"
+                    aria-label="Zoom out timeline"
+                    title="Zoom out"
+                    onClick={() => zoomBy(1 / 1.18)}
+                  >
+                    <Minus className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                  <span className="min-w-[2.75rem] tabular-nums text-[11px] font-medium text-foreground">
+                    {Math.round(timelineZoom * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background text-foreground transition-colors hover:bg-muted/50"
+                    aria-label="Zoom in timeline"
+                    title="Zoom in"
+                    onClick={() => zoomBy(1.18)}
+                  >
+                    <Plus className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-background px-2 text-foreground transition-colors hover:bg-muted/50"
+                    aria-label="Fit timeline to window width"
+                    title="Fit width"
+                    onClick={fitTimelineToViewport}
+                  >
+                    <StretchHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span className="hidden sm:inline">Fit</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background text-foreground transition-colors hover:bg-muted/50"
+                    aria-label="Reset zoom and pan"
+                    title="Reset zoom and pan"
+                    onClick={resetZoomAndPan}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                  <span className="min-w-0 text-[10px] leading-snug text-muted-foreground">
+                    Slide-friendly: drag the corner to widen the window.{' '}
+                    <kbd className="rounded border border-border/60 bg-muted/40 px-0.5 font-mono text-[9px]">⌃</kbd> or{' '}
+                    <kbd className="rounded border border-border/60 bg-muted/40 px-0.5 font-mono text-[9px]">⌘</kbd> +
+                    scroll zooms; shift-scroll or middle-drag pans.
+                  </span>
+                </div>
+                <div
+                  ref={ganttViewportRef}
+                  className="max-w-full overflow-hidden bg-white px-3 pb-4 pt-3 dark:bg-zinc-950 resize-x"
+                  style={{
+                    width: '100%',
+                    minWidth: 'min(100%, 460px)',
+                    minHeight: Math.max(
+                      40,
+                      Math.ceil(ganttPlusSparklineHeightPx * timelineZoom) +
+                        PROGRAMME_GANTT_VIEWPORT_CHART_SAFE_TOP_PX,
+                    ),
+                  }}
+                  onPointerDown={onGanttPointerDown}
+                  onPointerMove={onGanttPointerMove}
+                  onPointerUp={endPanDrag}
+                  onPointerCancel={endPanDrag}
+                >
+                  <div
+                    className="flex origin-top-left flex-col items-stretch"
+                    style={{
+                      width: stripWidth,
+                      transform: `translate3d(${panX}px,0,0) scale(${timelineZoom})`,
+                      willChange: 'transform',
+                    }}
+                  >
+                    <RunwayProgrammeGanttStrip
+                      marketKey={`${country}-programme`}
+                      placedCells={placedCells}
+                      contributionMeta={contributionMeta}
+                      cellPx={cellPx}
+                      gap={gap}
+                      width={stripWidth}
+                      riskByDate={riskByDate}
+                      lanes={lanes}
+                      blackouts={blackouts}
+                      prefs={prefs}
+                      animateInKey={animateInKey}
+                      disclosureTier={disclosureTier}
+                      landingHeatmapOrganicSyncTick={landingHeatmapOrganicSyncTick}
+                      landingOrganicSyncMarketKey={landingOrganicSyncMarketKey}
+                    />
+                    {renderTechDemandSparkline()}
+                  </div>
+                </div>
                 </div>
               </div>
             </div>
@@ -402,17 +661,14 @@ export function RunwayProgrammeGanttBlock({
           </motion.div>
         ) : null}
       </AnimatePresence>
+      {!open && techDemandSparkline != null ? (
+        <div className="flex min-w-0 flex-row items-end gap-1.5">
+          <div className="shrink-0" style={{ width: railSpacerWidthPx }} aria-hidden />
+          <div className="min-w-0 shrink-0" style={{ width: stripWidth, minWidth: stripWidth }}>
+            {renderTechDemandSparkline()}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
-}
-
-/** Normalise stored fill to `#rrggbb` for `<input type="color">`. */
-function solidOrHexForPicker(value: string, fallbackHex: string): string {
-  if (value.startsWith('#') && (value.length === 7 || value.length === 4)) return value.slice(0, 7);
-  const m = value.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-  if (!m) return fallbackHex;
-  const r = Number(m[1]).toString(16).padStart(2, '0');
-  const g = Number(m[2]).toString(16).padStart(2, '0');
-  const b = Number(m[3]).toString(16).padStart(2, '0');
-  return `#${r}${g}${b}`;
 }

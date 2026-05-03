@@ -13,6 +13,7 @@ import type { RunwayQuarter } from '@/lib/runwayDateFilter';
 import {
   clampRunwayHeatmapGapPx,
   clampRunwayHeatmapRadiusPx,
+  clampRunwayTechSparklineUtilSmoothWindow,
   snapRunwayHeatmapCellPx,
 } from '@/lib/runwayHeatmapLayoutPrefs';
 /** File wrapper for export/import (JSON). */
@@ -54,6 +55,8 @@ export type ViewSettingsPayloadV1 = {
    * Off by default.
    */
   runwayHeatmapCellIntroPulse?: boolean;
+  /** Tech sparkline trace: 0 = raw; odd 3/5/7/9 = centered moving-average window (modeled days). */
+  runwayTechSparklineUtilSmoothWindow?: number;
 };
 
 export type ViewSettingsFileV1 = {
@@ -89,6 +92,7 @@ export const VIEW_SETTINGS_PAYLOAD_KEYS = [
   'runwayHeatmapCellGapPx',
   'runwayHeatmapCellRadiusPx',
   'runwayHeatmapCellIntroPulse',
+  'runwayTechSparklineUtilSmoothWindow',
 ] as const satisfies readonly (keyof ViewSettingsPayloadV1)[];
 
 export type ViewSettingsPayloadKey = (typeof VIEW_SETTINGS_PAYLOAD_KEYS)[number];
@@ -382,6 +386,12 @@ export function sanitizeSettingsPayload(raw: Record<string, unknown>): Partial<V
     typeof raw.runwayHeatmapCellIntroPulse === 'boolean'
   ) {
     out.runwayHeatmapCellIntroPulse = raw.runwayHeatmapCellIntroPulse;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(raw, 'runwayTechSparklineUtilSmoothWindow')) {
+    out.runwayTechSparklineUtilSmoothWindow = clampRunwayTechSparklineUtilSmoothWindow(
+      raw.runwayTechSparklineUtilSmoothWindow
+    );
   }
 
   if (!out.riskHeatmapTuningByLens && rawHasLegacyHeatmapKeys(raw)) {

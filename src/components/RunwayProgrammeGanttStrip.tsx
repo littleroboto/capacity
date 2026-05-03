@@ -18,8 +18,11 @@ import {
   contributionStripYmdToCellLayout,
   xSpanForInclusiveYmdRangeClipped,
 } from '@/lib/runwayProgrammeGanttLayout';
+import { layoutContributionStripRunwaySvg } from '@/lib/runwayCompareSvgLayout';
 import type { ProgrammeGanttChronicleIcon, ProgrammeGanttChronicleLane } from '@/lib/runwayProgrammeGanttModel';
 import type { ProgrammeGanttDisplayPrefs } from '@/lib/runwayProgrammeGanttPrefs';
+import type { ProgrammeGanttDisclosureTier } from '@/lib/runwayProgrammeGanttDisclosure';
+import { organicHeatmapCellLayerIndex } from '@/lib/runwayHeatmapOrganicLayers';
 
 const LABEL_GAP_PX = 5;
 const LABEL_FONT_SIZE_PX = 11;
@@ -126,6 +129,18 @@ function cellCenterX(ymd: string, layout: ReadonlyMap<string, { x: number; cellP
   return c.x + c.cellPx / 2;
 }
 
+/** Same cadence as contribution heatmap organic layers (homepage hero build-out). */
+function landingGanttDrawProgress(
+  tick: number | undefined,
+  marketKey: string,
+  anchorYmd: string,
+  salt: string,
+): number {
+  if (tick == null) return 1;
+  const L = organicHeatmapCellLayerIndex({ tick, marketKey, dateYmd: anchorYmd, salt });
+  return (L + 1) / 5;
+}
+
 export type RunwayProgrammeGanttStripProps = {
   marketKey: string;
   placedCells: readonly PlacedRunwayCell[];
@@ -139,6 +154,21 @@ export type RunwayProgrammeGanttStripProps = {
   prefs: ProgrammeGanttDisplayPrefs;
   /** Remount key for subtle in-place pop animation of timeline content. */
   animateInKey?: string | number;
+  /**
+   * Progressive disclosure driven by timeline zoom (0 = overview, 3 = full detail).
+   * Icons and labels stay mounted where needed to avoid mount flicker during zoom.
+   */
+  disclosureTier?: ProgrammeGanttDisclosureTier;
+  /**
+   * Landing hero: drive segment reveal from the same organic tick as contribution heatmaps
+   * (`organicLayerTick` in RunwayGridBody).
+   */
+  landingHeatmapOrganicSyncTick?: number;
+  /**
+   * When syncing with heatmaps, use the same `marketKey` as those strips (e.g. `${country}-combined`)
+   * so per-day reveal order matches; programme `marketKey` alone would hash differently.
+   */
+  landingOrganicSyncMarketKey?: string;
 };
 
 export function runwayProgrammeGanttStripHeightPx(prefs: ProgrammeGanttDisplayPrefs, laneCount: number): number {
@@ -159,11 +189,31 @@ type PlacedMark =
       railStyle?: 'dotted' | 'dashed';
       phaseLabel?: string;
       spanTitle?: string;
+      anchorYmd: string;
     }
-  | { kind: 'run_bar'; key: string; x: number; y: number; w: number; h: number; fill: string; opacity: number }
-  | { kind: 'bracket_span'; key: string; x0: number; x1: number; yTop: number; yBot: number }
-  | { kind: 'tick'; key: string; cx: number; y0: number; y1: number; tickLabel?: string; tickStyle?: 'line' | 'dot' }
-  | { kind: 'diamond'; key: string; cx: number; cy: number; r: number; diamondLabel?: string };
+  | {
+      kind: 'run_bar';
+      key: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      fill: string;
+      opacity: number;
+      anchorYmd: string;
+    }
+  | { kind: 'bracket_span'; key: string; x0: number; x1: number; yTop: number; yBot: number; anchorYmd: string }
+  | {
+      kind: 'tick';
+      key: string;
+      cx: number;
+      y0: number;
+      y1: number;
+      tickLabel?: string;
+      tickStyle?: 'line' | 'dot';
+      anchorYmd: string;
+    }
+  | { kind: 'diamond'; key: string; cx: number; cy: number; r: number; diamondLabel?: string; anchorYmd: string };
 
 type LaneRow = {
   lane: ProgrammeGanttChronicleLane;
@@ -225,7 +275,22 @@ export function RunwayProgrammeGanttStrip({
   blackouts,
   prefs,
   animateInKey,
+  disclosureTier: disclosureTierProp,
+  landingHeatmapOrganicSyncTick,
+  landingOrganicSyncMarketKey,
 }: RunwayProgrammeGanttStripProps) {
+  const disclosureTier: ProgrammeGanttDisclosureTier = disclosureTierProp ?? 3;
+  const landingHeroBuild = landingHeatmapOrganicSyncTick != null;
+  const landingOrganicMk =
+    landingOrganicSyncMarketKey?.trim() && landingHeroBuild
+      ? landingOrganicSyncMarketKey.trim()
+      : marketKey;
+  const showChronicleIcons = disclosureTier >= 1;
+  const showPrepPhaseLabels = disclosureTier >= 2;
+  const showTickAndDiamondLabels = disclosureTier >= 2;
+  const showSchoolStripIcons = disclosureTier >= 2;
+  const showBlackoutRibbonSnowflake = disclosureTier >= 3;
+  const showLaneCaptionDates = disclosureTier >= 3 && prefs.showBarTrailingCaption;
   const reduceMotion = useReducedMotion();
   const uid = useId().replace(/:/g, '');
   const schoolHatchId = `gantt-school-hatch-45-${uid}`;
@@ -240,6 +305,19 @@ export function RunwayProgrammeGanttStrip({
     const clipEnd = contributionMeta.rangeEndYmd;
     return { clipStart, clipEnd, layout };
   }, [placedCells, cellPx, contributionMeta.rangeStartYmd, contributionMeta.rangeEndYmd]);
+
+  /** Calendar quarter boundaries (same x as contribution strip quarter rail ticks), for faint vertical guides. */
+  const quarterRailXs = useMemo(() => {
+    const { quarterRailBoundaryTicks } = layoutContributionStripRunwaySvg({
+      placedCells: [...placedCells],
+      cellPx,
+      gap: _gap,
+      width,
+      height: 0,
+      meta: contributionMeta,
+    });
+    return quarterRailBoundaryTicks.map((t) => t.x);
+  }, [placedCells, cellPx, _gap, width, contributionMeta]);
 
   const { laneRows, svgHeight, schoolOverlaySpans, blackoutSpans, blackoutBandPx } = useMemo(() => {
     const { stripTopPadPx, barHeightPx, laneGapPx, stripBottomPadPx, barOpacity } = prefs;
@@ -299,6 +377,7 @@ export function RunwayProgrammeGanttStrip({
             railStyle: m.railStyle,
             phaseLabel: m.phaseLabel,
             spanTitle: m.title,
+            anchorYmd: visibleStartYmd,
           });
         } else if (m.kind === 'run_bar') {
           const span = xSpanForInclusiveYmdRangeClipped(
@@ -320,6 +399,7 @@ export function RunwayProgrammeGanttStrip({
             h: barHeightPx - 2,
             fill,
             opacity: barOpacity,
+            anchorYmd: m.startYmd,
           });
         } else if (m.kind === 'bracket_span') {
           const span = xSpanForInclusiveYmdRangeClipped(
@@ -343,6 +423,7 @@ export function RunwayProgrammeGanttStrip({
             x1,
             yTop: yRow + 2.5,
             yBot: yRow + barHeightPx - 2.5,
+            anchorYmd: m.startYmd,
           });
         } else if (m.kind === 'tick') {
           const cx = cellCenterX(m.ymd, layout);
@@ -356,12 +437,21 @@ export function RunwayProgrammeGanttStrip({
             y1: y1t,
             tickLabel: m.label,
             tickStyle: m.tickStyle,
+            anchorYmd: m.ymd,
           });
         } else if (m.kind === 'diamond') {
           const cx = cellCenterX(m.ymd, layout);
           if (cx == null) continue;
           maxRightX = Math.max(maxRightX, cx + 5);
-          marks.push({ kind: 'diamond', key: `${lane.id}-dm-${m.ymd}`, cx, cy: midY, r: 4, diamondLabel: m.label });
+          marks.push({
+            kind: 'diamond',
+            key: `${lane.id}-dm-${m.ymd}`,
+            cx,
+            cy: midY,
+            r: 4,
+            diamondLabel: m.label,
+            anchorYmd: m.ymd,
+          });
         }
       }
 
@@ -409,7 +499,7 @@ export function RunwayProgrammeGanttStrip({
     >
       <defs>
         <clipPath id={panelClipId} clipPathUnits="userSpaceOnUse">
-          <rect x={gutter} y={0.5} width={Math.max(0, gridWidth - gutter)} height={Math.max(0, svgHeight - 1)} rx={2} />
+          <rect x={gutter} y={0} width={Math.max(0, gridWidth - gutter)} height={Math.max(0, svgHeight)} />
         </clipPath>
         <pattern
           id={schoolHatchId}
@@ -447,23 +537,37 @@ export function RunwayProgrammeGanttStrip({
         </pattern>
       </defs>
 
-      <rect
-        x={gutter}
-        y={0.5}
-        width={Math.max(0, gridWidth - gutter)}
-        height={svgHeight - 1}
-        rx={2}
-        className="fill-zinc-50 stroke-zinc-300/90 dark:fill-zinc-950 dark:stroke-zinc-800"
-        strokeWidth={1}
-      />
+      {/* Flat canvas: one fill, no inset stroke (avoids double-frame with outer UI). */}
+      <rect x={0} y={0} width={gridWidth} height={svgHeight} className="fill-white dark:fill-zinc-950" />
       <motion.g
         key={`gantt-pop-${String(animateInKey ?? 'static')}`}
-        initial={reduceMotion ? false : { opacity: 0, scale: 0.985 }}
+        initial={landingHeroBuild || reduceMotion ? false : { opacity: 0, scale: 0.985 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        transition={
+          landingHeroBuild || reduceMotion
+            ? { duration: 0 }
+            : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
+        }
         style={{ transformOrigin: `${gutter + 8}px ${Math.max(8, barAreaTop + 6)}px` }}
         clipPath={`url(#${panelClipId})`}
       >
+      {quarterRailXs.length ? (
+        <g className="pointer-events-none" aria-hidden>
+          {quarterRailXs.map((x, qi) => (
+            <line
+              key={`gantt-qgrid-${qi}-${x.toFixed(1)}`}
+              x1={x}
+              x2={x}
+              y1={0}
+              y2={svgHeight}
+              className="stroke-muted-foreground"
+              strokeWidth={0.65}
+              strokeOpacity={0.075}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </g>
+      ) : null}
       <g>
         {laneRows.flatMap((row) =>
           row.marks
@@ -471,8 +575,17 @@ export function RunwayProgrammeGanttStrip({
             .map((m) => {
               const railStyle = m.railStyle ?? (m.icon === 'none' ? 'dotted' : 'dashed');
               const isDotted = railStyle === 'dotted';
+              const p = landingGanttDrawProgress(
+                landingHeatmapOrganicSyncTick,
+                landingOrganicMk,
+                m.anchorYmd,
+                `gantt-dot:${m.key}`,
+              );
+              const sx = Math.max(0.02, p);
+              const gx = m.x0;
+              const gy = m.midY;
               return (
-                <g key={m.key}>
+                <g key={m.key} transform={`translate(${gx} ${gy}) scale(${sx} 1) translate(${-gx} ${-gy})`}>
                 <title>
                   {m.spanTitle?.trim()
                     ? m.spanTitle.trim()
@@ -491,7 +604,7 @@ export function RunwayProgrammeGanttStrip({
                   className="stroke-zinc-500 dark:stroke-zinc-400"
                   strokeWidth={isDotted ? 1.1 : 1.15}
                   strokeDasharray={isDotted ? '0.01 4.6' : '3.5 3'}
-                  strokeOpacity={isDotted ? 0.62 : 0.92}
+                  strokeOpacity={(isDotted ? 0.62 : 0.92) * Math.min(1, 0.2 + p * 0.95)}
                   strokeLinecap={isDotted ? 'round' : 'butt'}
                   vectorEffect="non-scaling-stroke"
                 />
@@ -504,8 +617,9 @@ export function RunwayProgrammeGanttStrip({
                     fill="currentColor"
                     fontSize={9}
                     fontWeight={500}
-                    opacity={0.88}
+                    opacity={(showPrepPhaseLabels ? 0.88 : 0) * Math.min(1, 0.15 + p)}
                     style={{ letterSpacing: '-0.005em' }}
+                    visibility={showPrepPhaseLabels ? 'visible' : 'hidden'}
                   >
                     {m.phaseLabel.trim()}
                   </text>
@@ -520,6 +634,21 @@ export function RunwayProgrammeGanttStrip({
         {schoolOverlaySpans.map((s) => {
           const schoolFillOp = Math.min(0.52, 0.12 + prefs.overlayHatchOpacity * 0.32);
           const schoolStrokeOp = Math.min(0.72, 0.28 + prefs.overlayHatchOpacity * 0.42);
+          const pSch =
+            (landingGanttDrawProgress(
+              landingHeatmapOrganicSyncTick,
+              landingOrganicMk,
+              s.ymdStart,
+              `gantt-sch:${s.key}:a`,
+            ) +
+              landingGanttDrawProgress(
+                landingHeatmapOrganicSyncTick,
+                landingOrganicMk,
+                s.ymdEnd,
+                `gantt-sch:${s.key}:b`,
+              )) /
+            2;
+          const schMul = Math.min(1, 0.18 + pSch * 0.92);
           return (
             <g key={s.key}>
               <title>{`School holiday context: ${s.ymdStart}${s.ymdEnd !== s.ymdStart ? ` → ${s.ymdEnd}` : ''}`}</title>
@@ -529,7 +658,7 @@ export function RunwayProgrammeGanttStrip({
                 width={Math.max(0, s.x1 - s.x0)}
                 height={Math.max(0, svgHeight - barAreaTop - 1)}
                 fill={`url(#${schoolHatchId})`}
-                fillOpacity={schoolFillOp}
+                fillOpacity={schoolFillOp * schMul}
               />
               <rect
                 x={s.x0}
@@ -539,7 +668,7 @@ export function RunwayProgrammeGanttStrip({
                 fill="none"
                 className="stroke-zinc-400 dark:stroke-zinc-500"
                 strokeWidth={1}
-                strokeOpacity={schoolStrokeOp}
+                strokeOpacity={schoolStrokeOp * schMul}
                 strokeDasharray="5 4"
                 vectorEffect="non-scaling-stroke"
               />
@@ -552,28 +681,43 @@ export function RunwayProgrammeGanttStrip({
         {laneRows.flatMap((row) =>
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'tick' }> => m.kind === 'tick')
-            .map((m) =>
-              m.tickStyle === 'dot' ? (
-                <circle
+            .map((m) => {
+              const p = landingGanttDrawProgress(
+                landingHeatmapOrganicSyncTick,
+                landingOrganicMk,
+                m.anchorYmd,
+                `gantt-tk-glyph:${m.key}`,
+              );
+              const cy = (m.y0 + m.y1) / 2;
+              const sx = Math.max(0.02, p);
+              const op = Math.min(1, 0.12 + p * 0.95);
+              return (
+                <g
                   key={`${m.key}-glyph`}
-                  cx={m.cx}
-                  cy={(m.y0 + m.y1) / 2}
-                  r={2.1}
-                  className="fill-zinc-700 dark:fill-zinc-300"
-                />
-              ) : (
-                <line
-                  key={`${m.key}-glyph`}
-                  x1={m.cx}
-                  x2={m.cx}
-                  y1={m.y0}
-                  y2={m.y1}
-                  className="stroke-zinc-600 dark:stroke-zinc-400"
-                  strokeWidth={1}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ),
-            ),
+                  transform={`translate(${m.cx} ${cy}) scale(${sx} 1) translate(${-m.cx} ${-cy})`}
+                  opacity={op}
+                >
+                  {m.tickStyle === 'dot' ? (
+                    <circle
+                      cx={m.cx}
+                      cy={cy}
+                      r={2.1}
+                      className="fill-zinc-700 dark:fill-zinc-300"
+                    />
+                  ) : (
+                    <line
+                      x1={m.cx}
+                      x2={m.cx}
+                      y1={m.y0}
+                      y2={m.y1}
+                      className="stroke-zinc-600 dark:stroke-zinc-400"
+                      strokeWidth={1}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                </g>
+              );
+            }),
         )}
       </g>
 
@@ -581,45 +725,61 @@ export function RunwayProgrammeGanttStrip({
         {laneRows.flatMap((row) =>
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'run_bar' }> => m.kind === 'run_bar')
-            .map((m) => (
-              <g key={m.key} opacity={m.opacity}>
-                <title>{`${row.lane.kind === 'campaign' ? 'Campaign' : 'Tech'} live: ${row.lane.parentName}`}</title>
-                <rect x={m.x} y={m.y} width={Math.max(0, m.w)} height={m.h} rx={1} fill={m.fill} />
-                {prefs.barHatchOpacity > 0.001 ? (
+            .map((m) => {
+              const p = landingGanttDrawProgress(
+                landingHeatmapOrganicSyncTick,
+                landingOrganicMk,
+                m.anchorYmd,
+                `gantt-run:${m.key}`,
+              );
+              const sx = Math.max(0.02, p);
+              const ox = m.x;
+              const oy = m.y + m.h / 2;
+              const rowOp = m.opacity * Math.min(1, 0.12 + p * 0.95);
+              return (
+                <g
+                  key={m.key}
+                  opacity={rowOp}
+                  transform={`translate(${ox} ${oy}) scale(${sx} 1) translate(${-ox} ${-oy})`}
+                >
+                  <title>{`${row.lane.kind === 'campaign' ? 'Campaign' : 'Tech'} live: ${row.lane.parentName}`}</title>
+                  <rect x={m.x} y={m.y} width={Math.max(0, m.w)} height={m.h} rx={1} fill={m.fill} />
+                  {prefs.barHatchOpacity > 0.001 ? (
+                    <rect
+                      x={m.x}
+                      y={m.y}
+                      width={Math.max(0, m.w)}
+                      height={m.h}
+                      rx={1}
+                      fill={`url(#${barHatchId})`}
+                      fillOpacity={prefs.barHatchOpacity}
+                    />
+                  ) : null}
                   <rect
                     x={m.x}
                     y={m.y}
                     width={Math.max(0, m.w)}
                     height={m.h}
                     rx={1}
-                    fill={`url(#${barHatchId})`}
-                    fillOpacity={prefs.barHatchOpacity}
+                    fill="none"
+                    className="stroke-zinc-700/90 dark:stroke-zinc-300/80"
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
                   />
-                ) : null}
-                <rect
-                  x={m.x}
-                  y={m.y}
-                  width={Math.max(0, m.w)}
-                  height={m.h}
-                  rx={1}
-                  fill="none"
-                  className="stroke-zinc-700/90 dark:stroke-zinc-300/80"
-                  strokeWidth={1}
-                  vectorEffect="non-scaling-stroke"
-                />
-                <rect
-                  x={m.x + 0.5}
-                  y={m.y + 0.5}
-                  width={Math.max(0, m.w - 1)}
-                  height={Math.max(0, m.h - 1)}
-                  rx={0.5}
-                  fill="none"
-                  className="stroke-white/25 dark:stroke-zinc-950/35"
-                  strokeWidth={0.75}
-                  vectorEffect="non-scaling-stroke"
-                />
-              </g>
-            )),
+                  <rect
+                    x={m.x + 0.5}
+                    y={m.y + 0.5}
+                    width={Math.max(0, m.w - 1)}
+                    height={Math.max(0, m.h - 1)}
+                    rx={0.5}
+                    fill="none"
+                    className="stroke-white/25 dark:stroke-zinc-950/35"
+                    strokeWidth={0.75}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
+              );
+            }),
         )}
       </g>
 
@@ -627,20 +787,35 @@ export function RunwayProgrammeGanttStrip({
         {laneRows.flatMap((row) =>
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'bracket_span' }> => m.kind === 'bracket_span')
-            .map((m) => (
-              <g key={m.key}>
-                <title>{Math.abs(m.x0 - m.x1) < 0.5 ? 'Offer codes expire' : 'Readiness gate (pre–go-live)'}</title>
-                <path
-                  d={`M ${m.x0} ${m.yBot} L ${m.x0} ${m.yTop} L ${m.x1} ${m.yTop} L ${m.x1} ${m.yBot}`}
-                  fill="none"
-                  className="stroke-zinc-600 dark:stroke-zinc-400"
-                  strokeWidth={1.15}
-                  strokeLinecap="square"
-                  strokeLinejoin="miter"
-                  vectorEffect="non-scaling-stroke"
-                />
-              </g>
-            )),
+            .map((m) => {
+              const p = landingGanttDrawProgress(
+                landingHeatmapOrganicSyncTick,
+                landingOrganicMk,
+                m.anchorYmd,
+                `gantt-br:${m.key}`,
+              );
+              const bx0 = m.x0;
+              const bmy = (m.yTop + m.yBot) / 2;
+              const bsx = Math.max(0.02, p);
+              return (
+                <g
+                  key={m.key}
+                  opacity={Math.min(1, 0.15 + p * 0.92)}
+                  transform={`translate(${bx0} ${bmy}) scale(${bsx} 1) translate(${-bx0} ${-bmy})`}
+                >
+                  <title>{Math.abs(m.x0 - m.x1) < 0.5 ? 'Offer codes expire' : 'Readiness gate (pre–go-live)'}</title>
+                  <path
+                    d={`M ${m.x0} ${m.yBot} L ${m.x0} ${m.yTop} L ${m.x1} ${m.yTop} L ${m.x1} ${m.yBot}`}
+                    fill="none"
+                    className="stroke-zinc-600 dark:stroke-zinc-400"
+                    strokeWidth={1.15}
+                    strokeLinecap="square"
+                    strokeLinejoin="miter"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
+              );
+            }),
         )}
       </g>
 
@@ -648,25 +823,34 @@ export function RunwayProgrammeGanttStrip({
         {laneRows.flatMap((row) =>
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'tick' }> => m.kind === 'tick')
-            .map((m) => (
-              <g key={m.key}>
-                {m.tickLabel?.trim() ? (
-                  <text
-                    x={m.cx}
-                    y={m.y0 - 6}
-                    textAnchor="middle"
-                    dominantBaseline="auto"
-                    fill="currentColor"
-                    fontSize={9}
-                    fontWeight={600}
-                    opacity={0.92}
-                    style={{ letterSpacing: '-0.005em' }}
-                  >
-                    {m.tickLabel.trim()}
-                  </text>
-                ) : null}
-              </g>
-            )),
+            .map((m) => {
+              const p = landingGanttDrawProgress(
+                landingHeatmapOrganicSyncTick,
+                landingOrganicMk,
+                m.anchorYmd,
+                `gantt-tk-lbl:${m.key}`,
+              );
+              return (
+                <g key={m.key}>
+                  {m.tickLabel?.trim() ? (
+                    <text
+                      x={m.cx}
+                      y={m.y0 - 6}
+                      textAnchor="middle"
+                      dominantBaseline="auto"
+                      fill="currentColor"
+                      fontSize={9}
+                      fontWeight={600}
+                      opacity={(showTickAndDiamondLabels ? 0.92 : 0) * Math.min(1, 0.12 + p)}
+                      style={{ letterSpacing: '-0.005em' }}
+                      visibility={showTickAndDiamondLabels ? 'visible' : 'hidden'}
+                    >
+                      {m.tickLabel.trim()}
+                    </text>
+                  ) : null}
+                </g>
+              );
+            }),
         )}
       </g>
 
@@ -674,33 +858,48 @@ export function RunwayProgrammeGanttStrip({
         {laneRows.flatMap((row) =>
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'diamond' }> => m.kind === 'diamond')
-            .map((m) => (
-              <g key={m.key}>
-                <circle
-                  cx={m.cx}
-                  cy={m.cy}
-                  r={Math.max(2.25, m.r - 1.25)}
-                  className="fill-white stroke-zinc-950 dark:fill-white dark:stroke-zinc-50"
-                  strokeWidth={0.75}
-                  vectorEffect="non-scaling-stroke"
-                />
-                {m.diamondLabel?.trim() ? (
-                  <text
-                    x={m.cx}
-                    y={m.cy - m.r - 6}
-                    textAnchor="middle"
-                    dominantBaseline="auto"
-                    fill="currentColor"
-                    fontSize={9}
-                    fontWeight={600}
-                    opacity={0.92}
-                    style={{ letterSpacing: '-0.005em' }}
-                  >
-                    {m.diamondLabel.trim()}
-                  </text>
-                ) : null}
-              </g>
-            )),
+            .map((m) => {
+              const p = landingGanttDrawProgress(
+                landingHeatmapOrganicSyncTick,
+                landingOrganicMk,
+                m.anchorYmd,
+                `gantt-dm:${m.key}`,
+              );
+              const sc = Math.max(0.02, p);
+              const dop = Math.min(1, 0.12 + p * 0.95);
+              return (
+                <g
+                  key={m.key}
+                  transform={`translate(${m.cx} ${m.cy}) scale(${sc}) translate(${-m.cx} ${-m.cy})`}
+                  opacity={dop}
+                >
+                  <circle
+                    cx={m.cx}
+                    cy={m.cy}
+                    r={Math.max(2.25, m.r - 1.25)}
+                    className="fill-white stroke-zinc-950 dark:fill-white dark:stroke-zinc-50"
+                    strokeWidth={0.75}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  {m.diamondLabel?.trim() ? (
+                    <text
+                      x={m.cx}
+                      y={m.cy - m.r - 6}
+                      textAnchor="middle"
+                      dominantBaseline="auto"
+                      fill="currentColor"
+                      fontSize={9}
+                      fontWeight={600}
+                      opacity={(showTickAndDiamondLabels ? 0.92 : 0) * Math.min(1, 0.12 + p)}
+                      style={{ letterSpacing: '-0.005em' }}
+                      visibility={showTickAndDiamondLabels ? 'visible' : 'hidden'}
+                    >
+                      {m.diamondLabel.trim()}
+                    </text>
+                  ) : null}
+                </g>
+              );
+            }),
         )}
       </g>
 
@@ -711,6 +910,12 @@ export function RunwayProgrammeGanttStrip({
             .filter((m) => m.icon !== 'none')
             .map((m) => {
               const cx = (m.x0 + m.x1) / 2;
+              const pIco = landingGanttDrawProgress(
+                landingHeatmapOrganicSyncTick,
+                landingOrganicMk,
+                m.anchorYmd,
+                `gantt-ico:${m.key}`,
+              );
               const isPosLane =
                 row.lane.kind === 'tech_programme' &&
                 (/\bpos\b/i.test(row.lane.parentName) ||
@@ -721,7 +926,13 @@ export function RunwayProgrammeGanttStrip({
                   ? m.midY - CHRONICLE_ICON_PX - CHRONICLE_ICON_ABOVE_LINE_PAD_PX
                   : m.midY - CHRONICLE_ICON_HALF;
               return (
-                <g key={`${m.key}-ico`} transform={`translate(${cx - CHRONICLE_ICON_HALF}, ${iconY})`}>
+                <g
+                  key={`${m.key}-ico`}
+                  transform={`translate(${cx - CHRONICLE_ICON_HALF}, ${iconY})`}
+                  opacity={showChronicleIcons ? Math.min(1, 0.1 + pIco * 0.98) : 0}
+                  visibility={showChronicleIcons ? 'visible' : 'hidden'}
+                  aria-hidden
+                >
                   <ChronicleIconMount icon={m.icon === 'hammer' ? 'hammer' : 'flask'} />
                 </g>
               );
@@ -730,39 +941,63 @@ export function RunwayProgrammeGanttStrip({
       </g>
 
       <g>
-        {laneRows.map((row) => (
-          <text
-            key={`${row.lane.id}-caption`}
-            x={row.labelX}
-            y={row.midY}
-            dominantBaseline="middle"
-            textAnchor="start"
-            fill="currentColor"
-            fontSize={LABEL_FONT_SIZE_PX}
-            fontWeight={500}
-            style={{ letterSpacing: '-0.01em' }}
-          >
-            <title>{`${row.lane.kind === 'campaign' ? 'Campaign' : 'Tech programme'}: ${row.lane.parentName} (${row.lane.footprintStartYmd}${
-              row.lane.footprintStartYmd === row.lane.footprintEndYmdInclusive ? '' : `–${row.lane.footprintEndYmdInclusive}`
-            })`}</title>
-            {programmeBarTrailingLabel(
-              row.lane.parentName,
-              row.lane.footprintStartYmd,
-              row.lane.footprintEndYmdInclusive,
-              prefs.showBarTrailingCaption,
-            )}
-          </text>
-        ))}
+        {laneRows.map((row) => {
+          const pLane = landingGanttDrawProgress(
+            landingHeatmapOrganicSyncTick,
+            landingOrganicMk,
+            row.lane.footprintStartYmd,
+            `gantt-lane:${row.lane.id}`,
+          );
+          return (
+            <text
+              key={`${row.lane.id}-caption`}
+              x={row.labelX}
+              y={row.midY}
+              dominantBaseline="middle"
+              textAnchor="start"
+              fill="currentColor"
+              fontSize={LABEL_FONT_SIZE_PX}
+              fontWeight={500}
+              style={{ letterSpacing: '-0.01em' }}
+              opacity={Math.min(1, 0.14 + pLane * 0.94)}
+            >
+              <title>{`${row.lane.kind === 'campaign' ? 'Campaign' : 'Tech programme'}: ${row.lane.parentName} (${row.lane.footprintStartYmd}${
+                row.lane.footprintStartYmd === row.lane.footprintEndYmdInclusive ? '' : `–${row.lane.footprintEndYmdInclusive}`
+              })`}</title>
+              {programmeBarTrailingLabel(
+                row.lane.parentName,
+                row.lane.footprintStartYmd,
+                row.lane.footprintEndYmdInclusive,
+                showLaneCaptionDates,
+              )}
+            </text>
+          );
+        })}
       </g>
 
       <g className="pointer-events-none select-none">
         {schoolOverlaySpans.map((s) => {
-          if (s.x1 - s.x0 < SCHOOL_STRIP_ICON_PX + 3) return null;
+          if (!showSchoolStripIcons || s.x1 - s.x0 < SCHOOL_STRIP_ICON_PX + 3) return null;
+          const pSchIco =
+            (landingGanttDrawProgress(
+              landingHeatmapOrganicSyncTick,
+              landingOrganicMk,
+              s.ymdStart,
+              `gantt-sch-ico:${s.key}:a`,
+            ) +
+              landingGanttDrawProgress(
+                landingHeatmapOrganicSyncTick,
+                landingOrganicMk,
+                s.ymdEnd,
+                `gantt-sch-ico:${s.key}:b`,
+              )) /
+            2;
           return (
             <g
               key={`${s.key}-school-ico`}
               transform={`translate(${s.x0 + 2}, ${barAreaTop + 2})`}
               className="text-zinc-700 dark:text-zinc-300"
+              opacity={Math.min(1, 0.15 + pSchIco * 0.92)}
             >
               <title>{`School holiday: ${s.ymdStart}${s.ymdEnd !== s.ymdStart ? ` → ${s.ymdEnd}` : ''}`}</title>
               <svg width={SCHOOL_STRIP_ICON_PX} height={SCHOOL_STRIP_ICON_PX} viewBox="0 0 24 24" fill="none">
@@ -797,15 +1032,24 @@ export function RunwayProgrammeGanttStrip({
                 : '';
             const pipe = 5;
             const spanW = s.x1 - s.x0;
-            const showRibbonSnowflake = spanW >= RIBBON_BLACKOUT_ICON_PX + 2;
+            const showRibbonSnowflake = showBlackoutRibbonSnowflake && spanW >= RIBBON_BLACKOUT_ICON_PX + 2;
             const snowflakeTx = showRibbonSnowflake
               ? Math.min(
                   Math.max((s.x0 + s.x1) / 2 - RIBBON_BLACKOUT_ICON_HALF, s.x0 + 1),
                   s.x1 - 1 - RIBBON_BLACKOUT_ICON_PX,
                 )
               : 0;
+            const pBl = landingGanttDrawProgress(
+              landingHeatmapOrganicSyncTick,
+              landingOrganicMk,
+              s.ymdStart,
+              `gantt-blo:${s.key}`,
+            );
+            const blMul = Math.min(1, 0.16 + pBl * 0.92);
+            const cxBl = (s.x0 + s.x1) / 2;
+            const ribbonHx = Math.max(0.02, pBl);
             return (
-              <g key={`bl-${s.key}`}>
+              <g key={`bl-${s.key}`} opacity={blMul}>
                 <title>{`Deployment blackout: ${yamlRange}.${viewNote} ${label}`}</title>
                 <line
                   x1={s.x0}
@@ -825,17 +1069,21 @@ export function RunwayProgrammeGanttStrip({
                   strokeWidth={1}
                   vectorEffect="non-scaling-stroke"
                 />
-                <line
-                  x1={s.x0}
-                  y1={ribbonMidY}
-                  x2={s.x1}
-                  y2={ribbonMidY}
-                  className="stroke-zinc-500 dark:stroke-zinc-400"
-                  strokeWidth={1}
-                  strokeDasharray="3 3"
-                  vectorEffect="non-scaling-stroke"
-                  strokeOpacity={0.9}
-                />
+                <g
+                  transform={`translate(${cxBl} ${ribbonMidY}) scale(${ribbonHx} 1) translate(${-cxBl} ${-ribbonMidY})`}
+                >
+                  <line
+                    x1={s.x0}
+                    y1={ribbonMidY}
+                    x2={s.x1}
+                    y2={ribbonMidY}
+                    className="stroke-zinc-500 dark:stroke-zinc-400"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    vectorEffect="non-scaling-stroke"
+                    strokeOpacity={0.9}
+                  />
+                </g>
                 <line
                   x1={s.x0}
                   y1={barAreaTop}
@@ -863,6 +1111,7 @@ export function RunwayProgrammeGanttStrip({
                     transform={`translate(${snowflakeTx}, ${ribbonMidY - RIBBON_BLACKOUT_ICON_HALF})`}
                     className="text-zinc-700 dark:text-zinc-300"
                     aria-hidden
+                    opacity={Math.min(1, 0.12 + pBl * 0.95)}
                   >
                     <svg
                       width={RIBBON_BLACKOUT_ICON_PX}

@@ -90,11 +90,8 @@ import {
   RUNWAY_HEATMAP_CELL_PX_MAX,
   RUNWAY_HEATMAP_CELL_PX_MIN,
   RUNWAY_HEATMAP_CELL_PX_STEP,
-  RUNWAY_HEATMAP_CELL_GAP_MAX,
-  RUNWAY_HEATMAP_CELL_GAP_MIN,
-  RUNWAY_HEATMAP_CELL_RADIUS_MAX,
   RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX,
-  RUNWAY_HEATMAP_LAYOUT_DEFAULTS,
+  resolvedSparklineUtilSmoothWindow,
   snapRunwayHeatmapCellPx,
 } from '@/lib/runwayHeatmapLayoutPrefs';
 import {
@@ -143,18 +140,23 @@ import {
 } from '@/lib/runwayCompareSvgLayout';
 import { RunwayContributionStripSvg } from '@/components/RunwayContributionStripSvg';
 import { RunwayProgrammeGanttBlock } from '@/components/RunwayProgrammeGanttBlock';
+import type { ProgrammePlanVisibleYmdRange } from '@/lib/runwayProgrammePlanViewportRange';
 import type { ProgrammeGanttDisplayPrefs } from '@/lib/runwayProgrammeGanttPrefs';
+import {
+  loadProgrammeGanttPrefs,
+  PROGRAMME_GANTT_PREFS_CHANGED_EVENT,
+} from '@/lib/runwayProgrammeGanttPrefs';
 import { RUNWAY_EMERGE_DURATION_SEC, RUNWAY_EMERGE_PAUSE_MS } from '@/hooks/useRunwayHeatmapEmergence';
 import {
   contributionDayIndexForYmd,
   contributionStripDayColumnCenterX,
 } from '@/lib/runwayTechContributionOverloadHistogram';
-import { RunwayHeatmapCellStylePopover } from '@/components/RunwayHeatmapCellStylePopover';
 import { RunwayQuarterGridSvg } from '@/components/RunwayQuarterGridSvg';
 import {
   ORGANIC_HEATMAP_MAX_TICK,
   ORGANIC_HEATMAP_TICK_MS,
 } from '@/lib/runwayHeatmapOrganicLayers';
+import { requestOpenWorkbenchSettingsDialog } from '@/lib/sharedDslSync';
 import {
   AlertTriangle,
   Box,
@@ -162,6 +164,7 @@ import {
   Download,
   Gauge,
   Grid2x2,
+  SlidersHorizontal,
   LineChart,
   Loader2,
   ZoomIn,
@@ -175,8 +178,6 @@ export const CELL_PX = RUNWAY_HEATMAP_DEFAULT_SNAPPED_CELL_PX;
 const RUNWAY_CELL_PX_MIN = RUNWAY_HEATMAP_CELL_PX_MIN;
 const RUNWAY_CELL_PX_MAX = RUNWAY_HEATMAP_CELL_PX_MAX;
 const RUNWAY_CELL_PX_STEP = RUNWAY_HEATMAP_CELL_PX_STEP;
-const RUNWAY_CELL_GAP_ADJ_MIN = RUNWAY_HEATMAP_CELL_GAP_MIN;
-const RUNWAY_CELL_GAP_ADJ_MAX = RUNWAY_HEATMAP_CELL_GAP_MAX;
 
 /**
  * Isometric 3D runway (single-market skyline + LIOM city block). Hidden: toolbar + branches are gated off
@@ -211,26 +212,26 @@ const SINGLE_MARKET_MULTI_LENS_HEADLINE = 'Tech Capacity, Trading Pressure, Depl
 const SINGLE_MARKET_STACK_SHARED_LEGEND_LENS: ViewModeId =
   SINGLE_MARKET_STACK_LENS_IDS[0] ?? 'combined';
 
-const LENS_STACK_RAIL_ICON_CLASS =
-  'h-4 w-4 shrink-0 text-foreground/85 sm:h-[18px] sm:w-[18px]';
-
-function lensStackRailIconEl(mode: ViewModeId) {
+/** Short rail label for stacked triple-lens heatmaps (Technology / Rest-of-ops / Risk). */
+function tripleLensStackRailShortLabel(mode: ViewModeId): string {
   switch (mode) {
     case 'combined':
-      return <Gauge className={LENS_STACK_RAIL_ICON_CLASS} aria-hidden strokeWidth={2} />;
+      return 'TECH';
     case 'in_store':
-      return <LineChart className={LENS_STACK_RAIL_ICON_CLASS} aria-hidden strokeWidth={2} />;
+      return 'REST-OPS';
     case 'market_risk':
-      return <AlertTriangle className={LENS_STACK_RAIL_ICON_CLASS} aria-hidden strokeWidth={2} />;
+      return 'RISK';
     default:
-      return <Box className={LENS_STACK_RAIL_ICON_CLASS} aria-hidden strokeWidth={2} />;
+      return mode.slice(0, 4).toUpperCase();
   }
 }
 
-/** Slim triple-lens rail: one icon per lens; native tooltip + aria label use product copy. */
+/** Slim triple-lens rail: vertical lens tag; tooltip still uses full product names. */
 function TripleLensStackRailCaption({ lensMode, railH }: { lensMode: ViewModeId; railH: number }) {
   const railW = SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX;
+  const short = tripleLensStackRailShortLabel(lensMode);
   const tip = `${runwayLensProductLabel(lensMode)} — ${runwayHeatmapTitleForViewMode(lensMode)}`;
+  const fontPx = Math.max(6, Math.min(9, Math.floor((railH - 14) / Math.max(4, short.length))));
 
   return (
     <div
@@ -239,7 +240,14 @@ function TripleLensStackRailCaption({ lensMode, railH }: { lensMode: ViewModeId;
       title={tip}
       aria-label={tip}
     >
-      <div className="flex h-full min-h-0 w-full items-center justify-center">{lensStackRailIconEl(lensMode)}</div>
+      <div className="flex h-full min-h-0 w-full items-center justify-center overflow-visible px-px">
+        <span
+          className="select-none whitespace-nowrap font-bold uppercase tracking-wide text-foreground/90"
+          style={{ transform: 'rotate(-90deg)', fontSize: fontPx }}
+        >
+          {short}
+        </span>
+      </div>
     </div>
   );
 }
@@ -1774,9 +1782,7 @@ export function RunwayGrid({
   const runwayHeatmapUserCellPx = useAtcStore((s) => s.runwayHeatmapCellPx);
   const setRunwayHeatmapCellPx = useAtcStore((s) => s.setRunwayHeatmapCellPx);
   const runwayCellGapPx = useAtcStore((s) => s.runwayHeatmapCellGapPx);
-  const setRunwayCellGapPx = useAtcStore((s) => s.setRunwayHeatmapCellGapPx);
   const runwayHeatmapCellRadiusPx = useAtcStore((s) => s.runwayHeatmapCellRadiusPx);
-  const setRunwayHeatmapCellRadiusPx = useAtcStore((s) => s.setRunwayHeatmapCellRadiusPx);
 
   /** Largest cell size (px) that fits the current scrollport; {@link runwayHeatmapUserCellPx} may be larger. */
   const [runwayHeatmapFitCapPx, setRunwayHeatmapFitCapPx] = useState(RUNWAY_HEATMAP_CELL_PX_MAX);
@@ -2691,10 +2697,6 @@ export function RunwayGrid({
         setDimPastDays={setDimPastDays}
         runwayCellPx={runwayHeatmapUserCellPx}
         setRunwayCellPx={setRunwayHeatmapCellPx}
-        runwayCellGapPx={runwayCellGapPx}
-        setRunwayCellGapPx={setRunwayCellGapPx}
-        runwayHeatmapCellRadiusPx={runwayHeatmapCellRadiusPx}
-        setRunwayHeatmapCellRadiusPx={setRunwayHeatmapCellRadiusPx}
         calendarLayoutPresent={!!calendarLayout}
         pngExporting={pngExporting}
         handleDownloadPng={handleDownloadPng}
@@ -2714,10 +2716,6 @@ export function RunwayGrid({
     setDimPastDays,
     runwayHeatmapUserCellPx,
     setRunwayHeatmapCellPx,
-    runwayCellGapPx,
-    setRunwayCellGapPx,
-    runwayHeatmapCellRadiusPx,
-    setRunwayHeatmapCellRadiusPx,
     calendarLayout,
     pngExporting,
     handleDownloadPng,
@@ -2912,10 +2910,6 @@ type RunwayViewActionsToolbarProps = {
   setDimPastDays: Dispatch<SetStateAction<boolean>>;
   runwayCellPx: number;
   setRunwayCellPx: Dispatch<SetStateAction<number>>;
-  runwayCellGapPx: number;
-  setRunwayCellGapPx: Dispatch<SetStateAction<number>>;
-  runwayHeatmapCellRadiusPx: number;
-  setRunwayHeatmapCellRadiusPx: Dispatch<SetStateAction<number>>;
   calendarLayoutPresent: boolean;
   pngExporting: boolean;
   handleDownloadPng: () => void | Promise<void>;
@@ -2934,10 +2928,6 @@ function RunwayViewActionsToolbar({
   setDimPastDays,
   runwayCellPx,
   setRunwayCellPx,
-  runwayCellGapPx,
-  setRunwayCellGapPx,
-  runwayHeatmapCellRadiusPx,
-  setRunwayHeatmapCellRadiusPx,
   calendarLayoutPresent,
   pngExporting,
   handleDownloadPng,
@@ -3025,26 +3015,16 @@ function RunwayViewActionsToolbar({
       >
         <ZoomIn className="h-3.5 w-3.5 opacity-90" aria-hidden />
       </button>
-      <RunwayHeatmapCellStylePopover
+      <button
+        type="button"
         disabled={countrySwitchLoading}
-        iconButtonClassName={RUNWAY_TOOLBAR_ICON_BTN}
-        cellPx={runwayCellPx}
-        setCellPx={setRunwayCellPx}
-        cellPxMin={RUNWAY_CELL_PX_MIN}
-        cellPxMax={RUNWAY_CELL_PX_MAX}
-        cellPxStep={RUNWAY_CELL_PX_STEP}
-        snapCellPx={snapRunwayCellPx}
-        gapPx={runwayCellGapPx}
-        setGapPx={setRunwayCellGapPx}
-        gapPxMin={RUNWAY_CELL_GAP_ADJ_MIN}
-        gapPxMax={RUNWAY_CELL_GAP_ADJ_MAX}
-        radiusPx={runwayHeatmapCellRadiusPx}
-        setRadiusPx={setRunwayHeatmapCellRadiusPx}
-        radiusPxMax={RUNWAY_HEATMAP_CELL_RADIUS_MAX}
-        defaultCellPx={RUNWAY_HEATMAP_LAYOUT_DEFAULTS.cellPx}
-        defaultGapPx={RUNWAY_HEATMAP_LAYOUT_DEFAULTS.gapPx}
-        defaultRadiusPx={RUNWAY_HEATMAP_LAYOUT_DEFAULTS.radiusPx}
-      />
+        onClick={() => requestOpenWorkbenchSettingsDialog()}
+        title="Workbench settings — cell size, sparkline, programme plan, heatmap"
+        aria-label="Open workbench settings"
+        className={RUNWAY_TOOLBAR_ICON_BTN}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5 opacity-90" aria-hidden />
+      </button>
       <button
         type="button"
         disabled={
@@ -3208,6 +3188,15 @@ function RunwayGridBody({
   landingTechSparklineTightFill,
   landingStaggerCellPulse,
 }: RunwayGridBodyProps) {
+  const runwayTechSparklineUtilSmoothWindow = useAtcStore((s) => s.runwayTechSparklineUtilSmoothWindow);
+  const sparklineUtilSmoothResolved = useMemo(
+    () =>
+      resolvedSparklineUtilSmoothWindow(runwayTechSparklineUtilSmoothWindow, {
+        landingMinimalChrome,
+      }),
+    [runwayTechSparklineUtilSmoothWindow, landingMinimalChrome],
+  );
+
   const enableColorSweep = !reduceMotion;
   const [postSweep, setPostSweep] = useState(reduceMotion);
   const [organicLayerTick, setOrganicLayerTick] = useState(0);
@@ -3383,7 +3372,7 @@ function RunwayGridBody({
 
   /** Session-only: programme Gantt on by default; per-lens contribution strips independent (see below). */
   const [showRunwayProgrammePlanWorkbench, setShowRunwayProgrammePlanWorkbench] = useState(true);
-  /** Workbench: XY sparkline always on; tech capacity (`combined`) strip on by default; trading / deployment off. */
+  /** Workbench: tech sparkline row above strips; trading/risk traces appear there when “three-line view” is on in programme display prefs. */
   const [showTripleLensTechCapacityStrip, setShowTripleLensTechCapacityStrip] = useState(true);
   const [showTripleLensTradingStrip, setShowTripleLensTradingStrip] = useState(false);
   const [showTripleLensDeploymentStrip, setShowTripleLensDeploymentStrip] = useState(false);
@@ -3391,6 +3380,46 @@ function RunwayGridBody({
   const showProgrammeGanttBlock =
     (landingMinimalChrome && landingProgrammePlan) ||
     (!landingMinimalChrome && showRunwayProgrammePlanWorkbench);
+
+  const [programmePlanHeatmapFocusRange, setProgrammePlanHeatmapFocusRange] =
+    useState<ProgrammePlanVisibleYmdRange | null>(null);
+
+  useEffect(() => {
+    if (!showProgrammeGanttBlock) setProgrammePlanHeatmapFocusRange(null);
+  }, [showProgrammeGanttBlock]);
+
+  const onProgrammePlanVisibleYmdRange = useCallback((r: ProgrammePlanVisibleYmdRange | null) => {
+    setProgrammePlanHeatmapFocusRange(r);
+  }, []);
+
+  const contributionStripProgrammePlanFocus = showProgrammeGanttBlock ? programmePlanHeatmapFocusRange : null;
+
+  /** Same programme display prefs as {@link RunwayProgrammeGanttBlock} / workbench settings (three-line sparkline). */
+  const [programmeGanttPrefsSnapshot, setProgrammeGanttPrefsSnapshot] = useState(() => loadProgrammeGanttPrefs());
+  useEffect(() => {
+    const sync = () => setProgrammeGanttPrefsSnapshot(loadProgrammeGanttPrefs());
+    sync();
+    window.addEventListener(PROGRAMME_GANTT_PREFS_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(PROGRAMME_GANTT_PREFS_CHANGED_EVENT, sync);
+  }, []);
+
+  const workbenchStandaloneSparklineGanttLensOverlays = useMemo(() => {
+    if (techStripModelTraceSuppressed || !programmeGanttPrefsSnapshot.showGanttUnifiedThreeLineSparkline) {
+      return undefined;
+    }
+    return {
+      unifiedThreeLine: true as const,
+      heatmapOptsTrading: heatmapOptsForMarketLens(country, 'in_store'),
+      heatmapOptsRisk: heatmapOptsForMarketLens(country, 'market_risk'),
+      organicLayerMarketKeyTrading: `${country}-in_store`,
+      organicLayerMarketKeyRisk: `${country}-market_risk`,
+    };
+  }, [
+    techStripModelTraceSuppressed,
+    programmeGanttPrefsSnapshot.showGanttUnifiedThreeLineSparkline,
+    heatmapOptsForMarketLens,
+    country,
+  ]);
 
   const tripleLensVisibleStripModes = useMemo((): ViewModeId[] => {
     if (landingMinimalChrome) return [...SINGLE_MARKET_STACK_LENS_IDS];
@@ -3845,43 +3874,96 @@ function RunwayGridBody({
                                       landingMinimalChrome && landingProgrammePlan ? 0 : 900
                                     }
                                     ephemeralInitialPrefs={landingProgrammePlanPrefs}
+                                    onPlanVisibleYmdRangeChange={onProgrammePlanVisibleYmdRange}
+                                    landingHeatmapOrganicSyncTick={
+                                      landingMinimalChrome &&
+                                      landingProgrammePlan &&
+                                      landingStaggerCellPulse
+                                        ? organicLayerTick
+                                        : undefined
+                                    }
+                                    landingOrganicSyncMarketKey={
+                                      landingMinimalChrome &&
+                                      landingProgrammePlan &&
+                                      landingStaggerCellPulse
+                                        ? `${country}-combined`
+                                        : undefined
+                                    }
+                                    techDemandSparkline={{
+                                      selectedDayYmd: singleMarketSelectedDayYmd,
+                                      modelTraceSuppressed: techStripModelTraceSuppressed,
+                                      landingMarketingSweepReveal:
+                                        landingMinimalChrome && landingTechSparklineSweep && !reduceMotion,
+                                      landingMarketingTightCapacityFill:
+                                        landingMinimalChrome && landingTechSparklineTightFill,
+                                      suppressSelectionColumnLine: suppressTripleLensSplitSelectionLines,
+                                      organicLayerTick: landingStaggerCellPulse ? organicLayerTick : undefined,
+                                      organicLayerMarketKey: landingStaggerCellPulse
+                                        ? `${country}-combined`
+                                        : undefined,
+                                      landingSparklineStackInMinOrganicTick:
+                                        landingMinimalChrome &&
+                                        landingProgrammePlan &&
+                                        landingStaggerCellPulse
+                                          ? 7
+                                          : undefined,
+                                      sparklineUtilSmoothWindow: sparklineUtilSmoothResolved,
+                                      riskTuning,
+                                      ganttLensOverlaySource: {
+                                        heatmapOptsTrading: heatmapOptsForMarketLens(country, 'in_store'),
+                                        heatmapOptsRisk: heatmapOptsForMarketLens(country, 'market_risk'),
+                                        organicLayerMarketKeyTrading: `${country}-in_store`,
+                                        organicLayerMarketKeyRisk: `${country}-market_risk`,
+                                      },
+                                    }}
                                   />
                                 </motion.div>
                               ) : null}
                             </AnimatePresence>
-                            <div className="flex min-h-0 shrink-0 flex-col gap-1">
-                              <div className="flex min-h-0 flex-row items-end gap-1.5">
-                                <div
-                                  className="shrink-0"
-                                  style={{ width: SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX }}
-                                  aria-hidden
-                                />
-                                <RunwayTechCapacityDemandSparkline
-                                  contributionMeta={contributionMeta}
-                                  cellPx={cellPx}
-                                  gap={gap}
-                                  riskByDate={singleRiskByDate!}
-                                  width={contributionColumnContentWidth ?? contentWidth}
-                                  selectedDayYmd={singleMarketSelectedDayYmd}
-                                  className="min-w-0"
-                                  modelTraceSuppressed={techStripModelTraceSuppressed}
-                                  landingMarketingSweepReveal={
-                                    landingMinimalChrome && landingTechSparklineSweep && !reduceMotion
-                                  }
-                                  landingMarketingTightCapacityFill={
-                                    landingMinimalChrome && landingTechSparklineTightFill
-                                  }
-                                  suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
-                                  organicLayerTick={
-                                    landingStaggerCellPulse ? organicLayerTick : undefined
-                                  }
-                                  organicLayerMarketKey={
-                                    landingStaggerCellPulse ? `${country}-combined` : undefined
-                                  }
-                                  riskTuning={riskTuning}
-                                />
+                            {!showProgrammeGanttBlock ? (
+                              <div className="flex min-h-0 shrink-0 flex-col gap-1">
+                                <div className="flex min-h-0 flex-row items-end gap-1.5">
+                                  <div
+                                    className="shrink-0"
+                                    style={{ width: SINGLE_MARKET_TRIPLE_LENS_LEFT_RAIL_W_PX }}
+                                    aria-hidden
+                                  />
+                                  <RunwayTechCapacityDemandSparkline
+                                    contributionMeta={contributionMeta}
+                                    cellPx={cellPx}
+                                    gap={gap}
+                                    riskByDate={singleRiskByDate!}
+                                    width={contributionColumnContentWidth ?? contentWidth}
+                                    selectedDayYmd={singleMarketSelectedDayYmd}
+                                    className="min-w-0"
+                                    modelTraceSuppressed={techStripModelTraceSuppressed}
+                                    landingMarketingSweepReveal={
+                                      landingMinimalChrome && landingTechSparklineSweep && !reduceMotion
+                                    }
+                                    landingMarketingTightCapacityFill={
+                                      landingMinimalChrome && landingTechSparklineTightFill
+                                    }
+                                    suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
+                                    organicLayerTick={
+                                      landingStaggerCellPulse ? organicLayerTick : undefined
+                                    }
+                                    organicLayerMarketKey={
+                                      landingStaggerCellPulse ? `${country}-combined` : undefined
+                                    }
+                                    landingSparklineStackInMinOrganicTick={
+                                      landingMinimalChrome &&
+                                      landingProgrammePlan &&
+                                      landingStaggerCellPulse
+                                        ? 7
+                                        : undefined
+                                    }
+                                    sparklineUtilSmoothWindow={sparklineUtilSmoothResolved}
+                                    riskTuning={riskTuning}
+                                    ganttLensOverlays={workbenchStandaloneSparklineGanttLensOverlays}
+                                  />
+                                </div>
                               </div>
-                            </div>
+                            ) : null}
                             <AnimatePresence initial={false} mode="popLayout">
                               {tripleLensVisibleStripModes.map((lensMode, rowIdx) => {
                                 const stripW = contributionColumnContentWidth ?? contentWidth;
@@ -3895,7 +3977,11 @@ function RunwayGridBody({
                                     key={lensMode}
                                     layout
                                     className="flex min-h-0 shrink-0 flex-row items-start gap-1.5"
-                                    style={{ height: stripH }}
+                                    style={{
+                                      minHeight: stripH,
+                                      height: stripH,
+                                      maxHeight: stripH,
+                                    }}
                                     initial={reduceMotion ? false : { opacity: 0, y: -8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={
@@ -3924,66 +4010,66 @@ function RunwayGridBody({
                                   >
                                     <TripleLensStackRailCaption lensMode={lensMode} railH={railH} />
                                     <div
-                                      className="relative z-0 min-w-0 shrink-0 self-stretch overflow-visible bg-transparent"
-                                      style={{
-                                        width: stripW,
-                                        height: stripH,
-                                        minHeight: stripH,
-                                        maxHeight: stripH,
-                                      }}
+                                      className="relative z-0 flex min-w-0 shrink-0 flex-col self-stretch overflow-visible bg-transparent"
+                                      style={{ width: stripW, minHeight: stripH }}
                                     >
-                                      <RunwayContributionStripSvg
-                                        marketKey={`${country}-${lensMode}`}
-                                        placedCells={placedCells}
-                                        contributionMeta={contributionMeta}
-                                        cellPx={cellPx}
-                                        gap={gap}
-                                        cellRadiusPx={heatmapCellRadiusPx}
-                                        width={stripW}
-                                        height={stripH}
-                                        riskByDate={singleRiskByDate!}
-                                        heatmapOpts={heatmapOptsForMarketLens(country, lensMode)}
-                                        riskTuning={riskTuning}
-                                        viewMode={lensMode}
-                                        todayYmd={todayYmd}
-                                        dimPastDays={dimPastDays}
-                                        selectedDayYmd={singleMarketSelectedDayYmd}
-                                        openDayDetailsFromCell={(anchor, ds, wc) =>
-                                          makeShowTip(country, singleRiskByDate!, marketConfig)(anchor, ds, wc, {
-                                            detailViewMode: lensMode,
-                                          })
-                                        }
-                                        emergeResetKey={`${isoGrowResetKey}-${lensMode}`}
-                                        emergeStaggerMs={
-                                          landingMinimalChrome
-                                            ? rowIdx * LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS
-                                            : 0
-                                        }
-                                        showAxisLabels={isBottomRow}
-                                        ledgerAttribution={ledgerAttrForLens(lensMode)}
-                                        ledgerImplicitBaselineFootprint={
-                                          ledgerImplicitBaselineFootprintForHeatmap
-                                        }
-                                        deploymentRiskBlackouts={
-                                          lensMode === 'market_risk'
-                                            ? marketConfig?.deployment_risk_blackouts ?? null
-                                            : null
-                                        }
-                                        landingStaggerCellPulse={landingStaggerCellPulse}
-                                        organicLayerTick={
-                                          landingStaggerCellPulse ? organicLayerTick : undefined
-                                        }
-                                        suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
-                                      />
+                                      <div className="shrink-0" style={{ width: stripW, height: stripH }}>
+                                        <RunwayContributionStripSvg
+                                          marketKey={`${country}-${lensMode}`}
+                                          placedCells={placedCells}
+                                          contributionMeta={contributionMeta}
+                                          cellPx={cellPx}
+                                          gap={gap}
+                                          cellRadiusPx={heatmapCellRadiusPx}
+                                          width={stripW}
+                                          height={stripH}
+                                          riskByDate={singleRiskByDate!}
+                                          heatmapOpts={heatmapOptsForMarketLens(country, lensMode)}
+                                          riskTuning={riskTuning}
+                                          viewMode={lensMode}
+                                          todayYmd={todayYmd}
+                                          dimPastDays={dimPastDays}
+                                          selectedDayYmd={singleMarketSelectedDayYmd}
+                                          openDayDetailsFromCell={(anchor, ds, wc) =>
+                                            makeShowTip(country, singleRiskByDate!, marketConfig)(anchor, ds, wc, {
+                                              detailViewMode: lensMode,
+                                            })
+                                          }
+                                          emergeResetKey={`${isoGrowResetKey}-${lensMode}`}
+                                          emergeStaggerMs={
+                                            landingMinimalChrome
+                                              ? rowIdx * LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS
+                                              : 0
+                                          }
+                                          showAxisLabels={isBottomRow}
+                                          ledgerAttribution={ledgerAttrForLens(lensMode)}
+                                          ledgerImplicitBaselineFootprint={
+                                            ledgerImplicitBaselineFootprintForHeatmap
+                                          }
+                                          deploymentRiskBlackouts={
+                                            lensMode === 'market_risk'
+                                              ? marketConfig?.deployment_risk_blackouts ?? null
+                                              : null
+                                          }
+                                          landingStaggerCellPulse={landingStaggerCellPulse}
+                                          organicLayerTick={
+                                            landingStaggerCellPulse ? organicLayerTick : undefined
+                                          }
+                                          suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
+                                          programmePlanFocusVisibleRange={contributionStripProgrammePlanFocus}
+                                        />
+                                      </div>
                                     </div>
                                   </motion.div>
                                 );
                               })}
                             </AnimatePresence>
                           </div>
-                          <div className="relative z-[4] ml-[25px] flex shrink-0 self-end">
-                            {heatmapLegendEl}
-                          </div>
+                          {tripleLensVisibleStripModes.length > 0 ? (
+                            <div className="relative z-[4] ml-[25px] flex shrink-0 self-end">
+                              {heatmapLegendEl}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     ) : layoutKind === 'contribution_strip' && contributionMeta ? (
@@ -4020,6 +4106,7 @@ function RunwayGridBody({
                           organicLayerTick={
                             landingStaggerCellPulse ? organicLayerTick : undefined
                           }
+                          programmePlanFocusVisibleRange={contributionStripProgrammePlanFocus}
                         />
                         <div className="relative z-[4] ml-[25px] flex shrink-0 self-end">
                           {heatmapLegendEl}

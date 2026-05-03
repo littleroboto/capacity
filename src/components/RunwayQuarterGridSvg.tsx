@@ -25,7 +25,6 @@ import {
   ledgerAttributionNeutralFillHex,
   maxRawLedgerOverlapInMap,
 } from '@/lib/runwayLedgerAttribution';
-
 type RunwayTipAnchor = { clientX: number; clientY: number };
 
 export type RunwayQuarterGridSvgProps = {
@@ -191,7 +190,7 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
             x={wd.x}
             y={wd.y}
             textAnchor="middle"
-            style={{ fontSize: 9, fontWeight: 600, letterSpacing: '-0.02em' }}
+            style={{ fontSize: 8, fontWeight: 600, letterSpacing: '-0.015em' }}
           >
             <title>{wd.title}</title>
             {wd.abbr}
@@ -269,7 +268,9 @@ export const RunwayQuarterGridSvg = memo(function RunwayQuarterGridSvg({
                 ry={rr}
                 fill={fill}
                 opacity={opacity}
-                className={isSelected ? 'stroke-primary' : 'stroke-border/35'}
+                className={
+                  isSelected ? 'stroke-primary' : 'stroke-border/35'
+                }
                 strokeWidth={
                   isSelected ? 1.75 : ledgerAttribution && overlap > 1 ? 1.25 : 0.5
                 }

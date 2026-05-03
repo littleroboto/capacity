@@ -1,12 +1,13 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
 import type { RiskRow } from '@/engine/riskModel';
 import { DEFAULT_RISK_TUNING, type RiskModelTuning } from '@/engine/riskModelTuning';
 import {
   CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX,
+  CONTRIBUTION_STRIP_TIME_AXIS_STACK_H,
   CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W,
   RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CHART_PX,
-  RUNWAY_TECH_SPARKLINE_STACK_PX,
+  RUNWAY_TECH_SPARKLINE_LEGEND_BELOW_CHART_PX,
 } from '@/lib/calendarQuarterLayout';
 import type { ContributionStripLayoutMeta } from '@/lib/calendarQuarterLayout';
 import {
@@ -24,25 +25,71 @@ import {
   contributionStripDayColumnCenterX,
   contributionStripDaySparklineX,
 } from '@/lib/runwayTechContributionOverloadHistogram';
+import type { HeatmapColorOpts } from '@/lib/riskHeatmapColors';
+import {
+  buildGanttLensOverlayU01Series,
+  movingAverageForModeledDays,
+} from '@/lib/runwayGanttLensOverlaySeries';
 import { heatmapCellMetric } from '@/lib/runwayViewMetrics';
+import {
+  loadSparklineTripleSeriesVisibility,
+  saveSparklineTripleSeriesVisibility,
+  type SparklineTripleSeriesKey,
+} from '@/lib/runwaySparklineSeriesVisibility';
 import { cn } from '@/lib/utils';
 
 const RS = {
   marker: 'hsl(var(--primary) / 0.85)',
 } as const;
 
-const CHART_H = RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CHART_PX;
-/** Placeholder / min block: chronology + chart (see `RUNWAY_TECH_SPARKLINE_STACK_PX`). */
-const BLOCK_H = RUNWAY_TECH_SPARKLINE_STACK_PX;
-/** Vertical padding inside the SVG so the trace does not touch the top/bottom edges. */
-const PAD_Y = Math.round(CHART_H * 0.1);
 /** Minimum `uMax − uMin` on the strip (share of cap) so BAU cadence is readable, not a flat hairline. */
 const SCALE_UTIL_SPAN_FLOOR = 0.08;
+/** Programme Gantt unified three-line chart: centered moving average window (modeled days only). */
+const GANTT_TRIPLE_MOVING_AVERAGE_WINDOW = 7;
+/** Per-trace vertical span floor (tech ratios): keeps a flat week from collapsing to a hairline. */
+const GANTT_TRIPLE_TECH_SPAN_FLOOR = 0.08;
+/** Per-trace span floor (restaurant / risk 0–1 display scalars): same intent as strip lens sparklines. */
+const GANTT_TRIPLE_LENS_SPAN_FLOOR = 0.06;
 
 const Y_AXIS_TICK_X0 = 14;
 const Y_AXIS_TICK_X1 = 20;
 const Y_AXIS_LABEL_ANCHOR_X = Y_AXIS_TICK_X0 - 2;
-const LEFT_AXIS_OVERFLOW_PX = 14;
+/** Extra width left of the strip for High/Low labels + margin (~14px wider than legacy 14). */
+const LEFT_AXIS_OVERFLOW_PX = 28;
+
+function SparklineLegendLineSwatch({
+  className,
+  dashed,
+}: {
+  className: string;
+  dashed?: boolean;
+}) {
+  return (
+    <svg width={14} height={10} viewBox="0 0 14 10" className="shrink-0 overflow-visible" aria-hidden>
+      <line
+        x1={0}
+        y1={5}
+        x2={14}
+        y2={5}
+        fill="none"
+        className={className}
+        strokeWidth={dashed ? 1.2 : 2}
+        strokeLinecap="round"
+        strokeDasharray={dashed ? '3 3' : undefined}
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+/** Tech utilization / tech demand trace (single- and triple-line). */
+const SPARKLINE_TECH_STROKE_SOLID = 'stroke-blue-600 dark:stroke-blue-400';
+/** Single-line mode: dotted segments below 100% cap — still blue family. */
+const SPARKLINE_TECH_STROKE_HEADROOM = 'stroke-blue-500/55 dark:stroke-blue-400/48';
+/** Store / in-restaurant trading lens overlay (triple-line). */
+const SPARKLINE_STORE_TRADING_STROKE = 'stroke-emerald-600 dark:stroke-emerald-400';
+/** Deployment risk lens overlay (triple-line). */
+const SPARKLINE_DEPLOYMENT_RISK_STROKE = 'stroke-rose-700 dark:stroke-rose-400';
 
 const DEFICIT_FILL = 'fill-[hsl(350_88%_40%)] dark:fill-[hsl(348_92%_58%)]';
 const TIGHT_HEADROOM_FILL = 'fill-rose-500/[0.32] dark:fill-rose-400/[0.28]';
@@ -50,6 +97,35 @@ const TIGHT_HEADROOM_FILL = 'fill-rose-500/[0.32] dark:fill-rose-400/[0.28]';
 const TIGHT_HEADROOM_UTIL_LOW = 0.86;
 
 type SparkPt = { x: number; y: number };
+
+type DayWithTrace = ReturnType<typeof computeContributionStripDailyCapacityBalance>[number] & {
+  uTrace: number;
+};
+
+/**
+ * Odd window ≥ 3: centered mean of `uTrace` over modeled (`hasData`) neighbors only.
+ * Leaves `hasData: false` days unchanged (flat baseline segment).
+ */
+function movingAverageUTraceForModeledDays(days: readonly DayWithTrace[], window: number): number[] {
+  const n = days.length;
+  const out = days.map((d) => d.uTrace);
+  if (window < 3 || window % 2 === 0 || n === 0) return out;
+  const half = (window - 1) / 2;
+  for (let i = 0; i < n; i += 1) {
+    if (!days[i]!.hasData) continue;
+    let sum = 0;
+    let cnt = 0;
+    for (let k = -half; k <= half; k += 1) {
+      const j = i + k;
+      if (j < 0 || j >= n) continue;
+      if (!days[j]!.hasData) continue;
+      sum += days[j]!.uTrace;
+      cnt += 1;
+    }
+    if (cnt > 0) out[i] = sum / cnt;
+  }
+  return out;
+}
 
 function ribbonPathsBetweenBaseline(
   pts: SparkPt[],
@@ -201,7 +277,36 @@ export type RunwayTechCapacityDemandSparklineProps = {
   organicLayerTick?: number;
   /** Hash salt for {@link organicHeatmapCellLayerIndex}; use the same key as the combined tech strip. */
   organicLayerMarketKey?: string;
+  /**
+   * When set with {@link landingMarketingSweepReveal}, delay the stack-in CSS until the organic
+   * tick reaches this value (homepage: sparkline eases in after Gantt has started drawing).
+   */
+  landingSparklineStackInMinOrganicTick?: number;
+  /**
+   * Odd window ≥ 3: smooth displayed utilization (centered moving average over modeled days only).
+   * Keeps underlying model and axis span from raw ratios; softens single-day jitter in the stroke and fills.
+   */
+  sparklineUtilSmoothWindow?: number;
   riskTuning?: RiskModelTuning;
+  /**
+   * Programme Gantt: optional unified chart — tech utilization, restaurant, and deployment risk in one strip with
+   * fixed 7-day smoothing; each trace is vertically stretched from its own in-window min/max (qualitative shapes).
+   * Merged from prefs in {@link RunwayProgrammeGanttBlock}.
+   */
+  ganttLensOverlays?: {
+    unifiedThreeLine: boolean;
+    heatmapOptsTrading: HeatmapColorOpts;
+    heatmapOptsRisk: HeatmapColorOpts;
+    organicLayerMarketKeyTrading: string;
+    organicLayerMarketKeyRisk: string;
+  };
+  /**
+   * Chart SVG height in px (viewBox height for the utilization plot). Workbench uses the default
+   * {@link RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CHART_PX}; programme Gantt passes a smaller value for a squished Y band.
+   */
+  chartSvgHeightPx?: number;
+  /** Extra px between the chronology SVG and the chart SVG (programme Gantt uses ~30px). */
+  chartContentMarginTopPx?: number;
 };
 
 function yForUtilizationStroke(
@@ -239,9 +344,30 @@ export function RunwayTechCapacityDemandSparkline({
   suppressSelectionColumnLine = false,
   organicLayerTick,
   organicLayerMarketKey,
+  landingSparklineStackInMinOrganicTick,
+  sparklineUtilSmoothWindow,
   riskTuning = DEFAULT_RISK_TUNING,
+  ganttLensOverlays,
+  chartSvgHeightPx = RUNWAY_TECH_CONTRIBUTION_HISTOGRAM_CHART_PX,
+  chartContentMarginTopPx = 0,
 }: RunwayTechCapacityDemandSparklineProps) {
+  const chartH = chartSvgHeightPx;
+  const padY = Math.round(chartH * 0.1);
+  const blockStackH =
+    CONTRIBUTION_STRIP_TIME_AXIS_STACK_H +
+    CONTRIBUTION_STRIP_GRID_AXIS_GAP_PX +
+    chartContentMarginTopPx +
+    chartH +
+    RUNWAY_TECH_SPARKLINE_LEGEND_BELOW_CHART_PX;
   const prefersReducedMotion = useReducedMotion();
+  const [tripleSeriesVisible, setTripleSeriesVisible] = useState(() => loadSparklineTripleSeriesVisibility());
+  const setTripleSeriesVis = useCallback((key: SparklineTripleSeriesKey, value: boolean) => {
+    setTripleSeriesVisible((prev) => {
+      const next = { ...prev, [key]: value };
+      saveSparklineTripleSeriesVisibility(next);
+      return next;
+    });
+  }, []);
   const organicTraceOn =
     organicLayerTick != null &&
     organicLayerMarketKey != null &&
@@ -265,8 +391,8 @@ export function RunwayTechCapacityDemandSparkline({
     [contributionMeta, riskByDate],
   );
 
-  const innerH = CHART_H - PAD_Y * 2;
-  const centerY = PAD_Y + innerH / 2;
+  const innerH = chartH - padY * 2;
+  const centerY = padY + innerH / 2;
   const halfSpan = Math.max(12, innerH / 2 - 4);
   const yBandTop = centerY - halfSpan;
   const yBandBot = centerY + halfSpan;
@@ -308,7 +434,116 @@ export function RunwayTechCapacityDemandSparkline({
     riskTuning,
   ]);
 
+  const utilSmoothedForDisplay = useMemo(() => {
+    const w = sparklineUtilSmoothWindow;
+    if (w == null || w < 3 || w % 2 === 0) return null;
+    return movingAverageUTraceForModeledDays(daysForTrace, w);
+  }, [daysForTrace, sparklineUtilSmoothWindow]);
+
+  const daysForSparkDisplay = useMemo((): DayWithTrace[] => {
+    if (!utilSmoothedForDisplay) return daysForTrace;
+    return daysForTrace.map((d, i) => ({ ...d, uTrace: utilSmoothedForDisplay[i]! }));
+  }, [daysForTrace, utilSmoothedForDisplay]);
+
+  const ganttTripleUnified =
+    Boolean(ganttLensOverlays?.unifiedThreeLine) && !modelTraceSuppressed && ganttLensOverlays != null;
+
+  const tripleLinePack = useMemo(() => {
+    if (!ganttTripleUnified || !ganttLensOverlays) return null;
+    const go = ganttLensOverlays;
+    const n = days.length;
+    const has = days.map((d) => d.hasData);
+    const w = GANTT_TRIPLE_MOVING_AVERAGE_WINDOW;
+    const techRaw = daysForTrace.map((d) => d.uTrace);
+    const techSm = movingAverageForModeledDays(techRaw, has, w);
+    const restRaw = buildGanttLensOverlayU01Series(
+      days,
+      riskByDate,
+      'in_store',
+      go.heatmapOptsTrading,
+      riskTuning,
+      organicLayerTick,
+      go.organicLayerMarketKeyTrading,
+      prefersReducedMotion,
+      sparklineUtilSmoothWindow,
+      'none',
+    );
+    const riskRaw = buildGanttLensOverlayU01Series(
+      days,
+      riskByDate,
+      'market_risk',
+      go.heatmapOptsRisk,
+      riskTuning,
+      organicLayerTick,
+      go.organicLayerMarketKeyRisk,
+      prefersReducedMotion,
+      sparklineUtilSmoothWindow,
+      'none',
+    );
+    const restSm = movingAverageForModeledDays(restRaw, has, w);
+    const riskSm = movingAverageForModeledDays(riskRaw, has, w);
+
+    const qualScale = (uArr: number[], spanFloor: number): { uMin: number; span: number } | null => {
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let i = 0; i < n; i += 1) {
+        if (!has[i]) continue;
+        lo = Math.min(lo, uArr[i]!);
+        hi = Math.max(hi, uArr[i]!);
+      }
+      if (!Number.isFinite(lo)) return null;
+      const span = Math.max(spanFloor, hi - lo);
+      return { uMin: lo, span };
+    };
+
+    const techQ = qualScale(techSm, GANTT_TRIPLE_TECH_SPAN_FLOOR);
+    const restQ = qualScale(restSm, GANTT_TRIPLE_LENS_SPAN_FLOOR);
+    const riskQ = qualScale(riskSm, GANTT_TRIPLE_LENS_SPAN_FLOOR);
+    if (!techQ || !restQ || !riskQ) return null;
+
+    const toPts = (uArr: number[], q: { uMin: number; span: number }): SparkPt[] =>
+      days.map((d, i) => {
+        const x = contributionStripDaySparklineX(cellPx, gap, d.dayIndex) + LEFT_AXIS_OVERFLOW_PX;
+        if (!d.hasData) return { x, y: yBandBot };
+        return { x, y: yForUtilizationStroke(uArr[i]!, q.uMin, q.span, yBandTop, yBandBot) };
+      });
+    const techPts = toPts(techSm, techQ);
+    const restPts = toPts(restSm, restQ);
+    const riskPts = toPts(riskSm, riskQ);
+    const y100Raw =
+      1 >= techQ.uMin - 1e-9 && 1 <= techQ.uMin + techQ.span + 1e-9
+        ? yForUtilizationCapLine(1, techQ.uMin, techQ.span, yBandTop, yBandBot)
+        : null;
+    return {
+      techQ,
+      restQ,
+      riskQ,
+      techPts,
+      restPts,
+      riskPts,
+      y100: y100Raw != null ? Math.min(yBandBot, Math.max(yBandTop, y100Raw)) : null,
+    };
+  }, [
+    ganttTripleUnified,
+    ganttLensOverlays,
+    days,
+    daysForTrace,
+    riskByDate,
+    riskTuning,
+    organicLayerTick,
+    prefersReducedMotion,
+    sparklineUtilSmoothWindow,
+    cellPx,
+    gap,
+    yBandTop,
+    yBandBot,
+  ]);
+
   const uScale = useMemo(() => {
+    if (tripleLinePack) {
+      const { techQ } = tripleLinePack;
+      return { uMin: techQ.uMin, uMax: techQ.uMin + techQ.span, span: techQ.span };
+    }
     if (!modeledDays.length) {
       return { uMin: 0, uMax: 1, span: 1 };
     }
@@ -317,17 +552,20 @@ export function RunwayTechCapacityDemandSparkline({
     const uMax = Math.max(...us);
     const span = Math.max(SCALE_UTIL_SPAN_FLOOR, uMax - uMin);
     return { uMin, uMax, span };
-  }, [modeledDays]);
+  }, [tripleLinePack, modeledDays]);
 
   const yCapPx = useMemo(() => {
+    if (tripleLinePack?.y100 != null) return tripleLinePack.y100;
+    if (tripleLinePack) return (yBandTop + yBandBot) / 2;
     const { uMin, span } = uScale;
     const raw = yForUtilizationCapLine(1, uMin, span, yBandTop, yBandBot);
     return Math.min(yBandBot, Math.max(yBandTop, raw));
-  }, [uScale, yBandTop, yBandBot]);
+  }, [tripleLinePack, uScale, yBandTop, yBandBot]);
 
   const sparkPtsRawSvg = useMemo((): SparkPt[] => {
+    if (tripleLinePack) return tripleLinePack.techPts;
     const { uMin, span } = uScale;
-    return daysForTrace.map((d) => {
+    return daysForSparkDisplay.map((d) => {
       const x = contributionStripDaySparklineX(cellPx, gap, d.dayIndex);
       const xo = x + LEFT_AXIS_OVERFLOW_PX;
       if (modelTraceSuppressed || !d.hasData) {
@@ -336,30 +574,48 @@ export function RunwayTechCapacityDemandSparkline({
       const y = yForUtilizationStroke(d.uTrace, uMin, span, yBandTop, yBandBot);
       return { x: xo, y };
     });
-  }, [daysForTrace, cellPx, gap, uScale, yBandTop, yBandBot, modelTraceSuppressed]);
+  }, [tripleLinePack, daysForSparkDisplay, cellPx, gap, uScale, yBandTop, yBandBot, modelTraceSuppressed]);
 
-  const deficitRibbonDsSvg = useMemo(
-    () => ribbonPathsBetweenBaseline(sparkPtsRawSvg, yCapPx, (y) => y < yCapPx),
-    [sparkPtsRawSvg, yCapPx],
-  );
+  const deficitRibbonDsSvg = useMemo(() => {
+    if (tripleLinePack) return [];
+    return ribbonPathsBetweenBaseline(sparkPtsRawSvg, yCapPx, (y) => y < yCapPx);
+  }, [tripleLinePack, sparkPtsRawSvg, yCapPx]);
 
   const tightHeadroomMask = useMemo(() => {
-    if (!landingMarketingTightCapacityFill) return null;
-    return daysForTrace.map((d) => {
+    if (tripleLinePack || !landingMarketingTightCapacityFill) return null;
+    return daysForSparkDisplay.map((d) => {
       if (modelTraceSuppressed || !d.hasData) return false;
       const u = d.uTrace;
       return u >= TIGHT_HEADROOM_UTIL_LOW && u <= 1 + 1e-9;
     });
-  }, [daysForTrace, modelTraceSuppressed, landingMarketingTightCapacityFill]);
+  }, [tripleLinePack, daysForSparkDisplay, modelTraceSuppressed, landingMarketingTightCapacityFill]);
 
   const tightRibbonDsSvg = useMemo(() => {
     if (!tightHeadroomMask) return [];
     return ribbonPathsTightHeadroomToCap(sparkPtsRawSvg, tightHeadroomMask, yCapPx);
   }, [tightHeadroomMask, sparkPtsRawSvg, yCapPx]);
 
-  const sparkStrokeRuns = useMemo(
-    () => polylineRunsByCapBaseline(sparkPtsRawSvg, yCapPx),
-    [sparkPtsRawSvg, yCapPx],
+  const sparkStrokeRuns = useMemo(() => {
+    if (tripleLinePack) {
+      if (tripleLinePack.y100 != null) {
+        return polylineRunsByCapBaseline(tripleLinePack.techPts, tripleLinePack.y100);
+      }
+      return tripleLinePack.techPts.length >= 2
+        ? [{ dotted: false as const, points: tripleLinePack.techPts }]
+        : [];
+    }
+    return polylineRunsByCapBaseline(sparkPtsRawSvg, yCapPx);
+  }, [tripleLinePack, sparkPtsRawSvg, yCapPx]);
+
+  const tripleRestPathD = useMemo(
+    () =>
+      tripleLinePack && tripleLinePack.restPts.length >= 2 ? pathDFromPoints(tripleLinePack.restPts) : '',
+    [tripleLinePack],
+  );
+  const tripleRiskPathD = useMemo(
+    () =>
+      tripleLinePack && tripleLinePack.riskPts.length >= 2 ? pathDFromPoints(tripleLinePack.riskPts) : '',
+    [tripleLinePack],
   );
 
   const selX = useMemo(() => {
@@ -380,21 +636,26 @@ export function RunwayTechCapacityDemandSparkline({
   );
 
   const axisBandPct = Math.round(Math.min(250, uScale.span * 100));
-  const yAxisTopLabel = 'Peak';
-  const yAxisMidLabel = '100%';
+  const yAxisTopLabel = 'High';
   const yAxisBotLabel = 'Low';
+
+  const stackInOrganicGate =
+    landingSparklineStackInMinOrganicTick == null ||
+    organicLayerTick == null ||
+    organicLayerTick >= landingSparklineStackInMinOrganicTick;
 
   const softStackIn =
     landingMarketingSweepReveal &&
     !prefersReducedMotion &&
     width >= 24 &&
-    contributionMeta.numWeeks >= 1;
+    contributionMeta.numWeeks >= 1 &&
+    stackInOrganicGate;
 
   if (width < 24 || contributionMeta.numWeeks < 1) {
     return (
       <div
         className={cn('rounded-md border border-border/30 bg-muted/15 dark:border-border/40', className)}
-        style={{ width, height: BLOCK_H }}
+        style={{ width, height: blockStackH }}
         aria-hidden
       />
     );
@@ -402,9 +663,17 @@ export function RunwayTechCapacityDemandSparkline({
 
   const xo = (x: number) => x + LEFT_AXIS_OVERFLOW_PX;
 
-  const ariaChart = `Daily technology load as a share of effective lab and Market IT capacity along the strip; vertical scale stretches across the lowest and highest share in this window (span about ${axisBandPct} percentage points of cap); middle tick marks 100% of modeled caps; red fill only where load exceeds 100% of caps${
-    landingMarketingTightCapacityFill ? '; rose fill where load is high but still at or below 100% of caps' : ''
-  }; dotted stroke where there is headroom below 100%`;
+  const ariaChart = tripleLinePack
+    ? `Programme chart: three qualitative sparklines — tech demand (blue), store trading (green), and deployment risk (red). Each series is shown with a centered ${GANTT_TRIPLE_MOVING_AVERAGE_WINDOW}-day average on modeled days and is scaled to its own high–low range so shapes read clearly (not a single shared numeric axis). Tech 100% of caps is marked in the band only when that level falls inside the tech trace’s scaled range${
+        tripleLinePack.y100 != null ? '.' : ' (off-scale in this window).'
+      }`
+    : `Daily technology load as a share of effective lab and Market IT capacity along the strip; vertical scale stretches across the lowest and highest share in this window (span about ${axisBandPct} percentage points of cap); a faint horizontal line marks 100% of modeled caps when visible in the band; red fill only where load exceeds 100% of caps${
+        landingMarketingTightCapacityFill ? '; rose fill where load is high but still at or below 100% of caps' : ''
+      }; dotted stroke where there is headroom below 100%${
+        sparklineUtilSmoothWindow != null && sparklineUtilSmoothWindow >= 3
+          ? '; displayed trace uses a short moving average for readability'
+          : ''
+      }`;
 
   const ch = chronologyAbove.height;
 
@@ -558,10 +827,14 @@ export function RunwayTechCapacityDemandSparkline({
           />
         ) : null}
       </svg>
+      <div
+        className="block max-w-none shrink-0"
+        style={{ marginTop: chartContentMarginTopPx }}
+      >
       <svg
         width={width + LEFT_AXIS_OVERFLOW_PX}
-        height={CHART_H}
-        viewBox={`0 0 ${width + LEFT_AXIS_OVERFLOW_PX} ${CHART_H}`}
+        height={chartH}
+        viewBox={`0 0 ${width + LEFT_AXIS_OVERFLOW_PX} ${chartH}`}
         className="block max-w-none shrink-0 text-foreground"
         style={{ marginLeft: -LEFT_AXIS_OVERFLOW_PX }}
         role="img"
@@ -591,16 +864,6 @@ export function RunwayTechCapacityDemandSparkline({
           <line
             x1={xo(Y_AXIS_TICK_X0)}
             x2={xo(Y_AXIS_TICK_X1)}
-            y1={yCapPx}
-            y2={yCapPx}
-            stroke="currentColor"
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-            opacity={0.55}
-          />
-          <line
-            x1={xo(Y_AXIS_TICK_X0)}
-            x2={xo(Y_AXIS_TICK_X1)}
             y1={yBandBot}
             y2={yBandBot}
             stroke="currentColor"
@@ -616,19 +879,12 @@ export function RunwayTechCapacityDemandSparkline({
             fill="currentColor"
             style={{ fontSize: 9, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
           >
-            <title>{`Highest share of lab+Market IT caps consumed in this strip (top of scaled band; span ≈ ${axisBandPct} pts of cap)`}</title>
+            <title>
+              {tripleLinePack
+                ? 'Top of chart band — each trace is stretched from its own high in this window (qualitative shape, not a common number scale)'
+                : `Top of utilization band in this strip (span ≈ ${axisBandPct} pts of cap vs modeled limits)`}
+            </title>
             {yAxisTopLabel}
-          </text>
-          <text
-            x={xo(Y_AXIS_LABEL_ANCHOR_X)}
-            y={yCapPx}
-            dominantBaseline="central"
-            textAnchor="end"
-            fill="currentColor"
-            style={{ fontSize: 9, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
-          >
-            <title>100% of modeled lab and Market IT effective capacity</title>
-            {yAxisMidLabel}
           </text>
           <text
             x={xo(Y_AXIS_LABEL_ANCHOR_X)}
@@ -638,7 +894,11 @@ export function RunwayTechCapacityDemandSparkline({
             fill="currentColor"
             style={{ fontSize: 9, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
           >
-            <title>{`Lowest share in this strip (bottom of scaled band; span ≈ ${axisBandPct} pts of cap)`}</title>
+            <title>
+              {tripleLinePack
+                ? 'Bottom of chart band — each trace is stretched from its own low in this window (qualitative comparison of rhythm, not level)'
+                : `Lowest share in this strip (bottom of scaled band; span ≈ ${axisBandPct} pts of cap)`}
+            </title>
             {yAxisBotLabel}
           </text>
         </g>
@@ -661,19 +921,48 @@ export function RunwayTechCapacityDemandSparkline({
               vectorEffect="non-scaling-stroke"
             />
           ))}
-          {sparkStrokeRuns.map((run, i) => (
+          {tripleLinePack && tripleSeriesVisible.trading && tripleRestPathD ? (
             <path
-              key={`spark-run-${i}`}
-              d={pathDFromPoints(run.points)}
+              d={tripleRestPathD}
               fill="none"
-              className={run.dotted ? 'stroke-muted-foreground/45' : 'stroke-foreground/80'}
-              strokeWidth={run.dotted ? 1.2 : 1.35}
+              className={SPARKLINE_STORE_TRADING_STROKE}
+              strokeWidth={1.35}
               strokeLinejoin="round"
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
-              strokeDasharray={run.dotted ? '3 3' : undefined}
             />
-          ))}
+          ) : null}
+          {tripleLinePack && tripleSeriesVisible.risk && tripleRiskPathD ? (
+            <path
+              d={tripleRiskPathD}
+              fill="none"
+              className={SPARKLINE_DEPLOYMENT_RISK_STROKE}
+              strokeWidth={1.35}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ) : null}
+          {(!tripleLinePack || tripleSeriesVisible.tech) &&
+            sparkStrokeRuns.map((run, i) => (
+              <path
+                key={`spark-run-${i}`}
+                d={pathDFromPoints(run.points)}
+                fill="none"
+                className={
+                  tripleLinePack
+                    ? SPARKLINE_TECH_STROKE_SOLID
+                    : run.dotted
+                      ? SPARKLINE_TECH_STROKE_HEADROOM
+                      : SPARKLINE_TECH_STROKE_SOLID
+                }
+                strokeWidth={run.dotted ? 1.2 : 1.35}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+                strokeDasharray={run.dotted ? '3 3' : undefined}
+              />
+            ))}
         </g>
         {!anyModeledDay ? (
           <text
@@ -701,23 +990,39 @@ export function RunwayTechCapacityDemandSparkline({
             No days over 100% of caps in this strip
           </text>
         ) : null}
-        <line
-          x1={xo(gutter)}
-          x2={xo(width - 2)}
-          y1={yCapPx}
-          y2={yCapPx}
-          className="text-muted-foreground"
-          stroke="currentColor"
-          strokeWidth={1}
-          vectorEffect="non-scaling-stroke"
-          opacity={0.55}
-        />
+        {tripleLinePack ? (
+          tripleLinePack.y100 != null && tripleSeriesVisible.tech ? (
+            <line
+              x1={xo(gutter)}
+              x2={xo(width - 2)}
+              y1={yCapPx}
+              y2={yCapPx}
+              className="text-muted-foreground"
+              stroke="currentColor"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+              opacity={0.55}
+            />
+          ) : null
+        ) : (
+          <line
+            x1={xo(gutter)}
+            x2={xo(width - 2)}
+            y1={yCapPx}
+            y2={yCapPx}
+            className="text-muted-foreground"
+            stroke="currentColor"
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+            opacity={0.55}
+          />
+        )}
         {selX != null && !suppressSelectionColumnLine ? (
           <line
             x1={xo(selX)}
             x2={xo(selX)}
             y1={2}
-            y2={CHART_H - 2}
+            y2={chartH - 2}
             stroke={RS.marker}
             strokeWidth={1.75}
             strokeDasharray="3 3"
@@ -726,6 +1031,94 @@ export function RunwayTechCapacityDemandSparkline({
           />
         ) : null}
       </svg>
+      <div
+        role="group"
+        aria-label="Chart legend"
+        className="mt-1 flex min-h-[20px] flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-medium leading-tight text-muted-foreground"
+        style={{
+          marginLeft: -LEFT_AXIS_OVERFLOW_PX,
+          width: width + LEFT_AXIS_OVERFLOW_PX,
+          paddingLeft: gutter,
+        }}
+      >
+        {tripleLinePack ? (
+          <>
+            <label className="inline-flex cursor-pointer select-none items-center gap-1 text-foreground/90 hover:text-foreground">
+              <input
+                type="checkbox"
+                checked={tripleSeriesVisible.tech}
+                onChange={(e) => setTripleSeriesVis('tech', e.target.checked)}
+                className="accent-primary h-3 w-3 shrink-0"
+              />
+              <SparklineLegendLineSwatch className={SPARKLINE_TECH_STROKE_SOLID} />
+              <span>Tech Demand</span>
+            </label>
+            <label className="inline-flex cursor-pointer select-none items-center gap-1 text-foreground/90 hover:text-foreground">
+              <input
+                type="checkbox"
+                checked={tripleSeriesVisible.trading}
+                onChange={(e) => setTripleSeriesVis('trading', e.target.checked)}
+                className="accent-primary h-3 w-3 shrink-0"
+              />
+              <SparklineLegendLineSwatch className={SPARKLINE_STORE_TRADING_STROKE} />
+              <span>Store trading</span>
+            </label>
+            <label className="inline-flex cursor-pointer select-none items-center gap-1 text-foreground/90 hover:text-foreground">
+              <input
+                type="checkbox"
+                checked={tripleSeriesVisible.risk}
+                onChange={(e) => setTripleSeriesVis('risk', e.target.checked)}
+                className="accent-primary h-3 w-3 shrink-0"
+              />
+              <SparklineLegendLineSwatch className={SPARKLINE_DEPLOYMENT_RISK_STROKE} />
+              <span>Deployment risk</span>
+            </label>
+            {tripleLinePack.y100 != null ? (
+              <span className="inline-flex items-center gap-1">
+                <svg width={14} height={10} viewBox="0 0 14 10" className="shrink-0 text-muted-foreground" aria-hidden>
+                  <line
+                    x1={0}
+                    y1={5}
+                    x2={14}
+                    y2={5}
+                    stroke="currentColor"
+                    strokeWidth={1}
+                    strokeOpacity={0.55}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+                <span>100% of tech caps</span>
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <span className="inline-flex items-center gap-1">
+              <SparklineLegendLineSwatch className={SPARKLINE_TECH_STROKE_SOLID} />
+              <span>Tech Demand</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <svg width={12} height={10} viewBox="0 0 12 10" className="shrink-0 overflow-visible" aria-hidden>
+                <rect x={0} y={2} width={12} height={6} rx={1} className={DEFICIT_FILL} fillOpacity={0.52} />
+              </svg>
+              <span>Over 100% of caps</span>
+            </span>
+            {landingMarketingTightCapacityFill ? (
+              <span className="inline-flex items-center gap-1">
+                <svg width={12} height={10} viewBox="0 0 12 10" className="shrink-0 overflow-visible" aria-hidden>
+                  <rect x={0} y={2} width={12} height={6} rx={1} className={TIGHT_HEADROOM_FILL} fillOpacity={0.95} />
+                </svg>
+                <span>High load (under cap)</span>
+              </span>
+            ) : null}
+            <span className="inline-flex items-center gap-1">
+              <SparklineLegendLineSwatch dashed className="stroke-muted-foreground/45" />
+              <span>Headroom</span>
+            </span>
+          </>
+        )}
+      </div>
+      </div>
       </div>
     </div>
   );
