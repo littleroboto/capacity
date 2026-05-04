@@ -20,7 +20,14 @@ import {
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, ArrowUpDown, Columns3 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Columns3, MoreHorizontal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { getColumnsForTable, type FragmentSchemaColumn } from '@/pages/admin/fragmentTableSchema';
 import {
   clearFragmentColumnVisibility,
@@ -288,12 +295,22 @@ export function FragmentTable({
         enableHiding: false,
         enableSorting: false,
         enableGlobalFilter: false,
-        header: () => <span className="block w-full text-right">Actions</span>,
+        header: () => (
+          <span className="block w-full text-right" title="Row actions">
+            Actions
+          </span>
+        ),
         cell: ({ row, table: tbl }) => {
           const meta = tbl.options.meta as FragmentTableMeta;
           const frag = row.original;
           const rowSaving = meta.saving === frag.id;
           const editing = meta.editingRowId === String(frag.id);
+          const rowLabel =
+            typeof frag.name === 'string' && frag.name.trim()
+              ? frag.name.trim()
+              : typeof frag.label === 'string' && frag.label.trim()
+                ? frag.label.trim()
+                : String(frag.id ?? 'row');
           if (editing) {
             return (
               <div className="flex justify-end gap-1">
@@ -322,25 +339,45 @@ export function FragmentTable({
               </div>
             );
           }
+          const canArchive = String(frag.status) !== 'archived';
           return (
-            <div className="flex justify-end gap-1">
-              <button
-                type="button"
-                onClick={() => meta.startEdit(frag)}
-                className="rounded border border-border px-2 py-1 text-xs hover:bg-muted"
-              >
-                Edit
-              </button>
-              {String(frag.status) !== 'archived' && (
-                <button
-                  type="button"
-                  onClick={() => meta.onArchive(frag)}
-                  disabled={rowSaving}
-                  className="rounded border border-destructive/40 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                >
-                  Archive
-                </button>
-              )}
+            <div className="flex justify-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 shrink-0 p-0"
+                    aria-label={`Actions for ${rowLabel}`}
+                    disabled={rowSaving}
+                  >
+                    <MoreHorizontal className="h-4 w-4 opacity-80" aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem
+                    className="text-sm"
+                    onSelect={() => {
+                      meta.startEdit(frag);
+                    }}
+                  >
+                    Edit
+                  </DropdownMenuItem>
+                  {canArchive ? (
+                    <DropdownMenuItem
+                      className="text-sm"
+                      destructive
+                      disabled={rowSaving}
+                      onSelect={() => {
+                        meta.onArchive(frag);
+                      }}
+                    >
+                      Archive
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           );
         },
