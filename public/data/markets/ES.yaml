@@ -80,10 +80,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.55
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Semana Santa combo deal
     start_date: '2027-04-07'
@@ -93,10 +93,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.7
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Summer drinks festival
     start_date: '2026-07-02'
@@ -106,10 +106,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.54
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Summer drinks festival
     start_date: '2027-07-18'
@@ -119,10 +119,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.69
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Vuelta al cole promo
     start_date: '2026-08-22'
@@ -132,10 +132,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.53
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Vuelta al cole promo
     start_date: '2027-08-17'
@@ -145,10 +145,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.68
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Navidad family meal
     start_date: '2026-11-24'
@@ -158,10 +158,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.52
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Navidad family meal
     start_date: '2027-12-10'
@@ -171,10 +171,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.67
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
 
 # Tech programmes — POS HoC rollouts. Two per year (May/Oct) with prep + national deployment windows; following year repeats.

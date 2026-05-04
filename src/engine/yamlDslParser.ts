@@ -57,6 +57,14 @@ const DAY_TOKEN_TO_WEEKDAY: Record<string, number> = {
 
 const IMPACT_TO_LOAD: Record<string, number> = { low: 0.25, medium: 0.5, high: 0.8, very_high: 1 };
 
+/** Lab headcount from YAML (`labs_required`, `load.labs`, …): non-negative integer; fractional values round. */
+function coerceLabsCount(raw: unknown): number | undefined {
+  if (raw == null || raw === '') return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.max(0, Math.round(n));
+}
+
 function pickPhaseLoad(raw: unknown): PhaseLoad {
   if (raw == null || typeof raw !== 'object') return {};
   const o = raw as Record<string, unknown>;
@@ -67,7 +75,7 @@ function pickPhaseLoad(raw: unknown): PhaseLoad {
     return Number.isFinite(x) ? x : undefined;
   };
   const out: PhaseLoad = {};
-  const labs = n('labs');
+  const labs = coerceLabsCount(o.labs);
   const teams = n('teams');
   const backend = n('backend');
   const ops = n('ops');
@@ -131,7 +139,7 @@ function mapCampaignSupportToPhaseLoad(raw: unknown): PhaseLoad {
     return Number.isFinite(n) ? n : undefined;
   };
   const out: PhaseLoad = {};
-  const labs = num(o.labs_required ?? o.labsRequired ?? o.labs);
+  const labs = coerceLabsCount(o.labs_required ?? o.labsRequired ?? o.labs);
   const teams = num(o.tech_staff ?? o.techStaff ?? o.staff ?? o.teams);
   const backend = num(o.backend);
   const ops = num(o.ops ?? o.supply);
@@ -468,6 +476,11 @@ function mapReleases(raw: unknown[] | undefined): ReleaseConfig[] {
     const load: Record<string, number> = {};
     if (loadObj && typeof loadObj === 'object') {
       for (const [k, v] of Object.entries(loadObj as Record<string, unknown>)) {
+        if (k === 'labs') {
+          const c = coerceLabsCount(v);
+          if (c != null) load[k] = c;
+          continue;
+        }
         const n = Number(v);
         if (Number.isFinite(n)) load[k] = n;
       }
@@ -548,7 +561,7 @@ function mapBauModern(bauSection: Record<string, unknown> | undefined): BauEntry
   const cycle = bauSection.weekly_cycle ?? bauSection.weeklyCycle;
   if (!days?.length || !cycle || typeof cycle !== 'object') return undefined;
   const c = cycle as Record<string, unknown>;
-  const labs = Number(c.labs_required ?? c.labsRequired ?? c.labs) || 0;
+  const labs = coerceLabsCount(c.labs_required ?? c.labsRequired ?? c.labs) ?? 0;
   const staff = Number(c.staff_required ?? c.staffRequired ?? c.tech_staff ?? c.teams) || 0;
   const supportDays = Number(c.support_days ?? c.supportDays) || 0;
   const load: PhaseLoad = { labs, teams: staff };
@@ -1314,7 +1327,7 @@ function mapWeeklyPromo(wp: Record<string, unknown>, name: string): BauEntry | n
   const entry: BauEntry = {
     name,
     weekday: w,
-    load: { labs: Number(wp.labs) || 0, teams: 0 },
+    load: { labs: coerceLabsCount(wp.labs) ?? 0, teams: 0 },
   };
   if (supportDays > 0) {
     entry.supportStart = w;
@@ -1343,7 +1356,7 @@ function mapBau(bauSection: Record<string, unknown> | undefined): BauEntry | Bau
     entries.push({
       name: 'integration_tests',
       weekday: w,
-      load: { labs: Number(it.labs) || 0, teams: 0 },
+      load: { labs: coerceLabsCount(it.labs) ?? 0, teams: 0 },
     });
   }
 
@@ -1377,7 +1390,7 @@ function combineBau(bauSection: Record<string, unknown> | undefined): BauEntry |
       entries.push({
         name: 'integration_tests',
         weekday: w,
-        load: { labs: Number(it.labs) || 0, teams: 0 },
+        load: { labs: coerceLabsCount(it.labs) ?? 0, teams: 0 },
       });
     }
   }

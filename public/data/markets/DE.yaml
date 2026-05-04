@@ -82,10 +82,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.6
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Easter breakfast launch
     start_date: '2027-04-11'
@@ -95,10 +95,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.45
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Summer frozen drinks
     start_date: '2026-07-21'
@@ -108,10 +108,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.61
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Summer frozen drinks
     start_date: '2027-07-05'
@@ -121,10 +121,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.46
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Back-to-school combo
     start_date: '2026-08-08'
@@ -134,10 +134,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.62
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Back-to-school combo
     start_date: '2027-08-13'
@@ -147,10 +147,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.47
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Advent calendar promo
     start_date: '2026-12-08'
@@ -160,10 +160,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.63
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Flagship festive collectible
     start_date: '2027-11-22'
@@ -173,10 +173,10 @@ campaigns:
     promo_weight: 1.3
     live_tech_load_scale: 0.48
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
 
 # Tech programmes — POS HoC rollouts. Two per year (May/Oct) with prep + national deployment windows; following year repeats.

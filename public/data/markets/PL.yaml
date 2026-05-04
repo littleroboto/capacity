@@ -84,10 +84,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.48
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Spring combo launch
     start_date: '2027-04-06'
@@ -97,10 +97,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.63
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Summer family bundle
     start_date: '2026-06-29'
@@ -110,10 +110,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.47
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Summer family bundle
     start_date: '2027-07-15'
@@ -123,10 +123,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.62
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Kids meal collectibles
     start_date: '2026-07-28'
@@ -136,10 +136,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.46
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Kids meal collectibles
     start_date: '2027-07-23'
@@ -149,10 +149,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.61
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Festive menu event
     start_date: '2026-11-21'
@@ -162,10 +162,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.45
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Festive menu event
     start_date: '2027-12-07'
@@ -175,10 +175,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.6
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
 
 # Tech programmes — POS HoC rollouts. Two per year (May/Oct) with prep + national deployment windows; following year repeats.

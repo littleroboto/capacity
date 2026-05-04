@@ -79,10 +79,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.72
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Spring combo promo
     start_date: '2027-04-07'
@@ -92,10 +92,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.57
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Summer frozen deal
     start_date: '2026-06-27'
@@ -105,10 +105,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.71
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Summer frozen deal
     start_date: '2027-07-02'
@@ -118,10 +118,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.56
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Back-to-school meal event
     start_date: '2026-08-10'
@@ -131,10 +131,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.7
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Back-to-school meal event
     start_date: '2027-07-25'
@@ -144,10 +144,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.55
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Advent dessert launch
     start_date: '2026-11-22'
@@ -157,10 +157,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.69
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
   - name: Advent dessert launch
     start_date: '2027-11-27'
@@ -170,10 +170,10 @@ campaigns:
     promo_weight: 1.0
     live_tech_load_scale: 0.54
     campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
     live_campaign_support:
-      labs_required: 0.8
+      labs_required: 1
       tech_staff: 0.7
 
 # Tech programmes — POS HoC rollouts. Two per year (May/Oct) with prep + national deployment windows; following year repeats.
