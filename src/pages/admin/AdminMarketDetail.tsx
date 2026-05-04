@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   flexRender,
@@ -43,9 +43,14 @@ export function AdminMarketDetail() {
   const activeTab = entityParam && isAdminMarketEntityKey(entityParam) ? entityParam : DEFAULT_ADMIN_MARKET_ENTITY;
   const [fragments, setFragments] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [fragmentListError, setFragmentListError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+    detail?: ReactNode;
+  } | null>(null);
   const [marketRow, setMarketRow] = useState<AdminMarketRow | null>(null);
 
   // Build state
@@ -70,12 +75,13 @@ export function AdminMarketDetail() {
   const loadFragments = useCallback(async () => {
     if (!marketId || !currentTable) return;
     setLoading(true);
-    setError(null);
+    setFragmentListError(null);
     try {
       const data = await fetchFragments(currentTable, marketId);
       setFragments(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setFragmentListError(`Failed to load ${currentTable}: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -181,12 +187,17 @@ export function AdminMarketDetail() {
   const handleBuild = async () => {
     if (!marketId) return;
     setBuildLoading(true);
+    setSaveMessage(null);
     try {
       await buildMarketApi(marketId);
       const updated = await fetchBuilds(marketId);
       setBuilds(updated);
+      setSaveMessage({ type: 'success', text: 'Build submitted successfully.' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setSaveMessage({
+        type: 'error',
+        text: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setBuildLoading(false);
     }
@@ -194,14 +205,19 @@ export function AdminMarketDetail() {
 
   const handlePublish = async (buildId: string) => {
     setBuildLoading(true);
+    setSaveMessage(null);
     try {
       await publishBuildApi(buildId);
       if (marketId) {
         const updated = await fetchBuilds(marketId);
         setBuilds(updated);
       }
+      setSaveMessage({ type: 'success', text: 'Build published successfully.' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setSaveMessage({
+        type: 'error',
+        text: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setBuildLoading(false);
     }
@@ -209,17 +225,38 @@ export function AdminMarketDetail() {
 
   const handleValidate = async () => {
     if (!marketId) return;
-    setLoading(true);
+    setValidating(true);
+    setSaveMessage(null);
     try {
       const report = await validateMarketApi(marketId);
+      const rawErr = Number(report.errorCount);
+      const rawWarn = Number(report.warningCount);
+      const errN = Number.isFinite(rawErr) ? rawErr : 0;
+      const warnN = Number.isFinite(rawWarn) ? rawWarn : 0;
+      const hasIssues = errN > 0 || warnN > 0;
       setSaveMessage({
         type: report.isValid ? 'success' : 'error',
-        text: `Validation: ${report.errorCount} errors, ${report.warningCount} warnings`,
+        text: `Market validation: ${errN} error${errN === 1 ? '' : 's'}, ${warnN} warning${warnN === 1 ? '' : 's'}.`,
+        detail:
+          hasIssues ? (
+            <p className="mt-2 text-xs opacity-90">
+              <Link
+                to={adminMarketEntityPath(marketId, 'yaml')}
+                className="font-medium underline underline-offset-2 hover:no-underline"
+              >
+                Open Expert YAML
+              </Link>{' '}
+              to inspect source and fix issues.
+            </p>
+          ) : undefined,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setSaveMessage({
+        type: 'error',
+        text: e instanceof Error ? e.message : String(e),
+      });
     } finally {
-      setLoading(false);
+      setValidating(false);
     }
   };
 
@@ -230,24 +267,46 @@ export function AdminMarketDetail() {
           <Link to="/admin" className="text-sm text-muted-foreground hover:underline">← Markets</Link>
           <h1 className="text-2xl font-semibold">{marketId}</h1>
         </div>
-        <button
-          onClick={handleValidate}
-          className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
-        >
-          Validate
-        </button>
+        <div className="flex flex-col items-end gap-0.5">
+          <button
+            type="button"
+            onClick={handleValidate}
+            disabled={validating}
+            title="Runs validation across the whole market, not only the current section."
+            className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-60"
+          >
+            {validating ? 'Validating…' : 'Validate market'}
+          </button>
+          <span className="max-w-[14rem] text-right text-[11px] text-muted-foreground leading-snug">
+            Whole-market check (all sections)
+          </span>
+        </div>
       </div>
 
+      {fragmentListError && (
+        <div
+          className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+          role="alert"
+        >
+          {fragmentListError}
+        </div>
+      )}
+
       {saveMessage && (
-        <div className={`mb-4 rounded-md p-3 text-sm ${
-          saveMessage.type === 'success' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-        }`}>
-          {saveMessage.text}
+        <div
+          className={`mb-4 rounded-md p-3 text-sm ${
+            saveMessage.type === 'success'
+              ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+              : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+          }`}
+          role="status"
+        >
+          <p>{saveMessage.text}</p>
+          {saveMessage.detail}
         </div>
       )}
 
       {/* Tab content — section nav lives in AdminLayout sidebar */}
-      {error && <div className="mb-4 text-sm text-red-500">{error}</div>}
 
       {activeTab === 'build' ? (
         <BuildTab
