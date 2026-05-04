@@ -290,6 +290,7 @@ export function AdminMarketDetail() {
             fragments={fragments}
             loading={loading}
             table={currentTable}
+            prefsScope={{ marketId: marketId ?? '', entity: activeTab }}
             saving={saving}
             onSave={handleSave}
             onArchive={handleArchive}

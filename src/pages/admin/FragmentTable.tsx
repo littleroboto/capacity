@@ -20,8 +20,15 @@ import {
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Columns3 } from 'lucide-react';
 import { getColumnsForTable, type FragmentSchemaColumn } from '@/pages/admin/fragmentTableSchema';
+import {
+  clearFragmentColumnVisibility,
+  fragmentColumnPrefsStorageKey,
+  readFragmentColumnVisibility,
+  writeFragmentColumnVisibility,
+  type FragmentColumnVisibility,
+} from '@/pages/admin/fragmentTableColumnPrefs';
 
 function formatValue(val: unknown): string {
   if (val === null || val === undefined) return '—';
@@ -115,6 +122,7 @@ export function FragmentTable({
   fragments,
   loading,
   table,
+  prefsScope,
   saving,
   onSave,
   onArchive,
@@ -122,6 +130,8 @@ export function FragmentTable({
   fragments: Record<string, unknown>[];
   loading: boolean;
   table: string;
+  /** Key for persisted column visibility (per market + URL entity + fragment table name). */
+  prefsScope: { marketId: string; entity: string };
   saving: string | null;
   onSave: (fragment: Record<string, unknown>, updates: Record<string, unknown>) => void;
   onArchive: (fragment: Record<string, unknown>) => void;
@@ -137,8 +147,58 @@ export function FragmentTable({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 });
+  const [columnVisibility, setColumnVisibility] = useState<FragmentColumnVisibility>({});
+  const [columnsPanelOpen, setColumnsPanelOpen] = useState(false);
 
   const schema = useMemo(() => getColumnsForTable(table), [table]);
+
+  const allowedColumnIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of schema) ids.add(c.key);
+    ids.add('version');
+    ids.add('status');
+    return ids;
+  }, [schema]);
+
+  const columnPrefsKey = useMemo(
+    () => fragmentColumnPrefsStorageKey(prefsScope.marketId, prefsScope.entity, table),
+    [prefsScope.marketId, prefsScope.entity, table]
+  );
+
+  useEffect(() => {
+    setColumnVisibility(readFragmentColumnVisibility(columnPrefsKey, allowedColumnIds));
+  }, [columnPrefsKey, allowedColumnIds]);
+
+  const onColumnVisibilityChange = useCallback(
+    (updater: FragmentColumnVisibility | ((prev: FragmentColumnVisibility) => FragmentColumnVisibility)) => {
+      setColumnVisibility((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        writeFragmentColumnVisibility(columnPrefsKey, next);
+        return next;
+      });
+    },
+    [columnPrefsKey]
+  );
+
+  const resetColumnVisibility = useCallback(() => {
+    clearFragmentColumnVisibility(columnPrefsKey);
+    setColumnVisibility({});
+  }, [columnPrefsKey]);
+
+  const columnPickerRows = useMemo(
+    () =>
+      [
+        ...schema.map((c) => ({ id: c.key, label: c.label })),
+        { id: 'version', label: 'Version' },
+        { id: 'status', label: 'Status' },
+      ] as const,
+    [schema]
+  );
+
+  const isDataColumnVisible = useCallback(
+    (id: string) => columnVisibility[id] !== false,
+    [columnVisibility]
+  );
 
   const startEdit = useCallback(
     (frag: Record<string, unknown>) => {
@@ -159,10 +219,16 @@ export function FragmentTable({
         .toLowerCase();
       if (!q) return true;
       const f = row.original;
-      const bits = schema.map((c) => formatValue(f[c.key])).concat(String(f.status ?? ''), String(f.version_number ?? ''));
+      const bits: string[] = [];
+      for (const c of schema) {
+        if (columnVisibility[c.key] === false) continue;
+        bits.push(formatValue(f[c.key]));
+      }
+      if (columnVisibility.version !== false) bits.push(String(f.version_number ?? ''));
+      if (columnVisibility.status !== false) bits.push(String(f.status ?? ''));
       return bits.join(' ').toLowerCase().includes(q);
     },
-    [schema]
+    [schema, columnVisibility]
   );
 
   const columns = useMemo<ColumnDef<Record<string, unknown>>[]>(() => {
@@ -219,6 +285,7 @@ export function FragmentTable({
       },
       {
         id: 'actions',
+        enableHiding: false,
         enableSorting: false,
         enableGlobalFilter: false,
         header: () => <span className="block w-full text-right">Actions</span>,
@@ -298,15 +365,20 @@ export function FragmentTable({
 
   useEffect(() => {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
-  }, [globalFilter, visible, table]);
+  }, [globalFilter, visible, table, columnVisibility]);
+
+  useEffect(() => {
+    setSorting((prev) => prev.filter((s) => columnVisibility[s.id] !== false));
+  }, [columnVisibility]);
 
   const tableInstance = useReactTable({
     data: visible,
     columns,
-    state: { sorting, globalFilter, pagination },
+    state: { sorting, globalFilter, pagination, columnVisibility },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: setPagination,
+    onColumnVisibilityChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -347,22 +419,78 @@ export function FragmentTable({
         />
         Show archived records
       </label>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <label htmlFor="fragment-table-filter" className="sr-only">
-          Filter rows
-        </label>
-        <input
-          id="fragment-table-filter"
-          type="search"
-          placeholder="Filter…"
-          value={globalFilter ?? ''}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          className="h-9 w-full max-w-md rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        />
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+          <label htmlFor="fragment-table-filter" className="sr-only">
+            Filter rows
+          </label>
+          <input
+            id="fragment-table-filter"
+            type="search"
+            placeholder="Filter…"
+            value={globalFilter ?? ''}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="h-9 w-full max-w-md rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-expanded={columnsPanelOpen}
+              aria-controls="fragment-column-visibility-panel"
+              onClick={() => setColumnsPanelOpen((o) => !o)}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm text-foreground hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Columns3 className="h-4 w-4 opacity-70" aria-hidden />
+              Columns
+            </button>
+          </div>
+        </div>
         <p className="text-xs text-muted-foreground">
           Showing {tableInstance.getFilteredRowModel().rows.length} of {visible.length}
         </p>
       </div>
+      {columnsPanelOpen ? (
+        <div
+          id="fragment-column-visibility-panel"
+          role="group"
+          aria-label="Column visibility"
+          className="rounded-lg border border-border bg-muted/20 px-3 py-3"
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Show or hide columns</span>
+            <button
+              type="button"
+              onClick={resetColumnVisibility}
+              className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Reset to default
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {columnPickerRows.map(({ id, label }) => (
+              <label key={id} className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={isDataColumnVisible(id)}
+                  onChange={() => {
+                    onColumnVisibilityChange((old) => {
+                      const next = { ...old };
+                      if (next[id] === false) {
+                        delete next[id];
+                      } else {
+                        next[id] = false;
+                      }
+                      return next;
+                    });
+                  }}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="overflow-x-auto rounded-lg border border-border">
         <div className="max-h-[min(70vh,52rem)] overflow-y-auto">
           <table className="w-full min-w-[640px] text-sm">
@@ -380,7 +508,10 @@ export function FragmentTable({
             <tbody>
               {tableInstance.getRowModel().rows.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-3 py-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={Math.max(1, tableInstance.getVisibleLeafColumns().length)}
+                    className="px-3 py-8 text-center text-muted-foreground"
+                  >
                     No rows match this filter.
                   </td>
                 </tr>
