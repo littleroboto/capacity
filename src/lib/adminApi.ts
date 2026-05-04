@@ -50,8 +50,20 @@ function parseJsonBody<T>(text: string, label: string): T {
 function throwApiError(status: number, headers: Headers, text: string, label: string): never {
   let detail = '';
   let requestId = '';
+  let parsed:
+    | {
+        detail?: string;
+        error?: string;
+        message?: string;
+        hint?: string;
+        requestId?: string;
+        step?: string;
+        clerk_sub?: string;
+        jwt_email?: string | null;
+      }
+    | null = null;
   try {
-    const j = JSON.parse(text) as {
+    parsed = JSON.parse(text) as {
       detail?: string;
       error?: string;
       message?: string;
@@ -61,6 +73,34 @@ function throwApiError(status: number, headers: Headers, text: string, label: st
       clerk_sub?: string;
       jwt_email?: string | null;
     };
+  } catch {
+    const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 240);
+    if (snippet) detail += ` — body: ${snippet}`;
+  }
+  if (parsed) {
+    const j = parsed;
+    if (j.error === 'api_unavailable' && typeof j.detail === 'string' && j.detail.trim()) {
+      const msg = `Admin API unavailable (local dev): Vite does not run /api routes.\n${j.detail.trim()}`;
+      if (j.requestId) requestId = `\nVercel Logs: search "${j.requestId}"`;
+      if (!requestId) {
+        const hdr = headers.get('x-vercel-id');
+        if (hdr) requestId = `\nVercel Logs: search "${hdr}"`;
+      }
+      throw new Error(`${msg}${requestId}`);
+    }
+    if (j.error === 'server_misconfigured') {
+      const lines = ['Admin API misconfigured: server-side configuration is incomplete.'];
+      if (typeof j.message === 'string' && j.message.trim()) lines.push(`Message: ${j.message.trim()}`);
+      if (typeof j.hint === 'string' && j.hint.trim()) lines.push(`Hint: ${j.hint.trim()}`);
+      if (typeof j.detail === 'string' && j.detail.trim()) lines.push(`Detail: ${j.detail.trim()}`);
+      const msg = lines.join('\n');
+      if (j.requestId) requestId = `\nVercel Logs: search "${j.requestId}"`;
+      if (!requestId) {
+        const hdr = headers.get('x-vercel-id');
+        if (hdr) requestId = `\nVercel Logs: search "${hdr}"`;
+      }
+      throw new Error(`${msg}${requestId}`);
+    }
     if (j.step) detail += ` — step:${j.step}`;
     if (j.clerk_sub) detail += ` — clerk_sub:${j.clerk_sub}`;
     if (j.jwt_email !== undefined && j.jwt_email !== null && j.jwt_email !== '')
@@ -72,9 +112,6 @@ function throwApiError(status: number, headers: Headers, text: string, label: st
     else if (j.error && !j.detail) detail += ` — ${j.error}`;
     if (typeof j.hint === 'string' && j.hint.trim()) detail += ` — ${j.hint.trim()}`;
     if (j.requestId) requestId = ` [Vercel Logs: search "${j.requestId}"]`;
-  } catch {
-    const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 240);
-    if (snippet) detail += ` — body: ${snippet}`;
   }
   if (!requestId) {
     const hdr = headers.get('x-vercel-id');
@@ -96,12 +133,22 @@ async function readJsonMutation<T extends Record<string, unknown>>(
 ): Promise<T> {
   const text = await res.text();
   if (!res.ok) {
+    let hasCode = false;
+    let codeValue: unknown;
     try {
-      const j = JSON.parse(text) as { error?: string; message?: string };
-      throw new Error(j.error || j.message || `${label}: ${res.status}`);
-    } catch (e) {
-      if (e instanceof Error && !(e instanceof SyntaxError)) throw e;
+      const j = JSON.parse(text) as { code?: unknown };
+      if (Object.prototype.hasOwnProperty.call(j, 'code')) {
+        hasCode = true;
+        codeValue = j.code;
+      }
+    } catch {
       throwApiError(res.status, res.headers, text, label);
+    }
+    try {
+      throwApiError(res.status, res.headers, text, label);
+    } catch (e) {
+      if (hasCode && e instanceof Error) (e as unknown as Record<string, unknown>).code = codeValue;
+      throw e;
     }
   }
   return parseJsonBody<T>(text, label);

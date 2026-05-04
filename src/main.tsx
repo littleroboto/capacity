@@ -10,6 +10,7 @@ import { clerkPublishableKey, isClerkConfigured } from '@/lib/clerkConfig';
 import { ClerkUkWaitlistPage } from '@/pages/ClerkUkWaitlistPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { AdminClerkBridge } from '@/components/AdminClerkBridge';
+import { AdminLayout } from '@/pages/admin/AdminLayout';
 import { AdminMarketOverview } from '@/pages/admin/AdminMarketOverview';
 import { AdminMarketDetail } from '@/pages/admin/AdminMarketDetail';
 import { LaptopOnlyGate } from '@/components/LaptopOnlyGate';
@@ -79,8 +80,21 @@ function AppRoutes() {
       {/* Some Clerk setups use this path for the OAuth return URL */}
       <Route path="/sign-in/sso-callback" element={<ClerkOAuthCallbackPage />} />
       <Route path="/app" element={<WorkbenchRoutes />} />
-      <Route path="/admin" element={<LaptopOnlyGate><SignInGate enabled={gate}><AdminClerkBridge><AdminMarketOverview /></AdminClerkBridge></SignInGate></LaptopOnlyGate>} />
-      <Route path="/admin/market/:id" element={<LaptopOnlyGate><SignInGate enabled={gate}><AdminClerkBridge><AdminMarketDetail /></AdminClerkBridge></SignInGate></LaptopOnlyGate>} />
+      <Route
+        path="/admin"
+        element={
+          <LaptopOnlyGate>
+            <SignInGate enabled={gate}>
+              <AdminClerkBridge>
+                <AdminLayout />
+              </AdminClerkBridge>
+            </SignInGate>
+          </LaptopOnlyGate>
+        }
+      >
+        <Route index element={<AdminMarketOverview />} />
+        <Route path="market/:id" element={<AdminMarketDetail />} />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

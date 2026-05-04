@@ -177,6 +177,13 @@
     --runway-spark-mix-programme: hsl(199 65% 34%);
   }
 
+  .admin-studio {
+    color-scheme: light;
+    --primary: 161 52% 38%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 161 45% 36%;
+  }
+
   * {
     @apply border-border;
   }

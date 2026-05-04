@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { fetchMarkets } from '@/lib/adminApi';
 import { AdminHolidayEntryCreate } from '@/pages/admin/AdminHolidayEntryCreate';
 import { AdminMarketsDataTable, AdminMarketsTableSkeleton, type AdminMarketRow } from '@/pages/admin/AdminMarketsDataTable';
@@ -19,13 +18,7 @@ export function AdminMarketOverview() {
   if (error) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Market Configuration</h1>
-          <Link to="/app" className="text-sm text-muted-foreground hover:underline">
-            ← Back to Workbench
-          </Link>
-        </div>
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="whitespace-pre-wrap rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
         </div>
         <p className="mt-4 text-sm text-muted-foreground">
@@ -42,13 +35,6 @@ export function AdminMarketOverview() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Market Configuration</h1>
-        <Link to="/app" className="text-sm text-muted-foreground hover:underline">
-          ← Back to Workbench
-        </Link>
-      </div>
-
       {emptyDb ? (
         <div className="rounded-lg border border-border bg-muted/20 p-6 text-sm text-muted-foreground">
           <p className="font-medium text-foreground">No markets in the database (or none marked active).</p>
