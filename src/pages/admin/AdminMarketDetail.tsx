@@ -36,6 +36,7 @@ import {
   isAdminMarketEntityKey,
 } from '@/pages/admin/adminMarketTabs';
 import { FragmentTable, SortHeader } from '@/pages/admin/FragmentTable';
+import { AdminMarketYamlMonacoEditor } from '@/components/AdminMarketYamlMonacoEditor';
 
 export function AdminMarketDetail() {
   const { id: marketId, entity: entityParam } = useParams<{ id: string; entity: string }>();
@@ -717,12 +718,10 @@ function YamlTab({ content, loading, marketId }: { content: string; loading: boo
         <span className="text-xs text-muted-foreground">Paste or edit YAML, preview changes, then apply</span>
       </div>
 
-      <textarea
+      <AdminMarketYamlMonacoEditor
         value={editorValue}
-        onChange={(e) => setEditorValue(e.target.value)}
-        className="w-full rounded-lg border border-border bg-muted/30 p-4 font-mono text-xs leading-relaxed"
-        rows={24}
-        spellCheck={false}
+        onChange={setEditorValue}
+        readOnly={busy}
       />
 
       <div className="flex gap-2">
