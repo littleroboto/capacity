@@ -5,7 +5,9 @@ import {
   ALargeSmall,
   AlertCircle,
   Check,
+  Crosshair,
   ListOrdered,
+  ListTree,
   Map,
   Play,
   RotateCcw,
@@ -20,6 +22,7 @@ import {
   capacityYamlThemeId,
   registerCapacityYamlThemes,
 } from '@/lib/monacoCapacityThemes';
+import { registerCapacityYamlOutline } from '@/lib/monacoCapacityYamlProviders';
 import { registerDslEditorFlush } from '@/lib/dslEditorSyncBridge';
 import { cn } from '@/lib/utils';
 
@@ -251,7 +254,20 @@ export function DslEditorCore({
 
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     registerCapacityYamlThemes(monaco);
+    registerCapacityYamlOutline(monaco);
   }, []);
+
+  const handleQuickOutline = useCallback(() => {
+    editorRef.current?.getAction('editor.action.quickOutline')?.run();
+  }, []);
+
+  const handleGoToSpecError = useCallback(() => {
+    const ed = editorRef.current;
+    if (!ed || !parseError?.trim()) return;
+    ed.revealLineInCenter(1);
+    ed.setPosition({ lineNumber: 1, column: 1 });
+    ed.focus();
+  }, [parseError]);
 
   const handleMount = useCallback<OnMount>((editor, monaco) => {
     editorRef.current = editor;
@@ -320,7 +336,7 @@ export function DslEditorCore({
             studio ? 'bg-muted/15' : 'border-b border-border/80 bg-muted/25'
           )}
           role="toolbar"
-          aria-label="Editor appearance"
+          aria-label="YAML editor tools"
         >
           <div className="flex flex-wrap items-center gap-1">
             {studio ? (
@@ -328,6 +344,34 @@ export function DslEditorCore({
                 <Sparkles className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
                 YAML
               </span>
+            ) : null}
+            {studio ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 shrink-0 gap-1 px-2 text-muted-foreground hover:text-foreground"
+                onClick={handleQuickOutline}
+                aria-label="Quick outline — jump to market or top-level section"
+                title="Quick outline (sections & markets) — ⌘⇧O / Ctrl+Shift+O"
+              >
+                <ListTree className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+                <span className="select-none text-[10px] font-medium leading-none">Outline</span>
+              </Button>
+            ) : null}
+            {studio && parseError?.trim() ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 shrink-0 gap-1 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={handleGoToSpecError}
+                aria-label="Go to spec error in editor"
+                title="Scroll to where the parse error is highlighted"
+              >
+                <Crosshair className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+                <span className="select-none text-[10px] font-medium leading-none">Error</span>
+              </Button>
             ) : null}
             <Button
               type="button"
