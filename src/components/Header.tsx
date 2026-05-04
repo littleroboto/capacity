@@ -15,6 +15,7 @@ import {
 import { useAtcStore } from '@/store/useAtcStore';
 import { Link, useNavigate } from 'react-router-dom';
 import { SegmentWorkbenchMark } from '@/components/SegmentWorkbenchMark';
+import { PRODUCT_NAME_SPOKEN, PRODUCT_WORDMARK } from '@/lib/productBranding';
 import { GitBranch } from 'lucide-react';
 import { useCallback, type MouseEvent } from 'react';
 
@@ -43,12 +44,13 @@ export function Header({ layout = 'default' }: HeaderProps) {
   const onTitleClick = useCallback(
     (e: MouseEvent<HTMLAnchorElement>) => {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const st = useAtcStore.getState();
-      if (!isRunwayMultiMarketStrip(st.country)) return;
       e.preventDefault();
-      const order = st.runwayMarketOrder.length ? st.runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
-      st.setCountry(gammaFocusMarket(st.country, st.configs, order), {});
-      navigate('/');
+      const st = useAtcStore.getState();
+      if (isRunwayMultiMarketStrip(st.country)) {
+        const order = st.runwayMarketOrder.length ? st.runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
+        st.setCountry(gammaFocusMarket(st.country, st.configs, order), {});
+      }
+      navigate({ pathname: '/', search: '' }, { replace: true });
     },
     [navigate]
   );
@@ -65,16 +67,16 @@ export function Header({ layout = 'default' }: HeaderProps) {
       <header className="border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="flex min-h-10 items-center justify-between gap-3 px-3 py-1.5 md:px-4">
           <div className="flex min-w-0 items-baseline gap-2 lg:hidden">
-            <h1 className="truncate text-sm font-semibold tracking-tight text-foreground">
+            <h1 className="truncate font-semibold tracking-tight text-foreground">
               <Link
                 to="/"
                 onClick={onTitleClick}
-                className={cn(titleLinkClass, 'inline-flex items-center gap-1.5')}
-                title="Home"
-                aria-label="Go to landing page"
+                className={cn(titleLinkClass, 'inline-flex items-center gap-1.5 text-[11px]')}
+                title={`${PRODUCT_WORDMARK} — home`}
+                aria-label={`${PRODUCT_NAME_SPOKEN}, go to home`}
               >
-                <SegmentWorkbenchMark className="h-4 w-4 shrink-0 text-primary" />
-                Capacity
+                <SegmentWorkbenchMark className="h-[1.2em] w-[1.2em] shrink-0 self-center text-primary" />
+                <span className="tracking-tight">{PRODUCT_WORDMARK}</span>
               </Link>
             </h1>
             <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{country}</span>
@@ -100,16 +102,19 @@ export function Header({ layout = 'default' }: HeaderProps) {
       <div className="px-4 py-1.5 md:px-5 md:py-1.5">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-1.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-            <h1 className="text-sm font-bold leading-tight tracking-tight text-foreground sm:text-[0.9375rem]">
+            <h1 className="font-bold leading-tight tracking-tight text-foreground">
               <Link
                 to="/"
                 onClick={onTitleClick}
-                className={cn(titleLinkClass, 'inline-flex items-center gap-2')}
-                title="Landing page"
-                aria-label="Go to landing page"
+                className={cn(
+                  titleLinkClass,
+                  'inline-flex items-center gap-2 text-[13px] font-semibold sm:text-[0.9375rem]'
+                )}
+                title={`${PRODUCT_WORDMARK} — home`}
+                aria-label={`${PRODUCT_NAME_SPOKEN}, go to home`}
               >
-                <SegmentWorkbenchMark className="h-5 w-5 text-foreground sm:h-[1.125rem] sm:w-[1.125rem]" />
-                Capacity Workbench
+                <SegmentWorkbenchMark className="h-[1.2em] w-[1.2em] shrink-0 self-center text-foreground" />
+                <span className="tracking-tight">{PRODUCT_WORDMARK}</span>
               </Link>
             </h1>
             <span

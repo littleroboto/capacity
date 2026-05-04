@@ -586,7 +586,7 @@ export const LandingIsoBrowserMock = memo(function LandingIsoBrowserMock() {
           </div>
           <div className="min-w-0 flex-1 rounded-lg border border-white/[0.06] bg-black/40 px-3 py-2 font-mono text-[11px] text-zinc-500">
             <span className="text-zinc-600">https://</span>
-            <span className="text-zinc-400">capacity</span>
+            <span className="text-zinc-400">stressy</span>
             <span className="text-zinc-600">.app</span>
             <span className="text-emerald-500/75"> / runway</span>
             <span className="text-zinc-600"> · 3D</span>

@@ -692,7 +692,7 @@ export function LandingCapacityProfilesMock() {
       {/* ── section heading ── */}
       <div className="mb-6 sm:mb-8">
         <p className="mb-2 font-landing text-xs font-semibold uppercase tracking-[0.14em] text-[#b45309]">
-          Capacity profiles
+          stressy profiles
         </p>
         <h2 className="font-landing text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
           Not all demand looks the same
@@ -717,7 +717,7 @@ export function LandingCapacityProfilesMock() {
           </div>
           <div className="min-w-0 flex-1 rounded-lg border border-white/[0.06] bg-black/40 px-3 py-2 font-mono text-[11px] text-zinc-500">
             <span className="text-zinc-600">https://</span>
-            <span className="text-zinc-400">capacity</span>
+            <span className="text-zinc-400">stressy</span>
             <span className="text-zinc-600">.app</span>
             <span className="text-cyan-500/80"> / profiles</span>
           </div>
@@ -752,7 +752,7 @@ export function LandingCapacityProfilesMock() {
               className="block w-full"
               preserveAspectRatio="xMidYMid meet"
               role="img"
-              aria-label={`Capacity profile: ${profile.label}`}
+              aria-label={`stressy profile: ${profile.label}`}
             >
               <defs>
                 {/* Subtle hatch + whisper tint (replaces flat fills on stacked areas). */}

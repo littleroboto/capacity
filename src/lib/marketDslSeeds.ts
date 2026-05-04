@@ -36,7 +36,7 @@ function minimalDsl(country: string): string {
 market: ${country || 'DE'}
 
 #
-# Capacity — labs, people, test slots
+# stressy — labs, people, test slots
 # -----------------------------------
 #
 resources:

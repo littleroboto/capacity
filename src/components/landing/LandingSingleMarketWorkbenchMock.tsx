@@ -186,7 +186,7 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
               </div>
               <div className="min-w-0 flex-1 rounded-lg border border-zinc-200/90 bg-white px-3 py-2 font-mono text-[10px] leading-snug text-zinc-600 shadow-inner shadow-zinc-950/[0.03] sm:text-[11px]">
                 <span className="text-zinc-500">https://</span>
-                <span className="text-zinc-800">capacity</span>
+                <span className="text-zinc-800">stressy</span>
                 <span className="text-zinc-500">.app</span>
                 <span className="text-cyan-700"> /app</span>
                 <span className="text-zinc-600">?{q}</span>

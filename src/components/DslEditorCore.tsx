@@ -33,6 +33,7 @@ import { mergeStateToFullMultiDoc } from '@/lib/multiDocMarketYaml';
 import { registerDslEditorFlush } from '@/lib/dslEditorSyncBridge';
 import { normalizeWorkspaceYamlForPipelineCompare } from '@/lib/workspaceYamlPipelineCompare';
 import { cn } from '@/lib/utils';
+import { PRODUCT_WORDMARK } from '@/lib/productBranding';
 
 /** Long-form YAML reference (also used in the syntax dialog). */
 export function DslSyntaxHelpBody({ className }: { className?: string }) {
@@ -593,7 +594,7 @@ export function DslEditorCore({
         {studio ? (
           <div className="flex shrink-0 items-center justify-between gap-2 bg-muted/10 px-3 py-1.5">
             <p className="font-mono text-[10px] text-muted-foreground">
-              <span className="font-semibold text-foreground">Capacity</span> syntax
+              <span className="font-semibold text-foreground">{PRODUCT_WORDMARK}</span> syntax
               theme · keys / dates / strings highlighted
             </p>
             <span className="font-mono text-[10px] tabular-nums text-muted-foreground sm:hidden">

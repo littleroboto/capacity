@@ -3,6 +3,7 @@ import { Waitlist } from '@clerk/react';
 import { Loader2 } from 'lucide-react';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
 import { SegmentWorkbenchMark } from '@/components/SegmentWorkbenchMark';
+import { PRODUCT_NAME_SPOKEN, PRODUCT_WORDMARK } from '@/lib/productBranding';
 import { clerkPublishableKey } from '@/lib/clerkConfig';
 import { cn } from '@/lib/utils';
 
@@ -53,9 +54,11 @@ export function ClerkUkWaitlistPage() {
           <Link
             to="/"
             className="inline-flex items-center gap-2.5 font-landing text-base font-extrabold tracking-[-0.02em] text-zinc-50 sm:text-lg"
+            title={`${PRODUCT_WORDMARK} — home`}
+            aria-label={`${PRODUCT_NAME_SPOKEN}, go to home`}
           >
-            <SegmentWorkbenchMark className="h-7 w-7 shrink-0 text-zinc-50 sm:h-8 sm:w-8" />
-            Capacity Workbench
+            <SegmentWorkbenchMark className="h-[1.12em] w-[1.12em] shrink-0 self-center text-zinc-50" />
+            <span className="tracking-tight">{PRODUCT_WORDMARK}</span>
           </Link>
           <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs font-semibold text-zinc-300">
             <MarketCircleFlag marketId="UK" size={18} className="ring-white/15" />

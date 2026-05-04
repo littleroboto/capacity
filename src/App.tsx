@@ -24,6 +24,7 @@ import { useAtcStore } from '@/store/useAtcStore';
 import { filterManifestOrderForAccess } from '@/lib/capacityAccess';
 import { useCapacityAccess } from '@/lib/capacityAccessContext';
 import { useWorkbenchUrlViewState } from '@/hooks/useWorkbenchUrlViewState';
+import { PRODUCT_WORDMARK } from '@/lib/productBranding';
 import { mergeStateToFullMultiDoc, splitToDslByMarket } from '@/lib/multiDocMarketYaml';
 import {
   fetchSharedDslDetailed,
@@ -111,7 +112,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.title = 'Capacity Workbench';
+    document.title = PRODUCT_WORDMARK;
   }, []);
 
   useEffect(() => {

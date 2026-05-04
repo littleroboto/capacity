@@ -16,6 +16,7 @@ import { isClerkConfigured } from '@/lib/clerkConfig';
 import { prefetchWorkbenchApp } from '@/lib/prefetchWorkbench';
 import { workbenchEntryHref } from '@/lib/workbenchEntryHref';
 import { cn } from '@/lib/utils';
+import { PRODUCT_NAME_SPOKEN, PRODUCT_WORDMARK } from '@/lib/productBranding';
 import { LandingIsoBrowserMock } from '@/components/landing/LandingIsoBrowserMock';
 import { LandingYamlProjectTwinMock } from '@/components/landing/LandingYamlProjectTwinMock';
 import { LandingSingleMarketWorkbenchMock } from '@/components/landing/LandingSingleMarketWorkbenchMock';
@@ -213,7 +214,7 @@ export function LandingPage() {
   const landingNoiseCoarseId = useId().replace(/:/g, '');
   const workbenchHref = useMemo(() => workbenchEntryHref(), []);
   useEffect(() => {
-    document.title = 'Capacity Workbench · Multi-market capacity on one runway';
+    document.title = `${PRODUCT_WORDMARK} · Multi-market capacity on one runway`;
   }, []);
 
   useEffect(() => {
@@ -352,13 +353,16 @@ export function LandingPage() {
       <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-5 pb-20 pt-6 sm:px-8 sm:pt-10">
         <header className="mb-16 flex flex-wrap items-center justify-between gap-4 sm:mb-20">
           <motion.div
-            className="flex min-w-0 max-w-[min(100%,20rem)] items-center gap-2.5 font-landing text-balance text-base font-extrabold leading-snug tracking-[-0.02em] text-zinc-800 sm:max-w-none sm:gap-3 sm:text-xl"
+            className="flex min-w-0 max-w-[min(100%,20rem)] items-center gap-2.5 font-landing text-balance text-xl font-extrabold leading-snug tracking-[-0.02em] text-zinc-800 sm:max-w-none sm:gap-3 sm:text-2xl"
             initial={reducedMotion ? false : { opacity: 0, filter: 'blur(10px)', y: 5 }}
             animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
           >
-            <SegmentWorkbenchMark className="h-8 w-8 shrink-0 sm:h-9 sm:w-9" />
-            <span>Capacity Workbench</span>
+            <SegmentWorkbenchMark className="h-[1.2em] w-[1.2em] shrink-0 self-center" />
+            <span className="sr-only">{PRODUCT_NAME_SPOKEN}</span>
+            <span aria-hidden className="tracking-tight">
+              {PRODUCT_WORDMARK}
+            </span>
           </motion.div>
           <nav className="flex flex-wrap items-center gap-3">
             {clerkOn ? (

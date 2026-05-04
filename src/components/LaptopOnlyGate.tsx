@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Laptop } from 'lucide-react';
 import { useMediaMinWidth } from '@/hooks/useMediaMinWidth';
 import { SegmentWorkbenchMark } from '@/components/SegmentWorkbenchMark';
+import { PRODUCT_NAME_SPOKEN, PRODUCT_WORDMARK } from '@/lib/productBranding';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -85,9 +86,11 @@ function ViewportTooSmallScreen({
         <Link
           to="/"
           className="inline-flex items-center gap-2.5 font-landing text-base font-extrabold tracking-[-0.02em] text-zinc-900"
+          title={`${PRODUCT_WORDMARK} — home`}
+          aria-label={`${PRODUCT_NAME_SPOKEN}, go to home`}
         >
-          <SegmentWorkbenchMark className="h-7 w-7 shrink-0 text-zinc-900" />
-          Capacity Workbench
+          <SegmentWorkbenchMark className="h-[1.15em] w-[1.15em] shrink-0 self-center text-zinc-900" />
+          <span className="tracking-tight">{PRODUCT_WORDMARK}</span>
         </Link>
       </header>
 
@@ -100,7 +103,7 @@ function ViewportTooSmallScreen({
             The workbench needs a larger screen
           </h1>
           <p className="mt-3 text-pretty text-sm leading-relaxed text-zinc-600 sm:text-[15px]">
-            Capacity Workbench is built around a dense, multi-pane planning surface — a YAML
+            {PRODUCT_NAME_SPOKEN} is built around a dense, multi-pane planning surface — a YAML
             editor, day-grid heatmaps, and a draggable split — designed for laptop and desktop
             displays. On small screens it stacks awkwardly and is hard to use, so we&rsquo;re
             holding it back rather than ship a broken experience.

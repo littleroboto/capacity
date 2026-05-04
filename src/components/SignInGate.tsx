@@ -7,6 +7,7 @@ import {
   viteAllowedUserEmails,
 } from '@/lib/allowedUserEmails';
 import { cn } from '@/lib/utils';
+import { PRODUCT_WORDMARK } from '@/lib/productBranding';
 
 type SignInGateProps = {
   /** When false, render children only (no Clerk UI). */
@@ -70,7 +71,7 @@ function AuthGateInner({ children }: { children: ReactNode }) {
         )}
       >
         <p className="mb-6 max-w-md text-center text-sm text-muted-foreground">
-          Sign in to open Capacity Workbench.
+          Sign in to open <span className="font-medium">{PRODUCT_WORDMARK}</span>.
         </p>
         <SignIn
           routing="hash"

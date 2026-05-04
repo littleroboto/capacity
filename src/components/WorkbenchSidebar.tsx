@@ -16,6 +16,7 @@ import {
   requestOpenWorkbenchSettingsDialog,
 } from '@/lib/sharedDslSync';
 import { useAtcStore } from '@/store/useAtcStore';
+import { PRODUCT_NAME_SPOKEN, PRODUCT_WORDMARK } from '@/lib/productBranding';
 import { cn } from '@/lib/utils';
 
 type WorkbenchSidebarProps = {
@@ -51,12 +52,15 @@ export function WorkbenchSidebar({ parseError }: WorkbenchSidebarProps) {
   const onLogoClick = useCallback(
     (e: MouseEvent<HTMLAnchorElement>) => {
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const st = useAtcStore.getState();
-      if (!isRunwayMultiMarketStrip(st.country)) return;
       e.preventDefault();
-      const order = st.runwayMarketOrder.length ? st.runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
-      st.setCountry(gammaFocusMarket(st.country, st.configs, order), {});
-      navigate('/');
+      const st = useAtcStore.getState();
+      if (isRunwayMultiMarketStrip(st.country)) {
+        const order = st.runwayMarketOrder.length ? st.runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
+        st.setCountry(gammaFocusMarket(st.country, st.configs, order), {});
+      }
+      // Explicit empty search so we never carry `/app` query params onto marketing `/`
+      // (some navigations were leaving a long query string on `/` then syncing back to `/app`).
+      navigate({ pathname: '/', search: '' }, { replace: true });
     },
     [navigate]
   );
@@ -80,8 +84,8 @@ export function WorkbenchSidebar({ parseError }: WorkbenchSidebarProps) {
           'mb-2 flex h-10 w-10 flex-col items-center justify-center rounded-md text-foreground no-underline',
           'hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40'
         )}
-        title="Capacity — home"
-        aria-label="Go to marketing home"
+        title={`${PRODUCT_WORDMARK} — home`}
+        aria-label={`${PRODUCT_NAME_SPOKEN}, go to marketing home`}
       >
         <SegmentWorkbenchMark className="h-6 w-6 shrink-0 text-primary" />
       </Link>
