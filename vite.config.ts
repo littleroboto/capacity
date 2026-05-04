@@ -56,7 +56,8 @@ export default defineConfig({
     alias: {
       '@': path.join(rootDir, 'src'),
     },
-    dedupe: ['react', 'react-dom'],
+    /** Single Clerk module graph avoids duplicate `ClerkProvider` instance guards under Vite HMR. */
+    dedupe: ['react', 'react-dom', '@clerk/react', '@clerk/shared'],
   },
   build: {
     outDir: 'dist',

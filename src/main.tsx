@@ -145,16 +145,28 @@ const clerkAppearance = {
   },
 };
 
+const REACT_ROOT_SLOT = Symbol.for('capacity.reactRoot');
+
+type RootHost = HTMLElement & { [REACT_ROOT_SLOT]?: ReturnType<typeof createRoot> };
+
 /**
  * Clerk must use React Router’s navigate for post-auth redirects. If it only
  * mutates `history` directly, the SPA can stay on “Loading sign-in…” until a
  * full refresh (stale router location / no re-render).
+ *
+ * Matches Clerk’s declarative React Router guide: `BrowserRouter` → hook
+ * (`useNavigate`) → `ClerkProvider` → routes — not `Suspense` between router
+ * and provider (avoids dev-only double mount / multiple ClerkProvider warnings).
  */
-function ClerkBrowserRoot() {
+function ClerkProviderWithNav() {
   const navigate = useNavigate();
 
   if (!clerkKey) {
-    return <AppRoutes />;
+    return (
+      <Suspense fallback={<BootFallback />}>
+        <AppRoutes />
+      </Suspense>
+    );
   }
 
   return (
@@ -170,7 +182,9 @@ function ClerkBrowserRoot() {
         navigate(to, { replace: true });
       }}
     >
-      <AppRoutes />
+      <Suspense fallback={<BootFallback />}>
+        <AppRoutes />
+      </Suspense>
     </ClerkProvider>
   );
 }
@@ -181,17 +195,29 @@ if (!rootEl) {
 }
 
 try {
-  createRoot(rootEl).render(
+  const host = rootEl as RootHost;
+  let root = host[REACT_ROOT_SLOT];
+  if (!root) {
+    root = createRoot(rootEl);
+    host[REACT_ROOT_SLOT] = root;
+  }
+  root.render(
     <StrictMode>
       <RootErrorBoundary>
         <BrowserRouter basename={workbenchBasename()}>
-          <Suspense fallback={<BootFallback />}>
-            <ClerkBrowserRoot />
-          </Suspense>
+          <ClerkProviderWithNav />
         </BrowserRouter>
       </RootErrorBoundary>
     </StrictMode>
   );
+
+  if (import.meta.hot) {
+    import.meta.hot.dispose(() => {
+      const r = host[REACT_ROOT_SLOT];
+      r?.unmount();
+      delete host[REACT_ROOT_SLOT];
+    });
+  }
 } catch (e) {
   const msg = e instanceof Error ? e.message : String(e);
   console.error('[capacity] createRoot failed', e);
