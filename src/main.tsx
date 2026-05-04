@@ -1,4 +1,4 @@
-import { StrictMode, lazy, Suspense } from 'react';
+import { Component, StrictMode, lazy, Suspense, type ErrorInfo, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/react';
@@ -37,6 +37,43 @@ function clerkWaitlistUrlPath(): string {
 }
 
 applyPersistedWorkbenchThemeClass();
+
+function BootFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 text-sm text-muted-foreground">
+      Loading app…
+    </div>
+  );
+}
+
+class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[capacity] root render failed', error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      const msg = this.state.error.message;
+      return (
+        <div className="min-h-screen bg-background px-6 py-10 text-foreground">
+          <h1 className="text-lg font-semibold text-destructive">Something went wrong</h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            The app hit an error while rendering. Check the browser console for details, then try a hard refresh.
+            If you use an ad blocker or privacy extension, try disabling it for this origin.
+          </p>
+          <pre className="mt-4 max-h-[40vh] overflow-auto rounded-md border border-border bg-muted/50 p-3 text-xs">{msg}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function WorkbenchLoading() {
   return (
@@ -138,10 +175,29 @@ function ClerkBrowserRoot() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter basename={workbenchBasename()}>
-      <ClerkBrowserRoot />
-    </BrowserRouter>
-  </StrictMode>
-);
+const rootEl = document.getElementById('root');
+if (!rootEl) {
+  throw new Error('Missing #root element — index.html must define <div id="root"></div>.');
+}
+
+try {
+  createRoot(rootEl).render(
+    <StrictMode>
+      <RootErrorBoundary>
+        <BrowserRouter basename={workbenchBasename()}>
+          <Suspense fallback={<BootFallback />}>
+            <ClerkBrowserRoot />
+          </Suspense>
+        </BrowserRouter>
+      </RootErrorBoundary>
+    </StrictMode>
+  );
+} catch (e) {
+  const msg = e instanceof Error ? e.message : String(e);
+  console.error('[capacity] createRoot failed', e);
+  rootEl.innerHTML = `<div style="padding:24px;font-family:system-ui,sans-serif;max-width:42rem">
+    <h1 style="font-size:1.125rem;margin:0 0 12px">App failed to start</h1>
+    <p style="margin:0 0 12px;color:#444;font-size:14px">Check the browser console. Common causes: blocked script (extension), or a stale dev server — restart <code>pnpm dev:vercel</code>.</p>
+    <pre style="font-size:12px;overflow:auto;background:#f4f4f5;padding:12px;border-radius:8px">${msg.replace(/</g, '&lt;')}</pre>
+  </div>`;
+}

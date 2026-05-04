@@ -354,8 +354,8 @@ export function LandingPage() {
         <header className="mb-16 flex flex-wrap items-center justify-between gap-4 sm:mb-20">
           <motion.div
             className="flex min-w-0 max-w-[min(100%,20rem)] items-center gap-2.5 font-landing text-balance text-xl font-extrabold leading-snug tracking-[-0.02em] text-zinc-800 sm:max-w-none sm:gap-3 sm:text-2xl"
-            initial={reducedMotion ? false : { opacity: 0, filter: 'blur(10px)', y: 5 }}
-            animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
+            initial={reducedMotion ? false : { opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
           >
             <SegmentWorkbenchMark className="h-[1.2em] w-[1.2em] shrink-0 self-center" />
