@@ -11,6 +11,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { HolidayCalendarsEditor } from '@/pages/admin/HolidayCalendarsEditor';
+import { AdminHolidayEntryCreate } from '@/pages/admin/AdminHolidayEntryCreate';
 import {
   fetchFragments,
   fetchMarkets,
@@ -260,14 +261,17 @@ export function AdminMarketDetail() {
       ) : activeTab === 'audit' ? (
         <AuditTab events={auditEvents} loading={loading} />
       ) : activeTab === 'holidays' ? (
-        <HolidayCalendarsEditor
-          fragments={fragments}
-          loading={loading}
-          saving={saving}
-          onSave={handleSave}
-          onArchive={handleArchive}
-          onRefresh={loadFragments}
-        />
+        <div className="space-y-8">
+          <AdminHolidayEntryCreate marketId={marketId ?? ''} onEntriesAdded={loadFragments} />
+          <HolidayCalendarsEditor
+            fragments={fragments}
+            loading={loading}
+            saving={saving}
+            onSave={handleSave}
+            onArchive={handleArchive}
+            onRefresh={loadFragments}
+          />
+        </div>
       ) : (
         <>
           {activeTab === 'campaigns' && marketRow ? (

@@ -1,10 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
 import { createHolidayEntryApi, fetchFragments } from '@/lib/adminApi';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import type { AdminMarketRow } from '@/pages/admin/AdminMarketsDataTable';
-import { adminMarketEntityPath } from '@/pages/admin/adminMarketTabs';
 
 function calendarTypeLabel(cal: Record<string, unknown>): string {
   const t = String(cal.calendar_type ?? cal.calendarType ?? '').replace(/_/g, ' ');
@@ -54,20 +51,12 @@ function isDuplicateHolidayError(message: string): boolean {
 }
 
 type Props = {
-  markets: AdminMarketRow[];
+  marketId: string;
+  /** Called after holiday days are added successfully so parent can refresh calendar fragments. */
+  onEntriesAdded?: () => void;
 };
 
-export function AdminHolidayEntryCreate({ markets }: Props) {
-  const sortedMarkets = useMemo(
-    () => [...markets].sort((a, b) => a.id.localeCompare(b.id)),
-    [markets]
-  );
-
-  const [marketId, setMarketId] = useState(() => sortedMarkets[0]?.id ?? '');
-  useEffect(() => {
-    if (!marketId && sortedMarkets[0]) setMarketId(sortedMarkets[0].id);
-  }, [marketId, sortedMarkets]);
-
+export function AdminHolidayEntryCreate({ marketId, onEntriesAdded }: Props) {
   const [calendars, setCalendars] = useState<Record<string, unknown>[]>([]);
   const [calLoading, setCalLoading] = useState(false);
   const [calError, setCalError] = useState<string | null>(null);
@@ -133,12 +122,12 @@ export function AdminHolidayEntryCreate({ markets }: Props) {
     e.preventDefault();
     resetMessages();
     const calId = calendarId.trim();
-    if (!marketId) {
-      setFormError('Choose a market.');
+    if (!marketId.trim()) {
+      setFormError('Missing market.');
       return;
     }
     if (!calId) {
-      setFormError('No holiday calendar is available for this market. Add one under Configure → Holidays.');
+      setFormError('No holiday calendar is available for this market yet. Add calendars via seed, import, or YAML.');
       return;
     }
     const start = startDate.trim();
@@ -207,6 +196,7 @@ export function AdminHolidayEntryCreate({ markets }: Props) {
       setFormSuccess(parts.join(' '));
       setEndDate('');
       setEventName('');
+      onEntriesAdded?.();
     } finally {
       setSubmitting(false);
     }
@@ -223,35 +213,15 @@ export function AdminHolidayEntryCreate({ markets }: Props) {
             Add holiday dates
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Create public or school holiday entries with a name and date range. Uses the same API as the per-market
-            holiday editor. For new calendars or multipliers, open{' '}
-            <span className="font-medium text-foreground">Configure</span> for that market.
+            Add public or school holiday days by date range for this market. Pick a calendar below, then use the cards
+            further down to edit multipliers, load effects, or remove individual dates.
           </p>
         </div>
       </div>
 
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="holiday-create-market">Market</Label>
-            <select
-              id="holiday-create-market"
-              value={marketId}
-              onChange={(e) => {
-                resetMessages();
-                setMarketId(e.target.value);
-              }}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              {sortedMarkets.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.id} — {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-2">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2 sm:col-span-2">
             <Label htmlFor="holiday-create-calendar">Holiday calendar</Label>
             {calLoading ? (
               <div
@@ -266,14 +236,8 @@ export function AdminHolidayEntryCreate({ markets }: Props) {
                   <span className="text-destructive">{calError}</span>
                 ) : (
                   <>
-                    No holiday calendars for this market yet.{' '}
-                    <Link
-                      to={adminMarketEntityPath(marketId, 'holidays')}
-                      className="font-medium text-primary underline-offset-4 hover:underline"
-                    >
-                      Open Configure
-                    </Link>{' '}
-                    to add or import calendars.
+                    No holiday calendars for this market yet. Seed or import config (Expert YAML / database), or add
+                    calendar rows so you can attach dates here.
                   </>
                 )}
               </div>
@@ -355,17 +319,14 @@ export function AdminHolidayEntryCreate({ markets }: Props) {
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" disabled={submitting || calLoading || calendars.length === 0 || !startDate}>
+          <Button
+            type="submit"
+            disabled={
+              submitting || calLoading || calendars.length === 0 || !startDate || !marketId.trim()
+            }
+          >
             {submitting ? 'Adding…' : 'Add to calendar'}
           </Button>
-          {marketId ? (
-            <Link
-              to={adminMarketEntityPath(marketId, 'holidays')}
-              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
-              Full holiday editor for this market
-            </Link>
-          ) : null}
         </div>
       </form>
     </section>

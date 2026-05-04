@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { fetchMarkets } from '@/lib/adminApi';
-import { AdminHolidayEntryCreate } from '@/pages/admin/AdminHolidayEntryCreate';
 import { AdminMarketsDataTable, AdminMarketsTableSkeleton, type AdminMarketRow } from '@/pages/admin/AdminMarketsDataTable';
 
 export function AdminMarketOverview() {
@@ -54,10 +53,7 @@ export function AdminMarketOverview() {
       {loading ? (
         <AdminMarketsTableSkeleton />
       ) : !emptyDb ? (
-        <div className="space-y-8">
-          <AdminHolidayEntryCreate markets={markets} />
-          <AdminMarketsDataTable data={markets} />
-        </div>
+        <AdminMarketsDataTable data={markets} />
       ) : null}
     </div>
   );
