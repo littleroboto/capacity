@@ -18,12 +18,20 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAtcStore } from '@/store/useAtcStore';
+import type { editor } from 'monaco-editor';
 import {
   capacityYamlThemeId,
   registerCapacityYamlThemes,
 } from '@/lib/monacoCapacityThemes';
-import { registerCapacityYamlOutline } from '@/lib/monacoCapacityYamlProviders';
+import {
+  registerCapacityYamlCompletion,
+  registerCapacityYamlMultiDocFolding,
+  registerCapacityYamlOutline,
+} from '@/lib/monacoCapacityYamlProviders';
+import { getSectionBandLineRanges } from '@/lib/monacoCapacityYamlSectionScan';
+import { mergeStateToFullMultiDoc } from '@/lib/multiDocMarketYaml';
 import { registerDslEditorFlush } from '@/lib/dslEditorSyncBridge';
+import { normalizeWorkspaceYamlForPipelineCompare } from '@/lib/workspaceYamlPipelineCompare';
 import { cn } from '@/lib/utils';
 
 /** Long-form YAML reference (also used in the syntax dialog). */
@@ -92,29 +100,42 @@ export type DslEditorMarketTabBinding = {
   onTextChange: (value: string) => void;
 };
 
-function applyCapacitySpecMarkers(
-  monaco: Monaco,
+/** UX1: full parse message lives in the banner only — avoid duplicating it as a line-1 Monaco problem. */
+function clearCapacitySpecMarkers(monaco: Monaco, editor: Parameters<OnMount>[0]) {
+  const model = editor.getModel();
+  if (!model) return;
+  monaco.editor.setModelMarkers(model, 'capacity-spec', []);
+}
+
+const SECTION_BAND_DEBOUNCE_MS = 400;
+const SECTION_BAND_DEBOUNCE_REDUCED_MOTION_MS = 550;
+
+function computeSectionBandDecorations(monaco: Monaco, model: editor.ITextModel) {
+  const text = model.getValue();
+  const ranges = getSectionBandLineRanges(text);
+  return ranges.map((r, i) => ({
+    range: new monaco.Range(
+      r.startLineNumber,
+      1,
+      r.endLineNumber,
+      model.getLineMaxColumn(r.endLineNumber)
+    ),
+    options: {
+      isWholeLine: true,
+      className: i % 2 === 0 ? 'cd-yaml-section-band-a' : 'cd-yaml-section-band-b',
+    },
+  }));
+}
+
+function applySectionBandDecorations(
   editor: Parameters<OnMount>[0],
-  parseErrorVal: string | null
+  monaco: Monaco,
+  decorationIdsRef: { current: string[] }
 ) {
   const model = editor.getModel();
   if (!model) return;
-  const msg = parseErrorVal?.trim();
-  if (msg) {
-    const endCol = Math.max(1, model.getLineMaxColumn(1));
-    monaco.editor.setModelMarkers(model, 'capacity-spec', [
-      {
-        severity: monaco.MarkerSeverity.Error,
-        startLineNumber: 1,
-        startColumn: 1,
-        endLineNumber: 1,
-        endColumn: endCol,
-        message: msg,
-      },
-    ]);
-  } else {
-    monaco.editor.setModelMarkers(model, 'capacity-spec', []);
-  }
+  const next = computeSectionBandDecorations(monaco, model);
+  decorationIdsRef.current = editor.deltaDecorations(decorationIdsRef.current, next);
 }
 
 type DslEditorCoreProps = {
@@ -163,6 +184,12 @@ export function DslEditorCore({
 
   const dslText = useAtcStore((s) => s.dslText);
   const parseError = useAtcStore((s) => s.parseError);
+  const workspaceYamlSync = useAtcStore((s) => {
+    const baseline = s.pipelineCommittedWorkspaceYaml;
+    if (baseline == null) return 'unknown' as const;
+    const cur = normalizeWorkspaceYamlForPipelineCompare(mergeStateToFullMultiDoc(s));
+    return cur === baseline ? ('in_sync' as const) : ('draft' as const);
+  });
   const dslAssistantEditorLock = useAtcStore((s) => s.dslAssistantEditorLock);
   const dslMutationLocked = useAtcStore((s) => s.dslMutationLocked);
   const theme = useAtcStore((s) => s.theme);
@@ -173,6 +200,8 @@ export function DslEditorCore({
 
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
+  const sectionBandDecoIdsRef = useRef<string[]>([]);
+  const sectionBandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editorValue = marketTabDocument?.text ?? dslText;
   const handleEditorChange = useCallback((v: string | undefined) => {
@@ -255,6 +284,8 @@ export function DslEditorCore({
   const handleBeforeMount = useCallback((monaco: Monaco) => {
     registerCapacityYamlThemes(monaco);
     registerCapacityYamlOutline(monaco);
+    registerCapacityYamlMultiDocFolding(monaco);
+    registerCapacityYamlCompletion(monaco);
   }, []);
 
   const handleQuickOutline = useCallback(() => {
@@ -262,30 +293,60 @@ export function DslEditorCore({
   }, []);
 
   const handleGoToSpecError = useCallback(() => {
-    const ed = editorRef.current;
-    if (!ed || !parseError?.trim()) return;
-    ed.revealLineInCenter(1);
-    ed.setPosition({ lineNumber: 1, column: 1 });
-    ed.focus();
+    if (!parseError?.trim()) return;
+    document.getElementById('dsl-workbench-parse-error')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [parseError]);
 
   const handleMount = useCallback<OnMount>((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    applyCapacitySpecMarkers(monaco, editor, useAtcStore.getState().parseError);
+    sectionBandDecoIdsRef.current = [];
+
+    const debounceMs =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+        ? SECTION_BAND_DEBOUNCE_REDUCED_MOTION_MS
+        : SECTION_BAND_DEBOUNCE_MS;
+
+    clearCapacitySpecMarkers(monaco, editor);
     const sync = () => {
       const p = editor.getPosition();
       if (p) setCursorPos({ line: p.lineNumber, column: p.column });
     };
     sync();
     editor.onDidChangeCursorPosition(sync);
+
+    const model = editor.getModel();
+    const scheduleSectionBands = () => {
+      if (sectionBandDebounceRef.current) clearTimeout(sectionBandDebounceRef.current);
+      sectionBandDebounceRef.current = setTimeout(() => {
+        sectionBandDebounceRef.current = null;
+        applySectionBandDecorations(editor, monaco, sectionBandDecoIdsRef);
+      }, debounceMs);
+    };
+
+    applySectionBandDecorations(editor, monaco, sectionBandDecoIdsRef);
+
+    const contentSub = model?.onDidChangeContent(() => {
+      scheduleSectionBands();
+    });
+
+    editor.onDidDispose(() => {
+      contentSub?.dispose();
+      if (sectionBandDebounceRef.current) {
+        clearTimeout(sectionBandDebounceRef.current);
+        sectionBandDebounceRef.current = null;
+      }
+      sectionBandDecoIdsRef.current = [];
+    });
   }, []);
 
   useEffect(() => {
     const monaco = monacoRef.current;
     const editor = editorRef.current;
     if (!monaco || !editor) return;
-    applyCapacitySpecMarkers(monaco, editor, parseError);
+    clearCapacitySpecMarkers(monaco, editor);
+    applySectionBandDecorations(editor, monaco, sectionBandDecoIdsRef);
   }, [parseError, editorValue]);
 
   useEffect(() => {
@@ -345,6 +406,28 @@ export function DslEditorCore({
                 YAML
               </span>
             ) : null}
+            {studio && workspaceYamlSync !== 'unknown' ? (
+              <span
+                className={cn(
+                  'mr-1 inline-block max-w-[9.5rem] truncate rounded-md border px-2 py-0.5 font-mono text-[10px] font-medium leading-tight sm:max-w-[11rem]',
+                  workspaceYamlSync === 'in_sync'
+                    ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200'
+                    : 'border-amber-500/45 bg-amber-500/12 text-amber-950 dark:text-amber-100'
+                )}
+                title={
+                  workspaceYamlSync === 'in_sync'
+                    ? 'Workspace YAML matches the last successful Apply (heatmap / runway use this).'
+                    : 'Editor differs from the last successful Apply — heatmap may be stale until you Apply YAML or switch away from Code.'
+                }
+                aria-label={
+                  workspaceYamlSync === 'in_sync'
+                    ? 'In sync with runway: last Apply matches the editor.'
+                    : 'Draft: unapplied edits; runway still reflects the last successful Apply.'
+                }
+              >
+                {workspaceYamlSync === 'in_sync' ? 'In sync' : 'Draft'}
+              </span>
+            ) : null}
             {studio ? (
               <Button
                 type="button"
@@ -366,8 +449,8 @@ export function DslEditorCore({
                 variant="ghost"
                 className="h-7 shrink-0 gap-1 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={handleGoToSpecError}
-                aria-label="Go to spec error in editor"
-                title="Scroll to where the parse error is highlighted"
+                aria-label="Show YAML error details"
+                title="Scroll to the YAML error message below the editor"
               >
                 <Crosshair className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
                 <span className="select-none text-[10px] font-medium leading-none">Error</span>
@@ -521,9 +604,14 @@ export function DslEditorCore({
       </div>
 
       {parseError ? (
-        <p className="shrink-0 rounded-lg border border-red-400/40 bg-gradient-to-r from-red-500/15 to-orange-500/10 px-3 py-2 text-xs font-medium text-red-800 dark:border-red-500/35 dark:from-red-950/50 dark:to-orange-950/30 dark:text-red-200">
-          {parseError}
-        </p>
+        <div
+          id="dsl-workbench-parse-error"
+          role="alert"
+          className="shrink-0 rounded-lg border border-red-400/40 bg-gradient-to-r from-red-500/15 to-orange-500/10 px-3 py-2 text-xs text-red-800 dark:border-red-500/35 dark:from-red-950/50 dark:to-orange-950/30 dark:text-red-200"
+        >
+          <p className="font-semibold text-red-900 dark:text-red-100">YAML did not apply</p>
+          <p className="mt-1 font-medium leading-snug">{parseError}</p>
+        </div>
       ) : null}
 
       <div className="flex shrink-0 flex-col gap-1.5">
@@ -604,13 +692,9 @@ export function DslEditorCore({
             </span>
           ) : null}
           {applyFeedback === 'fail' ? (
-            <span
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive"
-              role="alert"
-              aria-live="assertive"
-            >
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
-              Could not apply — fix the error above.
+              Could not apply — see the YAML error panel.
             </span>
           ) : null}
           {trailingActions}

@@ -89,6 +89,13 @@ import { unionLedgerContributorIdsForDay } from '@/lib/runwayLedgerDayContributi
 import { activeLedgerEntryIds } from '@/lib/runwayLedgerAttribution';
 import { CAPACITY_ATC_PERSIST_KEY, CAPACITY_ATC_PERSIST_VERSION } from '@/lib/capacityAtcPersist';
 import { runPipelineInWorker } from '@/lib/pipelineWorkerClient';
+import { buildWorkbenchPipelineEventLines } from '@/lib/workbenchPipelineEventLines';
+import {
+  newWorkbenchLogEntries,
+  trimWorkbenchEventLog,
+  type WorkbenchEventLogEntry,
+} from '@/lib/workbenchEventLog';
+import { normalizeWorkspaceYamlForPipelineCompare } from '@/lib/workspaceYamlPipelineCompare';
 import { computeWorkbenchHydrateBundle } from '@/lib/workbenchHydrate';
 import {
   buildViewSettingsFile,
@@ -135,6 +142,17 @@ type AtcState = {
   riskSurfaceLedgerView: RiskRow[] | null;
   configs: MarketConfig[];
   parseError: string | null;
+  /**
+   * Last workspace multi-doc YAML that produced a successful pipeline commit (no parseError).
+   * Used for draft vs runway sync in the Code view.
+   */
+  pipelineCommittedWorkspaceYaml: string | null;
+  /**
+   * Workbench right drawer: YAML / pipeline / Gantt trace (ring buffer, not persisted).
+   */
+  workbenchEventLog: WorkbenchEventLogEntry[];
+  pushWorkbenchEventLog: (lines: string | readonly string[]) => void;
+  clearWorkbenchEventLog: () => void;
   /** Runway heatmap: optional sparkle / twinkle on every cell when on (dark theme, honour reduced-motion). */
   discoMode: boolean;
   /**
@@ -303,6 +321,8 @@ type AtcState = {
   importViewSettingsFromJson: (jsonText: string) => { ok: true } | { ok: false; error: string };
 };
 
+type AtcStoreSetter = (partial: Partial<AtcState> | ((s: AtcState) => Partial<AtcState>)) => void;
+
 function shouldBlockDslMutation(get: () => AtcState): boolean {
   return get().dslMutationLocked;
 }
@@ -318,7 +338,7 @@ function normalizeIsoYmdInput(x: string | null | undefined): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
 }
 
-function syncLedgerCounterfactualRiskSurface(get: () => AtcState, set: (partial: Partial<AtcState>) => void) {
+function syncLedgerCounterfactualRiskSurface(get: () => AtcState, set: AtcStoreSetter) {
   const { configs, riskSurface, runwayLedgerExcludedEntryIds, riskTuning, country, parseError } = get();
   if (parseError || !configs.length || !riskSurface.length) {
     set({ riskSurfaceLedgerView: riskSurface });
@@ -344,20 +364,42 @@ function syncLedgerCounterfactualRiskSurface(get: () => AtcState, set: (partial:
   }
 }
 
+type PipelineCommitLogCtx = { dslText: string; ranInWorker?: boolean };
+
 function commitPipelineRisk(
   get: () => AtcState,
-  set: (partial: Partial<AtcState>) => void,
+  set: AtcStoreSetter,
   r: { riskSurface: RiskRow[]; configs: MarketConfig[]; parseError?: string },
+  logCtx?: PipelineCommitLogCtx,
 ) {
-  set({
-    riskSurface: r.riskSurface,
-    configs: r.configs,
-    parseError: r.parseError ?? null,
+  set((s) => {
+    const next: Partial<AtcState> = {
+      riskSurface: r.riskSurface,
+      configs: r.configs,
+      parseError: r.parseError ?? null,
+    };
+    if (!r.parseError?.trim() && logCtx?.dslText != null) {
+      next.pipelineCommittedWorkspaceYaml = normalizeWorkspaceYamlForPipelineCompare(logCtx.dslText);
+    }
+    if (logCtx) {
+      const lines = buildWorkbenchPipelineEventLines({
+        dslText: logCtx.dslText,
+        result: r,
+        calendar: pipelineCalendarRangeFromGet(get),
+        focusCountry: get().country,
+        ranInWorker: logCtx.ranInWorker ?? false,
+      });
+      next.workbenchEventLog = trimWorkbenchEventLog([
+        ...s.workbenchEventLog,
+        ...newWorkbenchLogEntries(lines),
+      ]);
+    }
+    return next;
   });
   syncLedgerCounterfactualRiskSurface(get, set);
 }
 
-function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) => void) {
+function rerunPipeline(get: () => AtcState, set: AtcStoreSetter) {
   const full = mergeStateToFullMultiDoc(get());
   if (!full.trim() || !looksLikeYamlDsl(full)) return;
   const { riskTuning, country } = get();
@@ -366,7 +408,7 @@ function rerunPipeline(get: () => AtcState, set: (partial: Partial<AtcState>) =>
     riskTuningForPipelineView(riskTuning, country),
     pipelineCalendarRangeFromGet(get)
   );
-  commitPipelineRisk(get, set, r);
+  commitPipelineRisk(get, set, r, { dslText: full });
 }
 
 function withClampedRunwayHeatmapLayout(s: AtcState): AtcState {
@@ -436,6 +478,19 @@ export const useAtcStore = create<AtcState>()(
       riskSurfaceLedgerView: null,
       configs: [],
       parseError: null,
+      pipelineCommittedWorkspaceYaml: null,
+      workbenchEventLog: [],
+      pushWorkbenchEventLog: (lines) => {
+        const arr = typeof lines === 'string' ? [lines] : [...lines];
+        if (!arr.length) return;
+        set((s) => ({
+          workbenchEventLog: trimWorkbenchEventLog([
+            ...s.workbenchEventLog,
+            ...newWorkbenchLogEntries(arr),
+          ]),
+        }));
+      },
+      clearWorkbenchEventLog: () => set({ workbenchEventLog: [] }),
       discoMode: false,
       runwayReturnPicker: null,
       runwayLensBeforeCode: 'combined',
@@ -504,7 +559,7 @@ export const useAtcStore = create<AtcState>()(
             riskTuningForPipelineView(riskTuning, c),
             pipelineCalendarRangeFromGet(get)
           );
-          commitPipelineRisk(get, set, r);
+          commitPipelineRisk(get, set, r, { dslText: full });
           return;
         }
 
@@ -524,7 +579,7 @@ export const useAtcStore = create<AtcState>()(
           riskTuningForPipelineView(riskTuning, c),
           pipelineCalendarRangeFromGet(get)
         );
-        commitPipelineRisk(get, set, r);
+        commitPipelineRisk(get, set, r, { dslText: full });
       },
 
       setViewMode: (v) => {
@@ -973,10 +1028,14 @@ export const useAtcStore = create<AtcState>()(
         const stateAfterFlush = get();
         const merged = (text?.trim() ? text.trim() : mergeStateToFullMultiDoc(stateAfterFlush).trim());
         if (!looksLikeYamlDsl(merged)) {
-          set({
+          set((s) => ({
             parseError:
               'Editor content is not valid workspace YAML (e.g. HTML, a JS/TS source file like server/impl/_sharedDslImpl.ts, or a bad cloud pull). Reset the workspace or paste real market DSL. If the team Blob has the wrong file, re-save valid YAML from the editor.',
-          });
+            workbenchEventLog: trimWorkbenchEventLog([
+              ...s.workbenchEventLog,
+              ...newWorkbenchLogEntries(['[yaml] rejected buffer — not workspace YAML shape']),
+            ]),
+          }));
           return;
         }
         const co = stateAfterFlush.country;
@@ -996,7 +1055,7 @@ export const useAtcStore = create<AtcState>()(
           riskTuningForPipelineView(get().riskTuning, co),
           pipelineCalendarRangeFromGet(get)
         );
-        commitPipelineRisk(get, set, r);
+        commitPipelineRisk(get, set, r, { dslText: full });
       },
 
       resetDsl: () => {
@@ -1026,7 +1085,7 @@ export const useAtcStore = create<AtcState>()(
           riskTuningForPipelineView(riskTuning, country),
           pipelineCalendarRangeFromGet(get)
         );
-        commitPipelineRisk(get, set, r);
+        commitPipelineRisk(get, set, r, { dslText: full });
       },
 
       getLastBootstrapMultiDoc: () => lastBootstrapMultiDoc,
@@ -1048,7 +1107,7 @@ export const useAtcStore = create<AtcState>()(
           riskTuningForPipelineView(riskTuning, country),
           pipelineCalendarRangeFromGet(get)
         );
-        commitPipelineRisk(get, set, r);
+        commitPipelineRisk(get, set, r, { dslText: bundle.dslMultiDoc, ranInWorker: true });
         document.documentElement.classList.remove('dark');
       },
     }),

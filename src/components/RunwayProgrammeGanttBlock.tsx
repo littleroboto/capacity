@@ -100,7 +100,10 @@ type Props = {
    * so the workbench is not overwritten.
    */
   ephemeral?: boolean;
-  /** With `ephemeral`, open the plan once this becomes true (e.g. section / toolbar in view). */
+  /**
+   * With `ephemeral`, open the plan once this becomes true (e.g. section / toolbar in view).
+   * If already true on first mount, the panel starts open (no “Show plan” flash).
+   */
   revealPlanWhen?: boolean;
   /** Milliseconds after `revealPlanWhen` before opening; ignored when reduced motion (opens immediately). */
   revealPlanDelayMs?: number;
@@ -116,6 +119,16 @@ type Props = {
    * When the plan is open it shares pan/zoom; when closed it still renders below the header at 1:1 scale.
    */
   techDemandSparkline?: ProgrammeGanttTechDemandSparklineConfig | null;
+  /**
+   * When the plan is open: render the tech sparkline inside the zoom/pan viewport (default).
+   * Set false to omit it from the open panel (caller renders elsewhere — rare).
+   */
+  embedTechDemandSparklineInOpenPanel?: boolean;
+  /**
+   * Keep the sparkline in-layout (same DOM as /app) but invisible — e.g. homepage sequential hero
+   * before the tech chart fades in.
+   */
+  techSparklineVisuallyHidden?: boolean;
   /** Landing: same organic tick as contribution heatmaps so Gantt segments build in sync. */
   landingHeatmapOrganicSyncTick?: number;
   /** Hash key for organic reveal; match combined heatmap strips (e.g. `${country}-combined`). */
@@ -143,12 +156,17 @@ export function RunwayProgrammeGanttBlock({
   ephemeralInitialPrefs,
   onPlanVisibleYmdRangeChange,
   techDemandSparkline = null,
+  embedTechDemandSparklineInOpenPanel = true,
+  techSparklineVisuallyHidden = false,
   landingHeatmapOrganicSyncTick,
   landingOrganicSyncMarketKey,
 }: Props) {
   const reduceMotion = useReducedMotion();
   const programmePlanPanelId = useId().replace(/:/g, '');
-  const [open, setOpen] = useState(() => (ephemeral ? false : loadProgrammeGanttOpen()));
+  /** Homepage / embed: when `revealPlanWhen` is already true on mount, open immediately (no flash of “Show plan”). */
+  const [open, setOpen] = useState(() =>
+    ephemeral && revealPlanWhen ? true : ephemeral ? false : loadProgrammeGanttOpen(),
+  );
   const [prefs, setPrefs] = useState<ProgrammeGanttDisplayPrefs>(() =>
     ephemeral
       ? { ...RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS, ...ephemeralInitialPrefs }
@@ -395,12 +413,13 @@ export function RunwayProgrammeGanttBlock({
   }, []);
 
   const stripHeightPx = runwayProgrammeGanttStripHeightPx(prefs, lanes.length);
-  const sparklineStackPx = techDemandSparkline
-    ? runwayTechSparklineStackHeightForChartSvgPx(
-        RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_PX,
-        RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_TOP_OFFSET_PX,
-      )
-    : 0;
+  const sparklineStackPx =
+    techDemandSparkline != null && (open ? embedTechDemandSparklineInOpenPanel : true)
+      ? runwayTechSparklineStackHeightForChartSvgPx(
+          RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_PX,
+          RUNWAY_PROGRAMME_GANTT_SPARKLINE_CHART_TOP_OFFSET_PX,
+        )
+      : 0;
   const ganttPlusSparklineHeightPx = stripHeightPx + sparklineStackPx;
 
   function renderTechDemandSparkline() {
@@ -626,8 +645,19 @@ export function RunwayProgrammeGanttBlock({
                       disclosureTier={disclosureTier}
                       landingHeatmapOrganicSyncTick={landingHeatmapOrganicSyncTick}
                       landingOrganicSyncMarketKey={landingOrganicSyncMarketKey}
+                      suppressPlanBuildWorkbenchLog={ephemeral && prefs.planBuildAnimation === 'staged'}
                     />
-                    {renderTechDemandSparkline()}
+                    {embedTechDemandSparklineInOpenPanel ? (
+                      <div
+                        className={cn(
+                          'transition-opacity duration-500 ease-out',
+                          techSparklineVisuallyHidden && 'pointer-events-none opacity-0',
+                        )}
+                        aria-hidden={techSparklineVisuallyHidden}
+                      >
+                        {renderTechDemandSparkline()}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 </div>

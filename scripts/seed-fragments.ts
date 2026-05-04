@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
 import { createClient } from '@supabase/supabase-js';
+import { expandHolidayBlockDates } from '../src/lib/holidayBlockDatesAndRanges';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -211,12 +212,13 @@ for (const file of yamlFiles) {
 
     if (calErr) {
       errors.push(`holiday_calendars (public): ${calErr.message}`);
-    } else if (cal && Array.isArray(ph.dates)) {
-      const entries = (ph.dates as string[]).map(d => ({
-        calendar_id: (cal as Record<string, unknown>).id,
-        holiday_date: String(d),
-      }));
-      if (entries.length > 0) {
+    } else if (cal) {
+      const { dates: holidayDates } = expandHolidayBlockDates(ph);
+      if (holidayDates && holidayDates.length > 0) {
+        const entries = holidayDates.map((d) => ({
+          calendar_id: (cal as Record<string, unknown>).id,
+          holiday_date: d,
+        }));
         const { error: entErr } = await client.from('holiday_entries').insert(entries);
         if (entErr) errors.push(`holiday_entries (public): ${entErr.message}`);
       }
@@ -239,12 +241,13 @@ for (const file of yamlFiles) {
 
     if (calErr) {
       errors.push(`holiday_calendars (school): ${calErr.message}`);
-    } else if (cal && Array.isArray(sh.dates)) {
-      const entries = (sh.dates as string[]).map(d => ({
-        calendar_id: (cal as Record<string, unknown>).id,
-        holiday_date: String(d),
-      }));
-      if (entries.length > 0) {
+    } else if (cal) {
+      const { dates: holidayDates } = expandHolidayBlockDates(sh);
+      if (holidayDates && holidayDates.length > 0) {
+        const entries = holidayDates.map((d) => ({
+          calendar_id: (cal as Record<string, unknown>).id,
+          holiday_date: d,
+        }));
         const { error: entErr } = await client.from('holiday_entries').insert(entries);
         if (entErr) errors.push(`holiday_entries (school): ${entErr.message}`);
       }

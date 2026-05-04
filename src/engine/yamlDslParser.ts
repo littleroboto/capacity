@@ -23,6 +23,7 @@ import type { TradingMonthKey } from '@/lib/tradingMonthlyDsl';
 import { parseNationalLeaveBands } from './nationalLeaveBands';
 import { coerceYamlDateString } from './yamlDateCoerce';
 import { clampHeatmapPressureOffset } from '@/lib/heatmapTuningPerLens';
+import { datesFromHolidayBlockDatesAndRanges } from '@/lib/holidayBlockDatesAndRanges';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -494,64 +495,6 @@ function mapReleases(raw: unknown[] | undefined): ReleaseConfig[] {
     });
   }
   return out;
-}
-
-function normalizeDateList(raw: unknown): string[] | undefined {
-  if (raw == null) return undefined;
-  if (!Array.isArray(raw)) return undefined;
-  const out: string[] = [];
-  for (const item of raw) {
-    const s = coerceYamlDateString(item);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) out.push(s);
-  }
-  return out.length ? out : undefined;
-}
-
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Inclusive calendar-day expansion using UTC (authoring uses plain ISO dates). */
-function expandIsoInclusiveRange(fromIso: string, toIso: string): string[] {
-  if (!ISO_DAY.test(fromIso) || !ISO_DAY.test(toIso)) return [];
-  const [fy, fm, fd] = fromIso.split('-').map(Number) as [number, number, number];
-  const [ty, tm, td] = toIso.split('-').map(Number) as [number, number, number];
-  let t = Date.UTC(fy, fm - 1, fd);
-  const end = Date.UTC(ty, tm - 1, td);
-  if (t > end) return [];
-  const out: string[] = [];
-  while (t <= end) {
-    const d = new Date(t);
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
-    out.push(`${y}-${m}-${day}`);
-    t += 86400000;
-  }
-  return out;
-}
-
-/**
- * `ranges:` under public_holidays / school_holidays — each entry `{ from, to }` (or start/end, camelCase).
- * Merged with explicit `dates:`; result sorted and deduped.
- */
-function datesFromHolidayBlockDatesAndRanges(block: Record<string, unknown>): string[] | undefined {
-  const explicit = normalizeDateList(block.dates) ?? [];
-  const rawRanges = block.ranges;
-  const fromRanges: string[] = [];
-  if (Array.isArray(rawRanges)) {
-    for (const row of rawRanges) {
-      if (!row || typeof row !== 'object') continue;
-      const r = row as Record<string, unknown>;
-      const fromRaw = r.from ?? r.start ?? r.Start ?? r.from_date ?? r.fromDate;
-      const toRaw = r.to ?? r.end ?? r.End ?? r.to_date ?? r.toDate;
-      const from = coerceYamlDateString(fromRaw);
-      const to = coerceYamlDateString(toRaw);
-      if (!ISO_DAY.test(from) || !ISO_DAY.test(to)) continue;
-      fromRanges.push(...expandIsoInclusiveRange(from, to));
-    }
-  }
-  if (explicit.length === 0 && fromRanges.length === 0) return undefined;
-  const merged = Array.from(new Set([...explicit, ...fromRanges])).sort();
-  return merged.length ? merged : undefined;
 }
 
 /** Readable BAU: `days_in_use` + `weekly_cycle.labs_required` / `staff_required`. */

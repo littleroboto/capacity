@@ -145,6 +145,7 @@ import type { ProgrammeGanttDisplayPrefs } from '@/lib/runwayProgrammeGanttPrefs
 import {
   loadProgrammeGanttPrefs,
   PROGRAMME_GANTT_PREFS_CHANGED_EVENT,
+  RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS,
 } from '@/lib/runwayProgrammeGanttPrefs';
 import { RUNWAY_EMERGE_DURATION_SEC, RUNWAY_EMERGE_PAUSE_MS } from '@/hooks/useRunwayHeatmapEmergence';
 import {
@@ -208,6 +209,17 @@ const SINGLE_MARKET_STACK_LENS_IDS: readonly ViewModeId[] = ['combined', 'in_sto
 const LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS = 300;
 /** Main page title when all three lenses are stacked (matches heatmap lens names). */
 const SINGLE_MARKET_MULTI_LENS_HEADLINE = 'Tech Capacity, Trading Pressure, Deployment Risk';
+
+function tripleLensStackHeadlineFromModes(modes: readonly ViewModeId[]): string {
+  if (modes.length === 0) return SINGLE_MARKET_MULTI_LENS_HEADLINE;
+  const parts: string[] = [];
+  for (const m of modes) {
+    if (m === 'combined') parts.push('Tech Capacity');
+    else if (m === 'in_store') parts.push('Trading Pressure');
+    else if (m === 'market_risk') parts.push('Deployment Risk');
+  }
+  return parts.length > 0 ? parts.join(', ') : SINGLE_MARKET_MULTI_LENS_HEADLINE;
+}
 /** One legend for the whole stack; ramp matches the first (Technology) lens colour tuning. */
 const SINGLE_MARKET_STACK_SHARED_LEGEND_LENS: ViewModeId =
   SINGLE_MARKET_STACK_LENS_IDS[0] ?? 'combined';
@@ -1671,6 +1683,22 @@ type RunwayGridProps = {
    * (cell stagger or emerge), so the programme Gantt can open after.
    */
   onLandingContributionHeatmapSettled?: () => void;
+  /**
+   * Homepage hero: reveal **programme Gantt first**, then triple-lens heatmaps, then tech demand sparkline
+   * below the heatmaps (matches the story order on the landing page).
+   */
+  landingSequentialHeroReveal?: boolean;
+  /**
+   * Homepage hero: show the same runway **strip toggle toolbar** as /app (decorative when combined with
+   * {@link landingMinimalChrome} — strip toggles match {@link landingTripleLensStackModes}; programme plan
+   * stays on when {@link landingProgrammePlan} is set).
+   */
+  landingHeroMirrorWorkbenchRunwayToolbars?: boolean;
+  /**
+   * With {@link landingMinimalChrome}: which stacked runway lenses to render (subset of technology /
+   * trading / deployment-risk). Order follows the default triple-lens stack. Omit or empty → all three.
+   */
+  landingTripleLensStackModes?: readonly ViewModeId[];
 };
 
 export function RunwayGrid({
@@ -1691,6 +1719,9 @@ export function RunwayGrid({
   landingProgrammePlanRevealReady = false,
   landingProgrammePlanPrefs,
   onLandingContributionHeatmapSettled,
+  landingSequentialHeroReveal = false,
+  landingHeroMirrorWorkbenchRunwayToolbars = false,
+  landingTripleLensStackModes,
 }: RunwayGridProps) {
   const country = useAtcStore((s) => s.country);
   const setCountry = useAtcStore((s) => s.setCountry);
@@ -1724,8 +1755,23 @@ export function RunwayGrid({
   const showIso3dSingleMarket = !compareAllMarkets && storeIso3dOn;
   /** Single-market flat: vertical months + Technology / Restaurant / Risk stacked (no quarter wall calendar). */
   const singleMarketMultiLens = !compareAllMarkets && !showIso3dSingleMarket;
+  const landingResolvedTripleLensStackModes = useMemo((): readonly ViewModeId[] => {
+    if (!landingMinimalChrome) return [...SINGLE_MARKET_STACK_LENS_IDS];
+    if (!landingTripleLensStackModes?.length) return [...SINGLE_MARKET_STACK_LENS_IDS];
+    const allowed = new Set(SINGLE_MARKET_STACK_LENS_IDS as readonly string[]);
+    const pick = new Set(
+      landingTripleLensStackModes.filter((m) => allowed.has(m))
+    );
+    const ordered = SINGLE_MARKET_STACK_LENS_IDS.filter((id) => pick.has(id));
+    return ordered.length > 0 ? ordered : [...SINGLE_MARKET_STACK_LENS_IDS];
+  }, [landingMinimalChrome, landingTripleLensStackModes]);
+
   const runwayTitleWithMarket = singleMarketMultiLens
-    ? `${runwayFocusStripLabel(country)}: ${SINGLE_MARKET_MULTI_LENS_HEADLINE}`
+    ? `${runwayFocusStripLabel(country)}: ${
+        landingMinimalChrome
+          ? tripleLensStackHeadlineFromModes(landingResolvedTripleLensStackModes)
+          : SINGLE_MARKET_MULTI_LENS_HEADLINE
+      }`
     : `${
         viewMode === 'combined'
           ? technologyRunwayTitleForWorkloadScope('all')
@@ -2876,6 +2922,9 @@ export function RunwayGrid({
                   onLandingContributionHeatmapSettled={onLandingContributionHeatmapSettled}
                   landingTechSparklineSweep={landingTechSparklineSweep}
                   landingTechSparklineTightFill={landingTechSparklineTightFill}
+                  landingSequentialHeroReveal={landingSequentialHeroReveal}
+                  landingHeroMirrorWorkbenchRunwayToolbars={landingHeroMirrorWorkbenchRunwayToolbars}
+                  landingResolvedTripleLensStackModes={landingResolvedTripleLensStackModes}
                   landingStaggerCellPulse={
                     (landingMinimalChrome || runwayHeatmapCellIntroPulse) && !reduceMotion
                   }
@@ -3120,6 +3169,10 @@ type RunwayGridBodyProps = {
   onLandingContributionHeatmapSettled?: () => void;
   landingTechSparklineSweep: boolean;
   landingTechSparklineTightFill: boolean;
+  landingSequentialHeroReveal: boolean;
+  landingHeroMirrorWorkbenchRunwayToolbars: boolean;
+  /** Resolved subset/order of triple-lens strips on the landing hero (full stack when not minimal chrome). */
+  landingResolvedTripleLensStackModes: readonly ViewModeId[];
   /** Landing: per-cell heatmap pulse + smooth fill (no vertical clip flicker). */
   landingStaggerCellPulse: boolean;
 };
@@ -3186,6 +3239,9 @@ function RunwayGridBody({
   onLandingContributionHeatmapSettled,
   landingTechSparklineSweep,
   landingTechSparklineTightFill,
+  landingSequentialHeroReveal,
+  landingHeroMirrorWorkbenchRunwayToolbars,
+  landingResolvedTripleLensStackModes,
   landingStaggerCellPulse,
 }: RunwayGridBodyProps) {
   const runwayTechSparklineUtilSmoothWindow = useAtcStore((s) => s.runwayTechSparklineUtilSmoothWindow);
@@ -3201,8 +3257,24 @@ function RunwayGridBody({
   const [postSweep, setPostSweep] = useState(reduceMotion);
   const [organicLayerTick, setOrganicLayerTick] = useState(0);
 
+  const ORGANIC_HEATMAP_SETTLE_PAD_MS = 680;
+  const LANDING_SEQ_GANTT_LEAD_MS = 2000;
+
+  const landingSeqActive =
+    landingMinimalChrome && landingProgrammePlan && landingSequentialHeroReveal && !reduceMotion;
+  const [landingSeqPhase, setLandingSeqPhase] = useState(0);
+  const landingSeqPhaseResolved = landingSeqActive ? landingSeqPhase : 2;
+  const effectiveLandingStagger =
+    landingStaggerCellPulse && (!landingSeqActive || landingSeqPhaseResolved >= 1);
+  const mirrorHeroToolbars = landingMinimalChrome && landingHeroMirrorWorkbenchRunwayToolbars;
+  const landingHeroTechSparklineVisuallyHidden = landingSeqActive && landingSeqPhaseResolved < 2;
+
   useEffect(() => {
-    if (!landingStaggerCellPulse) {
+    if (!effectiveLandingStagger) {
+      if (landingSeqActive && landingSeqPhaseResolved < 1) {
+        setOrganicLayerTick(0);
+        return;
+      }
       setOrganicLayerTick(ORGANIC_HEATMAP_MAX_TICK);
       return;
     }
@@ -3213,7 +3285,23 @@ function RunwayGridBody({
       );
     }, ORGANIC_HEATMAP_TICK_MS);
     return () => window.clearInterval(id);
-  }, [landingStaggerCellPulse, isoGrowResetKey, viewMode]);
+  }, [effectiveLandingStagger, landingSeqActive, landingSeqPhaseResolved, isoGrowResetKey, viewMode]);
+
+  useEffect(() => {
+    if (!landingSeqActive) return;
+    setLandingSeqPhase(0);
+    const heatmapRunMs =
+      ORGANIC_HEATMAP_MAX_TICK * ORGANIC_HEATMAP_TICK_MS + ORGANIC_HEATMAP_SETTLE_PAD_MS;
+    const t1 = window.setTimeout(() => setLandingSeqPhase(1), LANDING_SEQ_GANTT_LEAD_MS);
+    const t2 = window.setTimeout(
+      () => setLandingSeqPhase(2),
+      LANDING_SEQ_GANTT_LEAD_MS + heatmapRunMs,
+    );
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [landingSeqActive, isoGrowResetKey, country, viewMode]);
 
   useEffect(() => {
     if (reduceMotion) {
@@ -3225,12 +3313,18 @@ function RunwayGridBody({
     return () => clearTimeout(t);
   }, [reduceMotion, viewMode]);
 
-  const ORGANIC_HEATMAP_SETTLE_PAD_MS = 680;
+  /** When the landing hero uses staged programme build, drive the Gantt from {@link usePlanBuildElapsedMs} like /app — not heatmap organic ticks. */
+  const landingProgrammePlanUsesStagedBuild =
+    landingMinimalChrome &&
+    landingProgrammePlan &&
+    (landingProgrammePlanPrefs?.planBuildAnimation ?? RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS.planBuildAnimation) ===
+      'staged';
 
   useEffect(() => {
     const cb = onLandingContributionHeatmapSettled;
     if (!landingMinimalChrome || !landingProgrammePlan || !cb || !singleMarketMultiLens) return;
     if (placedCells.length === 0) return;
+    if (landingSequentialHeroReveal && !reduceMotion) return;
 
     if (reduceMotion) {
       const t = window.setTimeout(cb, 0);
@@ -3241,7 +3335,7 @@ function RunwayGridBody({
     if (landingStaggerCellPulse) {
       ms = ORGANIC_HEATMAP_MAX_TICK * ORGANIC_HEATMAP_TICK_MS + ORGANIC_HEATMAP_SETTLE_PAD_MS;
     } else {
-      const rowCount = SINGLE_MARKET_STACK_LENS_IDS.length;
+      const rowCount = Math.max(1, landingResolvedTripleLensStackModes.length);
       const lastRowStagger = (rowCount - 1) * LANDING_TRIPLE_LENS_HEATMAP_EMERGE_STAGGER_MS;
       ms = RUNWAY_EMERGE_PAUSE_MS + lastRowStagger + RUNWAY_EMERGE_DURATION_SEC * 1000 + 120;
     }
@@ -3256,6 +3350,8 @@ function RunwayGridBody({
     placedCells.length,
     reduceMotion,
     landingStaggerCellPulse,
+    landingSequentialHeroReveal,
+    landingResolvedTripleLensStackModes.length,
   ]);
 
   const firstCompareCalendarMonthKey = useMemo(
@@ -3373,8 +3469,8 @@ function RunwayGridBody({
   /** Session-only: programme Gantt on by default; per-lens contribution strips independent (see below). */
   const [showRunwayProgrammePlanWorkbench, setShowRunwayProgrammePlanWorkbench] = useState(true);
   /** Workbench: tech sparkline row above strips; trading/risk traces appear there when “three-line view” is on in programme display prefs. */
-  const [showTripleLensTechCapacityStrip, setShowTripleLensTechCapacityStrip] = useState(true);
-  const [showTripleLensTradingStrip, setShowTripleLensTradingStrip] = useState(false);
+  const [showTripleLensTechCapacityStrip, setShowTripleLensTechCapacityStrip] = useState(false);
+  const [showTripleLensTradingStrip, setShowTripleLensTradingStrip] = useState(true);
   const [showTripleLensDeploymentStrip, setShowTripleLensDeploymentStrip] = useState(false);
 
   const showProgrammeGanttBlock =
@@ -3422,7 +3518,7 @@ function RunwayGridBody({
   ]);
 
   const tripleLensVisibleStripModes = useMemo((): ViewModeId[] => {
-    if (landingMinimalChrome) return [...SINGLE_MARKET_STACK_LENS_IDS];
+    if (landingMinimalChrome) return [...landingResolvedTripleLensStackModes];
     const out: ViewModeId[] = [];
     for (const m of SINGLE_MARKET_STACK_LENS_IDS) {
       if (m === 'combined' && showTripleLensTechCapacityStrip) out.push(m);
@@ -3432,10 +3528,16 @@ function RunwayGridBody({
     return out;
   }, [
     landingMinimalChrome,
+    landingResolvedTripleLensStackModes,
     showTripleLensDeploymentStrip,
     showTripleLensTechCapacityStrip,
     showTripleLensTradingStrip,
   ]);
+
+  /** Legend ramp follows the top visible strip (landing uses the first rendered lens). */
+  const stackedWorkbenchHeatmapLegendViewMode = useMemo((): ViewModeId => {
+    return tripleLensVisibleStripModes[0] ?? SINGLE_MARKET_STACK_SHARED_LEGEND_LENS;
+  }, [tripleLensVisibleStripModes]);
 
   /** Workbench runway toggles: short ease-out in, slightly quicker ease-in out. */
   const workbenchSectionEase = [0.22, 1, 0.36, 1] as const;
@@ -3459,10 +3561,10 @@ function RunwayGridBody({
   const heatmapLegendEl = (
     <HeatmapLegend
       className="w-fit max-w-full min-w-0 text-left"
-      viewMode={singleMarketMultiLens ? SINGLE_MARKET_STACK_SHARED_LEGEND_LENS : viewMode}
+      viewMode={singleMarketMultiLens ? stackedWorkbenchHeatmapLegendViewMode : viewMode}
       heatmapOpts={
         singleMarketMultiLens
-          ? heatmapOptsForMarketLens(country, SINGLE_MARKET_STACK_SHARED_LEGEND_LENS)
+          ? heatmapOptsForMarketLens(country, stackedWorkbenchHeatmapLegendViewMode)
           : heatmapOptsBase
       }
       cellSizePx={
@@ -3728,24 +3830,37 @@ function RunwayGridBody({
                     />
                     {singleMarketMultiLens && contributionMeta ? (
                       <div className="flex w-max max-w-none flex-col gap-2 px-0.5">
-                        {!landingMinimalChrome ? (
+                        {!landingMinimalChrome || mirrorHeroToolbars ? (
                           <div
                             role="toolbar"
                             aria-label="Runway contribution strips"
-                            className="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2"
+                            className={cn(
+                              'flex w-full min-w-0 max-w-full flex-wrap items-center gap-2',
+                              mirrorHeroToolbars && 'pointer-events-none select-none',
+                            )}
                           >
                             <button
                               type="button"
                               className={cn(
                                 stripToggleBaseClass,
-                                showRunwayProgrammePlanWorkbench
-                                  ? stripToggleOnClass
-                                  : stripToggleOffClass,
+                                mirrorHeroToolbars
+                                  ? landingProgrammePlan
+                                    ? stripToggleOnClass
+                                    : stripToggleOffClass
+                                  : showRunwayProgrammePlanWorkbench
+                                    ? stripToggleOnClass
+                                    : stripToggleOffClass,
                               )}
                               title="Programme plan"
                               aria-label="Programme plan"
-                              aria-pressed={showRunwayProgrammePlanWorkbench}
-                              onClick={() => setShowRunwayProgrammePlanWorkbench((v) => !v)}
+                              aria-pressed={
+                                mirrorHeroToolbars ? landingProgrammePlan : showRunwayProgrammePlanWorkbench
+                              }
+                              onClick={
+                                mirrorHeroToolbars
+                                  ? undefined
+                                  : () => setShowRunwayProgrammePlanWorkbench((v) => !v)
+                              }
                             >
                               <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
                             </button>
@@ -3753,14 +3868,26 @@ function RunwayGridBody({
                               type="button"
                               className={cn(
                                 stripToggleBaseClass,
-                                showTripleLensTechCapacityStrip
-                                  ? stripToggleOnClass
-                                  : stripToggleOffClass,
+                                mirrorHeroToolbars
+                                  ? tripleLensVisibleStripModes.includes('combined')
+                                    ? stripToggleOnClass
+                                    : stripToggleOffClass
+                                  : showTripleLensTechCapacityStrip
+                                    ? stripToggleOnClass
+                                    : stripToggleOffClass,
                               )}
                               title="Tech capacity strip"
                               aria-label="Tech capacity strip"
-                              aria-pressed={showTripleLensTechCapacityStrip}
-                              onClick={() => setShowTripleLensTechCapacityStrip((v) => !v)}
+                              aria-pressed={
+                                mirrorHeroToolbars
+                                  ? tripleLensVisibleStripModes.includes('combined')
+                                  : showTripleLensTechCapacityStrip
+                              }
+                              onClick={
+                                mirrorHeroToolbars
+                                  ? undefined
+                                  : () => setShowTripleLensTechCapacityStrip((v) => !v)
+                              }
                             >
                               <Gauge className="h-3.5 w-3.5 shrink-0" aria-hidden />
                             </button>
@@ -3768,14 +3895,24 @@ function RunwayGridBody({
                               type="button"
                               className={cn(
                                 stripToggleBaseClass,
-                                showTripleLensTradingStrip
-                                  ? stripToggleOnClass
-                                  : stripToggleOffClass,
+                                mirrorHeroToolbars
+                                  ? tripleLensVisibleStripModes.includes('in_store')
+                                    ? stripToggleOnClass
+                                    : stripToggleOffClass
+                                  : showTripleLensTradingStrip
+                                    ? stripToggleOnClass
+                                    : stripToggleOffClass,
                               )}
                               title="Trading strip"
                               aria-label="Trading strip"
-                              aria-pressed={showTripleLensTradingStrip}
-                              onClick={() => setShowTripleLensTradingStrip((v) => !v)}
+                              aria-pressed={
+                                mirrorHeroToolbars
+                                  ? tripleLensVisibleStripModes.includes('in_store')
+                                  : showTripleLensTradingStrip
+                              }
+                              onClick={
+                                mirrorHeroToolbars ? undefined : () => setShowTripleLensTradingStrip((v) => !v)
+                              }
                             >
                               <LineChart className="h-3.5 w-3.5 shrink-0" aria-hidden />
                             </button>
@@ -3783,14 +3920,26 @@ function RunwayGridBody({
                               type="button"
                               className={cn(
                                 stripToggleBaseClass,
-                                showTripleLensDeploymentStrip
-                                  ? stripToggleOnClass
-                                  : stripToggleOffClass,
+                                mirrorHeroToolbars
+                                  ? tripleLensVisibleStripModes.includes('market_risk')
+                                    ? stripToggleOnClass
+                                    : stripToggleOffClass
+                                  : showTripleLensDeploymentStrip
+                                    ? stripToggleOnClass
+                                    : stripToggleOffClass,
                               )}
                               title="Deployment strip"
                               aria-label="Deployment strip"
-                              aria-pressed={showTripleLensDeploymentStrip}
-                              onClick={() => setShowTripleLensDeploymentStrip((v) => !v)}
+                              aria-pressed={
+                                mirrorHeroToolbars
+                                  ? tripleLensVisibleStripModes.includes('market_risk')
+                                  : showTripleLensDeploymentStrip
+                              }
+                              onClick={
+                                mirrorHeroToolbars
+                                  ? undefined
+                                  : () => setShowTripleLensDeploymentStrip((v) => !v)
+                              }
                             >
                               <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
                             </button>
@@ -3875,36 +4024,45 @@ function RunwayGridBody({
                                     }
                                     ephemeralInitialPrefs={landingProgrammePlanPrefs}
                                     onPlanVisibleYmdRangeChange={onProgrammePlanVisibleYmdRange}
+                                    techSparklineVisuallyHidden={landingHeroTechSparklineVisuallyHidden}
                                     landingHeatmapOrganicSyncTick={
-                                      landingMinimalChrome &&
-                                      landingProgrammePlan &&
-                                      landingStaggerCellPulse
-                                        ? organicLayerTick
-                                        : undefined
+                                      landingProgrammePlanUsesStagedBuild
+                                        ? undefined
+                                        : landingMinimalChrome &&
+                                            landingProgrammePlan &&
+                                            effectiveLandingStagger
+                                          ? organicLayerTick
+                                          : undefined
                                     }
                                     landingOrganicSyncMarketKey={
-                                      landingMinimalChrome &&
-                                      landingProgrammePlan &&
-                                      landingStaggerCellPulse
-                                        ? `${country}-combined`
-                                        : undefined
+                                      landingProgrammePlanUsesStagedBuild
+                                        ? undefined
+                                        : landingMinimalChrome &&
+                                            landingProgrammePlan &&
+                                            effectiveLandingStagger
+                                          ? `${country}-combined`
+                                          : undefined
                                     }
                                     techDemandSparkline={{
                                       selectedDayYmd: singleMarketSelectedDayYmd,
                                       modelTraceSuppressed: techStripModelTraceSuppressed,
                                       landingMarketingSweepReveal:
-                                        landingMinimalChrome && landingTechSparklineSweep && !reduceMotion,
+                                        landingMinimalChrome &&
+                                        landingTechSparklineSweep &&
+                                        !reduceMotion &&
+                                        !landingHeroTechSparklineVisuallyHidden,
                                       landingMarketingTightCapacityFill:
                                         landingMinimalChrome && landingTechSparklineTightFill,
                                       suppressSelectionColumnLine: suppressTripleLensSplitSelectionLines,
-                                      organicLayerTick: landingStaggerCellPulse ? organicLayerTick : undefined,
-                                      organicLayerMarketKey: landingStaggerCellPulse
+                                      organicLayerTick: effectiveLandingStagger ? organicLayerTick : undefined,
+                                      organicLayerMarketKey: effectiveLandingStagger
                                         ? `${country}-combined`
                                         : undefined,
                                       landingSparklineStackInMinOrganicTick:
+                                        !landingSeqActive &&
                                         landingMinimalChrome &&
                                         landingProgrammePlan &&
-                                        landingStaggerCellPulse
+                                        effectiveLandingStagger
                                           ? 7
                                           : undefined,
                                       sparklineUtilSmoothWindow: sparklineUtilSmoothResolved,
@@ -3964,6 +4122,24 @@ function RunwayGridBody({
                                 </div>
                               </div>
                             ) : null}
+                            <div
+                              key={
+                                landingSeqActive
+                                  ? landingSeqPhaseResolved >= 1
+                                    ? 'landing-triple-hm'
+                                    : 'landing-triple-hm-hold'
+                                  : 'triple-hm'
+                              }
+                              className={cn(
+                                'flex min-w-0 max-w-none shrink-0 flex-col transition-opacity duration-500 ease-out',
+                                landingSeqActive &&
+                                  landingSeqPhaseResolved < 1 &&
+                                  'pointer-events-none opacity-0',
+                              )}
+                              aria-hidden={
+                                landingSeqActive && landingSeqPhaseResolved < 1 ? true : undefined
+                              }
+                            >
                             <AnimatePresence initial={false} mode="popLayout">
                               {tripleLensVisibleStripModes.map((lensMode, rowIdx) => {
                                 const stripW = contributionColumnContentWidth ?? contentWidth;
@@ -4051,9 +4227,9 @@ function RunwayGridBody({
                                               ? marketConfig?.deployment_risk_blackouts ?? null
                                               : null
                                           }
-                                          landingStaggerCellPulse={landingStaggerCellPulse}
+                                          landingStaggerCellPulse={effectiveLandingStagger}
                                           organicLayerTick={
-                                            landingStaggerCellPulse ? organicLayerTick : undefined
+                                            effectiveLandingStagger ? organicLayerTick : undefined
                                           }
                                           suppressSelectionColumnLine={suppressTripleLensSplitSelectionLines}
                                           programmePlanFocusVisibleRange={contributionStripProgrammePlanFocus}
@@ -4064,8 +4240,10 @@ function RunwayGridBody({
                                 );
                               })}
                             </AnimatePresence>
+                            </div>
                           </div>
-                          {tripleLensVisibleStripModes.length > 0 ? (
+                          {tripleLensVisibleStripModes.length > 0 &&
+                          (!landingSeqActive || landingSeqPhaseResolved >= 1) ? (
                             <div className="relative z-[4] ml-[25px] flex shrink-0 self-end">
                               {heatmapLegendEl}
                             </div>

@@ -92,6 +92,61 @@ export function ProgrammePlanDisplaySettingsForm({
           </span>
         </span>
       </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-muted-foreground">Plan build animation (workbench)</span>
+        <select
+          className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+          value={prefs.planBuildAnimation}
+          onChange={(e) =>
+            setPref('planBuildAnimation', e.target.value === 'staged' ? 'staged' : 'off')
+          }
+        >
+          <option value="off">Off — show plan immediately</option>
+          <option value="staged">Staged — broad beats + build console (milestones → prep → bars → labels)</option>
+        </select>
+        <span className="text-muted-foreground">
+          Landing / preview still follows heatmap hero timing. Respects reduced motion (shows full plan).
+        </span>
+      </label>
+      {prefs.planBuildAnimation === 'staged' ? (
+        <div className="grid gap-2 border-l-2 border-border/60 pl-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-muted-foreground">Stagger between objects (ms)</span>
+            <input
+              type="number"
+              min={0}
+              max={400}
+              className="h-8 rounded-md border border-border bg-background px-2 font-mono text-xs text-foreground"
+              value={prefs.planBuildStaggerMs}
+              onChange={(e) => setPref('planBuildStaggerMs', Number(e.target.value) || 0)}
+            />
+            <span className="text-muted-foreground">Not used — each stage animates in parallel.</span>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-muted-foreground">Pause between stages (ms)</span>
+            <input
+              type="number"
+              min={0}
+              max={800}
+              className="h-8 rounded-md border border-border bg-background px-2 font-mono text-xs text-foreground"
+              value={prefs.planBuildCategoryGapMs}
+              onChange={(e) => setPref('planBuildCategoryGapMs', Number(e.target.value) || 0)}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-muted-foreground">Bar grow duration (ms)</span>
+            <input
+              type="number"
+              min={120}
+              max={1200}
+              step={20}
+              className="h-8 rounded-md border border-border bg-background px-2 font-mono text-xs text-foreground"
+              value={prefs.planBuildBarGrowMs}
+              onChange={(e) => setPref('planBuildBarGrowMs', Number(e.target.value) || 420)}
+            />
+          </label>
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-muted-foreground">Campaign colour</span>

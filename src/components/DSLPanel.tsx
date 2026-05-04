@@ -6,6 +6,7 @@ import { WorkbenchMarketAdminPanel } from '@/components/WorkbenchMarketAdminPane
 import { RunwayFocusSelect } from '@/components/RunwayFocusSelect';
 import { RunwayRangeSelect } from '@/components/RunwayRangeSelect';
 import { WorkbenchRunwayControls } from '@/components/WorkbenchRunwayControls';
+import { WorkbenchEventStream } from '@/components/WorkbenchEventStream';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -197,11 +198,11 @@ export function DSLPanel({ collapsed, onCollapsedChange, primaryNavInSidebar = f
           {parseError && !railMinimal ? (
             <span
               className="h-2 w-2 shrink-0 rounded-full bg-destructive"
-              title={parseError}
+              title="YAML error — open Code view for the full message"
               aria-label={
                 compareAllMarkets
-                  ? 'YAML parse error — choose a single market in Focus to open YAML and fix'
-                  : 'YAML parse error — switch to YAML editor to review'
+                  ? 'YAML error — choose a single market in Focus to open Code and fix'
+                  : 'YAML error — switch to Code view for details'
               }
             />
           ) : null}
@@ -279,6 +280,7 @@ export function DSLPanel({ collapsed, onCollapsedChange, primaryNavInSidebar = f
               hideMainAreaToggle={primaryNavInSidebar}
             />
           </div>
+          <WorkbenchEventStream />
           {!primaryNavInSidebar || compareAllMarkets ? <WorkbenchMarketAdminPanel /> : null}
         </div>
       </aside>

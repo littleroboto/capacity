@@ -239,3 +239,14 @@
     }
   }
 }
+
+/**
+ * Monaco YAML (Capacity themes): alternating whole-line bands for top-level sections (M1a).
+ * Works on light (#f8fafc) and dark (#0f0f14) editor backgrounds.
+ */
+.monaco-editor .cd-yaml-section-band-a {
+  background-color: rgba(99, 102, 241, 0.08) !important;
+}
+.monaco-editor .cd-yaml-section-band-b {
+  background-color: rgba(14, 165, 233, 0.055) !important;
+}

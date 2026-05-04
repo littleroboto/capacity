@@ -403,7 +403,9 @@ export default function App() {
                 ) : (
                   <>
                     {parseError ? (
-                      <p className="shrink-0 text-sm text-destructive">{parseError}</p>
+                      <p className="shrink-0 text-sm text-muted-foreground" role="status">
+                        YAML error — open Code view for details.
+                      </p>
                     ) : null}
                     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
                       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">

@@ -159,8 +159,8 @@ export function WorkbenchSidebar({ parseError }: WorkbenchSidebarProps) {
         {parseError ? (
           <span
             className="mt-0.5 h-2 w-2 rounded-full bg-destructive"
-            title={parseError}
-            aria-label="YAML parse error — open YAML editor for details"
+            title="YAML error — open Code view for the full message"
+            aria-label="YAML error — open Code view for details"
           />
         ) : null}
       </div>

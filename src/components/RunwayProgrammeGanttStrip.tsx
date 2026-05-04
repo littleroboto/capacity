@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { motion, useReducedMotion } from 'motion/react';
 import { Hammer, FlaskConical } from 'lucide-react';
@@ -23,6 +23,19 @@ import type { ProgrammeGanttChronicleIcon, ProgrammeGanttChronicleLane } from '@
 import type { ProgrammeGanttDisplayPrefs } from '@/lib/runwayProgrammeGanttPrefs';
 import type { ProgrammeGanttDisclosureTier } from '@/lib/runwayProgrammeGanttDisclosure';
 import { organicHeatmapCellLayerIndex } from '@/lib/runwayHeatmapOrganicLayers';
+import {
+  buildPlanAnimationSchedule,
+  planBuildProgressAt,
+  planBuildVisible,
+  scheduleLookup,
+  usePlanBuildElapsedMs,
+  type PlanAnimScheduledItem,
+  type PlanBuildMilestone,
+  type PlanScheduleLaneRow,
+  type PlanScheduleMark,
+} from '@/lib/runwayProgrammeGanttBuildAnimation';
+import { buildProgrammeGanttBuildLogLines } from '@/lib/runwayProgrammeGanttBuildConsoleScript';
+import { useAtcStore } from '@/store/useAtcStore';
 
 const LABEL_GAP_PX = 5;
 const LABEL_FONT_SIZE_PX = 11;
@@ -141,6 +154,27 @@ function landingGanttDrawProgress(
   return (L + 1) / 5;
 }
 
+/** Landing uses organic tick; workbench staged plan uses schedule map + elapsed ms. */
+function workbenchPlanDrawP(
+  landingHero: boolean,
+  useWorkbenchSchedule: boolean,
+  schedMap: Map<string, PlanAnimScheduledItem>,
+  elapsed: number,
+  barGrowMs: number,
+  schedKey: string,
+  organicTick: number | undefined,
+  organicMk: string,
+  anchorYmd: string,
+  organicSalt: string,
+): number {
+  if (landingHero) return landingGanttDrawProgress(organicTick, organicMk, anchorYmd, organicSalt);
+  if (!useWorkbenchSchedule) return 1;
+  const it = schedMap.get(schedKey);
+  if (!it) return 1;
+  if (!planBuildVisible(elapsed, it)) return 0;
+  return planBuildProgressAt(elapsed, it, barGrowMs);
+}
+
 export type RunwayProgrammeGanttStripProps = {
   marketKey: string;
   placedCells: readonly PlacedRunwayCell[];
@@ -161,7 +195,8 @@ export type RunwayProgrammeGanttStripProps = {
   disclosureTier?: ProgrammeGanttDisclosureTier;
   /**
    * Landing hero: drive segment reveal from the same organic tick as contribution heatmaps
-   * (`organicLayerTick` in RunwayGridBody).
+   * (`organicLayerTick` in RunwayGridBody). Omit when {@link ProgrammeGanttDisplayPrefs.planBuildAnimation}
+   * is `staged` so the strip uses the same schedule as /app.
    */
   landingHeatmapOrganicSyncTick?: number;
   /**
@@ -169,6 +204,8 @@ export type RunwayProgrammeGanttStripProps = {
    * so per-day reveal order matches; programme `marketKey` alone would hash differently.
    */
   landingOrganicSyncMarketKey?: string;
+  /** Ephemeral / marketing: do not push staged-build lines into {@link useAtcStore} workbench event log. */
+  suppressPlanBuildWorkbenchLog?: boolean;
 };
 
 export function runwayProgrammeGanttStripHeightPx(prefs: ProgrammeGanttDisplayPrefs, laneCount: number): number {
@@ -278,6 +315,7 @@ export function RunwayProgrammeGanttStrip({
   disclosureTier: disclosureTierProp,
   landingHeatmapOrganicSyncTick,
   landingOrganicSyncMarketKey,
+  suppressPlanBuildWorkbenchLog = false,
 }: RunwayProgrammeGanttStripProps) {
   const disclosureTier: ProgrammeGanttDisclosureTier = disclosureTierProp ?? 3;
   const landingHeroBuild = landingHeatmapOrganicSyncTick != null;
@@ -291,7 +329,7 @@ export function RunwayProgrammeGanttStrip({
   const showSchoolStripIcons = disclosureTier >= 2;
   const showBlackoutRibbonSnowflake = disclosureTier >= 3;
   const showLaneCaptionDates = disclosureTier >= 3 && prefs.showBarTrailingCaption;
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotion() === true;
   const uid = useId().replace(/:/g, '');
   const schoolHatchId = `gantt-school-hatch-45-${uid}`;
   const barHatchId = `gantt-bar-hatch-45-${uid}`;
@@ -482,6 +520,180 @@ export function RunwayProgrammeGanttStrip({
     return { laneRows, svgHeight, schoolOverlaySpans, blackoutSpans, blackoutBandPx };
   }, [lanes, layout, clipStart, clipEnd, prefs, riskByDate, blackouts, cellPx]);
 
+  const planScheduleLaneInput = useMemo((): PlanScheduleLaneRow[] => {
+    return laneRows.map((row) => ({
+      laneId: row.lane.id,
+      marks: row.marks.map((m): PlanScheduleMark => {
+        if (m.kind === 'dotted_span') {
+          return { kind: 'dotted_span', key: m.key, xMid: (m.x0 + m.x1) / 2 };
+        }
+        if (m.kind === 'run_bar') {
+          return { kind: 'run_bar', key: m.key, xMid: m.x + Math.max(0, m.w) / 2 };
+        }
+        if (m.kind === 'bracket_span') {
+          return { kind: 'bracket_span', key: m.key, xMid: (m.x0 + m.x1) / 2 };
+        }
+        if (m.kind === 'tick') {
+          return { kind: 'tick', key: m.key, xMid: m.cx };
+        }
+        return { kind: 'diamond', key: m.key, xMid: m.cx };
+      }),
+    }));
+  }, [laneRows]);
+
+  const planMarkCounts = useMemo(() => {
+    let diamond = 0;
+    let dottedSpan = 0;
+    let runBar = 0;
+    let bracket = 0;
+    let tick = 0;
+    for (const row of laneRows) {
+      for (const m of row.marks) {
+        if (m.kind === 'diamond') diamond += 1;
+        else if (m.kind === 'dotted_span') dottedSpan += 1;
+        else if (m.kind === 'run_bar') runBar += 1;
+        else if (m.kind === 'bracket_span') bracket += 1;
+        else if (m.kind === 'tick') tick += 1;
+      }
+    }
+    return { diamond, dottedSpan, runBar, bracket, tick };
+  }, [laneRows]);
+
+  const planAnimPrefsSlice = useMemo(
+    () => ({
+      planBuildAnimation: prefs.planBuildAnimation,
+      planBuildStaggerMs: prefs.planBuildStaggerMs,
+      planBuildCategoryGapMs: prefs.planBuildCategoryGapMs,
+      planBuildBarGrowMs: prefs.planBuildBarGrowMs,
+    }),
+    [
+      prefs.planBuildAnimation,
+      prefs.planBuildStaggerMs,
+      prefs.planBuildCategoryGapMs,
+      prefs.planBuildBarGrowMs,
+    ],
+  );
+
+  const { planTotalMs, planSchedMap, planMilestones } = useMemo(() => {
+    if (prefs.planBuildAnimation !== 'staged') {
+      return {
+        planTotalMs: 0,
+        planSchedMap: new Map<string, PlanAnimScheduledItem>(),
+        planMilestones: [] as PlanBuildMilestone[],
+      };
+    }
+    const built = buildPlanAnimationSchedule(planScheduleLaneInput, planAnimPrefsSlice);
+    return {
+      planTotalMs: built.totalMs,
+      planSchedMap: scheduleLookup(built.items),
+      planMilestones: built.milestones,
+    };
+  }, [planScheduleLaneInput, planAnimPrefsSlice, prefs.planBuildAnimation]);
+
+  const planBuildLogLines = useMemo(() => {
+    if (prefs.planBuildAnimation !== 'staged' || planTotalMs <= 0) return [];
+    return buildProgrammeGanttBuildLogLines({
+      marketKey,
+      milestones: planMilestones,
+      totalMs: planTotalMs,
+      clipStart,
+      clipEnd,
+      laneCount: laneRows.length,
+      cellCount: layout.size,
+      stripWidth: width,
+      cellPx,
+      counts: planMarkCounts,
+    });
+  }, [
+    prefs.planBuildAnimation,
+    planTotalMs,
+    planMilestones,
+    marketKey,
+    clipStart,
+    clipEnd,
+    laneRows.length,
+    layout.size,
+    width,
+    cellPx,
+    planMarkCounts,
+  ]);
+
+  const useWorkbenchPlanSchedule =
+    !landingHeroBuild && prefs.planBuildAnimation === 'staged' && !reduceMotion && planTotalMs > 0;
+
+  const planElapsedMs = usePlanBuildElapsedMs(
+    useWorkbenchPlanSchedule,
+    `${String(animateInKey ?? 'static')}:${marketKey}:${planTotalMs}`,
+    planTotalMs,
+    reduceMotion,
+  );
+
+  const planElapsedMsRef = useRef(planElapsedMs);
+  planElapsedMsRef.current = planElapsedMs;
+
+  useEffect(() => {
+    if (
+      suppressPlanBuildWorkbenchLog ||
+      !useWorkbenchPlanSchedule ||
+      planTotalMs <= 0 ||
+      planBuildLogLines.length === 0
+    )
+      return;
+    const push = useAtcStore.getState().pushWorkbenchEventLog;
+    const seen = new Set<number>();
+    let raf = 0;
+    const lines = planBuildLogLines;
+    const maxAt = lines.length ? Math.max(...lines.map((l) => l.atMs)) : 0;
+    push(`[gantt] programme strip staged build · ${marketKey}`);
+    const tick = () => {
+      const elapsed = planElapsedMsRef.current;
+      const streamMs = Math.min(maxAt + 48, elapsed * 4.1);
+      const batch: string[] = [];
+      for (let i = 0; i < lines.length; i += 1) {
+        if (lines[i]!.atMs <= streamMs && !seen.has(i)) {
+          seen.add(i);
+          batch.push(`[gantt] ${lines[i]!.text}`);
+        }
+      }
+      if (batch.length) push(batch);
+      if (elapsed < planTotalMs) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [
+    suppressPlanBuildWorkbenchLog,
+    useWorkbenchPlanSchedule,
+    planTotalMs,
+    planBuildLogLines,
+    marketKey,
+    animateInKey,
+  ]);
+
+  const wbPlanP = useCallback(
+    (schedKey: string, anchorYmd: string, organicSalt: string) =>
+      workbenchPlanDrawP(
+        landingHeroBuild,
+        useWorkbenchPlanSchedule,
+        planSchedMap,
+        planElapsedMs,
+        prefs.planBuildBarGrowMs,
+        schedKey,
+        landingHeatmapOrganicSyncTick,
+        landingOrganicMk,
+        anchorYmd,
+        organicSalt,
+      ),
+    [
+      landingHeroBuild,
+      useWorkbenchPlanSchedule,
+      planSchedMap,
+      planElapsedMs,
+      prefs.planBuildBarGrowMs,
+      landingHeatmapOrganicSyncTick,
+      landingOrganicMk,
+    ],
+  );
+
   const gridWidth = width;
   const gutter = CONTRIBUTION_STRIP_WEEKDAY_GUTTER_W;
   const barAreaTop = prefs.stripTopPadPx + blackoutBandPx;
@@ -575,55 +787,53 @@ export function RunwayProgrammeGanttStrip({
             .map((m) => {
               const railStyle = m.railStyle ?? (m.icon === 'none' ? 'dotted' : 'dashed');
               const isDotted = railStyle === 'dotted';
-              const p = landingGanttDrawProgress(
-                landingHeatmapOrganicSyncTick,
-                landingOrganicMk,
-                m.anchorYmd,
-                `gantt-dot:${m.key}`,
-              );
-              const sx = Math.max(0.02, p);
+              const pLine = wbPlanP(`dotline:${m.key}`, m.anchorYmd, `gantt-dot:${m.key}`);
+              const pPhase = wbPlanP(`dotphase:${m.key}`, m.anchorYmd, `gantt-dot-ph:${m.key}`);
+              const sx = Math.max(0.02, pLine);
               const gx = m.x0;
               const gy = m.midY;
               return (
-                <g key={m.key} transform={`translate(${gx} ${gy}) scale(${sx} 1) translate(${-gx} ${-gy})`}>
-                <title>
-                  {m.spanTitle?.trim()
-                    ? m.spanTitle.trim()
-                    : m.icon === 'hammer'
-                      ? 'Build window (prep)'
-                      : m.icon === 'flask'
-                        ? 'Test / prep window'
-                        : 'Prep connector'}
-                </title>
-                <line
-                  x1={m.x0}
-                  x2={m.x1}
-                  y1={m.midY}
-                  y2={m.midY}
-                  fill="none"
-                  className="stroke-zinc-500 dark:stroke-zinc-400"
-                  strokeWidth={isDotted ? 1.1 : 1.15}
-                  strokeDasharray={isDotted ? '0.01 4.6' : '3.5 3'}
-                  strokeOpacity={(isDotted ? 0.62 : 0.92) * Math.min(1, 0.2 + p * 0.95)}
-                  strokeLinecap={isDotted ? 'round' : 'butt'}
-                  vectorEffect="non-scaling-stroke"
-                />
-                {m.phaseLabel?.trim() ? (
-                  <text
-                    x={(m.x0 + m.x1) / 2}
-                    y={m.midY - 7}
-                    textAnchor="middle"
-                    dominantBaseline="auto"
-                    fill="currentColor"
-                    fontSize={9}
-                    fontWeight={500}
-                    opacity={(showPrepPhaseLabels ? 0.88 : 0) * Math.min(1, 0.15 + p)}
-                    style={{ letterSpacing: '-0.005em' }}
-                    visibility={showPrepPhaseLabels ? 'visible' : 'hidden'}
-                  >
-                    {m.phaseLabel.trim()}
-                  </text>
-                ) : null}
+                <g key={m.key}>
+                  <g transform={`translate(${gx} ${gy}) scale(${sx} 1) translate(${-gx} ${-gy})`}>
+                    <title>
+                      {m.spanTitle?.trim()
+                        ? m.spanTitle.trim()
+                        : m.icon === 'hammer'
+                          ? 'Build window (prep)'
+                          : m.icon === 'flask'
+                            ? 'Test / prep window'
+                            : 'Prep connector'}
+                    </title>
+                    <line
+                      x1={m.x0}
+                      x2={m.x1}
+                      y1={m.midY}
+                      y2={m.midY}
+                      fill="none"
+                      className="stroke-zinc-500 dark:stroke-zinc-400"
+                      strokeWidth={isDotted ? 1.1 : 1.15}
+                      strokeDasharray={isDotted ? '0.01 4.6' : '3.5 3'}
+                      strokeOpacity={(isDotted ? 0.62 : 0.92) * Math.min(1, 0.2 + pLine * 0.95)}
+                      strokeLinecap={isDotted ? 'round' : 'butt'}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </g>
+                  {m.phaseLabel?.trim() ? (
+                    <text
+                      x={(m.x0 + m.x1) / 2}
+                      y={m.midY - 7}
+                      textAnchor="middle"
+                      dominantBaseline="auto"
+                      fill="currentColor"
+                      fontSize={9}
+                      fontWeight={500}
+                      opacity={(showPrepPhaseLabels ? 0.88 : 0) * Math.min(1, 0.15 + pPhase)}
+                      style={{ letterSpacing: '-0.005em' }}
+                      visibility={showPrepPhaseLabels ? 'visible' : 'hidden'}
+                    >
+                      {m.phaseLabel.trim()}
+                    </text>
+                  ) : null}
                 </g>
               );
             }),
@@ -682,12 +892,7 @@ export function RunwayProgrammeGanttStrip({
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'tick' }> => m.kind === 'tick')
             .map((m) => {
-              const p = landingGanttDrawProgress(
-                landingHeatmapOrganicSyncTick,
-                landingOrganicMk,
-                m.anchorYmd,
-                `gantt-tk-glyph:${m.key}`,
-              );
+              const p = wbPlanP(m.key, m.anchorYmd, `gantt-tk-glyph:${m.key}`);
               const cy = (m.y0 + m.y1) / 2;
               const sx = Math.max(0.02, p);
               const op = Math.min(1, 0.12 + p * 0.95);
@@ -726,29 +931,20 @@ export function RunwayProgrammeGanttStrip({
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'run_bar' }> => m.kind === 'run_bar')
             .map((m) => {
-              const p = landingGanttDrawProgress(
-                landingHeatmapOrganicSyncTick,
-                landingOrganicMk,
-                m.anchorYmd,
-                `gantt-run:${m.key}`,
-              );
-              const sx = Math.max(0.02, p);
-              const ox = m.x;
-              const oy = m.y + m.h / 2;
-              const rowOp = m.opacity * Math.min(1, 0.12 + p * 0.95);
+              const pGrow = wbPlanP(m.key, m.anchorYmd, `gantt-run:${m.key}`);
+              const fullW = Math.max(0, m.w);
+              const minW = Math.min(Math.max(2, m.h - 1), fullW, 8);
+              const curW = minW + (fullW - minW) * pGrow;
+              const rowOp = m.opacity * Math.min(1, 0.12 + pGrow * 0.95);
               return (
-                <g
-                  key={m.key}
-                  opacity={rowOp}
-                  transform={`translate(${ox} ${oy}) scale(${sx} 1) translate(${-ox} ${-oy})`}
-                >
+                <g key={m.key} opacity={rowOp}>
                   <title>{`${row.lane.kind === 'campaign' ? 'Campaign' : 'Tech'} live: ${row.lane.parentName}`}</title>
-                  <rect x={m.x} y={m.y} width={Math.max(0, m.w)} height={m.h} rx={1} fill={m.fill} />
+                  <rect x={m.x} y={m.y} width={curW} height={m.h} rx={1} fill={m.fill} />
                   {prefs.barHatchOpacity > 0.001 ? (
                     <rect
                       x={m.x}
                       y={m.y}
-                      width={Math.max(0, m.w)}
+                      width={curW}
                       height={m.h}
                       rx={1}
                       fill={`url(#${barHatchId})`}
@@ -758,7 +954,7 @@ export function RunwayProgrammeGanttStrip({
                   <rect
                     x={m.x}
                     y={m.y}
-                    width={Math.max(0, m.w)}
+                    width={curW}
                     height={m.h}
                     rx={1}
                     fill="none"
@@ -769,7 +965,7 @@ export function RunwayProgrammeGanttStrip({
                   <rect
                     x={m.x + 0.5}
                     y={m.y + 0.5}
-                    width={Math.max(0, m.w - 1)}
+                    width={Math.max(0, curW - 1)}
                     height={Math.max(0, m.h - 1)}
                     rx={0.5}
                     fill="none"
@@ -788,12 +984,7 @@ export function RunwayProgrammeGanttStrip({
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'bracket_span' }> => m.kind === 'bracket_span')
             .map((m) => {
-              const p = landingGanttDrawProgress(
-                landingHeatmapOrganicSyncTick,
-                landingOrganicMk,
-                m.anchorYmd,
-                `gantt-br:${m.key}`,
-              );
+              const p = wbPlanP(m.key, m.anchorYmd, `gantt-br:${m.key}`);
               const bx0 = m.x0;
               const bmy = (m.yTop + m.yBot) / 2;
               const bsx = Math.max(0.02, p);
@@ -824,12 +1015,7 @@ export function RunwayProgrammeGanttStrip({
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'tick' }> => m.kind === 'tick')
             .map((m) => {
-              const p = landingGanttDrawProgress(
-                landingHeatmapOrganicSyncTick,
-                landingOrganicMk,
-                m.anchorYmd,
-                `gantt-tk-lbl:${m.key}`,
-              );
+              const p = wbPlanP(`tktext:${m.key}`, m.anchorYmd, `gantt-tk-lbl:${m.key}`);
               return (
                 <g key={m.key}>
                   {m.tickLabel?.trim() ? (
@@ -859,14 +1045,10 @@ export function RunwayProgrammeGanttStrip({
           row.marks
             .filter((m): m is Extract<PlacedMark, { kind: 'diamond' }> => m.kind === 'diamond')
             .map((m) => {
-              const p = landingGanttDrawProgress(
-                landingHeatmapOrganicSyncTick,
-                landingOrganicMk,
-                m.anchorYmd,
-                `gantt-dm:${m.key}`,
-              );
-              const sc = Math.max(0.02, p);
-              const dop = Math.min(1, 0.12 + p * 0.95);
+              const pCirc = wbPlanP(m.key, m.anchorYmd, `gantt-dm:${m.key}`);
+              const pLbl = wbPlanP(`dmtext:${m.key}`, m.anchorYmd, `gantt-dm-lbl:${m.key}`);
+              const sc = Math.max(0.02, pCirc);
+              const dop = Math.min(1, 0.12 + pCirc * 0.95);
               return (
                 <g
                   key={m.key}
@@ -890,7 +1072,7 @@ export function RunwayProgrammeGanttStrip({
                       fill="currentColor"
                       fontSize={9}
                       fontWeight={600}
-                      opacity={(showTickAndDiamondLabels ? 0.92 : 0) * Math.min(1, 0.12 + p)}
+                      opacity={(showTickAndDiamondLabels ? 0.92 : 0) * Math.min(1, 0.12 + pLbl)}
                       style={{ letterSpacing: '-0.005em' }}
                       visibility={showTickAndDiamondLabels ? 'visible' : 'hidden'}
                     >
@@ -910,12 +1092,7 @@ export function RunwayProgrammeGanttStrip({
             .filter((m) => m.icon !== 'none')
             .map((m) => {
               const cx = (m.x0 + m.x1) / 2;
-              const pIco = landingGanttDrawProgress(
-                landingHeatmapOrganicSyncTick,
-                landingOrganicMk,
-                m.anchorYmd,
-                `gantt-ico:${m.key}`,
-              );
+              const pIco = wbPlanP(`ico:${m.key}`, m.anchorYmd, `gantt-ico:${m.key}`);
               const isPosLane =
                 row.lane.kind === 'tech_programme' &&
                 (/\bpos\b/i.test(row.lane.parentName) ||
@@ -942,9 +1119,8 @@ export function RunwayProgrammeGanttStrip({
 
       <g>
         {laneRows.map((row) => {
-          const pLane = landingGanttDrawProgress(
-            landingHeatmapOrganicSyncTick,
-            landingOrganicMk,
+          const pLane = wbPlanP(
+            `lane:${row.lane.id}`,
             row.lane.footprintStartYmd,
             `gantt-lane:${row.lane.id}`,
           );

@@ -10,6 +10,7 @@
  * and revision pipeline — this service is the common entry point for
  * creating fragments from YAML-shaped input.
  */
+import { expandHolidayBlockDates } from '../../src/lib/holidayBlockDatesAndRanges';
 import { supabaseServiceClient } from '../lib/supabaseClient';
 import type { OperatingModelId } from '../lib/domainTypes';
 
@@ -199,12 +200,18 @@ export async function importMarketYamlObject(
         extra_settings: {},
       }).select().single();
 
-      if (cal && Array.isArray(ph.dates)) {
-        const entries = (ph.dates as string[]).map((d) => ({
-          calendar_id: (cal as Record<string, unknown>).id,
-          holiday_date: d,
-        }));
-        if (entries.length > 0) {
+      if (cal) {
+        const { dates: holidayDates, skippedRangeRows } = expandHolidayBlockDates(ph);
+        if (skippedRangeRows > 0) {
+          warnings.push(
+            `public_holidays: skipped ${skippedRangeRows} range row(s) with missing or non-ISO from/to`
+          );
+        }
+        if (holidayDates && holidayDates.length > 0) {
+          const entries = holidayDates.map((d) => ({
+            calendar_id: (cal as Record<string, unknown>).id,
+            holiday_date: d,
+          }));
           await client.from('holiday_entries').insert(entries);
         }
       }
@@ -228,12 +235,18 @@ export async function importMarketYamlObject(
         extra_settings: {},
       }).select().single();
 
-      if (cal && Array.isArray(sh.dates)) {
-        const entries = (sh.dates as string[]).map((d) => ({
-          calendar_id: (cal as Record<string, unknown>).id,
-          holiday_date: d,
-        }));
-        if (entries.length > 0) {
+      if (cal) {
+        const { dates: holidayDates, skippedRangeRows } = expandHolidayBlockDates(sh);
+        if (skippedRangeRows > 0) {
+          warnings.push(
+            `school_holidays: skipped ${skippedRangeRows} range row(s) with missing or non-ISO from/to`
+          );
+        }
+        if (holidayDates && holidayDates.length > 0) {
+          const entries = holidayDates.map((d) => ({
+            calendar_id: (cal as Record<string, unknown>).id,
+            holiday_date: d,
+          }));
           await client.from('holiday_entries').insert(entries);
         }
       }

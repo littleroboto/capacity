@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yamlLib from 'js-yaml';
 import { createClient } from '@supabase/supabase-js';
+import { expandHolidayBlockDates } from '../src/lib/holidayBlockDatesAndRanges';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -45,6 +46,7 @@ for (const file of yamlFiles) {
   // Load original YAML
   const originalContent = fs.readFileSync(path.join(marketsDir, file), 'utf-8');
   const original = yamlLib.load(originalContent) as Record<string, unknown>;
+  normalizeHolidayBlocksForVerify(original);
 
   // Load fragments from Postgres
   const assembled = await loadAndAssemble(marketId);
@@ -81,6 +83,21 @@ for (const file of yamlFiles) {
 
 console.log(`\n${pass} passed, ${fail} failed out of ${yamlFiles.length} markets`);
 process.exit(fail > 0 ? 1 : 0);
+
+/** Merge `dates` + expanded `ranges`, drop `ranges` so compare matches assembly (`dates` only). */
+function normalizeHolidayBlocksForVerify(obj: Record<string, unknown>): void {
+  for (const key of ['public_holidays', 'school_holidays'] as const) {
+    const b = obj[key];
+    if (!b || typeof b !== 'object' || Array.isArray(b)) continue;
+    const block = { ...(b as Record<string, unknown>) };
+    const exp = expandHolidayBlockDates(block);
+    if (exp.dates && exp.dates.length > 0) {
+      block.dates = exp.dates;
+    }
+    delete block.ranges;
+    obj[key] = block;
+  }
+}
 
 // ============================================================================
 // Assembly (inline — avoids bundling the full service)

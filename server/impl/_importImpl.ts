@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { expandHolidayBlockDates } from '../../src/lib/holidayBlockDatesAndRanges';
 import { authenticateScope } from '../lib/authScope';
 import { scopeAllowsMarketEdit } from '../lib/scopeResolver';
 import { supabaseServiceClient } from '../lib/supabaseClient';
@@ -127,8 +128,16 @@ function summarizeSections(obj: Record<string, unknown>): { section: string; act
   if (Array.isArray(obj.campaigns)) sections.push({ section: 'campaigns', action: 'create', count: obj.campaigns.length });
   if (Array.isArray(obj.tech_programmes)) sections.push({ section: 'tech_programmes', action: 'create', count: obj.tech_programmes.length });
   if (Array.isArray(obj.national_leave_bands)) sections.push({ section: 'national_leave_bands', action: 'create', count: obj.national_leave_bands.length });
-  if (obj.public_holidays) sections.push({ section: 'public_holidays', action: 'upsert', count: 1 });
-  if (obj.school_holidays) sections.push({ section: 'school_holidays', action: 'upsert', count: 1 });
+  if (obj.public_holidays) {
+    const ph = obj.public_holidays as Record<string, unknown>;
+    const n = expandHolidayBlockDates(ph).dates?.length ?? 0;
+    sections.push({ section: 'public_holidays', action: 'upsert', count: n });
+  }
+  if (obj.school_holidays) {
+    const sh = obj.school_holidays as Record<string, unknown>;
+    const n = expandHolidayBlockDates(sh).dates?.length ?? 0;
+    sections.push({ section: 'school_holidays', action: 'upsert', count: n });
+  }
   if (obj.deployment_risk_events || obj.deployment_risk_blackouts) sections.push({ section: 'deployment_risk', action: 'upsert', count: 1 });
   if (Array.isArray(obj.operating_windows)) sections.push({ section: 'operating_windows', action: 'create', count: obj.operating_windows.length });
 

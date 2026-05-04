@@ -5,7 +5,10 @@ import type { RiskRow } from '@/engine/riskModel';
 import type { MarketConfig } from '@/engine/types';
 import { RunwayGrid, type SlotSelection } from '@/components/RunwayGrid';
 import { defaultDslForMarket } from '@/lib/marketDslSeeds';
-import type { ProgrammeGanttDisplayPrefs } from '@/lib/runwayProgrammeGanttPrefs';
+import {
+  RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS,
+  type ProgrammeGanttDisplayPrefs,
+} from '@/lib/runwayProgrammeGanttPrefs';
 import { WORKBENCH_URL_KEYS } from '@/lib/workbenchUrlViewState';
 import { useAtcStore } from '@/store/useAtcStore';
 import type { ViewModeId } from '@/lib/constants';
@@ -13,11 +16,17 @@ import type { RunwayQuarter } from '@/lib/runwayDateFilter';
 
 const LANDING_HERO_MARKET = 'UK';
 
-/** Homepage hero: overlay columns off by default; campaign bars a pale blue (less mint/teal). */
+/**
+ * Homepage hero: same programme-strip build as workbench when **Staged plan build** is on
+ * (`planBuildAnimation: 'staged'`), plus marketing tweaks (pale campaign fill, no overlay columns).
+ */
 const LANDING_HERO_PROGRAMME_GANTT_PREFS = {
   showSchoolHolidays: false,
   showBlackouts: false,
   campaignFill: '#d5e8fa',
+  planBuildAnimation: 'staged',
+  planBuildCategoryGapMs: RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS.planBuildCategoryGapMs,
+  planBuildBarGrowMs: RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS.planBuildBarGrowMs,
 } satisfies Partial<ProgrammeGanttDisplayPrefs>;
 const LANDING_HERO_FROM = '2026-04-23';
 const LANDING_HERO_TO = '2027-09-23';
@@ -32,6 +41,7 @@ type LandingWorkbenchSnap = {
   riskSurface: RiskRow[];
   configs: MarketConfig[];
   parseError: string | null;
+  pipelineCommittedWorkspaceYaml: string | null;
   runwayReturnPicker: string | null;
   runwayFilterYear: number | null;
   runwayFilterQuarter: RunwayQuarter | null;
@@ -54,6 +64,7 @@ function cloneLandingWorkbenchSnap(): LandingWorkbenchSnap {
     riskSurface: s.riskSurface,
     configs: s.configs,
     parseError: s.parseError,
+    pipelineCommittedWorkspaceYaml: s.pipelineCommittedWorkspaceYaml,
     runwayReturnPicker: s.runwayReturnPicker,
     runwayFilterYear: s.runwayFilterYear,
     runwayFilterQuarter: s.runwayFilterQuarter,
@@ -76,6 +87,7 @@ function restoreLandingWorkbenchSnap(snap: LandingWorkbenchSnap) {
     riskSurface: snap.riskSurface,
     configs: snap.configs,
     parseError: snap.parseError,
+    pipelineCommittedWorkspaceYaml: snap.pipelineCommittedWorkspaceYaml,
     runwayReturnPicker: snap.runwayReturnPicker,
     runwayFilterYear: snap.runwayFilterYear,
     runwayFilterQuarter: snap.runwayFilterQuarter,
@@ -189,23 +201,28 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
               </p>
             </div>
 
-            <div className="max-h-[min(78vh,920px)] min-h-[min(52vh,520px)] w-full min-w-0 overflow-y-auto overflow-x-auto">
+            <div className="flex max-h-[min(78vh,920px)] min-h-[min(52vh,520px)] min-w-0 w-full flex-col overflow-hidden">
               {parseError ? (
                 <p className="px-4 py-10 text-center text-sm text-destructive">{parseError}</p>
               ) : ready ? (
-                <div className="min-w-0 px-1 pb-2 pt-1 sm:px-2 sm:pb-3 sm:pt-2">
-                  <RunwayGrid
-                    riskSurface={riskSurface}
-                    viewMode="combined"
-                    onSlotSelection={noopSlot}
-                    landingMinimalChrome
-                    landingProgrammePlan
-                    landingProgrammePlanRevealReady={ready}
-                    landingProgrammePlanPrefs={LANDING_HERO_PROGRAMME_GANTT_PREFS}
-                    landingCompareDisableCellDetails
-                    landingTechSparklineSweep={!reducedMotion}
-                    landingTechSparklineTightFill
-                  />
+                <div className="workbench-studio flex min-h-0 min-w-0 flex-1 flex-col gap-2 bg-muted/20 p-4 overflow-y-auto overflow-x-auto [scrollbar-gutter:stable]">
+                  <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-visible">
+                    <RunwayGrid
+                      riskSurface={riskSurface}
+                      viewMode="combined"
+                      onSlotSelection={noopSlot}
+                      landingMinimalChrome
+                      landingProgrammePlan
+                      landingProgrammePlanRevealReady={ready}
+                      landingProgrammePlanPrefs={LANDING_HERO_PROGRAMME_GANTT_PREFS}
+                      landingTripleLensStackModes={['in_store']}
+                      landingCompareDisableCellDetails
+                      landingSequentialHeroReveal
+                      landingHeroMirrorWorkbenchRunwayToolbars
+                      landingTechSparklineSweep={!reducedMotion}
+                      landingTechSparklineTightFill
+                    />
+                  </div>
                 </div>
               ) : (
                 <div
@@ -219,7 +236,7 @@ export function LandingSingleMarketWorkbenchMock({ reducedMotion }: Props) {
 
             <div className="border-t border-border bg-muted/30 px-3 py-2.5 sm:px-4 sm:py-3">
               <p className="mx-auto max-w-3xl text-center font-landing text-[10px] leading-relaxed text-muted-foreground sm:text-[11px]">
-                Triple-lens stack, contribution strip, programme plan, and activity ledger — identical components to{' '}
+                Trading pressure strip, programme plan, and activity ledger — identical components to{' '}
                 <span className="font-medium text-foreground/80">/app</span> with bundled United Kingdom YAML and a fixed
                 planning window.
               </p>

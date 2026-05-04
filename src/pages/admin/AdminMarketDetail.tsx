@@ -114,14 +114,23 @@ function formatValue(val: unknown): string {
   return String(val);
 }
 
-function SortHeader<TData>({ column, children }: { column: HeaderContext<TData, unknown>['column']; children: React.ReactNode }) {
+function SortHeader<TData>({
+  column,
+  children,
+  title,
+}: {
+  column: HeaderContext<TData, unknown>['column'];
+  children: React.ReactNode;
+  title?: string;
+}) {
   if (!column.getCanSort()) {
-    return <span>{children}</span>;
+    return <span title={title}>{children}</span>;
   }
   const sorted = column.getIsSorted();
   return (
     <button
       type="button"
+      title={title}
       className="inline-flex items-center gap-1.5 rounded-sm text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       onClick={column.getToggleSortingHandler()}
     >
@@ -944,7 +953,14 @@ const yamlPreviewColumns: ColumnDef<YamlPreviewRow>[] = [
   },
   {
     accessorKey: 'count',
-    header: ({ column }) => <SortHeader column={column}>Count</SortHeader>,
+    header: ({ column }) => (
+      <SortHeader
+        column={column}
+        title="For public_holidays and school_holidays: unique ISO days after merging dates and ranges (same as engine import)."
+      >
+        Count
+      </SortHeader>
+    ),
     cell: ({ getValue }) => <div className="text-right tabular-nums">{String(getValue())}</div>,
     sortingFn: 'basic',
   },

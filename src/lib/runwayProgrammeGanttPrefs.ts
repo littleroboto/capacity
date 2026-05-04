@@ -1,3 +1,5 @@
+import type { PlanBuildAnimationMode } from '@/lib/runwayProgrammeGanttBuildAnimation';
+
 const STORAGE_KEY = 'cpm.runway.programmeGanttPrefs.v1';
 const OPEN_KEY = 'cpm.runway.programmeGanttOpen.v1';
 
@@ -35,6 +37,18 @@ export type ProgrammeGanttDisplayPrefs = {
    * risk); each line uses its own in-window min/max stretch in the band for readable qualitative shapes.
    */
   showGanttUnifiedThreeLineSparkline: boolean;
+  /**
+   * Workbench: milestones → prep rails (P1, …) → live bars grow → labels & icons.
+   * Landing hero can use the same staged build when `planBuildAnimation: 'staged'` is set in
+   * {@link RunwayGrid} `landingProgrammePlanPrefs` and organic sync props are omitted.
+   */
+  planBuildAnimation: PlanBuildAnimationMode;
+  /** Delay between consecutive objects within the same animation category (ms). */
+  planBuildStaggerMs: number;
+  /** Pause between categories (ms). */
+  planBuildCategoryGapMs: number;
+  /** Duration for each live bar width grow (ms). */
+  planBuildBarGrowMs: number;
 };
 
 export const RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS: ProgrammeGanttDisplayPrefs = {
@@ -60,6 +74,11 @@ export const RUNWAY_PROGRAMME_GANTT_DEFAULT_PREFS: ProgrammeGanttDisplayPrefs = 
   timelineZoom: 1,
   /** On by default so workbench strip + programme chart show tech, trading, and risk traces together. */
   showGanttUnifiedThreeLineSparkline: true,
+  planBuildAnimation: 'off',
+  /** Unused by the parallel stage scheduler; kept for prefs compatibility. */
+  planBuildStaggerMs: 0,
+  planBuildCategoryGapMs: 48,
+  planBuildBarGrowMs: 280,
 };
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -127,6 +146,13 @@ export function loadProgrammeGanttPrefs(): ProgrammeGanttDisplayPrefs {
       if (hadTrading || hadRisk) return true;
       return d.showGanttUnifiedThreeLineSparkline;
     })(),
+    planBuildAnimation:
+      p.planBuildAnimation === 'staged' || p.planBuildAnimation === 'off'
+        ? p.planBuildAnimation
+        : d.planBuildAnimation,
+    planBuildStaggerMs: clamp(Number(p.planBuildStaggerMs) || d.planBuildStaggerMs, 0, 400),
+    planBuildCategoryGapMs: clamp(Number(p.planBuildCategoryGapMs) || d.planBuildCategoryGapMs, 0, 800),
+    planBuildBarGrowMs: clamp(Number(p.planBuildBarGrowMs) || d.planBuildBarGrowMs, 120, 1200),
   };
 }
 
