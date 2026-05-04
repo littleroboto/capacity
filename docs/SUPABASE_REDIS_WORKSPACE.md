@@ -17,7 +17,7 @@ For a **non–mass-market**, **internal** app with **hundreds** of possible user
 
 ## Why not Supabase Auth?
 
-Session handling remains **Clerk**. Vercel serverless verifies the session JWT (`CLERK_SECRET_KEY` + `verifyToken`), resolves **allowed market ids** the same way as `api/_sharedDslImpl.ts` and `src/lib/capacityAccess.ts`, then talks to Postgres with the **service role** (or a dedicated DB user limited to `SELECT/INSERT/UPDATE` on these tables). **Do not** expose the service role to the browser.
+Session handling remains **Clerk**. Vercel serverless verifies the session JWT (`CLERK_SECRET_KEY` + `verifyToken`), resolves **allowed market ids** the same way as `server/impl/_sharedDslImpl.ts` and `src/lib/capacityAccess.ts`, then talks to Postgres with the **service role** (or a dedicated DB user limited to `SELECT/INSERT/UPDATE` on these tables). **Do not** expose the service role to the browser.
 
 `segment_markets` in the database is a **reference** for migrations and CI alignment with `public/data/segments.json`; **authorization** still uses JWT claims at runtime, not a join to `segment_markets` for user identity.
 

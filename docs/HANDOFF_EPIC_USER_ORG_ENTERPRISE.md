@@ -2,9 +2,9 @@
 
 **Epic:** User, org, and permissions (see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md))  
 **Epic id:** `epic-auth-org`  
-**Stack context:** React 18 + Vite 6 SPA, deployed on **Vercel**, workspace YAML via **`api/shared-dsl.js`** (bundled handler) + **Vercel Blob** (`@vercel/blob`).
+**Stack context:** React 18 + Vite 6 SPA, deployed on **Vercel**, workspace YAML via **`/api/shared-dsl`** → **`api/app.js`** (`__cap=shared-dsl`, bundle from `server/impl/_sharedDslImpl.ts`) + **Vercel Blob** (`@vercel/blob`).
 
-**Implementation status (repo):** **Phases 1–4 largely shipped** — `ClerkProvider` + `SignInGate` + **`ClerkSharedDslBridge`** (`getToken`, org write allow list, `useCapacityAccess`). **`VITE_AUTH_DISABLED=1`** bypasses the gate. When **`CLERK_SECRET_KEY`** is set, GET/HEAD require a session JWT; PUT verifies JWT (optional legacy `CAPACITY_SHARED_DSL_SECRET`; disable with **`CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE`**) — logic lives in `api/_sharedDslImpl.ts` (esbuild → `shared-dsl.js` on Vercel). **Org UI:** `OrganizationSwitcher`, `UserButton`. **Market ACL:** `cap_*` session claims + **`cap_mkts`**; server **filters GET** and **merges PUT** in the same handler. One-pager: [AUTH_PROVIDER.md](./AUTH_PROVIDER.md). **Still open:** per-org Blob pathname, SSO/SCIM runbooks, automated auth test matrix. **Agent rule:** use the **user-clerk** MCP when changing auth — see `.cursor/rules/clerk-auth-mcp.mdc`.
+**Implementation status (repo):** **Phases 1–4 largely shipped** — `ClerkProvider` + `SignInGate` + **`ClerkSharedDslBridge`** (`getToken`, org write allow list, `useCapacityAccess`). **`VITE_AUTH_DISABLED=1`** bypasses the gate. When **`CLERK_SECRET_KEY`** is set, GET/HEAD require a session JWT; PUT verifies JWT (optional legacy `CAPACITY_SHARED_DSL_SECRET`; disable with **`CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE`**) — logic lives in `server/impl/_sharedDslImpl.ts` (esbuild → `server-bundles/_shared-dsl.runtime.cjs` on Vercel). **Org UI:** `OrganizationSwitcher`, `UserButton`. **Market ACL:** `cap_*` session claims + **`cap_mkts`**; server **filters GET** and **merges PUT** in the same handler. One-pager: [AUTH_PROVIDER.md](./AUTH_PROVIDER.md). **Still open:** per-org Blob pathname, SSO/SCIM runbooks, automated auth test matrix. **Agent rule:** use the **user-clerk** MCP when changing auth — see `.cursor/rules/clerk-auth-mcp.mdc`.
 
 This document is a **build-ready handoff**: it assumes the reader will implement identity, protect the API, and wrap the existing shell—without rewriting the runway engine or DSL pipeline.
 
@@ -44,7 +44,7 @@ This document is a **build-ready handoff**: it assumes the reader will implement
 |------|--------|
 | Bootstrap (cloud vs bundle) | `src/App.tsx` (effect ~L126–186): `fetchSharedDsl()` → `hydrateFromStorage` → `initSharedDslOutboundSync()` |
 | Cloud sync client | `src/lib/sharedDslSync.ts` — `fetchSharedDsl`, `putSharedDsl`, `getSharedDslBearer`, debounced auto-save |
-| Cloud sync API | `api/shared-dsl.js` — HEAD/GET/PUT, Blob path `capacity-shared/workspace.yaml` |
+| Cloud sync API | `/api/shared-dsl` → `api/app.js` — HEAD/GET/PUT, Blob path `capacity-shared/workspace.yaml` |
 | Workspace UI | `src/components/SharedWorkspaceSection.tsx`, `src/components/DSLPanel.tsx` |
 | Env types | `src/vite-env.d.ts` |
 

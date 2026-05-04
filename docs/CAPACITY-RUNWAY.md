@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL** after editing YAML. DSL is persisted under `localStorage` key `atc_dsl` (see [Browser storage](#browser-storage)).
+Open the URL Vite prints (typically `http://localhost:5173/`). In **Code** view, use **Apply YAML** to parse the buffer and refresh the runway (leaving Code also applies automatically). The compact editor control may still expose an **Apply DSL** label in non-studio layouts; both run the same pipeline. Workspace YAML is also tracked in `localStorage` / cloud per [Browser storage](#browser-storage) and [PRODUCT_BASELINE.md](./PRODUCT_BASELINE.md).
 
 ---
 
@@ -34,7 +34,8 @@ Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL**
 | Area | Details |
 |------|---------|
 | **Stack** | React 18, TypeScript, Vite, Tailwind, Radix/shadcn-style UI, Zustand, Monaco Editor, `@visx/group`, `@use-gesture/react`, `js-yaml` |
-| **Layout** | Header (country dropdown includes **All markets**, view mode, dark mode) · **DSL panel** (Monaco, Apply / Reset / Save scenario) · **Runway** (full week grid; scroll the main column) |
+| **Layout** | Header (country, **All markets**, view mode, dark mode) · **Main column**: runway heatmap **or**, in **Code** view, the **YAML editor** (`MainDslWorkspace` → `DslEditorCore`, Monaco) · **Right rail** (`DSLPanel`): workbench controls, workspace/settings — **not** the YAML surface |
+| **Code view (Monaco)** | Section band shading, **multi-doc folding** on `---`, **Quick outline** (⌘⇧O), **Ctrl+Space** context snippets (campaigns / `tech_programmes` / holiday `ranges`), **Draft** vs **In sync** chip vs last successful apply, **single** parse error panel (no duplicate line-1 problem marker) |
 | **YAML DSL** | Single or **multi-document** YAML (`---`) for multiple markets in one file |
 | **Parser** | `src/engine/yamlDslParser.ts` → `src/engine/types.ts` (`MarketConfig`) |
 | **Pipeline** | `src/engine/pipeline.ts` orchestrates calendar → phases → capacity → risk → noise |
@@ -52,7 +53,7 @@ Open the URL Vite prints (typically `http://localhost:5173/`). Use **Apply DSL**
 
 | Item | Status |
 |------|--------|
-| **AI assistant** | Copy-only placeholder in `DSLPanel`; no API, no streaming (old `?llm=1` flow removed) |
+| **LLM coding assistant** | **Optional** — `DslAssistantPanel` docked beside Code view when enabled (settings / `?llm`). Not in `DSLPanel`. BYOK / streaming behaviour: see [HANDOFF_DSL_CODING_ASSISTANT.md](./HANDOFF_DSL_CODING_ASSISTANT.md) (partially shipped). |
 | **Releases** | Optional top-level **`releases:`** → `MarketConfig.releases` (see [Releases](#releases-yaml)); omit or `[]` if none |
 | **Pilot / Slot Finder** | Not present in current React shell (removed with legacy app) |
 | **Legacy line-based `.dsl`** | Not supported; only YAML |
@@ -316,7 +317,10 @@ If YAML omits **`releases`**, the list is empty.
 | `src/lib/mergeMarketYaml.ts` | Join per-market YAML with `---` for default / reset |
 | `src/store/useAtcStore.ts` | State, apply/reset/hydrate |
 | `src/components/Header.tsx` | Country, view, scenario, theme |
-| `src/components/DSLPanel.tsx` | Monaco + actions + AI placeholder |
+| `src/components/MainDslWorkspace.tsx` | Code view shell, optional assistant dock |
+| `src/components/DslEditorCore.tsx` | Monaco YAML editor, Apply YAML, outline, folding, completions |
+| `src/components/DslAssistantPanel.tsx` | Optional LLM assistant (Code view) |
+| `src/components/DSLPanel.tsx` | Right rail: lens controls, workspace, settings (no Monaco) |
 | `src/components/RunwayGrid.tsx` | Week grid, list, tooltips |
 | `src/components/SlotOverlay.tsx` | Drag selection |
 | `src/engine/pipeline.ts` | Full pipeline |
@@ -335,4 +339,4 @@ If YAML omits **`releases`**, the list is empty.
 
 ## Version note
 
-This document matches the **React + TypeScript** runway app. Older README references (legacy DSL file format, cal-heatmap-only UI, pilot finder) are **not** current unless reintroduced in code.
+This document matches the **React + TypeScript** runway app. Older README references (legacy DSL file format, cal-heatmap-only UI, pilot finder) are **not** current unless reintroduced in code. **2026-05-04:** Quick start, layout, Code view, and source map aligned with **Apply YAML**, `MainDslWorkspace` / `DslEditorCore`, and optional `DslAssistantPanel`.

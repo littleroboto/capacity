@@ -1,12 +1,14 @@
 # Handoff: DSL coding assistant (BYOK chat, Code view)
 
+**Status:** Partially shipped — `DslAssistantPanel` is docked beside **Code** view when enabled (settings / `?llm`). This document remains the **build spec** for behaviour, prompts, and polish; treat checklist items as **done** only where noted below.
+
 This document is the **build prompt** for a right-hand **LLM-powered coding assistant** that helps users draft and edit market YAML in the Capacity Pressure Modeler. It is written for an implementer (human or agent) who will wire UI, state, and API calls to match the quality bar of the existing app.
 
 ---
 
 ## 1. Product intent
 
-Users stay in **View mode → Code** with the main **YAML editor** (`DslEditorCore` / `MainDslWorkspace`). A **dedicated assistant panel** on the right (replacing the current “DSL authoring / BYOK placeholder” copy in `DSLPanel.tsx`) behaves like a **serious coding assistant**: clear status, streaming replies, and **visible application** of changes to the buffer—not a black box that replaces the whole file silently.
+Users stay in **View mode → Code** with the main **YAML editor** (`DslEditorCore` / `MainDslWorkspace`). A **dedicated assistant panel** (`DslAssistantPanel`) sits beside that editor (not inside `DSLPanel.tsx`) and should behave like a **serious coding assistant**: clear status, streaming replies, and **visible application** of changes to the buffer—not a black box that replaces the whole file silently.
 
 **Representative user utterances:**
 
@@ -28,14 +30,14 @@ The assistant must **not** invent or “normalize” **dates**, **holiday lists*
 | **Schema & behaviour** | [`docs/MARKET_DSL_AND_PIPELINE.md`](./MARKET_DSL_AND_PIPELINE.md), parser `src/engine/yamlDslParser.ts`, types `src/engine/types.ts`. |
 | **Editor buffer** | Zustand `useAtcStore`: `dslText` / `setDslText` — the assistant **must** read and write through this so `DslEditorCore` stays the single source of truth. |
 | **Code view shell** | `src/components/MainDslWorkspace.tsx`, `src/components/DslEditorCore.tsx`. |
-| **Right panel placeholder** | `src/components/DSLPanel.tsx` — “DSL authoring” / `RightPanelSection`; replace placeholder with the real assistant **only when `viewMode === 'code'`** (or always show the section but **enable** chat + patching only in Code view—pick one UX and document it; prefer **visible only in Code view** so Technology/Business lenses stay focused). |
+| **Assistant UI** | `src/components/DslAssistantPanel.tsx` — Code view dock; `DSLPanel.tsx` stays the **right rail** (lens / workspace / settings), not the assistant surface. |
 | **Parse errors** | `useAtcStore` `parseError` — after applying a patch, surface success vs failure; on failure, **do not discard** the user’s previous buffer without explicit undo (see §5). |
 
 ---
 
 ## 3. Deployment & trust model
 
-- **Hosting:** GitHub Pages (static). **No server-side secret.** The user **pastes their own API key** in the UI.
+- **Hosting:** **Vercel** (Vite SPA + `/api/*` serverless). **BYOK:** no OpenAI (or other provider) secret on the server — the user **pastes their own API key** in the UI. Other server secrets (Clerk, Supabase, etc.) are normal Vercel env vars and are unrelated to BYOK.
 - **Provider (v1):** OpenAI Chat Completions or Responses API with **streaming**.
 - **Future:** Second provider (e.g. Google) behind a small **provider interface** (`OpenAIClient` / `GoogleClient`) so the rest of the UI is unchanged.
 - **Key handling:** Store key in **`localStorage`** (persists across sessions) with a one-time migration from legacy `sessionStorage`. Never log the key; never put it in URLs or analytics. Show a short **security note**: key stays on this browser until cleared; static site cannot hide it from the user’s machine—BYOK risk is accepted.
@@ -65,7 +67,7 @@ The assistant must **not** invent or “normalize” **dates**, **holiday lists*
 
 ### 4.3 In-place edits
 
-- The main editor must **update live** when the user clicks **Apply**: call `setDslText(next)` so Monaco/content reflects the patch immediately.
+- The main editor must **update live** when the user confirms an apply (e.g. **Apply YAML** in Code view): call `setDslText(next)` so Monaco/content reflects the patch immediately.
 - Optional polish: brief **highlight flash** on changed line ranges (if easy with Monaco API); if too heavy, skip—diff preview is enough.
 
 ### 4.4 Guardrails (UX + copy)
@@ -133,7 +135,7 @@ When proposing file changes, respond with [the chosen structured format per impl
 
 ## 9. Acceptance criteria (checklist for the builder)
 
-- [ ] Assistant **visible** in Code view right rail; styling consistent with existing controls.
+- [x] Assistant **visible** beside Code view when enabled (`DslAssistantPanel`); `DSLPanel` is not the assistant host.
 - [ ] OpenAI **streaming** chat works with **user-provided key**; key not persisted to disk by default (or behaviour explicitly documented).
 - [ ] **Model** selectable; **token usage** and **approximate $** shown per session / last turn.
 - [ ] **dslText** / `setDslText` are the only write path to the main editor buffer.
@@ -154,8 +156,8 @@ When proposing file changes, respond with [the chosen structured format per impl
 
 ## 11. Suggested implementation order
 
-1. Replace placeholder in `DSLPanel.tsx` with a shell component + `viewMode === 'code'` gating.
-2. Wire **read** `dslText` from store; **write** only via confirmed apply path.
+1. **Done (baseline):** `DslAssistantPanel` + Code view gating in `MainDslWorkspace` — do **not** mount the assistant inside `DSLPanel.tsx`.
+2. Wire **read** `dslText` from store; **write** only via confirmed apply path (align with **Apply YAML** / store pipeline).
 3. OpenAI streaming client + model list + pricing table + usage display.
 4. System prompt loader (import markdown section at build time or duplicate into `src/prompts/dslAssistantSystem.ts` with a comment “keep in sync with docs/LLM_MARKET_DSL_PROMPT.md”).
 5. Patch or full-doc diff pipeline + parse gate.

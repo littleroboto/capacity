@@ -59,12 +59,12 @@ Configure under Clerk → **Sessions** → **Customize session token**. When **n
 | Token + ACL bridge | `src/components/ClerkSharedDslBridge.tsx` |
 | Client ACL helpers | `src/lib/capacityAccess.ts`, `src/lib/capacityAccessContext.tsx` |
 | Cloud sync | `src/lib/sharedDslSync.ts` |
-| API + Blob | `api/shared-dsl.js` + esbuild output `api/_shared-dsl.runtime.cjs` (from `api/_sharedDslImpl.ts`); ACL data `api/_capacityWorkspaceAcl.data.ts` |
-| Server JWT + legacy bearer | bundled handler (Clerk verify + bearer parsing) |
-| Server YAML filter / merge | same; email allowlist: `api/_allowedUserEmails.ts` (bundled handler) |
+| API + Blob | `/api/shared-dsl` → `api/app.js` (`__cap=shared-dsl`); bundle `server-bundles/_shared-dsl.runtime.cjs` from `server/impl/_sharedDslImpl.ts`; ACL data `server/impl/_capacityWorkspaceAcl.data.ts` |
+| Server JWT + legacy bearer | same bundle (Clerk verify + bearer parsing) |
+| Server YAML filter / merge | same; email allowlist: `server/impl/_allowedUserEmails.ts` |
 
 ## Still open (backlog)
 
 Per-org Blob paths, SSO/SCIM runbooks for customers, automated role × market test matrix — see [BACKLOG_EPICS.md](./BACKLOG_EPICS.md) (`epic-auth-org`, `epic-market-acl`).
 
-**Canonical workspace (Supabase + Redis):** SQL migrations under `supabase/migrations/` and architecture notes in [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md). Clerk remains the session issuer; Vercel APIs use the Supabase **service role** and enforce the same `cap_*` rules as `api/_sharedDslImpl.ts`.
+**Canonical workspace (Supabase + Redis):** SQL migrations under `supabase/migrations/` and architecture notes in [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md). Clerk remains the session issuer; Vercel APIs use the Supabase **service role** and enforce the same `cap_*` rules as `server/impl/_sharedDslImpl.ts`.

@@ -12,7 +12,7 @@ Dense reference; full prose + examples live in `docs/LLM_MARKET_DSL_PROMPT.md`. 
 | `bau` | `days_in_use`, `weekly_cycle`, optional `integration_tests`, optional **`market_it_weekly_load`** (same inner keys as legacy `tech`); legacy `weekly_promo*` |
 | `campaigns` | Marketing / store programmes: list or map |
 | `tech_programmes` | Non-marketing tech load; **not** under `tech:`, **not** `releases` |
-| `public_holidays`, `school_holidays` | `auto`, `dates[]`, multipliers; school may add `load_effects` |
+| `public_holidays`, `school_holidays` | `auto`, `dates[]`, optional `ranges[]` (`from` / `to` ISO, merged with `dates`), multipliers; school may add `load_effects` |
 | `holidays` | Cross: `capacity_taper_days`, `lab_capacity_scale` |
 | `stress_correlations` | Legacy; prefer `school_holidays.load_effects` |
 | `trading` | Store demand: `weekly_pattern`, optional `monthly_pattern`, `seasonal`, payday, campaign boosts |
@@ -91,7 +91,7 @@ resources:
 
 ## Holidays
 
-`public_holidays` / `school_holidays`: `auto` bool, `dates: ['YYYY-MM-DD', …]`, `staffing_multiplier`, optional `trading_multiplier`; `school_holidays.load_effects` optional mult map (`lab_load_mult`, `team_load_mult`, …).
+`public_holidays` / `school_holidays`: `auto` bool, `dates: ['YYYY-MM-DD', …]`, optional `ranges: [{ from: '…', to: '…' }, …]` (inclusive calendar days, merged with `dates`), `staffing_multiplier`, optional `trading_multiplier`; `school_holidays.load_effects` optional mult map (`lab_load_mult`, `team_load_mult`, …).
 
 ## Heatmap (app only)
 

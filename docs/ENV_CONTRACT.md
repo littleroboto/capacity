@@ -42,7 +42,7 @@
 | Variable | Replacement | Migration Status | Used In |
 |----------|-------------|-----------------|---------|
 | `VITE_CLERK_PUBLISHABLE_KEY` | Prefer `NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY` | **Optional legacy alias** — same `pk_` value | `clerkConfig.ts`, `clientEnv.ts` |
-| `CLERK_SECRET_KEY` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` | **Optional server fallback** | `api/_lib/env.ts` (all `verifyToken` callers) |
+| `CLERK_SECRET_KEY` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` | **Optional server fallback** | `server/lib/env.ts` (all `verifyToken` callers) |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | N/A (wrong integration name) | **Do not use** | Not in code |
 
 ---
@@ -51,16 +51,16 @@
 
 | Variable | Status | Action | Used In |
 |----------|--------|--------|---------|
-| `CAPACITY_SHARED_DSL_SECRET` | Compatibility only | Remove after Postgres migration complete | `api/_sharedDslImpl.ts` |
-| `BLOB_READ_WRITE_TOKEN` | Compatibility only | Remove after Postgres migration complete | `api/_sharedDslImpl.ts` |
+| `CAPACITY_SHARED_DSL_SECRET` | Compatibility only | Remove after Postgres migration complete | `server/impl/_sharedDslImpl.ts` |
+| `BLOB_READ_WRITE_TOKEN` | Compatibility only | Remove after Postgres migration complete | `server/impl/_sharedDslImpl.ts` |
 | `VITE_SHARED_DSL` | Active | Keep until Postgres read path replaces Blob | `sharedDslSync.ts` |
-| `CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE` | Active | Remove with legacy write path | `api/_sharedDslImpl.ts` |
-| `CAPACITY_CLERK_DSL_WRITE_ROLES` | Active | Replace with `user_access_scopes` | `api/_sharedDslImpl.ts` |
+| `CAPACITY_DISABLE_LEGACY_SHARED_DSL_WRITE` | Active | Remove with legacy write path | `server/impl/_sharedDslImpl.ts` |
+| `CAPACITY_CLERK_DSL_WRITE_ROLES` | Active | Replace with `user_access_scopes` | `server/impl/_sharedDslImpl.ts` |
 | `VITE_CLERK_DSL_WRITE_ROLES` | Active | Replace with `user_access_scopes` | `clerkDslRoles.ts` |
 | `VITE_ALLOWED_USER_EMAILS` | Active | Replace with `user_access_scopes` | `allowedUserEmails.ts` |
-| `CAPACITY_ALLOWED_USER_EMAILS` | Active | Replace with `user_access_scopes` | `api/_allowedUserEmails.ts` |
-| `CAPACITY_BLOB_ACCESS` | Active | Remove with Blob | `api/_sharedDslImpl.ts` |
-| `CAPACITY_ORG_ADMIN_ROLES` | Active | Replace with `user_access_scopes` | `api/_sharedDslImpl.ts` |
+| `CAPACITY_ALLOWED_USER_EMAILS` | Active | Replace with `user_access_scopes` | `server/impl/_allowedUserEmails.ts` |
+| `CAPACITY_BLOB_ACCESS` | Active | Remove with Blob | `server/impl/_sharedDslImpl.ts` |
+| `CAPACITY_ORG_ADMIN_ROLES` | Active | Replace with `user_access_scopes` | `server/impl/_sharedDslImpl.ts` |
 | `VITE_CAPACITY_ORG_ADMIN_ROLES` | Active | Replace with `user_access_scopes` | `capacityAccess.ts` |
 
 ---
@@ -97,7 +97,7 @@ Variables exposed to the browser are controlled by `vite.config.ts` `envPrefix` 
 
 All other variables. Verified by:
 - Vite only bundles `VITE_*` and `NEXT_PUBLIC_*` (per `envPrefix`) into client code
-- `process.env.*` references only exist in `api/` (Vercel serverless)
+- `process.env.*` for secrets exists in `server/` sources bundled into `api/app.js` (Vercel serverless)
 - No shared utility files import server secrets
 
 ---
@@ -108,17 +108,17 @@ All other variables. Verified by:
 |----------|------|---------|-------|
 | `src/main.tsx` | ClerkProvider | `clerkPublishableKey()` | Reads canonical then legacy (see `clerkConfig.ts`) |
 | `src/lib/clerkConfig.ts` | Config helper | `NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_AUTH_DISABLED` | Determines if Clerk active |
-| `api/_lib/env.ts` | `serverEnv().clerkSecretKey` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY`, `CLERK_SECRET_KEY` | Server JWT verification |
-| `api/_sharedDslImpl.ts` | verifyToken | same as `serverEnv()` | Shared DSL + partial-env fallback |
+| `server/lib/env.ts` | `serverEnv().clerkSecretKey` | `CLERK_AUTHENTICATION_CLERK_SECRET_KEY`, `CLERK_SECRET_KEY` | Server JWT verification |
+| `server/impl/_sharedDslImpl.ts` | verifyToken | same as `serverEnv()` | Shared DSL + partial-env fallback |
 
 ---
 
 ## Migration Checklist
 
 1. [x] Audit all env var references in code
-2. [x] Server: `api/_lib/env.ts` — `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` with fallback to `CLERK_SECRET_KEY`
+2. [x] Server: `server/lib/env.ts` — `CLERK_AUTHENTICATION_CLERK_SECRET_KEY` with fallback to `CLERK_SECRET_KEY`
 3. [x] Client: `clerkConfig.ts` / `clientEnv.ts` — `NEXT_PUBLIC_CLERK_AUTHENTICATION_CLERK_PUBLISHABLE_KEY` with fallback to `VITE_CLERK_PUBLISHABLE_KEY`; Vite `envPrefix` includes `NEXT_PUBLIC_`
-4. [ ] Add typed env validation (see `src/lib/env.ts` / `api/_lib/env.ts`)
+4. [ ] Add typed env validation (see `src/lib/env.ts` / `server/lib/env.ts`)
 5. [ ] Confirm no server secrets leak to client bundle
 6. [ ] Document which Vercel Integration auto-provisions which vars
 7. [ ] Remove legacy `VITE_CLERK_*` / `CLERK_SECRET_KEY` aliases after migration stabilises

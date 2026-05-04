@@ -14,7 +14,7 @@ Start here after the [root README](../README.md) (run, deploy, Blob env vars).
 | [VP-CAPACITY-RUNWAY-ONE-PAGER.md](./VP-CAPACITY-RUNWAY-ONE-PAGER.md) | Short executive-style product summary. |
 | [LLM_MARKET_DSL_PROMPT.md](./LLM_MARKET_DSL_PROMPT.md) | LLM authoring instructions (full). |
 | [LLM_MARKET_DSL_SCHEMA_COMPACT.md](./LLM_MARKET_DSL_SCHEMA_COMPACT.md) | Compact schema for prompts / assistants. |
-| [HANDOFF_DSL_CODING_ASSISTANT.md](./HANDOFF_DSL_CODING_ASSISTANT.md) | Build notes for a future in-app DSL coding assistant. |
+| [HANDOFF_DSL_CODING_ASSISTANT.md](./HANDOFF_DSL_CODING_ASSISTANT.md) | DSL coding assistant **spec + SSOT pointers**; UI ships **behind flag / query** (`DslAssistantPanel`), handoff tracks remaining acceptance items. |
 | [AUTH_PROVIDER.md](./AUTH_PROVIDER.md) | **Clerk** — env vars, session claims (`cap_*`), code map for identity and `/api/shared-dsl`. |
 | [SUPABASE_REDIS_WORKSPACE.md](./SUPABASE_REDIS_WORKSPACE.md) | **Supabase + Redis** — canonical per-market workspace schema, bundle cache keys, Clerk-only auth (service role from Vercel). |
 | [CLERK_CAPACITY_ORG_SETUP.md](./CLERK_CAPACITY_ORG_SETUP.md) | **Org layout** — IOM/LIOM segment orgs vs market teams, `public_metadata` keys, session token mapping. |

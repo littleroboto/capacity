@@ -344,7 +344,7 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 
 **Goal:** **Enforceable** limits on which markets a user may **view, focus, and edit** in workspace YAML—e.g. **one market only**, **all markets in a segment** (e.g. IOM vs LIOM), or **full access** for admins—so restricted users cannot bypass the UI via the API.
 
-**Repo status:** **Mostly shipped** — Server **GET** returns YAML **filtered** to allowed markets; **PUT** **merges** partial multi-doc YAML for scoped editors (`api/_sharedDslImpl.ts` / bundle). Client **`useCapacityAccess`**, runway manifest order filtering, DSL mutation lock for viewers. Session claim **`cap_mkts`** (comma market ids) **narrows** **`cap_segs`** or stands alone. **Remaining:** Clerk ops doc for assigning metadata; **automated** role × market × PUT matrix tests; optional stricter “single market only” product rule on top of claims.
+**Repo status:** **Mostly shipped** — Server **GET** returns YAML **filtered** to allowed markets; **PUT** **merges** partial multi-doc YAML for scoped editors (`server/impl/_sharedDslImpl.ts` / `server-bundles/_shared-dsl.runtime.cjs`). Client **`useCapacityAccess`**, runway manifest order filtering, DSL mutation lock for viewers. Session claim **`cap_mkts`** (comma market ids) **narrows** **`cap_segs`** or stands alone. **Remaining:** Clerk ops doc for assigning metadata; **automated** role × market × PUT matrix tests; optional stricter “single market only” product rule on top of claims.
 
 **Scope (indicative):**
 
@@ -354,7 +354,7 @@ These epics are **largely shipped** in prod; treat scope bullets as **stretch / 
 - **Server** — **`/api/shared-dsl`** filters GET YAML and merges scoped PUT bodies (implemented); **org-scoped storage** — Blob path today; **Postgres workspace** with same filter/merge semantics under **`epic-canonical-workspace-postgres`**.
 - **Tests / matrix** — roles × markets × PUT accept/reject (automated coverage still backlog).
 
-**Dependencies:** **`epic-auth-org`** for verified JWT. **Org-scoped canonical storage** is **`epic-canonical-workspace-postgres`** (Postgres rows per org/workspace). Server-side market ACL for shared-dsl **ships** with claim parsing in `api/_sharedDslImpl.ts`.
+**Dependencies:** **`epic-auth-org`** for verified JWT. **Org-scoped canonical storage** is **`epic-canonical-workspace-postgres`** (Postgres rows per org/workspace). Server-side market ACL for shared-dsl **ships** with claim parsing in `server/impl/_sharedDslImpl.ts`.
 
 **Outcomes:** Documented role matrix; no saving disallowed markets through the API; procurement-credible “who can edit what.”
 
