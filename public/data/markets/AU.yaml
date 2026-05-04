@@ -287,7 +287,6 @@ tech_programmes:
       tech_staff: 1
 public_holidays:
   auto: false
-  # Isolated NSW/ACT-style 2026 fixtures; consecutive runs use ranges (merged with dates by the parser).
   dates:
     - '2026-01-01'
     - '2026-01-26'
@@ -305,10 +304,7 @@ public_holidays:
       from: '2026-12-25'
       to: '2026-12-26'
   staffing_multiplier: 0.25
-  trading_multiplier: 1.0
-
-# School breaks — NSW Eastern Division terms as inclusive ranges (same calendar as former per-day list).
-
+  trading_multiplier: 1
 school_holidays:
   auto: false
   ranges:
@@ -337,16 +333,13 @@ school_holidays:
       from: '2027-09-27'
       to: '2027-10-08'
   staffing_multiplier: 0.75
-  trading_multiplier: 1.0
+  trading_multiplier: 1
   load_effects:
-    lab_load_mult: 1.0
-    team_load_mult: 1.0
-    backend_load_mult: 1.0
-    ops_activity_mult: 1.0
-    commercial_activity_mult: 1.0
-
-# Holiday capacity shaping — taper and lab ceiling vs public + school calendars above.
-
+    lab_load_mult: 1
+    team_load_mult: 1
+    backend_load_mult: 1
+    ops_activity_mult: 1
+    commercial_activity_mult: 1
 holidays:
   capacity_taper_days: 0
   lab_capacity_scale: 1.0
