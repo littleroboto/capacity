@@ -354,7 +354,7 @@ export function LandingPage() {
         <header className="mb-16 flex flex-wrap items-center justify-between gap-4 sm:mb-20">
           <motion.div
             className="flex min-w-0 max-w-[min(100%,20rem)] items-center gap-2.5 font-landing text-balance text-xl font-extrabold leading-snug tracking-[-0.02em] text-zinc-800 sm:max-w-none sm:gap-3 sm:text-2xl"
-            initial={reducedMotion ? false : { opacity: 0, y: 5 }}
+            initial={reducedMotion ? false : { opacity: 1, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
           >
@@ -405,7 +405,7 @@ export function LandingPage() {
           <section className="grid min-w-0 items-start gap-12 overflow-x-visible lg:grid-cols-[minmax(0,1.05fr)_minmax(32rem,1.45fr)] lg:gap-16">
             <motion.div
               className="min-w-0"
-              initial={reducedMotion ? false : { opacity: 0, y: 16 }}
+              initial={reducedMotion ? false : { opacity: 1, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             >
