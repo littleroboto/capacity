@@ -41,7 +41,12 @@ export function DslSyntaxHelpBody({ className }: { className?: string }) {
       <span className="font-mono text-foreground/80">default</span> (or{' '}
       <span className="font-mono text-foreground/80">weekdays</span> /{' '}
       <span className="font-mono text-foreground/80">weekend</span>) plus per-day overrides instead of listing all seven
-      days. Other optional keys under that BAU block: <span className="font-mono text-foreground/80">labs_multiplier</span> /{' '}
+      days. Under <span className="font-mono text-foreground/80">public_holidays</span> and{' '}
+      <span className="font-mono text-foreground/80">school_holidays</span>, optional{' '}
+      <span className="font-mono text-foreground/80">ranges:</span> (list of{' '}
+      <span className="font-mono text-foreground/80">from</span> / <span className="font-mono text-foreground/80">to</span>{' '}
+      ISO dates, inclusive) expands to calendar days and merges with <span className="font-mono text-foreground/80">dates:</span>.{' '}
+      Other optional keys under that BAU block: <span className="font-mono text-foreground/80">labs_multiplier</span> /{' '}
       <span className="font-mono text-foreground/80">teams_multiplier</span>,{' '}
       <span className="font-mono text-foreground/80">trading.monthly_pattern</span> (optional Jan–Dec{' '}
       <strong>0–1</strong> multipliers on weekly store level),{' '}
@@ -84,6 +89,31 @@ export type DslEditorMarketTabBinding = {
   onTextChange: (value: string) => void;
 };
 
+function applyCapacitySpecMarkers(
+  monaco: Monaco,
+  editor: Parameters<OnMount>[0],
+  parseErrorVal: string | null
+) {
+  const model = editor.getModel();
+  if (!model) return;
+  const msg = parseErrorVal?.trim();
+  if (msg) {
+    const endCol = Math.max(1, model.getLineMaxColumn(1));
+    monaco.editor.setModelMarkers(model, 'capacity-spec', [
+      {
+        severity: monaco.MarkerSeverity.Error,
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: 1,
+        endColumn: endCol,
+        message: msg,
+      },
+    ]);
+  } else {
+    monaco.editor.setModelMarkers(model, 'capacity-spec', []);
+  }
+}
+
 type DslEditorCoreProps = {
   /** Wrapper around Monaco (extra classes). */
   editorWrapClassName?: string;
@@ -121,7 +151,8 @@ export function DslEditorCore({
 }: DslEditorCoreProps) {
   const [fontSize, setFontSize] = useState(initialFontSize);
   const [wordWrap, setWordWrap] = useState<'on' | 'off'>('on');
-  const [minimapEnabled, setMinimapEnabled] = useState(true);
+  /** Long YAML: minimap off by default (toggle in toolbar). */
+  const [minimapEnabled, setMinimapEnabled] = useState(false);
   const [lineNumbers, setLineNumbers] = useState<'on' | 'off'>('on');
   const [cursorPos, setCursorPos] = useState({ line: 1, column: 1 });
 
@@ -138,6 +169,7 @@ export function DslEditorCore({
   tabOnChangeRef.current = marketTabDocument?.onTextChange;
 
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
 
   const editorValue = marketTabDocument?.text ?? dslText;
   const handleEditorChange = useCallback((v: string | undefined) => {
@@ -188,6 +220,8 @@ export function DslEditorCore({
       cursorBlinking: 'smooth' as const,
       cursorSmoothCaretAnimation: 'on' as const,
       bracketPairColorization: { enabled: true },
+      glyphMargin: true,
+      stickyScroll: { enabled: true },
       guides: {
         bracketPairs: true,
         indentation: true,
@@ -219,8 +253,10 @@ export function DslEditorCore({
     registerCapacityYamlThemes(monaco);
   }, []);
 
-  const handleMount = useCallback<OnMount>((editor) => {
+  const handleMount = useCallback<OnMount>((editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+    applyCapacitySpecMarkers(monaco, editor, useAtcStore.getState().parseError);
     const sync = () => {
       const p = editor.getPosition();
       if (p) setCursorPos({ line: p.lineNumber, column: p.column });
@@ -228,6 +264,13 @@ export function DslEditorCore({
     sync();
     editor.onDidChangeCursorPosition(sync);
   }, []);
+
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    const editor = editorRef.current;
+    if (!monaco || !editor) return;
+    applyCapacitySpecMarkers(monaco, editor, parseError);
+  }, [parseError, editorValue]);
 
   useEffect(() => {
     registerDslEditorFlush(() => {
@@ -241,6 +284,7 @@ export function DslEditorCore({
     return () => {
       registerDslEditorFlush(null);
       editorRef.current = null;
+      monacoRef.current = null;
     };
   }, [dslAssistantEditorLock, dslMutationLocked]);
 
@@ -263,7 +307,9 @@ export function DslEditorCore({
         className={cn(
           'flex min-h-0 w-full flex-col overflow-hidden bg-background',
           editorFixedHeight ? 'shrink-0' : 'min-h-0 flex-1',
-          studio ? 'rounded-none border-0 shadow-none' : 'rounded-md border border-border',
+          studio
+            ? 'rounded-lg border border-border/60 shadow-sm'
+            : 'rounded-md border border-border',
           editorWrapClassName
         )}
         style={editorFixedHeight ? ({ height: editorFixedHeight } as CSSProperties) : undefined}
