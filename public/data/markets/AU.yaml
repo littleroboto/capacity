@@ -384,46 +384,6 @@ deployment_risk_week_weight: 0.38
 # deployment_risk_month_curve omitted — engine applies a light Oct–Dec default; add a custom curve in YAML if needed.
 
 deployment_risk_events:
-  - id: earnings_q1_fy2026
-    start: '2026-05-13'
-    end: '2026-05-15'
-    severity: 0.52
-    kind: earnings
-  - id: earnings_q2_fy2026
-    start: '2026-08-11'
-    end: '2026-08-13'
-    severity: 0.52
-    kind: earnings
-  - id: earnings_q3_fy2026
-    start: '2026-11-10'
-    end: '2026-11-12'
-    severity: 0.52
-    kind: earnings
-  - id: earnings_q4_fy2026
-    start: '2027-02-10'
-    end: '2027-02-12'
-    severity: 0.55
-    kind: earnings
-  - id: earnings_q1_fy2027
-    start: '2027-05-12'
-    end: '2027-05-14'
-    severity: 0.52
-    kind: earnings
-  - id: earnings_q2_fy2027
-    start: '2027-08-10'
-    end: '2027-08-12'
-    severity: 0.52
-    kind: earnings
-  - id: earnings_q3_fy2027
-    start: '2027-11-09'
-    end: '2027-11-11'
-    severity: 0.52
-    kind: earnings
-  - id: earnings_q4_fy2027
-    start: '2028-02-09'
-    end: '2028-02-11'
-    severity: 0.55
-    kind: earnings
   - id: agm_prep_fy2026
     start: '2026-10-14'
     end: '2026-10-20'
@@ -444,7 +404,6 @@ deployment_risk_events:
     end: '2027-10-20'
     severity: 0.42
     kind: agm
-
 deployment_risk_blackouts:
   - id: year_end_change_blackout_fy2026
     start: '2026-12-15'
