@@ -17,6 +17,7 @@ import {
 } from '@/lib/sharedDslSync';
 import { useAtcStore } from '@/store/useAtcStore';
 import { PRODUCT_NAME_SPOKEN, PRODUCT_WORDMARK } from '@/lib/productBranding';
+import { adminMarketEntityPath, DEFAULT_ADMIN_MARKET_ENTITY } from '@/pages/admin/adminMarketTabs';
 import { cn } from '@/lib/utils';
 
 type WorkbenchSidebarProps = {
@@ -47,7 +48,7 @@ export function WorkbenchSidebar({ parseError }: WorkbenchSidebarProps) {
   const canAdmin = access.admin || access.legacyFullAccess;
   const order = runwayMarketOrder.length ? runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
   const adminFocusMarketId = gammaFocusMarket(country, configs, order);
-  const adminMarketPath = `/admin/market/${encodeURIComponent(adminFocusMarketId)}`;
+  const adminMarketPath = adminMarketEntityPath(adminFocusMarketId, DEFAULT_ADMIN_MARKET_ENTITY);
 
   const onLogoClick = useCallback(
     (e: MouseEvent<HTMLAnchorElement>) => {

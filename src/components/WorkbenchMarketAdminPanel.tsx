@@ -9,6 +9,7 @@ import {
   isRunwayMultiMarketStrip,
   runwayFocusStripLabel,
 } from '@/lib/markets';
+import { adminMarketEntityPath, DEFAULT_ADMIN_MARKET_ENTITY } from '@/pages/admin/adminMarketTabs';
 import { useAtcStore } from '@/store/useAtcStore';
 
 /**
@@ -31,7 +32,7 @@ export function WorkbenchMarketAdminPanel() {
   const order = runwayMarketOrder.length ? runwayMarketOrder : [...FALLBACK_RUNWAY_MARKET_IDS];
   const marketId = gammaFocusMarket(country, configs, order);
   const compareStrip = isRunwayMultiMarketStrip(country);
-  const adminMarketPath = `/admin/market/${encodeURIComponent(marketId)}`;
+  const adminMarketPath = adminMarketEntityPath(marketId, DEFAULT_ADMIN_MARKET_ENTITY);
 
   return (
     <div className="flex min-w-0 shrink-0 flex-col overflow-hidden rounded-lg border border-border/55 bg-muted/15 dark:border-border/45 dark:bg-muted/10">

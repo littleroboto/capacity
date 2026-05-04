@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   flexRender,
   getCoreRowModel,
@@ -30,21 +30,12 @@ import {
 import { AdminCampaignCreate } from '@/pages/admin/AdminCampaignCreate';
 import { AdminTechProgrammeCreate } from '@/pages/admin/AdminTechProgrammeCreate';
 import type { AdminMarketRow } from '@/pages/admin/AdminMarketsDataTable';
-
-const TABS = [
-  { key: 'campaigns', label: 'Campaigns', table: 'campaign_configs' },
-  { key: 'resources', label: 'Resources', table: 'resource_configs' },
-  { key: 'bau', label: 'BAU', table: 'bau_configs' },
-  { key: 'trading', label: 'Trading', table: 'trading_configs' },
-  { key: 'holidays', label: 'Holidays', table: 'holiday_calendars' },
-  { key: 'leave', label: 'Leave Bands', table: 'national_leave_band_configs' },
-  { key: 'risk', label: 'Deploy Risk', table: 'deployment_risk_configs' },
-  { key: 'tech', label: 'Tech Programmes', table: 'tech_programme_configs' },
-  { key: 'windows', label: 'Op. Windows', table: 'operating_window_configs' },
-  { key: 'build', label: 'Build & Publish', table: '' },
-  { key: 'yaml', label: 'Expert YAML', table: '' },
-  { key: 'audit', label: 'Audit Log', table: '' },
-] as const;
+import {
+  ADMIN_MARKET_ENTITY_TABS as TABS,
+  adminMarketEntityPath,
+  DEFAULT_ADMIN_MARKET_ENTITY,
+  isAdminMarketEntityKey,
+} from '@/pages/admin/adminMarketTabs';
 
 type SchemaCol = { key: string; label: string; editable?: boolean };
 
@@ -193,8 +184,9 @@ function FragmentTableSkeleton({ table }: { table: string }) {
 }
 
 export function AdminMarketDetail() {
-  const { id: marketId } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState('campaigns');
+  const { id: marketId, entity: entityParam } = useParams<{ id: string; entity: string }>();
+  const navigate = useNavigate();
+  const activeTab = entityParam && isAdminMarketEntityKey(entityParam) ? entityParam : DEFAULT_ADMIN_MARKET_ENTITY;
   const [fragments, setFragments] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -213,6 +205,13 @@ export function AdminMarketDetail() {
   const [auditEvents, setAuditEvents] = useState<Record<string, unknown>[]>([]);
 
   const currentTable = TABS.find(t => t.key === activeTab)?.table || '';
+
+  useEffect(() => {
+    if (!marketId || !entityParam) return;
+    if (!isAdminMarketEntityKey(entityParam)) {
+      navigate(adminMarketEntityPath(marketId, DEFAULT_ADMIN_MARKET_ENTITY), { replace: true });
+    }
+  }, [marketId, entityParam, navigate]);
 
   const loadFragments = useCallback(async () => {
     if (!marketId || !currentTable) return;
@@ -398,7 +397,11 @@ export function AdminMarketDetail() {
         {TABS.map(tab => (
           <button
             key={tab.key}
-            onClick={() => { setActiveTab(tab.key); setSaveMessage(null); }}
+            onClick={() => {
+              if (!marketId) return;
+              setSaveMessage(null);
+              navigate(adminMarketEntityPath(marketId, tab.key));
+            }}
             className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               activeTab === tab.key
                 ? 'border-primary text-primary'

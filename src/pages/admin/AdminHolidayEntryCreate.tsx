@@ -4,6 +4,7 @@ import { createHolidayEntryApi, fetchFragments } from '@/lib/adminApi';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import type { AdminMarketRow } from '@/pages/admin/AdminMarketsDataTable';
+import { adminMarketEntityPath } from '@/pages/admin/adminMarketTabs';
 
 function calendarTypeLabel(cal: Record<string, unknown>): string {
   const t = String(cal.calendar_type ?? cal.calendarType ?? '').replace(/_/g, ' ');
@@ -267,7 +268,7 @@ export function AdminHolidayEntryCreate({ markets }: Props) {
                   <>
                     No holiday calendars for this market yet.{' '}
                     <Link
-                      to={`/admin/market/${encodeURIComponent(marketId)}`}
+                      to={adminMarketEntityPath(marketId, 'holidays')}
                       className="font-medium text-primary underline-offset-4 hover:underline"
                     >
                       Open Configure
@@ -359,7 +360,7 @@ export function AdminHolidayEntryCreate({ markets }: Props) {
           </Button>
           {marketId ? (
             <Link
-              to={`/admin/market/${encodeURIComponent(marketId)}`}
+              to={adminMarketEntityPath(marketId, 'holidays')}
               className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             >
               Full holiday editor for this market

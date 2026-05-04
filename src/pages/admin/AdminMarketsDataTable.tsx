@@ -12,6 +12,7 @@ import {
 import { Link } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { MarketCircleFlag } from '@/components/MarketCircleFlag';
+import { adminMarketEntityPath, DEFAULT_ADMIN_MARKET_ENTITY } from '@/pages/admin/adminMarketTabs';
 import { cn } from '@/lib/utils';
 
 export interface AdminMarketRow {
@@ -156,7 +157,7 @@ const columns: ColumnDef<AdminMarketRow>[] = [
           Workbench
         </Link>
         <Link
-          to={`/admin/market/${row.original.id}`}
+          to={adminMarketEntityPath(row.original.id, DEFAULT_ADMIN_MARKET_ENTITY)}
           className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
         >
           Configure

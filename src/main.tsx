@@ -11,6 +11,7 @@ import { ClerkUkWaitlistPage } from '@/pages/ClerkUkWaitlistPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { AdminClerkBridge } from '@/components/AdminClerkBridge';
 import { AdminLayout } from '@/pages/admin/AdminLayout';
+import { AdminMarketLegacyRedirect } from '@/pages/admin/AdminMarketLegacyRedirect';
 import { AdminMarketOverview } from '@/pages/admin/AdminMarketOverview';
 import { AdminMarketDetail } from '@/pages/admin/AdminMarketDetail';
 import { LaptopOnlyGate } from '@/components/LaptopOnlyGate';
@@ -93,7 +94,8 @@ function AppRoutes() {
         }
       >
         <Route index element={<AdminMarketOverview />} />
-        <Route path="market/:id" element={<AdminMarketDetail />} />
+        <Route path="market/:id/:entity" element={<AdminMarketDetail />} />
+        <Route path="market/:id" element={<AdminMarketLegacyRedirect />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
