@@ -4,10 +4,12 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   type ColumnDef,
   type FilterFn,
   type HeaderContext,
+  type PaginationState,
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
@@ -392,28 +394,7 @@ export function AdminMarketDetail() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-border">
-        {TABS.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => {
-              if (!marketId) return;
-              setSaveMessage(null);
-              navigate(adminMarketEntityPath(marketId, tab.key));
-            }}
-            className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab content */}
+      {/* Tab content — section nav lives in AdminLayout sidebar */}
       {error && <div className="mb-4 text-sm text-red-500">{error}</div>}
 
       {activeTab === 'build' ? (
@@ -493,6 +474,7 @@ function FragmentTable({
   const [editValues, setEditValues] = useState<Record<string, unknown>>({});
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 });
 
   const schema = useMemo(() => getColumnsForTable(table), [table]);
 
@@ -652,15 +634,21 @@ function FragmentTable({
     [schema, editingRowId, editValues, saving, onSave, onArchive, startEdit]
   );
 
+  useEffect(() => {
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [globalFilter, visible, table]);
+
   const tableInstance = useReactTable({
     data: visible,
     columns,
-    state: { sorting, globalFilter },
+    state: { sorting, globalFilter, pagination },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     globalFilterFn: fragmentGlobalFilterFn,
     meta,
   });
@@ -714,18 +702,19 @@ function FragmentTable({
         </p>
       </div>
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full min-w-[640px] text-sm">
-          <thead>
-            {tableInstance.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} className="border-b border-border bg-muted/50">
-                {hg.headers.map((header) => (
-                  <th key={header.id} className="px-3 py-2 text-left font-medium">
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
+        <div className="max-h-[min(70vh,52rem)] overflow-y-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead className="sticky top-0 z-10 border-b border-border bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/80">
+              {tableInstance.getHeaderGroups().map((hg) => (
+                <tr key={hg.id}>
+                  {hg.headers.map((header) => (
+                    <th key={header.id} className="px-3 py-2 text-left font-medium text-muted-foreground">
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
           <tbody>
             {tableInstance.getRowModel().rows.length === 0 ? (
               <tr>
@@ -746,6 +735,51 @@ function FragmentTable({
             )}
           </tbody>
         </table>
+        </div>
+        <div className="flex flex-col gap-2 border-t border-border bg-muted/15 px-3 py-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Page {tableInstance.getState().pagination.pageIndex + 1} of{' '}
+            {Math.max(1, tableInstance.getPageCount())} · {tableInstance.getFilteredRowModel().rows.length} row(s)
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-1.5">
+              <span className="sr-only">Rows per page</span>
+              <select
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                value={tableInstance.getState().pagination.pageSize}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (!Number.isFinite(n)) return;
+                  tableInstance.setPageSize(n);
+                }}
+              >
+                {[10, 25, 50, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n} / page
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                className="rounded-md border border-border bg-background px-2 py-1 hover:bg-muted disabled:opacity-40"
+                disabled={!tableInstance.getCanPreviousPage()}
+                onClick={() => tableInstance.previousPage()}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-border bg-background px-2 py-1 hover:bg-muted disabled:opacity-40"
+                disabled={!tableInstance.getCanNextPage()}
+                onClick={() => tableInstance.nextPage()}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

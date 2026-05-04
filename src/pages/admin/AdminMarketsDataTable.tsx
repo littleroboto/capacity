@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   type ColumnDef,
   type FilterFn,
+  type PaginationState,
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
@@ -170,16 +172,23 @@ const columns: ColumnDef<AdminMarketRow>[] = [
 export function AdminMarketsDataTable({ data }: { data: AdminMarketRow[] }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'id', desc: false }]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 25 });
+
+  useEffect(() => {
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [globalFilter, data.length]);
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, globalFilter },
+    state: { sorting, globalFilter, pagination },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     globalFilterFn: adminMarketsGlobalFilter,
   });
 
@@ -203,15 +212,16 @@ export function AdminMarketsDataTable({ data }: { data: AdminMarketRow[] }) {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead>
-            {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} className="border-b border-border bg-muted/50">
-                {hg.headers.map((header) => {
+        <div className="max-h-[min(70vh,52rem)] overflow-y-auto">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead className="sticky top-0 z-10 border-b border-border bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/80">
+              {table.getHeaderGroups().map((hg) => (
+                <tr key={hg.id}>
+                  {hg.headers.map((header) => {
                   const canSort = header.column.getCanSort();
                   const sorted = header.column.getIsSorted();
                   return (
-                    <th key={header.id} className="px-4 py-3 text-left font-medium">
+                    <th key={header.id} className="px-4 py-3 text-left font-medium text-muted-foreground">
                       {header.isPlaceholder ? null : canSort ? (
                         <button
                           type="button"
@@ -233,29 +243,74 @@ export function AdminMarketsDataTable({ data }: { data: AdminMarketRow[] }) {
                     </th>
                   );
                 })}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.length === 0 ? (
-              <tr>
-                <td colSpan={table.getAllColumns().length} className="px-4 py-8 text-center text-muted-foreground">
-                  No rows match this filter.
-                </td>
-              </tr>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 align-middle">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.length === 0 ? (
+                <tr>
+                  <td colSpan={table.getAllColumns().length} className="px-4 py-8 text-center text-muted-foreground">
+                    No rows match this filter.
+                  </td>
+                </tr>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="border-b border-border last:border-b-0 hover:bg-muted/30">
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-3 align-middle">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex flex-col gap-2 border-t border-border bg-muted/15 px-3 py-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Page {table.getState().pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())} ·{' '}
+            {table.getFilteredRowModel().rows.length} row(s)
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-1.5">
+              <span className="sr-only">Rows per page</span>
+              <select
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                value={table.getState().pagination.pageSize}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (!Number.isFinite(n)) return;
+                  table.setPageSize(n);
+                }}
+              >
+                {[10, 25, 50, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n} / page
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                className="rounded-md border border-border bg-background px-2 py-1 hover:bg-muted disabled:opacity-40"
+                disabled={!table.getCanPreviousPage()}
+                onClick={() => table.previousPage()}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-border bg-background px-2 py-1 hover:bg-muted disabled:opacity-40"
+                disabled={!table.getCanNextPage()}
+                onClick={() => table.nextPage()}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
