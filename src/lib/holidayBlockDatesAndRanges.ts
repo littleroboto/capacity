@@ -80,3 +80,72 @@ export function datesFromHolidayBlockDatesAndRanges(
 ): string[] | undefined {
   return expandHolidayBlockDates(block).dates;
 }
+
+/**
+ * Normalised `ranges:` rows for `holiday_calendars.extra_settings` (public or school).
+ */
+export function extractYamlHolidayRangesForStorage(block: Record<string, unknown>): Record<string, unknown>[] | null {
+  const rawRanges = block.ranges;
+  if (!Array.isArray(rawRanges) || rawRanges.length === 0) return null;
+  const out: Record<string, unknown>[] = [];
+  for (const row of rawRanges) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    const from = coerceYamlDateString(r.from ?? r.start ?? r.Start ?? r.from_date ?? r.fromDate);
+    const to = coerceYamlDateString(r.to ?? r.end ?? r.End ?? r.to_date ?? r.toDate);
+    if (!ISO_DAY.test(from) || !ISO_DAY.test(to)) continue;
+    const o: Record<string, unknown> = { from, to };
+    if (r.label != null && String(r.label).trim() !== '') o.label = String(r.label).trim();
+    out.push(o);
+  }
+  return out.length > 0 ? out : null;
+}
+
+/** @deprecated alias — use {@link extractYamlHolidayRangesForStorage} */
+export function extractYamlSchoolRangesForStorage(block: Record<string, unknown>): Record<string, unknown>[] | null {
+  return extractYamlHolidayRangesForStorage(block);
+}
+
+/** Normalised `dates:` list from a holiday block for `extra_settings.yaml_public_dates`. */
+export function extractYamlHolidayExplicitDatesForStorage(block: Record<string, unknown>): string[] | null {
+  const raw = block.dates;
+  if (raw == null || !Array.isArray(raw)) return null;
+  const out: string[] = [];
+  for (const item of raw) {
+    const s = coerceYamlDateString(item);
+    if (ISO_DAY.test(s)) out.push(s);
+  }
+  return out.length > 0 ? [...new Set(out)].sort() : null;
+}
+
+/** Normalise persisted `yaml_*_ranges` JSON for YAML assembly output. */
+export function normalizeStoredYamlHolidayRanges(rangeList: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(rangeList)) return [];
+  const ranges: Record<string, unknown>[] = [];
+  for (const raw of rangeList) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const from = String(r.from ?? r.start ?? '').trim();
+    const to = String(r.to ?? r.end ?? '').trim();
+    if (!ISO_DAY.test(from) || !ISO_DAY.test(to)) continue;
+    const row: Record<string, unknown> = { from, to };
+    if (r.label != null && String(r.label).trim() !== '') row.label = String(r.label).trim();
+    ranges.push(row);
+  }
+  return ranges;
+}
+
+/** All ISO days covered by stored YAML-style range rows. */
+export function datesCoveredByYamlRanges(rangeList: unknown[]): Set<string> {
+  const s = new Set<string>();
+  if (!Array.isArray(rangeList)) return s;
+  for (const raw of rangeList) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const from = String(r.from ?? r.start ?? '').trim();
+    const to = String(r.to ?? r.end ?? '').trim();
+    if (!ISO_DAY.test(from) || !ISO_DAY.test(to)) continue;
+    for (const d of expandIsoInclusiveRange(from, to)) s.add(d);
+  }
+  return s;
+}

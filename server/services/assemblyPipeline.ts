@@ -13,6 +13,10 @@
  * so the existing engine pipeline can consume it unchanged.
  */
 import { createHash } from 'crypto';
+import {
+  datesCoveredByYamlRanges,
+  normalizeStoredYamlHolidayRanges,
+} from '../../src/lib/holidayBlockDatesAndRanges';
 import { supabaseServiceClient } from '../lib/supabaseClient';
 import type {
   AssembledMarketFragments,
@@ -120,6 +124,7 @@ function calNum(cal: Record<string, unknown>, camel: string, snake: string, fall
   return Number.isFinite(n) ? n : fallback;
 }
 
+
 /**
  * Assemble a market's fragments into a YAML-compatible plain object
  * matching the existing MarketConfig YAML schema.
@@ -155,35 +160,43 @@ export function assembleMarketYamlObject(
   }
 
   if (fragments.bauConfig) {
-    const bc = fragments.bauConfig;
+    const bc = fragments.bauConfig as unknown as Record<string, unknown>;
     const bau: Record<string, unknown> = {};
-    if (bc.daysInUse) bau.days_in_use = bc.daysInUse;
-    if (bc.weeklyCycle) {
+    const daysInUse = bc.days_in_use ?? bc.daysInUse;
+    if (daysInUse && Array.isArray(daysInUse)) {
+      bau.days_in_use = daysInUse;
+    }
+    const wc = bc.weekly_cycle ?? bc.weeklyCycle;
+    if (wc && typeof wc === 'object' && !Array.isArray(wc)) {
+      const w = wc as Record<string, unknown>;
       bau.weekly_cycle = {
-        labs_required: bc.weeklyCycle.labsRequired,
-        staff_required: bc.weeklyCycle.staffRequired,
-        support_days: bc.weeklyCycle.supportDays ?? 0,
+        labs_required: w.labs_required ?? w.labsRequired,
+        staff_required: w.staff_required ?? w.staffRequired,
+        support_days: w.support_days ?? w.supportDays ?? 0,
       };
     }
-    if (bc.marketItWeeklyLoad) {
-      const mit: Record<string, unknown> = {};
-      if (bc.marketItWeeklyLoad.weekdayIntensity) {
-        mit.weekday_intensity = bc.marketItWeeklyLoad.weekdayIntensity;
+    const mitRaw = bc.market_it_weekly_load ?? bc.marketItWeeklyLoad;
+    if (mitRaw && typeof mitRaw === 'object' && !Array.isArray(mitRaw)) {
+      const mit = mitRaw as Record<string, unknown>;
+      const wi = mit.weekday_intensity ?? mit.weekdayIntensity;
+      if (wi && typeof wi === 'object' && !Array.isArray(wi)) {
+        bau.market_it_weekly_load = { weekday_intensity: wi };
       }
-      bau.market_it_weekly_load = mit;
     }
     yaml.bau = bau;
   }
 
   if (fragments.nationalLeaveBands.length > 0) {
-    yaml.national_leave_bands = fragments.nationalLeaveBands.map((b) => {
-      const band: Record<string, unknown> = {
-        label: b.label,
-        from: b.fromDate,
-        to: b.toDate,
-      };
-      if (b.capacityMultiplier != null) band.capacity_multiplier = b.capacityMultiplier;
-      if (b.weeks) band.weeks = b.weeks;
+    yaml.national_leave_bands = fragments.nationalLeaveBands.map((rawBand) => {
+      const b = rawBand as unknown as Record<string, unknown>;
+      const label = b.label;
+      const from = b.from_date ?? b.fromDate;
+      const to = b.to_date ?? b.toDate;
+      const capRaw = b.capacity_multiplier ?? b.capacityMultiplier;
+      const band: Record<string, unknown> = { label, from, to };
+      if (capRaw != null && capRaw !== '') band.capacity_multiplier = Number(capRaw);
+      const weeks = b.weeks;
+      if (weeks && Array.isArray(weeks) && weeks.length > 0) band.weeks = weeks;
       return band;
     });
   }
@@ -228,7 +241,6 @@ export function assembleMarketYamlObject(
     const cal = fragments.publicHolidayCalendar as unknown as Record<string, unknown>;
     const pub: Record<string, unknown> = {
       auto: calBool(cal, 'autoImport', 'auto_import'),
-      dates: holidayCalendarEntryDates(cal),
       staffing_multiplier: calNum(cal, 'staffingMultiplier', 'staffing_multiplier', 1.0),
       trading_multiplier: calNum(cal, 'tradingMultiplier', 'trading_multiplier', 1.0),
     };
@@ -241,6 +253,30 @@ export function assembleMarketYamlObject(
     ) {
       pub.load_effects = loadEffects;
     }
+    const extra = cal.extra_settings ?? cal.extraSettings;
+    const e = extra && typeof extra === 'object' && !Array.isArray(extra) ? (extra as Record<string, unknown>) : {};
+    const rangeList = e.yaml_public_ranges;
+    const normalizedRanges = normalizeStoredYamlHolidayRanges(rangeList);
+    if (normalizedRanges.length > 0) {
+      pub.ranges = normalizedRanges;
+    }
+    const storedExplicit = e.yaml_public_dates;
+    const allEntryDates = holidayCalendarEntryDates(cal);
+    let explicitDates: string[];
+    if (Array.isArray(storedExplicit) && storedExplicit.length > 0) {
+      explicitDates = storedExplicit
+        .map((d) => String(d).trim())
+        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+      explicitDates = [...new Set(explicitDates)].sort();
+    } else if (normalizedRanges.length > 0) {
+      const inRange = datesCoveredByYamlRanges(Array.isArray(rangeList) ? rangeList : []);
+      explicitDates = allEntryDates.filter((d) => !inRange.has(d));
+    } else {
+      explicitDates = allEntryDates;
+    }
+    if (explicitDates.length > 0) {
+      pub.dates = explicitDates;
+    }
     yaml.public_holidays = pub;
   }
 
@@ -248,7 +284,6 @@ export function assembleMarketYamlObject(
     const cal = fragments.schoolHolidayCalendar as unknown as Record<string, unknown>;
     const school: Record<string, unknown> = {
       auto: calBool(cal, 'autoImport', 'auto_import'),
-      dates: holidayCalendarEntryDates(cal),
       staffing_multiplier: calNum(cal, 'staffingMultiplier', 'staffing_multiplier', 1.0),
       trading_multiplier: calNum(cal, 'tradingMultiplier', 'trading_multiplier', 1.0),
     };
@@ -261,15 +296,30 @@ export function assembleMarketYamlObject(
     ) {
       school.load_effects = loadEffects;
     }
+    const extra = cal.extra_settings ?? cal.extraSettings;
+    const rangeList =
+      extra && typeof extra === 'object' && !Array.isArray(extra)
+        ? (extra as Record<string, unknown>).yaml_school_ranges
+        : undefined;
+    const normalizedSchoolRanges = normalizeStoredYamlHolidayRanges(rangeList);
+    if (normalizedSchoolRanges.length > 0) {
+      school.ranges = normalizedSchoolRanges;
+    } else {
+      school.dates = holidayCalendarEntryDates(cal);
+    }
     yaml.school_holidays = school;
   }
 
-  if (fragments.marketConfig?.holidaySettings) {
-    const hs = fragments.marketConfig.holidaySettings;
+  const mc = fragments.marketConfig as unknown as Record<string, unknown> | undefined;
+  const hsRaw = mc?.holiday_settings ?? mc?.holidaySettings;
+  if (hsRaw && typeof hsRaw === 'object' && !Array.isArray(hsRaw)) {
+    const hs = hsRaw as Record<string, unknown>;
     const holidays: Record<string, unknown> = {};
-    if (hs.capacityTaperDays != null) holidays.capacity_taper_days = hs.capacityTaperDays;
-    if (hs.labCapacityScale != null) holidays.lab_capacity_scale = hs.labCapacityScale;
-    yaml.holidays = holidays;
+    const ctd = hs.capacity_taper_days ?? hs.capacityTaperDays;
+    const lcs = hs.lab_capacity_scale ?? hs.labCapacityScale;
+    if (ctd != null) holidays.capacity_taper_days = Number(ctd);
+    if (lcs != null) holidays.lab_capacity_scale = Number(lcs);
+    if (Object.keys(holidays).length > 0) yaml.holidays = holidays;
   }
 
   if (fragments.tradingConfig) {
@@ -299,31 +349,57 @@ export function assembleMarketYamlObject(
   }
 
   if (fragments.deploymentRiskConfig) {
-    const drc = fragments.deploymentRiskConfig;
-    if (drc.deploymentRiskWeekWeight != null) {
-      yaml.deployment_risk_week_weight = drc.deploymentRiskWeekWeight;
+    // PostgREST: snake_case + YAML-shaped `id` on events/blackouts; domain types used camelCase aliases.
+    const drc = fragments.deploymentRiskConfig as unknown as Record<string, unknown>;
+    const weekW = drc.deployment_risk_week_weight ?? drc.deploymentRiskWeekWeight;
+    if (weekW != null) yaml.deployment_risk_week_weight = Number(weekW);
+
+    const monthCurve = drc.deployment_risk_month_curve ?? drc.deploymentRiskMonthCurve;
+    if (monthCurve && typeof monthCurve === 'object' && !Array.isArray(monthCurve)) {
+      yaml.deployment_risk_month_curve = monthCurve as Record<string, number>;
     }
-    if (drc.deploymentRiskMonthCurve) {
-      yaml.deployment_risk_month_curve = drc.deploymentRiskMonthCurve;
+    const contextCurve = drc.deployment_risk_context_month_curve ?? drc.deploymentRiskContextMonthCurve;
+    if (contextCurve && typeof contextCurve === 'object' && !Array.isArray(contextCurve)) {
+      yaml.deployment_risk_context_month_curve = contextCurve as Record<string, number>;
     }
-    if (drc.events.length > 0) {
-      yaml.deployment_risk_events = drc.events.map((e) => ({
-        id: e.eventId,
-        start: e.start,
-        end: e.end,
-        severity: e.severity,
-        kind: e.kind,
-      }));
+    const strainW = drc.deployment_resourcing_strain_weight ?? drc.deploymentResourcingStrainWeight;
+    if (strainW != null) yaml.deployment_resourcing_strain_weight = Number(strainW);
+
+    const evs = drc.events;
+    const eventsArr = Array.isArray(evs) ? evs : [];
+    if (eventsArr.length > 0) {
+      yaml.deployment_risk_events = eventsArr.map((raw) => {
+        const e = raw as Record<string, unknown>;
+        const id = e.id ?? e.eventId;
+        const row: Record<string, unknown> = {
+          id,
+          start: e.start,
+          end: e.end,
+          severity: e.severity,
+        };
+        if (e.kind != null && e.kind !== '') row.kind = e.kind;
+        return row;
+      });
     }
-    if (drc.blackouts.length > 0) {
-      yaml.deployment_risk_blackouts = drc.blackouts.map((b) => ({
-        id: b.blackoutId,
-        start: b.start,
-        end: b.end,
-        severity: b.severity,
-        public_reason: b.publicReason,
-        operational_note: b.operationalNote,
-      }));
+
+    const bl = drc.blackouts;
+    const blackoutArr = Array.isArray(bl) ? bl : [];
+    if (blackoutArr.length > 0) {
+      yaml.deployment_risk_blackouts = blackoutArr.map((raw) => {
+        const b = raw as Record<string, unknown>;
+        const id = b.id ?? b.blackoutId;
+        const row: Record<string, unknown> = {
+          id,
+          start: b.start,
+          end: b.end,
+          severity: b.severity,
+        };
+        const pr = b.public_reason ?? b.publicReason;
+        const on = b.operational_note ?? b.operationalNote;
+        if (pr != null && pr !== '') row.public_reason = pr;
+        if (on != null && on !== '') row.operational_note = on;
+        return row;
+      });
     }
   }
 

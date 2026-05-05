@@ -10,7 +10,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
 import { createClient } from '@supabase/supabase-js';
-import { expandHolidayBlockDates } from '../src/lib/holidayBlockDatesAndRanges';
+import {
+  expandHolidayBlockDates,
+  extractYamlHolidayExplicitDatesForStorage,
+  extractYamlHolidayRangesForStorage,
+} from '../src/lib/holidayBlockDatesAndRanges';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -200,6 +204,11 @@ for (const file of yamlFiles) {
   // Public holidays
   if (yamlObj.public_holidays) {
     const ph = yamlObj.public_holidays as Record<string, unknown>;
+    const storedPubRanges = extractYamlHolidayRangesForStorage(ph);
+    const storedPubDates = extractYamlHolidayExplicitDatesForStorage(ph);
+    const pubExtra: Record<string, unknown> = {};
+    if (storedPubRanges) pubExtra.yaml_public_ranges = storedPubRanges;
+    if (storedPubDates) pubExtra.yaml_public_dates = storedPubDates;
     const { data: cal, error: calErr } = await client.from('holiday_calendars').insert({
       ...meta,
       calendar_type: 'public',
@@ -207,7 +216,7 @@ for (const file of yamlFiles) {
       staffing_multiplier: ph.staffing_multiplier ?? 1.0,
       trading_multiplier: ph.trading_multiplier ?? 1.0,
       load_effects: null,
-      extra_settings: {},
+      extra_settings: pubExtra,
     }).select().single();
 
     if (calErr) {
@@ -229,6 +238,7 @@ for (const file of yamlFiles) {
   // School holidays
   if (yamlObj.school_holidays) {
     const sh = yamlObj.school_holidays as Record<string, unknown>;
+    const storedRanges = extractYamlHolidayRangesForStorage(sh);
     const { data: cal, error: calErr } = await client.from('holiday_calendars').insert({
       ...meta,
       calendar_type: 'school',
@@ -236,7 +246,7 @@ for (const file of yamlFiles) {
       staffing_multiplier: sh.staffing_multiplier ?? 1.0,
       trading_multiplier: sh.trading_multiplier ?? 1.0,
       load_effects: sh.load_effects ?? null,
-      extra_settings: {},
+      extra_settings: storedRanges ? { yaml_school_ranges: storedRanges } : {},
     }).select().single();
 
     if (calErr) {

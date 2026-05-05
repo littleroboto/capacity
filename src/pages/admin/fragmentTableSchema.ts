@@ -30,8 +30,9 @@ export function getColumnsForTable(table: string): FragmentSchemaColumn[] {
       ];
     case 'bau_configs':
       return [
-        { key: 'days_in_use', label: 'Days In Use' },
-        { key: 'weekly_cycle', label: 'Weekly Cycle' },
+        { key: 'days_in_use', label: 'Days in use' },
+        { key: 'weekly_cycle', label: 'Weekly cycle' },
+        { key: 'market_it_weekly_load', label: 'IT load' },
       ];
     case 'trading_configs':
       return [
@@ -56,9 +57,15 @@ export function getColumnsForTable(table: string): FragmentSchemaColumn[] {
         { key: 'from_date', label: 'From', editable: true },
         { key: 'to_date', label: 'To', editable: true },
         { key: 'capacity_multiplier', label: 'Multiplier', editable: true },
+        { key: 'weeks', label: 'Weeks' },
       ];
     case 'deployment_risk_configs':
-      return [{ key: 'deployment_risk_week_weight', label: 'Week Weight', editable: true }];
+      return [
+        { key: 'deployment_risk_week_weight', label: 'Week weight', editable: true },
+        { key: 'deployment_resourcing_strain_weight', label: 'Strain weight', editable: true },
+        { key: 'events', label: 'Events' },
+        { key: 'blackouts', label: 'Blackouts' },
+      ];
     case 'operating_window_configs':
       return [
         { key: 'name', label: 'Name', editable: true },

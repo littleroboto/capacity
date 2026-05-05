@@ -126,17 +126,23 @@ export function validateTrading(config: Partial<TradingConfig>): ValidationIssue
 
 export function validateNationalLeaveBand(band: Partial<NationalLeaveBandConfig>): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  const r = band as unknown as Record<string, unknown>;
+  const fromDate = String(r.fromDate ?? r.from_date ?? '').trim();
+  const toDate = String(r.toDate ?? r.to_date ?? '').trim();
+  const capRaw = r.capacityMultiplier ?? r.capacity_multiplier;
+  const capacityMultiplier =
+    capRaw == null || capRaw === '' ? undefined : Number(capRaw);
 
-  if (!band.fromDate) {
+  if (!fromDate) {
     issues.push({ severity: 'error', ruleCode: 'LEAVE_FROM_REQUIRED', message: 'Leave band from date is required', fieldPath: 'fromDate' });
   }
-  if (!band.toDate) {
+  if (!toDate) {
     issues.push({ severity: 'error', ruleCode: 'LEAVE_TO_REQUIRED', message: 'Leave band to date is required', fieldPath: 'toDate' });
   }
-  if (band.fromDate && band.toDate && band.fromDate > band.toDate) {
+  if (fromDate && toDate && fromDate > toDate) {
     issues.push({ severity: 'error', ruleCode: 'LEAVE_DATE_ORDER', message: 'Leave band from date must be before to date', fieldPath: 'fromDate' });
   }
-  if (band.capacityMultiplier != null && (band.capacityMultiplier < 0 || band.capacityMultiplier > 1)) {
+  if (capacityMultiplier != null && Number.isFinite(capacityMultiplier) && (capacityMultiplier < 0 || capacityMultiplier > 1)) {
     issues.push({ severity: 'error', ruleCode: 'LEAVE_MULT_RANGE', message: 'Capacity multiplier must be 0–1', fieldPath: 'capacityMultiplier' });
   }
 

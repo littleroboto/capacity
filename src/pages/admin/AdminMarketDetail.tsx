@@ -30,6 +30,12 @@ import { AdminCampaignCreate } from '@/pages/admin/AdminCampaignCreate';
 import { AdminTechProgrammeCreate } from '@/pages/admin/AdminTechProgrammeCreate';
 import { AdminResourceConfigPanel } from '@/pages/admin/AdminResourceConfigPanel';
 import { AdminTradingConfigPanel } from '@/pages/admin/AdminTradingConfigPanel';
+import { AdminBauConfigPanel } from '@/pages/admin/AdminBauConfigPanel';
+import { AdminNationalLeaveBandsPanel } from '@/pages/admin/AdminNationalLeaveBandsPanel';
+import { AdminDeploymentRiskPanel } from '@/pages/admin/AdminDeploymentRiskPanel';
+import { AdminMarketHolidaySettingsPanel } from '@/pages/admin/AdminMarketHolidaySettingsPanel';
+import { AdminSchoolHolidayRangesPanel } from '@/pages/admin/AdminSchoolHolidayRangesPanel';
+import { AdminPublicHolidayYamlPanel } from '@/pages/admin/AdminPublicHolidayYamlPanel';
 import type { AdminMarketRow } from '@/pages/admin/AdminMarketsDataTable';
 import {
   ADMIN_MARKET_ENTITY_TABS as TABS,
@@ -72,6 +78,24 @@ export function AdminMarketDetail() {
   const [sectionEditorRow, setSectionEditorRow] = useState<Record<string, unknown> | null>(null);
 
   const currentTable = TABS.find(t => t.key === activeTab)?.table || '';
+
+  const schoolHolidayCalendar = useMemo(() => {
+    const active = fragments.filter((f) => String(f.status) !== 'archived');
+    return (
+      active.find((f) => String(f.calendar_type ?? f.calendarType) === 'school') ??
+      fragments.find((f) => String(f.calendar_type ?? f.calendarType) === 'school') ??
+      null
+    );
+  }, [fragments]);
+
+  const publicHolidayCalendar = useMemo(() => {
+    const active = fragments.filter((f) => String(f.status) !== 'archived');
+    return (
+      active.find((f) => String(f.calendar_type ?? f.calendarType) === 'public') ??
+      fragments.find((f) => String(f.calendar_type ?? f.calendarType) === 'public') ??
+      null
+    );
+  }, [fragments]);
 
   useEffect(() => {
     if (!marketId || !entityParam) return;
@@ -355,6 +379,19 @@ export function AdminMarketDetail() {
         <AuditTab events={auditEvents} loading={loading} />
       ) : activeTab === 'holidays' ? (
         <div className="space-y-8">
+          <AdminMarketHolidaySettingsPanel marketId={marketId ?? ''} />
+          <AdminPublicHolidayYamlPanel
+            publicCalendar={publicHolidayCalendar}
+            saving={saving}
+            onPersist={persistFragment}
+            onRefresh={loadFragments}
+          />
+          <AdminSchoolHolidayRangesPanel
+            schoolCalendar={schoolHolidayCalendar}
+            saving={saving}
+            onPersist={persistFragment}
+            onRefresh={loadFragments}
+          />
           <AdminHolidayEntryCreate marketId={marketId ?? ''} onEntriesAdded={loadFragments} />
           <HolidayCalendarsEditor
             fragments={fragments}
@@ -388,6 +425,23 @@ export function AdminMarketDetail() {
           ) : null}
           {activeTab === 'trading' ? (
             <AdminTradingConfigPanel fragments={fragments} saving={saving} onPersist={persistFragment} />
+          ) : null}
+          {activeTab === 'risk' ? (
+            <AdminDeploymentRiskPanel fragments={fragments} saving={saving} onPersist={persistFragment} />
+          ) : null}
+          {activeTab === 'bau' ? (
+            <AdminBauConfigPanel fragments={fragments} saving={saving} onPersist={persistFragment} />
+          ) : null}
+          {activeTab === 'leave' && marketRow ? (
+            <AdminNationalLeaveBandsPanel
+              fragments={fragments}
+              saving={saving}
+              onPersist={persistFragment}
+              market={marketRow}
+              onCreated={() => {
+                void loadFragments();
+              }}
+            />
           ) : null}
           <FragmentTable
             fragments={fragments}

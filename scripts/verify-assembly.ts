@@ -9,7 +9,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yamlLib from 'js-yaml';
 import { createClient } from '@supabase/supabase-js';
-import { expandHolidayBlockDates } from '../src/lib/holidayBlockDatesAndRanges';
+import {
+  datesCoveredByYamlRanges,
+  expandHolidayBlockDates,
+  normalizeStoredYamlHolidayRanges,
+} from '../src/lib/holidayBlockDatesAndRanges';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -197,23 +201,52 @@ async function loadAndAssemble(marketId: string): Promise<Record<string, unknown
 
   if (phc.data) {
     const entries = Array.isArray(phc.data.holiday_entries) ? phc.data.holiday_entries : [];
-    yaml.public_holidays = {
+    const allEntryDates = entries.map((e: Record<string, unknown>) => String(e.holiday_date)).sort();
+    const pub: Record<string, unknown> = {
       auto: phc.data.auto_import,
-      dates: entries.map((e: Record<string, unknown>) => String(e.holiday_date)).sort(),
       staffing_multiplier: Number(phc.data.staffing_multiplier) || 1.0,
       trading_multiplier: Number(phc.data.trading_multiplier) || 1.0,
     };
+    const extra = phc.data.extra_settings as Record<string, unknown> | undefined;
+    const rangeList = extra?.yaml_public_ranges;
+    const normalizedRanges = normalizeStoredYamlHolidayRanges(rangeList);
+    if (normalizedRanges.length > 0) {
+      pub.ranges = normalizedRanges;
+    }
+    const storedExplicit = extra?.yaml_public_dates;
+    let explicitDates: string[];
+    if (Array.isArray(storedExplicit) && storedExplicit.length > 0) {
+      explicitDates = storedExplicit
+        .map((d) => String(d).trim())
+        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+      explicitDates = [...new Set(explicitDates)].sort();
+    } else if (normalizedRanges.length > 0) {
+      const inRange = datesCoveredByYamlRanges(Array.isArray(rangeList) ? rangeList : []);
+      explicitDates = allEntryDates.filter((d) => !inRange.has(d));
+    } else {
+      explicitDates = allEntryDates;
+    }
+    if (explicitDates.length > 0) {
+      pub.dates = explicitDates;
+    }
+    yaml.public_holidays = pub;
   }
 
   if (shc.data) {
     const entries = Array.isArray(shc.data.holiday_entries) ? shc.data.holiday_entries : [];
     const school: Record<string, unknown> = {
       auto: shc.data.auto_import,
-      dates: entries.map((e: Record<string, unknown>) => String(e.holiday_date)).sort(),
       staffing_multiplier: Number(shc.data.staffing_multiplier) || 1.0,
       trading_multiplier: Number(shc.data.trading_multiplier) || 1.0,
     };
     if (shc.data.load_effects) school.load_effects = shc.data.load_effects;
+    const extra = shc.data.extra_settings as Record<string, unknown> | undefined;
+    const rangeList = extra?.yaml_school_ranges;
+    if (Array.isArray(rangeList) && rangeList.length > 0) {
+      school.ranges = rangeList;
+    } else {
+      school.dates = entries.map((e: Record<string, unknown>) => String(e.holiday_date)).sort();
+    }
     yaml.school_holidays = school;
   }
 
