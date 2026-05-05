@@ -273,15 +273,28 @@ export function assembleMarketYamlObject(
   }
 
   if (fragments.tradingConfig) {
-    const tc = fragments.tradingConfig;
+    // PostgREST returns snake_case; domain types use camelCase — accept both.
+    const tc = fragments.tradingConfig as unknown as Record<string, unknown>;
     const trading: Record<string, unknown> = {};
-    if (tc.weeklyPattern) trading.weekly_pattern = tc.weeklyPattern;
-    if (tc.monthlyPattern) trading.monthly_pattern = tc.monthlyPattern;
-    if (tc.seasonal) trading.seasonal = tc.seasonal;
-    if (tc.campaignStoreBoostPrep != null) trading.campaign_store_boost_prep = tc.campaignStoreBoostPrep;
-    if (tc.campaignStoreBoostLive != null) trading.campaign_store_boost_live = tc.campaignStoreBoostLive;
-    if (tc.campaignEffectScale != null) trading.campaign_effect_scale = tc.campaignEffectScale;
-    if (tc.paydayMonthPeakMultiplier != null) trading.payday_month_peak_multiplier = tc.paydayMonthPeakMultiplier;
+    const weekly = tc.weekly_pattern ?? tc.weeklyPattern;
+    const monthly = tc.monthly_pattern ?? tc.monthlyPattern;
+    if (weekly && typeof weekly === 'object' && !Array.isArray(weekly)) {
+      trading.weekly_pattern = weekly;
+    }
+    if (monthly && typeof monthly === 'object' && !Array.isArray(monthly)) {
+      trading.monthly_pattern = monthly;
+    }
+    if (tc.seasonal && typeof tc.seasonal === 'object' && !Array.isArray(tc.seasonal)) {
+      trading.seasonal = tc.seasonal;
+    }
+    const prep = tc.campaign_store_boost_prep ?? tc.campaignStoreBoostPrep;
+    const live = tc.campaign_store_boost_live ?? tc.campaignStoreBoostLive;
+    const effect = tc.campaign_effect_scale ?? tc.campaignEffectScale;
+    const payday = tc.payday_month_peak_multiplier ?? tc.paydayMonthPeakMultiplier;
+    if (prep != null) trading.campaign_store_boost_prep = prep;
+    if (live != null) trading.campaign_store_boost_live = live;
+    if (effect != null) trading.campaign_effect_scale = effect;
+    if (payday != null) trading.payday_month_peak_multiplier = payday;
     yaml.trading = trading;
   }
 

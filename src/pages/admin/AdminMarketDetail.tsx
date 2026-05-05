@@ -29,6 +29,7 @@ import {
 import { AdminCampaignCreate } from '@/pages/admin/AdminCampaignCreate';
 import { AdminTechProgrammeCreate } from '@/pages/admin/AdminTechProgrammeCreate';
 import { AdminResourceConfigPanel } from '@/pages/admin/AdminResourceConfigPanel';
+import { AdminTradingConfigPanel } from '@/pages/admin/AdminTradingConfigPanel';
 import type { AdminMarketRow } from '@/pages/admin/AdminMarketsDataTable';
 import {
   ADMIN_MARKET_ENTITY_TABS as TABS,
@@ -384,6 +385,9 @@ export function AdminMarketDetail() {
           ) : null}
           {activeTab === 'resources' ? (
             <AdminResourceConfigPanel fragments={fragments} saving={saving} onPersist={persistFragment} />
+          ) : null}
+          {activeTab === 'trading' ? (
+            <AdminTradingConfigPanel fragments={fragments} saving={saving} onPersist={persistFragment} />
           ) : null}
           <FragmentTable
             fragments={fragments}

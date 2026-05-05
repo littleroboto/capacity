@@ -35,9 +35,13 @@ export function getColumnsForTable(table: string): FragmentSchemaColumn[] {
       ];
     case 'trading_configs':
       return [
-        { key: 'campaign_effect_scale', label: 'Effect Scale', editable: true },
-        { key: 'payday_month_peak_multiplier', label: 'Payday Mult', editable: true },
-        { key: 'campaign_store_boost_live', label: 'Boost Live', editable: true },
+        { key: 'campaign_store_boost_prep', label: 'Boost prep', editable: true },
+        { key: 'campaign_store_boost_live', label: 'Boost live', editable: true },
+        { key: 'campaign_effect_scale', label: 'Effect scale', editable: true },
+        { key: 'payday_month_peak_multiplier', label: 'Payday mult', editable: true },
+        { key: 'monthly_pattern', label: 'Monthly' },
+        { key: 'weekly_pattern', label: 'Weekly' },
+        { key: 'seasonal', label: 'Seasonal' },
       ];
     case 'holiday_calendars':
       return [
