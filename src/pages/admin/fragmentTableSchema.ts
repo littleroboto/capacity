@@ -25,6 +25,8 @@ export function getColumnsForTable(table: string): FragmentSchemaColumn[] {
         { key: 'labs_capacity', label: 'Labs', editable: true },
         { key: 'staff_capacity', label: 'Staff', editable: true },
         { key: 'testing_capacity', label: 'Testing', editable: true },
+        { key: 'staff_monthly_pattern_basis', label: 'Staff basis' },
+        { key: 'staff_monthly_pattern', label: 'Staff monthly' },
       ];
     case 'bau_configs':
       return [

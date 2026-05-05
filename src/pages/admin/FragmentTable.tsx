@@ -84,8 +84,9 @@ type FragmentTableMeta = {
   setEditValues: Dispatch<SetStateAction<Record<string, unknown>>>;
   startEdit: (frag: Record<string, unknown>) => void;
   saving: string | null;
-  onSave: (fragment: Record<string, unknown>, updates: Record<string, unknown>) => void;
+  onSave: (fragment: Record<string, unknown>, updates: Record<string, unknown>) => void | Promise<void>;
   onArchive: (fragment: Record<string, unknown>) => void;
+  onOpenSectionEditor?: (fragment: Record<string, unknown>) => void;
 };
 
 export function FragmentTableSkeleton({ table }: { table: string }) {
@@ -133,6 +134,7 @@ export function FragmentTable({
   saving,
   onSave,
   onArchive,
+  onOpenSectionEditor,
 }: {
   fragments: Record<string, unknown>[];
   loading: boolean;
@@ -140,8 +142,9 @@ export function FragmentTable({
   /** Key for persisted column visibility (per market + URL entity + fragment table name). */
   prefsScope: { marketId: string; entity: string };
   saving: string | null;
-  onSave: (fragment: Record<string, unknown>, updates: Record<string, unknown>) => void;
+  onSave: (fragment: Record<string, unknown>, updates: Record<string, unknown>) => void | Promise<void>;
   onArchive: (fragment: Record<string, unknown>) => void;
+  onOpenSectionEditor?: (fragment: Record<string, unknown>) => void;
 }) {
   const [showArchived, setShowArchived] = useState(false);
   const visible = useMemo(
@@ -317,9 +320,15 @@ export function FragmentTable({
                 <button
                   type="button"
                   onClick={() => {
-                    meta.onSave(frag, meta.editValues);
-                    meta.setEditingRowId(null);
-                    meta.setEditValues({});
+                    void (async () => {
+                      try {
+                        await Promise.resolve(meta.onSave(frag, meta.editValues));
+                        meta.setEditingRowId(null);
+                        meta.setEditValues({});
+                      } catch {
+                        /* Parent shows error; keep row in edit mode */
+                      }
+                    })();
                   }}
                   disabled={rowSaving}
                   className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
@@ -355,15 +364,25 @@ export function FragmentTable({
                     <MoreHorizontal className="h-4 w-4 opacity-80" aria-hidden />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuContent align="end" className="min-w-[11rem]">
                   <DropdownMenuItem
                     className="text-sm"
                     onSelect={() => {
                       meta.startEdit(frag);
                     }}
                   >
-                    Edit
+                    Quick edit
                   </DropdownMenuItem>
+                  {meta.onOpenSectionEditor ? (
+                    <DropdownMenuItem
+                      className="text-sm"
+                      onSelect={() => {
+                        meta.onOpenSectionEditor?.(frag);
+                      }}
+                    >
+                      Full YAML fields…
+                    </DropdownMenuItem>
+                  ) : null}
                   {canArchive ? (
                     <DropdownMenuItem
                       className="text-sm"
@@ -396,8 +415,9 @@ export function FragmentTable({
       saving,
       onSave,
       onArchive,
+      onOpenSectionEditor,
     }),
-    [schema, editingRowId, editValues, saving, onSave, onArchive, startEdit]
+    [schema, editingRowId, editValues, saving, onSave, onArchive, onOpenSectionEditor, startEdit]
   );
 
   useEffect(() => {

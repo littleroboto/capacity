@@ -28,6 +28,7 @@ import {
 } from '@/lib/adminApi';
 import { AdminCampaignCreate } from '@/pages/admin/AdminCampaignCreate';
 import { AdminTechProgrammeCreate } from '@/pages/admin/AdminTechProgrammeCreate';
+import { AdminResourceConfigPanel } from '@/pages/admin/AdminResourceConfigPanel';
 import type { AdminMarketRow } from '@/pages/admin/AdminMarketsDataTable';
 import {
   ADMIN_MARKET_ENTITY_TABS as TABS,
@@ -36,6 +37,8 @@ import {
   isAdminMarketEntityKey,
 } from '@/pages/admin/adminMarketTabs';
 import { FragmentTable, SortHeader } from '@/pages/admin/FragmentTable';
+import { FragmentSectionEditorSheet } from '@/pages/admin/FragmentSectionEditorSheet';
+import { FRAGMENT_FULL_EDITOR_TABLES } from '@/pages/admin/fragmentSectionEditorDraft';
 import { AdminMarketYamlMonacoEditor } from '@/components/AdminMarketYamlMonacoEditor';
 
 export function AdminMarketDetail() {
@@ -63,6 +66,9 @@ export function AdminMarketDetail() {
 
   // Audit state
   const [auditEvents, setAuditEvents] = useState<Record<string, unknown>[]>([]);
+
+  /** Row opened in the full-section YAML dialog (table = current fragment table for that tab). */
+  const [sectionEditorRow, setSectionEditorRow] = useState<Record<string, unknown> | null>(null);
 
   const currentTable = TABS.find(t => t.key === activeTab)?.table || '';
 
@@ -109,6 +115,10 @@ export function AdminMarketDetail() {
   }, [marketId]);
 
   useEffect(() => {
+    setSectionEditorRow(null);
+  }, [activeTab]);
+
+  useEffect(() => {
     if (activeTab === 'build') {
       if (!marketId) return;
       setBuildLoading(true);
@@ -132,27 +142,38 @@ export function AdminMarketDetail() {
     return Number.isFinite(n) ? n : NaN;
   };
 
-  const handleSave = async (fragment: Record<string, unknown>, updates: Record<string, unknown>) => {
-    const id = fragment.id as string;
-    setSaving(id);
-    setSaveMessage(null);
-    try {
-      await updateFragmentApi(currentTable, id, {
-        ...updates,
-        expectedVersion: fragmentVersion(fragment),
-      });
-      setSaveMessage({ type: 'success', text: 'Saved successfully' });
-      await loadFragments();
-    } catch (e) {
-      const err = e as Error & { code?: string };
-      setSaveMessage({
-        type: 'error',
-        text: err.code === 'conflict' ? 'Conflict: someone else edited this. Reload and try again.' : err.message,
-      });
-    } finally {
-      setSaving(null);
-    }
-  };
+  const persistFragment = useCallback(
+    async (fragment: Record<string, unknown>, updates: Record<string, unknown>) => {
+      const id = fragment.id as string;
+      setSaving(id);
+      setSaveMessage(null);
+      try {
+        await updateFragmentApi(currentTable, id, {
+          ...updates,
+          expectedVersion: fragmentVersion(fragment),
+        });
+        setSaveMessage({ type: 'success', text: 'Saved successfully' });
+        await loadFragments();
+      } catch (e) {
+        const err = e as Error & { code?: string };
+        setSaveMessage({
+          type: 'error',
+          text: err.code === 'conflict' ? 'Conflict: someone else edited this. Reload and try again.' : err.message,
+        });
+        throw err;
+      } finally {
+        setSaving(null);
+      }
+    },
+    [currentTable, loadFragments],
+  );
+
+  const handleSave = useCallback(
+    async (fragment: Record<string, unknown>, updates: Record<string, unknown>) => {
+      await persistFragment(fragment, updates);
+    },
+    [persistFragment],
+  );
 
   const handleArchive = async (fragment: Record<string, unknown>) => {
     const id = fragment.id as string;
@@ -307,6 +328,17 @@ export function AdminMarketDetail() {
         </div>
       )}
 
+      <FragmentSectionEditorSheet
+        open={sectionEditorRow !== null && FRAGMENT_FULL_EDITOR_TABLES.has(currentTable)}
+        onOpenChange={(next) => {
+          if (!next) setSectionEditorRow(null);
+        }}
+        table={currentTable}
+        fragment={sectionEditorRow}
+        saving={sectionEditorRow != null && saving === String(sectionEditorRow.id)}
+        onSave={persistFragment}
+      />
+
       {/* Tab content — section nav lives in AdminLayout sidebar */}
 
       {activeTab === 'build' ? (
@@ -350,6 +382,9 @@ export function AdminMarketDetail() {
               }}
             />
           ) : null}
+          {activeTab === 'resources' ? (
+            <AdminResourceConfigPanel fragments={fragments} saving={saving} onPersist={persistFragment} />
+          ) : null}
           <FragmentTable
             fragments={fragments}
             loading={loading}
@@ -358,6 +393,11 @@ export function AdminMarketDetail() {
             saving={saving}
             onSave={handleSave}
             onArchive={handleArchive}
+            onOpenSectionEditor={
+              FRAGMENT_FULL_EDITOR_TABLES.has(currentTable)
+                ? (f) => setSectionEditorRow(f)
+                : undefined
+            }
           />
         </>
       )}
